@@ -1,0 +1,13 @@
+# Godot
+.godot/
+*.import
+export_presets.cfg
+.export_credentials/
+# 빌드 산출물
+build/
+*.aab
+*.apk
+*.ipa
+# OS/편집기
+.DS_Store
+Thumbs.db
