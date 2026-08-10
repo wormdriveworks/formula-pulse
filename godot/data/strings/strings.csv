@@ -1,0 +1,68 @@
+key,ko
+ui.symbol.slipstream,슬립스트림
+ui.symbol.braking,브레이킹
+ui.symbol.line,라인
+ui.symbol.pulse,펄스
+ui.symbol.trouble,트러블
+ui.symbol.chance,찬스
+ui.circuit.debug01,디버그 서킷
+ui.team.axion,악시온
+ui.team.vulka,불카
+ui.team.gryphon,그리폰
+ui.team.silvertrail,실버트레일
+ui.team.cometworks,코멧 웍스
+ui.team.northwind,노스윈드
+ui.rival.lorentz,빅터 로렌츠
+ui.rival.maro,셀린 마로
+ui.rival.diaz,라몬 디아스
+ui.rival.volkova,키라 볼코바
+ui.rival.holloway,에드가 홀로웨이
+ui.rival.bianca,비앙카 그리폰
+ui.rival.sherwood,카이 셔우드
+ui.rival.jude,주드 오카포
+ui.race.fillerName,No.{number} 머신
+ui.race.playerName,플레이어
+ui.debug.title,MS-1 디버그 레이스
+ui.debug.spin,스핀
+ui.debug.confirm,확정
+ui.debug.holdRespin,홀드·리스핀
+ui.debug.negateTrouble,트러블 무효화
+ui.debug.boostPlus,부스트 +1
+ui.debug.lap,랩
+ui.debug.sector,섹터
+ui.debug.position,포지션
+ui.debug.chassis,섀시
+ui.debug.charge,차지
+ui.debug.frontGauge,전방 게이지
+ui.debug.rearGauge,후방 게이지
+ui.debug.timer,잔여 시간
+ui.debug.newRace,새 GP
+ui.debug.saveSnapshot,스냅샷 저장
+ui.debug.loadSnapshot,스냅샷 로드
+ui.debug.standings,순위표
+raceLog.gpStart01,{circuit} — 그리드 정렬 완료.
+raceLog.sectorStart01,랩 {lap} 섹터 {sector} 진입.
+raceLog.overtakeSuccess01,{target} 추월. 포지션 {rank}.
+raceLog.overtakeFail01,추월 불발. 대열 유지.
+raceLog.defendSuccess01,{target}의 공세를 막아냈다.
+raceLog.defendFail01,{target}에게 자리를 내줬다.
+raceLog.troubleHit01,머신 이상. 섀시 {amount}.
+raceLog.stableSector01,안정 주행. 차지 +{amount}.
+raceLog.duelStartOvertake01,추월 듀얼 — 상대 {target}.
+raceLog.duelStartDefense01,방어 듀얼 — 상대 {target}.
+raceLog.duelWin01,듀얼 승리. 차지 +{amount}.
+raceLog.duelLoseOvertake01,듀얼 패배. 섀시 {amount}.
+raceLog.duelLoseDefense01,듀얼 패배. 피추월.
+raceLog.chanceProc01,결정적 순간이 열린다.
+raceLog.chanceDuel01,찬스 3매치 — 즉시 듀얼.
+raceLog.momentum01,흐름을 탔다. 전방 +{amount}.
+raceLog.aiRetire01,{target} 리타이어.
+raceLog.playerRetire01,섀시 한계. 리타이어.
+raceLog.gpFinish01,체커. 최종 {rank}위.
+raceLog.timeout01,머신이 코너에 진입해버렸다.
+vane.brief.sector01,섹터 {sector}. 변수 감시 중.
+vane.brief.provisional01,전개 후보 산출.
+vane.brief.holdRespin01,후보 고정. 잔여 재연산.
+vane.brief.negate01,트러블 변수 소거.
+vane.brief.timeout01,궤도 재계산. 계속합니다.
+vane.brief.duel01,결판 국면. 연산 집중.

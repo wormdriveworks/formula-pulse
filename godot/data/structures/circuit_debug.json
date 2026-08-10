@@ -1,0 +1,7 @@
+{
+	"schema_version": 1,
+	"id": "circuit_debug01",
+	"name_key": "ui.circuit.debug01",
+	"laps": 3,
+	"sectors_per_lap": 4
+}

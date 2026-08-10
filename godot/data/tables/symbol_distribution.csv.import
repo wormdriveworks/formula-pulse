@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://c8tei5xwn61ea"
+
+[deps]
+
+files=["res://data/tables/symbol_distribution.class.translation", "res://data/tables/symbol_distribution.name.translation", "res://data/tables/symbol_distribution.prob.translation", "res://data/tables/symbol_distribution.prob.translation", "res://data/tables/symbol_distribution.prob.translation"]
+
+source_file="res://data/tables/symbol_distribution.csv"
+dest_files=["res://data/tables/symbol_distribution.class.translation", "res://data/tables/symbol_distribution.name.translation", "res://data/tables/symbol_distribution.prob.translation", "res://data/tables/symbol_distribution.prob.translation", "res://data/tables/symbol_distribution.prob.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

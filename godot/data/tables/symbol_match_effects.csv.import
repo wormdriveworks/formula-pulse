@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dkeyxovxx3ex6"
+
+[deps]
+
+files=["res://data/tables/symbol_match_effects.symbol.translation", "res://data/tables/symbol_match_effects.match.translation", "res://data/tables/symbol_match_effects.front.translation", "res://data/tables/symbol_match_effects.rear.translation", "res://data/tables/symbol_match_effects.charge.translation", "res://data/tables/symbol_match_effects.chassis.translation", "res://data/tables/symbol_match_effects.special.translation"]
+
+source_file="res://data/tables/symbol_match_effects.csv"
+dest_files=["res://data/tables/symbol_match_effects.symbol.translation", "res://data/tables/symbol_match_effects.match.translation", "res://data/tables/symbol_match_effects.front.translation", "res://data/tables/symbol_match_effects.rear.translation", "res://data/tables/symbol_match_effects.charge.translation", "res://data/tables/symbol_match_effects.chassis.translation", "res://data/tables/symbol_match_effects.special.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

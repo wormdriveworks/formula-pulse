@@ -1,0 +1,7 @@
+id,name_key,pace_add,aggression_add,stability_add,rush_lap_final_add,pressure_mult
+team_axion,ui.team.axion,0,0,0.5,0,1.0
+team_vulka,ui.team.vulka,0,0.5,-0.5,0,1.3
+team_gryphon,ui.team.gryphon,0,0,0.3,0.3,1.0
+team_silvertrail,ui.team.silvertrail,0,0,0,0,1.0
+team_cometworks,ui.team.cometworks,0,0,0,0,1.0
+team_northwind,ui.team.northwind,0,0,0,0,1.0

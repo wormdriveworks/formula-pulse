@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://hki48aorkggw"
+
+[deps]
+
+files=["res://data/tables/ai_rivals.name.translation", "res://data/tables/ai_rivals.team.translation", "res://data/tables/ai_rivals.pace.translation", "res://data/tables/ai_rivals.aggression.translation", "res://data/tables/ai_rivals.rush.translation", "res://data/tables/ai_rivals.rush.translation", "res://data/tables/ai_rivals.rush.translation", "res://data/tables/ai_rivals.stability.translation", "res://data/tables/ai_rivals.start.translation", "res://data/tables/ai_rivals.form.translation", "res://data/tables/ai_rivals.duel.translation", "res://data/tables/ai_rivals.duel.translation"]
+
+source_file="res://data/tables/ai_rivals.csv"
+dest_files=["res://data/tables/ai_rivals.name.translation", "res://data/tables/ai_rivals.team.translation", "res://data/tables/ai_rivals.pace.translation", "res://data/tables/ai_rivals.aggression.translation", "res://data/tables/ai_rivals.rush.translation", "res://data/tables/ai_rivals.rush.translation", "res://data/tables/ai_rivals.rush.translation", "res://data/tables/ai_rivals.stability.translation", "res://data/tables/ai_rivals.start.translation", "res://data/tables/ai_rivals.form.translation", "res://data/tables/ai_rivals.duel.translation", "res://data/tables/ai_rivals.duel.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

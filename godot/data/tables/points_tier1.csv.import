@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dlmyn6o63kjqr"
+
+[deps]
+
+files=["res://data/tables/points_tier1.position.translation", "res://data/tables/points_tier1.points.translation"]
+
+source_file="res://data/tables/points_tier1.csv"
+dest_files=["res://data/tables/points_tier1.position.translation", "res://data/tables/points_tier1.points.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

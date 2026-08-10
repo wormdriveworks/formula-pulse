@@ -1,0 +1,16 @@
+{
+	"schema_version": 1,
+	"id": "grid_debug01",
+	"rivals": [
+		"ai_lorentz",
+		"ai_maro",
+		"ai_diaz",
+		"ai_volkova",
+		"ai_holloway",
+		"ai_bianca",
+		"ai_sherwood",
+		"ai_jude"
+	],
+	"filler_count": 7,
+	"player_start_position": 16
+}

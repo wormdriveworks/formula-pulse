@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dj582eeba1mwc"
+
+[deps]
+
+files=["res://data/tables/duel_conversion.symbol.translation", "res://data/tables/duel_conversion.mode.translation", "res://data/tables/duel_conversion.match1.translation", "res://data/tables/duel_conversion.match2.translation", "res://data/tables/duel_conversion.match3.translation", "res://data/tables/duel_conversion.per.translation"]
+
+source_file="res://data/tables/duel_conversion.csv"
+dest_files=["res://data/tables/duel_conversion.symbol.translation", "res://data/tables/duel_conversion.mode.translation", "res://data/tables/duel_conversion.match1.translation", "res://data/tables/duel_conversion.match2.translation", "res://data/tables/duel_conversion.match3.translation", "res://data/tables/duel_conversion.per.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

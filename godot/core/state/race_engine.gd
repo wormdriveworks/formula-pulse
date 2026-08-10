@@ -1,0 +1,740 @@
+# 레이스 엔진 — GP 상태 머신 + 턴 시퀀스 T1~T6 + 정산 8단계 (D05 §2~§5 · D12 §3).
+# 순수 로직 계층: UI·플랫폼·프레임 무접촉 (혼입 0 / 프레임 의존 로직 금지 — 불변규칙 1·8).
+# 전 수치는 GameData(D13) 경유 — 코드 내 수치 임의 기입 없음 (불변규칙 2).
+#
+# 봉인 규칙 (D12 §6.3 / 불변규칙 5): 스핀 결과는 T2 커밋 시점에 내부 확정되지만,
+# 본 엔진은 어떤 출력 경로에도 자발 노출하지 않는다 — 노출 타이밍(릴 정지 연출 완료 후)은
+# 표시 층이 get_provisional() 호출 시점으로 통제한다.
+class_name RaceEngine
+extends RefCounted
+
+const PLAYER_ID := "player"
+
+var data: GameData
+var rng: RngService
+
+var gp_state: int = RaceTypes.GpState.GP_START
+var turn_phase: int = RaceTypes.TurnPhase.T1_SECTOR_OPEN
+
+# 진행 카운터
+var lap: int = 0
+var sector: int = 0
+var turn_number: int = 0
+var duel_count: int = 0
+var ai_retire_count: int = 0
+var _retire_order: int = 0
+
+# 참가자 — id -> 상태 사전 / positions[i] = P(i+1)의 id
+var entrants: Dictionary = {}
+var positions: Array = []
+
+# 플레이어 자원 (D05 §6.2·§8 — 인게임 자원은 차지·섀시 이원이 전부)
+var chassis: float = 0.0
+var charge: int = 0
+var front_gauge: float = 0.0
+var rear_gauge: float = 0.0
+var front_target: String = ""
+var rear_target: String = ""
+
+# 턴 내부 상태
+var provisional: Array = []          # 심볼 id 3개 (T3 전개 후보)
+var hold_used: bool = false          # 홀드/리스핀 턴당 1회 (D05 §5.4)
+var negated_troubles: int = 0
+var duel_boost: int = 0
+var pending_duel: int = RaceTypes.DuelType.NONE
+var duel_opponent: String = ""
+var current_turn_is_duel: bool = false
+var _armed_duel: int = RaceTypes.DuelType.NONE
+
+var finished: bool = false
+var result: Dictionary = {}
+
+
+func setup(game_data: GameData, rng_service: RngService) -> void:
+	data = game_data
+	rng = rng_service
+
+
+# ── 상태 전이 (전이 표 강제 — 미정의 전이 = 에러) ──
+func _transition(next_state: int) -> void:
+	var allowed: Array = RaceTypes.TRANSITIONS[gp_state]
+	if not allowed.has(next_state):
+		push_error("RaceEngine: undefined transition %d -> %d" % [gp_state, next_state])
+		return
+	gp_state = next_state
+
+
+# ── GP_START: 그리드 정렬·리소스 초기화 (D05 §3) ──
+func start_gp() -> Array:
+	var events: Array = []
+	gp_state = RaceTypes.GpState.GP_START
+	lap = 1
+	sector = 0
+	turn_number = 0
+	duel_count = 0
+	ai_retire_count = 0
+	_retire_order = 0
+	chassis = data.param("param_chassis_max")
+	charge = 0
+	front_gauge = 0.0
+	rear_gauge = 0.0
+	pending_duel = RaceTypes.DuelType.NONE
+	finished = false
+	result = {}
+	_build_entrants()
+	_build_start_grid()
+	_retarget(true, true)
+	events.append(_ev("T5", "raceLog.gpStart01", {"circuit": data.circuit.get("name_key", "")}))
+	_transition(RaceTypes.GpState.LAP_LOOP)
+	return events
+
+
+func _build_entrants() -> void:
+	entrants.clear()
+	entrants[PLAYER_ID] = {
+		"id": PLAYER_ID, "name_key": "ui.race.playerName", "is_player": true, "is_filler": false,
+		"pace": 0.0, "aggression": 0.0, "stability": 0.0,
+		"rush_lap1": 0.0, "rush_lap_final": 0.0, "rush_roll": 0.0,
+		"start_mod": 3.0, "form": 0.0, "pressure_mult": 1.0,
+		"duel_overtake_add": 0.0, "duel_defense_override": -1.0,
+		"retired": false, "retire_order": -1, "number": 13,
+	}
+	for row in data.rivals:
+		if not data.grid.get("rivals", []).has(String(row["id"])):
+			continue
+		var team: Dictionary = data.teams.get(String(row["team_id"]), {})
+		var form_var := CsvTable.to_float(String(row["form_var"]))
+		var rush_random := CsvTable.to_float(String(row["rush_random"]))
+		entrants[String(row["id"])] = {
+			"id": String(row["id"]), "name_key": String(row["name_key"]), "is_player": false, "is_filler": false,
+			"pace": CsvTable.to_float(String(row["pace"])) + CsvTable.to_float(String(team.get("pace_add", "0"))),
+			"aggression": CsvTable.to_float(String(row["aggression"])) + CsvTable.to_float(String(team.get("aggression_add", "0"))),
+			"stability": CsvTable.to_float(String(row["stability"])) + CsvTable.to_float(String(team.get("stability_add", "0"))),
+			"seed_aggression": CsvTable.to_float(String(row["aggression"])),
+			"seed_stability": CsvTable.to_float(String(row["stability"])),
+			"rush_lap1": CsvTable.to_float(String(row["rush_lap1"])),
+			"rush_lap_final": CsvTable.to_float(String(row["rush_lap_final"])) + CsvTable.to_float(String(team.get("rush_lap_final_add", "0"))),
+			"rush_roll": rng.randf_range("ai", -rush_random, rush_random) if rush_random > 0.0 else 0.0,
+			"start_mod": CsvTable.to_float(String(row["start_mod"])),
+			"form": rng.randf_range("ai", -form_var, form_var) if form_var > 0.0 else 0.0,
+			"pressure_mult": CsvTable.to_float(String(team.get("pressure_mult", "1")), 1.0),
+			"duel_overtake_add": CsvTable.to_float(String(row["duel_overtake_add"])),
+			"duel_defense_override": CsvTable.to_float(String(row["duel_defense_override"]), -1.0),
+			"retired": false, "retire_order": -1, "number": 0,
+		}
+	var filler_var := data.param("param_filler_stat_var")
+	var filler_form := data.param("param_form_var_filler")
+	for i in range(int(data.grid.get("filler_count", 0))):
+		var filler_id := "filler_%02d" % (i + 1)
+		entrants[filler_id] = {
+			"id": filler_id, "name_key": "ui.race.fillerName", "is_player": false, "is_filler": true,
+			"pace": 3.0 + rng.randf_range("ai", -filler_var, filler_var),
+			"aggression": 3.0 + rng.randf_range("ai", -filler_var, filler_var),
+			"stability": 3.0 + rng.randf_range("ai", -filler_var, filler_var),
+			"seed_aggression": 3.0, "seed_stability": 3.0,
+			"rush_lap1": 0.0, "rush_lap_final": 0.0, "rush_roll": 0.0,
+			"start_mod": 3.0,
+			"form": rng.randf_range("ai", -filler_form, filler_form),
+			"pressure_mult": 1.0,
+			"duel_overtake_add": 0.0, "duel_defense_override": -1.0,
+			"retired": false, "retire_order": -1, "number": 20 + i + 1,
+		}
+
+
+# 시작 그리드 (D13 별첨A §6.3): 게임 최초 GP = 플레이어 P16 고정.
+# AI 기준 순위 = 합성 페이스 내림차순 [가안 — MS-1 단독 GP: 챔피언십 순위 부재] + 개별 시작 보정.
+func _build_start_grid() -> void:
+	var mod_coef := data.param("param_grid_start_mod_coef")
+	var ai_list: Array = []
+	for id in entrants:
+		if id == PLAYER_ID:
+			continue
+		ai_list.append(id)
+	ai_list.sort_custom(func(a, b): return entrants[a]["pace"] > entrants[b]["pace"])
+	var scored: Array = []
+	for i in range(ai_list.size()):
+		var id: String = ai_list[i]
+		# 개별 시작 보정 = (시작 보정 − 3) × 0.5 포지션 전진 (마로 5.0 → 1칸 전진 — 별첨A §6.3)
+		var score := float(i) - (float(entrants[id]["start_mod"]) - 3.0) * mod_coef
+		scored.append({"id": id, "score": score, "tie": i})
+	scored.sort_custom(func(a, b):
+		if a["score"] == b["score"]:
+			return a["tie"] < b["tie"]
+		return a["score"] < b["score"])
+	positions.clear()
+	for entry in scored:
+		positions.append(entry["id"])
+	var player_pos := int(data.grid.get("player_start_position", 16))
+	positions.insert(clampi(player_pos - 1, 0, positions.size()), PLAYER_ID)
+
+
+# ── 턴 개시 (T1) — 듀얼 = 섹터 비소모 삽입 턴 (D05 §2.2 "+듀얼 삽입 시 가변" · D13 §4.1 산술 정합) ──
+func begin_turn() -> Dictionary:
+	if finished:
+		return {"type": "finished"}
+	var info := {}
+	if pending_duel != RaceTypes.DuelType.NONE:
+		_transition(RaceTypes.GpState.DUEL)
+		current_turn_is_duel = true
+		info = {
+			"type": "duel",
+			"duel_type": pending_duel,
+			"opponent": duel_opponent,
+			"lap": lap, "sector": sector,
+			"events": [_ev("T1", "vane.brief.duel01", {})],
+		}
+	else:
+		# 랩 경계 분기 (LAP_LOOP)
+		if sector >= int(data.circuit.get("sectors_per_lap", 4)):
+			if lap >= int(data.circuit.get("laps", 3)):
+				_transition(RaceTypes.GpState.GP_FINISH)
+				_finish_gp()
+				return {"type": "finished"}
+			lap += 1
+			sector = 0
+		sector += 1
+		if gp_state == RaceTypes.GpState.LAP_LOOP or gp_state == RaceTypes.GpState.DUEL or gp_state == RaceTypes.GpState.SECTOR_TURN:
+			_transition(RaceTypes.GpState.SECTOR_TURN)
+		current_turn_is_duel = false
+		info = {
+			"type": "sector",
+			"lap": lap, "sector": sector,
+			"events": [
+				_ev("T1", "raceLog.sectorStart01", {"lap": lap, "sector": sector}),
+				_ev("T1", "vane.brief.sector01", {"sector": sector}),
+			],
+		}
+	turn_number += 1
+	turn_phase = RaceTypes.TurnPhase.T1_SECTOR_OPEN
+	provisional = []
+	hold_used = false
+	negated_troubles = 0
+	duel_boost = 0
+	return info
+
+
+# ── T2 스핀: reel 스트림 소비 = 스핀 커밋 시점 (D12 §6.2) ──
+func spin() -> void:
+	if turn_phase != RaceTypes.TurnPhase.T1_SECTOR_OPEN:
+		push_error("RaceEngine: spin out of phase")
+		return
+	provisional = []
+	for reel_index in range(3):
+		provisional.append(_roll_reel(reel_index))
+	turn_phase = RaceTypes.TurnPhase.T4_INTERVENTION
+
+
+func _roll_reel(reel_index: int) -> String:
+	var weights: Array = []
+	var column := "prob_reel%d" % (reel_index + 1)
+	for row in data.symbols:
+		weights.append(CsvTable.to_float(String(row[column])))
+	var picked := rng.pick_weighted("reel", weights)
+	return String(data.symbols[picked]["id"])
+
+
+# T3 전개 후보 — 표시 층이 릴 정지 연출 완료 후 조회 (봉인 규칙 §6.3)
+func get_provisional() -> Array:
+	return provisional.duplicate()
+
+
+# ── T4 개입 창 ──
+# 홀드 & 리스핀: 지정 릴 고정 + 나머지 재회전. 비용 1차지, 턴당 1회 (D05 §5.4)
+func hold_respin(keep_indices: Array) -> Dictionary:
+	if turn_phase != RaceTypes.TurnPhase.T4_INTERVENTION:
+		return {"ok": false, "error": "phase"}
+	if hold_used:
+		return {"ok": false, "error": "limit"}
+	var cost := data.param_int("param_charge_hold_cost")
+	if charge < cost:
+		return {"ok": false, "error": "charge"}
+	charge -= cost
+	hold_used = true
+	for reel_index in range(3):
+		if not keep_indices.has(reel_index):
+			provisional[reel_index] = _roll_reel(reel_index)
+	return {"ok": true, "events": [_ev("T4", "vane.brief.holdRespin01", {})]}
+
+
+# 차지 개입: 트러블 1개 무효화 = 2차지 (D05 §5.4)
+func negate_trouble() -> Dictionary:
+	if turn_phase != RaceTypes.TurnPhase.T4_INTERVENTION:
+		return {"ok": false, "error": "phase"}
+	var cost := data.param_int("param_charge_negate_cost")
+	if charge < cost:
+		return {"ok": false, "error": "charge"}
+	if _count_symbol(RaceTypes.SYMBOL_TROUBLE) - negated_troubles <= 0:
+		return {"ok": false, "error": "no_trouble"}
+	charge -= cost
+	negated_troubles += 1
+	return {"ok": true, "events": [_ev("T4", "vane.brief.negate01", {})]}
+
+
+# 듀얼 부스트: 차지당 판정 +10, 1회 최대 4차지 (D13 별첨A §2.2)
+func add_duel_boost() -> Dictionary:
+	if turn_phase != RaceTypes.TurnPhase.T4_INTERVENTION or not current_turn_is_duel:
+		return {"ok": false, "error": "phase"}
+	if duel_boost >= data.param_int("param_charge_boost_max"):
+		return {"ok": false, "error": "limit"}
+	if charge < 1:
+		return {"ok": false, "error": "charge"}
+	charge -= 1
+	duel_boost += 1
+	return {"ok": true}
+
+
+# 확정 (T4 → T5 번역 → T6 정산). remaining_ratio = 잔여 시간 비율 (여유 구간 = 모멘텀)
+func confirm(remaining_ratio: float) -> Array:
+	if turn_phase != RaceTypes.TurnPhase.T4_INTERVENTION:
+		push_error("RaceEngine: confirm out of phase")
+		return []
+	turn_phase = RaceTypes.TurnPhase.T5_TRANSLATE
+	var events: Array = []
+	var momentum := (not current_turn_is_duel) \
+		and remaining_ratio >= data.param("param_timer_leeway_ratio")
+	turn_phase = RaceTypes.TurnPhase.T6_SETTLE
+	if current_turn_is_duel:
+		events.append_array(_settle_duel())
+	else:
+		events.append_array(_settle_sector(momentum))
+	_after_settlement(events)
+	return events
+
+
+# 타임아웃: 잠정 결과 그대로 자동 확정 — 추가 페널티 없음 (D05 §7.3)
+func timeout() -> Array:
+	var events: Array = [_ev("T5", "raceLog.timeout01", {}), _ev("T5", "vane.brief.timeout01", {})]
+	events.append_array(confirm(0.0))
+	return events
+
+
+# ── T6 정산: 8단계 고정 순서 (C-2 — RaceTypes.SETTLE_ORDER 상수 전속) ──
+func _settle_sector(momentum: bool) -> Array:
+	var events: Array = []
+	var trouble_count := _count_symbol(RaceTypes.SYMBOL_TROUBLE) - negated_troubles
+	var trouble_fired := false
+	var gauge_mult := _gauge_mult()
+	var chance_full := false
+	for stage in RaceTypes.SETTLE_ORDER:
+		match stage:
+			RaceTypes.SettleStage.STAGE_1_HAZARD:
+				if trouble_count > 0:
+					trouble_fired = true
+					var effect := _match_effect(RaceTypes.SYMBOL_TROUBLE, trouble_count)
+					var chassis_delta := CsvTable.to_float(String(effect["chassis"]))
+					chassis += chassis_delta
+					rear_gauge += CsvTable.to_float(String(effect["rear_gauge"])) * gauge_mult
+					events.append(_ev("T5", "raceLog.troubleHit01", {"amount": chassis_delta}))
+			RaceTypes.SettleStage.STAGE_2_RESOURCE:
+				var pulse_count := _count_symbol(RaceTypes.SYMBOL_PULSE)
+				if pulse_count > 0:
+					_gain_charge(CsvTable.to_int(String(_match_effect(RaceTypes.SYMBOL_PULSE, pulse_count)["charge"])))
+				if not trouble_fired:
+					var stable_gain := data.param_int("param_charge_stable_sector")
+					_gain_charge(stable_gain)
+					events.append(_ev("T5", "raceLog.stableSector01", {"amount": stable_gain}))
+			RaceTypes.SettleStage.STAGE_3_DEFENSE:
+				var braking_count := _count_symbol(RaceTypes.SYMBOL_BRAKING)
+				if braking_count > 0:
+					rear_gauge += CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_BRAKING, braking_count)["rear_gauge"])) * gauge_mult
+			RaceTypes.SettleStage.STAGE_4_ADVANCE:
+				var slip_count := _count_symbol(RaceTypes.SYMBOL_SLIPSTREAM)
+				if slip_count > 0:
+					front_gauge += CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_SLIPSTREAM, slip_count)["front_gauge"])) * gauge_mult
+				var line_count := _count_symbol(RaceTypes.SYMBOL_LINE)
+				if line_count > 0:
+					var line_effect := _match_effect(RaceTypes.SYMBOL_LINE, line_count)
+					front_gauge += CsvTable.to_float(String(line_effect["front_gauge"])) * gauge_mult
+					rear_gauge += CsvTable.to_float(String(line_effect["rear_gauge"])) * gauge_mult
+				var chance_count := _count_symbol(RaceTypes.SYMBOL_CHANCE)
+				if chance_count > 0:
+					var chance_effect := _match_effect(RaceTypes.SYMBOL_CHANCE, chance_count)
+					if String(chance_effect["special"]).strip_edges() == "duel_trigger":
+						chance_full = true
+						events.append(_ev("T5", "raceLog.chanceDuel01", {}))
+					else:
+						front_gauge += CsvTable.to_float(String(chance_effect["front_gauge"])) * gauge_mult
+						events.append(_ev("T5", "raceLog.chanceProc01", {}))
+				if momentum:
+					var bonus := data.param("param_gauge_momentum_bonus")
+					front_gauge += bonus * gauge_mult
+					events.append(_ev("T5", "raceLog.momentum01", {"amount": int(bonus)}))
+			RaceTypes.SettleStage.STAGE_5_GAUGE_CHECK:
+				_apply_neighbor_passives(gauge_mult)
+				if chance_full:
+					front_gauge = data.param("param_gauge_full_threshold")
+				front_gauge = clampf(front_gauge, 0.0, data.param("param_gauge_full_threshold"))
+				rear_gauge = clampf(rear_gauge, 0.0, data.param("param_gauge_full_threshold"))
+				var threshold := data.param("param_gauge_full_threshold")
+				_armed_duel = RaceTypes.DuelType.NONE
+				if front_gauge >= threshold and front_target != "":
+					_armed_duel = RaceTypes.DuelType.OVERTAKE
+				elif rear_gauge >= threshold and rear_target != "":
+					_armed_duel = RaceTypes.DuelType.DEFENSE
+			RaceTypes.SettleStage.STAGE_6_DUEL_TRIGGER:
+				if _armed_duel != RaceTypes.DuelType.NONE:
+					pending_duel = _armed_duel
+					duel_opponent = front_target if _armed_duel == RaceTypes.DuelType.OVERTAKE else rear_target
+					var log_key := "raceLog.duelStartOvertake01" if _armed_duel == RaceTypes.DuelType.OVERTAKE else "raceLog.duelStartDefense01"
+					events.append(_ev("T5", log_key, {"target": entrants[duel_opponent]["name_key"]}))
+			RaceTypes.SettleStage.STAGE_7_RANK_UPDATE:
+				pass  # 섹터 턴의 플레이어 순위 변동은 듀얼 전속 (D05 §4)
+			RaceTypes.SettleStage.STAGE_8_BACKGROUND_AI:
+				events.append_array(_background_ai())
+	return events
+
+
+# 듀얼 턴 정산 — 전용 스핀: 심볼은 판정 환산 전속, 통상 효과 미적용 [가안 — impl_log]
+func _settle_duel() -> Array:
+	var events: Array = []
+	for stage in RaceTypes.SETTLE_ORDER:
+		match stage:
+			RaceTypes.SettleStage.STAGE_6_DUEL_TRIGGER:
+				events.append_array(_resolve_duel())
+			RaceTypes.SettleStage.STAGE_7_RANK_UPDATE:
+				pass  # 스왑은 _resolve_duel 내부에서 확정 (동일 단계 처리)
+			RaceTypes.SettleStage.STAGE_8_BACKGROUND_AI:
+				events.append_array(_background_ai())
+			_:
+				pass  # ①~⑤ 미적용 (듀얼 전용 스핀)
+	return events
+
+
+func _resolve_duel() -> Array:
+	var events: Array = []
+	duel_count += 1
+	var duel_type := pending_duel
+	var opponent_id := duel_opponent
+	pending_duel = RaceTypes.DuelType.NONE
+	duel_opponent = ""
+	if not entrants.has(opponent_id) or entrants[opponent_id]["retired"]:
+		return events  # 상대 소멸 — 듀얼 무산
+	var opponent_index := positions.find(opponent_id)
+	var player_index := positions.find(PLAYER_ID)
+	if absi(opponent_index - player_index) != 1:
+		return events  # 배경 스왑으로 비인접화 — 듀얼 무산 [가안 — impl_log]
+	var judgment := _duel_judgment(duel_type)
+	var threshold := _duel_threshold(duel_type, opponent_id)
+	var won := judgment >= threshold
+	if won:
+		var bonus := data.param_int("param_charge_duel_win")
+		_gain_charge(bonus)
+		events.append(_ev("T5", "raceLog.duelWin01", {"amount": bonus}))
+		if duel_type == RaceTypes.DuelType.OVERTAKE:
+			_swap_with(opponent_id)
+			events.append(_ev("T5", "raceLog.overtakeSuccess01",
+				{"target": entrants[opponent_id]["name_key"], "rank": player_position()}))
+		else:
+			events.append(_ev("T5", "raceLog.defendSuccess01", {"target": entrants[opponent_id]["name_key"]}))
+	else:
+		if duel_type == RaceTypes.DuelType.OVERTAKE:
+			var penalty := -data.param("param_chassis_duel_fail_penalty")
+			chassis += penalty
+			events.append(_ev("T5", "raceLog.duelLoseOvertake01", {"amount": penalty}))
+		else:
+			_swap_with(opponent_id)
+			events.append(_ev("T5", "raceLog.duelLoseDefense01", {}))
+			events.append(_ev("T5", "raceLog.defendFail01", {"target": entrants[opponent_id]["name_key"]}))
+	front_gauge = 0.0
+	rear_gauge = 0.0
+	_retarget(true, true)
+	return events
+
+
+# 듀얼 판정치 J (D13 별첨A §2.4): 심볼 환산 + 부스트 (튜닝·오버홀·레조넌스 = MS-1 범위 외 → 0)
+func _duel_judgment(duel_type: int) -> float:
+	var judgment := 0.0
+	var primary_symbol := RaceTypes.SYMBOL_SLIPSTREAM if duel_type == RaceTypes.DuelType.OVERTAKE else RaceTypes.SYMBOL_BRAKING
+	var primary_count := _count_symbol(primary_symbol)
+	if primary_count > 0:
+		judgment += CsvTable.to_float(String(data.duel_conversion[primary_symbol]["match%d" % primary_count]))
+	var line_count := _count_symbol(RaceTypes.SYMBOL_LINE)
+	if line_count > 0:
+		judgment += CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_LINE]["match%d" % line_count]))
+	judgment += CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_CHANCE]["per_symbol"])) * _count_symbol(RaceTypes.SYMBOL_CHANCE)
+	var trouble_count := _count_symbol(RaceTypes.SYMBOL_TROUBLE) - negated_troubles
+	judgment += CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_TROUBLE]["per_symbol"])) * maxi(trouble_count, 0)
+	judgment += float(duel_boost) * data.param("param_charge_boost_per_judgment")
+	return judgment
+
+
+# 저항 임계 (D13 별첨A §2.4) — 시드 파라미터 기준 (팀 가산 미적용: 별첨A 명시값 정합 [가안])
+func _duel_threshold(duel_type: int, opponent_id: String) -> float:
+	var opponent: Dictionary = entrants[opponent_id]
+	if duel_type == RaceTypes.DuelType.OVERTAKE:
+		return data.param("param_duel_overtake_base") \
+			+ float(opponent["seed_stability"]) * data.param("param_duel_overtake_stability_coef") \
+			+ float(opponent["duel_overtake_add"])
+	var override_value := float(opponent["duel_defense_override"])
+	if override_value >= 0.0:
+		return override_value
+	return data.param("param_duel_defense_base") \
+		+ float(opponent["seed_aggression"]) * data.param("param_duel_defense_aggression_coef")
+
+
+# ── 게이지 보조 ──
+# 최종 랩 계수 ×1.2 전역 (D13 별첨A §1.3) — 게이지 증감 전체에 곱 적용 [가안]
+func _gauge_mult() -> float:
+	return data.param("param_gauge_final_lap_mult") if lap >= int(data.circuit.get("laps", 3)) else 1.0
+
+
+# 앞차 저항·뒤차 압박 (D13 별첨A §2.1) — 만충 판정 직전 적용 [가안 — 8단계 내 배치]
+func _apply_neighbor_passives(gauge_mult: float) -> void:
+	if front_target != "":
+		var front: Dictionary = entrants[front_target]
+		var resist := data.param("param_gauge_front_resist_base") \
+			+ _effective_pace(front) * data.param("param_gauge_front_resist_pace_coef")
+		front_gauge -= resist * gauge_mult
+	if rear_target != "":
+		var rear: Dictionary = entrants[rear_target]
+		var pressure := (data.param("param_gauge_rear_pressure_base") \
+			+ float(rear["aggression"]) * data.param("param_gauge_rear_pressure_aggr_coef")) \
+			* float(rear["pressure_mult"])
+		rear_gauge += pressure * gauge_mult
+
+
+func _effective_pace(entrant: Dictionary) -> float:
+	var pace := float(entrant["pace"]) + float(entrant["form"]) + float(entrant["rush_roll"])
+	if lap == 1:
+		pace += float(entrant["rush_lap1"])
+	if lap >= int(data.circuit.get("laps", 3)):
+		pace += float(entrant["rush_lap_final"])
+	return pace
+
+
+# ── ⑧ 백그라운드 AI (D05 §4.4 · D13 별첨A §6.2) ──
+func _background_ai() -> Array:
+	var events: Array = []
+	var swap_min := data.param("param_ai_swap_min")
+	var swap_base := data.param("param_ai_swap_base")
+	var swap_coef := data.param("param_ai_swap_pace_coef")
+	var player_index := positions.find(PLAYER_ID)
+	var i := 0
+	while i < positions.size() - 1:
+		if i == player_index or i + 1 == player_index:
+			i += 1
+			continue  # 플레이어 포함 쌍 제외 — 플레이어 순위 변동은 듀얼 전속
+		var front_id: String = positions[i]
+		var rear_id: String = positions[i + 1]
+		var pace_diff := _effective_pace(entrants[rear_id]) - _effective_pace(entrants[front_id])
+		var probability := maxf(swap_min, swap_base + swap_coef * pace_diff)
+		if rng.randf("ai") < probability:
+			positions[i] = rear_id
+			positions[i + 1] = front_id
+			player_index = positions.find(PLAYER_ID)
+		i += 1
+	events.append_array(_ai_retire_check())
+	_retarget_if_changed()
+	return events
+
+
+func _ai_retire_check() -> Array:
+	var events: Array = []
+	var cap := data.param_int("param_ai_retire_gp_cap")
+	if ai_retire_count >= cap:
+		return events
+	var total_turns := int(data.circuit.get("laps", 3)) * int(data.circuit.get("sectors_per_lap", 4))
+	var coef := data.param("param_ai_retire_stability_coef")
+	var constant := data.param("param_ai_retire_const")
+	for id in positions.duplicate():
+		if id == PLAYER_ID or ai_retire_count >= cap:
+			continue
+		var probability := (coef * (5.0 - float(entrants[id]["stability"])) + constant) / float(total_turns)
+		if rng.randf("ai") < probability:
+			_retire_entrant(id)
+			ai_retire_count += 1
+			events.append(_ev("T5", "raceLog.aiRetire01", {"target": entrants[id]["name_key"]}))
+	return events
+
+
+func _retire_entrant(id: String) -> void:
+	entrants[id]["retired"] = true
+	entrants[id]["retire_order"] = _retire_order
+	_retire_order += 1
+	positions.erase(id)
+
+
+# ── 정산 후 공통 처리: 리타이어·타깃 갱신 ──
+func _after_settlement(events: Array) -> void:
+	if chassis <= 0.0:
+		chassis = 0.0
+		events.append(_ev("T5", "raceLog.playerRetire01", {}))
+		_retire_entrant(PLAYER_ID)
+		_transition(RaceTypes.GpState.RETIRE)
+		_finish_gp()
+		return
+	# 최종 섹터 정산 후 듀얼이 남아 있으면 폐기 — 다음 섹터 부재 (D05 §4.3 [가안])
+	if pending_duel != RaceTypes.DuelType.NONE \
+		and lap >= int(data.circuit.get("laps", 3)) \
+		and sector >= int(data.circuit.get("sectors_per_lap", 4)):
+		pending_duel = RaceTypes.DuelType.NONE
+		duel_opponent = ""
+	if gp_state == RaceTypes.GpState.SECTOR_TURN \
+		and pending_duel == RaceTypes.DuelType.NONE \
+		and sector >= int(data.circuit.get("sectors_per_lap", 4)):
+		_transition(RaceTypes.GpState.LAP_LOOP)
+	elif gp_state == RaceTypes.GpState.DUEL:
+		if sector >= int(data.circuit.get("sectors_per_lap", 4)):
+			_transition(RaceTypes.GpState.LAP_LOOP)
+		else:
+			_transition(RaceTypes.GpState.SECTOR_TURN)
+
+
+func _swap_with(opponent_id: String) -> void:
+	var player_index := positions.find(PLAYER_ID)
+	var opponent_index := positions.find(opponent_id)
+	if player_index < 0 or opponent_index < 0:
+		return
+	positions[player_index] = opponent_id
+	positions[opponent_index] = PLAYER_ID
+
+
+func _retarget(reset_front: bool, reset_rear: bool) -> void:
+	var player_index := positions.find(PLAYER_ID)
+	var new_front := String(positions[player_index - 1]) if player_index > 0 else ""
+	var new_rear := String(positions[player_index + 1]) if player_index < positions.size() - 1 else ""
+	if reset_front or new_front != front_target:
+		front_target = new_front
+		if reset_front:
+			front_gauge = 0.0
+	if reset_rear or new_rear != rear_target:
+		rear_target = new_rear
+		if reset_rear:
+			rear_gauge = 0.0
+
+
+# 인접 상대가 바뀌면 해당 게이지 리셋 후 새 상대와 개시 (D05 §4.2)
+func _retarget_if_changed() -> void:
+	if positions.find(PLAYER_ID) < 0:
+		return
+	var player_index := positions.find(PLAYER_ID)
+	var new_front := String(positions[player_index - 1]) if player_index > 0 else ""
+	var new_rear := String(positions[player_index + 1]) if player_index < positions.size() - 1 else ""
+	if new_front != front_target:
+		front_target = new_front
+		front_gauge = 0.0
+		if pending_duel == RaceTypes.DuelType.OVERTAKE:
+			pending_duel = RaceTypes.DuelType.NONE  # 상대 교체 — 예약 듀얼 해제 [가안]
+			duel_opponent = ""
+	if new_rear != rear_target:
+		rear_target = new_rear
+		rear_gauge = 0.0
+		if pending_duel == RaceTypes.DuelType.DEFENSE:
+			pending_duel = RaceTypes.DuelType.NONE
+			duel_opponent = ""
+
+
+# ── GP 종료 → RESULT (D05 §9.1~9.2) ──
+func _finish_gp() -> void:
+	_transition(RaceTypes.GpState.RESULT)
+	finished = true
+	var standings: Array = []
+	for id in positions:
+		standings.append(id)
+	# 리타이어 머신: 리타이어 시점 역순으로 최하위부터 (가장 이른 리타이어 = 최하위)
+	var retired_list: Array = []
+	for id in entrants:
+		if entrants[id]["retired"]:
+			retired_list.append(id)
+	retired_list.sort_custom(func(a, b): return entrants[a]["retire_order"] > entrants[b]["retire_order"])
+	standings.append_array(retired_list)
+	var player_rank := standings.find(PLAYER_ID) + 1
+	var player_retired: bool = entrants[PLAYER_ID]["retired"]
+	var points: int = 0 if player_retired else int(data.points_tier1.get(player_rank, 0))
+	result = {
+		"standings": standings,
+		"player_rank": player_rank,
+		"player_retired": player_retired,
+		"tour_points": points,
+		"turns": turn_number,
+		"duels": duel_count,
+	}
+
+
+# GP 소요 분량 모델 (D13 §4.1 A1 파생 — 완료 판정 4 로그용)
+func estimated_minutes() -> float:
+	var sector_turns := turn_number - duel_count
+	var seconds := float(sector_turns) * data.param("param_time_turn_sec") \
+		+ float(duel_count) * data.param("param_time_duel_sec") \
+		+ data.param("param_time_wrapup_sec")
+	return seconds / 60.0
+
+
+# ── 조회 ──
+func player_position() -> int:
+	var index := positions.find(PLAYER_ID)
+	return index + 1 if index >= 0 else -1
+
+
+func _count_symbol(symbol_id: String) -> int:
+	var count := 0
+	for s in provisional:
+		if s == symbol_id:
+			count += 1
+	return count
+
+
+func _match_effect(symbol_id: String, match_count: int) -> Dictionary:
+	return data.match_effects[symbol_id][clampi(match_count, 1, 3)]
+
+
+func _gain_charge(amount: int) -> void:
+	charge = clampi(charge + amount, 0, data.param_int("param_charge_cap"))
+
+
+func _ev(phase: String, key: String, params: Dictionary) -> Dictionary:
+	return {"phase": phase, "key": key, "params": params}
+
+
+# ── 직렬화 (서스펜드 스냅샷 §7.2 — RNG 포함, 재로드 리롤 무효 §6.2) ──
+func serialize() -> Dictionary:
+	return {
+		"gp_state": gp_state,
+		"turn_phase": turn_phase,
+		"lap": lap, "sector": sector,
+		"turn_number": turn_number, "duel_count": duel_count,
+		"ai_retire_count": ai_retire_count, "retire_order_counter": _retire_order,
+		"entrants": entrants.duplicate(true),
+		"positions": positions.duplicate(),
+		"chassis": chassis, "charge": charge,
+		"front_gauge": front_gauge, "rear_gauge": rear_gauge,
+		"front_target": front_target, "rear_target": rear_target,
+		"provisional": provisional.duplicate(),
+		"hold_used": hold_used, "negated_troubles": negated_troubles,
+		"duel_boost": duel_boost,
+		"pending_duel": pending_duel, "duel_opponent": duel_opponent,
+		"current_turn_is_duel": current_turn_is_duel,
+		"finished": finished, "result": result.duplicate(true),
+		"rng": rng.serialize(),
+	}
+
+
+func restore(payload: Dictionary) -> bool:
+	if not payload.has("rng") or not rng.deserialize(payload["rng"]):
+		return false
+	gp_state = int(payload["gp_state"])
+	turn_phase = int(payload["turn_phase"])
+	lap = int(payload["lap"])
+	sector = int(payload["sector"])
+	turn_number = int(payload["turn_number"])
+	duel_count = int(payload["duel_count"])
+	ai_retire_count = int(payload["ai_retire_count"])
+	_retire_order = int(payload["retire_order_counter"])
+	entrants = payload["entrants"]
+	positions = payload["positions"]
+	chassis = float(payload["chassis"])
+	charge = int(payload["charge"])
+	front_gauge = float(payload["front_gauge"])
+	rear_gauge = float(payload["rear_gauge"])
+	front_target = String(payload["front_target"])
+	rear_target = String(payload["rear_target"])
+	provisional = payload["provisional"]
+	hold_used = bool(payload["hold_used"])
+	negated_troubles = int(payload["negated_troubles"])
+	duel_boost = int(payload["duel_boost"])
+	pending_duel = int(payload["pending_duel"])
+	duel_opponent = String(payload["duel_opponent"])
+	current_turn_is_duel = bool(payload["current_turn_is_duel"])
+	finished = bool(payload["finished"])
+	result = payload.get("result", {})
+	return true

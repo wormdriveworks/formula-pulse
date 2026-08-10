@@ -1,0 +1,7 @@
+id,class,name_key,prob_reel1,prob_reel2,prob_reel3
+symbol_slipstream,forward,ui.symbol.slipstream,0.22,0.22,0.22
+symbol_braking,defense,ui.symbol.braking,0.20,0.20,0.20
+symbol_line,control,ui.symbol.line,0.23,0.23,0.23
+symbol_pulse,resource,ui.symbol.pulse,0.12,0.12,0.12
+symbol_trouble,hazard,ui.symbol.trouble,0.18,0.18,0.18
+symbol_chance,rare,ui.symbol.chance,0.05,0.05,0.05

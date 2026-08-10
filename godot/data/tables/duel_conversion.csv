@@ -1,0 +1,6 @@
+id,symbol_id,mode,match1,match2,match3,per_symbol
+duel_conv_slipstream,symbol_slipstream,overtake_primary,38,64,95,0
+duel_conv_braking,symbol_braking,defense_primary,38,64,95,0
+duel_conv_line,symbol_line,always,15,30,50,0
+duel_conv_chance,symbol_chance,always,0,0,0,40
+duel_conv_trouble,symbol_trouble,always,0,0,0,-15
