@@ -2,7 +2,8 @@
 .godot/
 
 # 서명 자격증명만 제외 (export_presets.cfg 는 커밋 — IMPL-006)
-# Godot이 어느 형태로 떨구든 잡히도록 양형 모두 기재
+# 실측(IMPL-017): 4.7 엔진 상수 = res://.godot/export_credentials.cfg → 위 .godot/ 로 이미 차단됨.
+# 아래 두 줄은 경로가 바뀌어도 잡히도록 남기는 이중 안전장치.
 export_credentials.cfg
 .export_credentials/
 
