@@ -1,13 +1,31 @@
 # Godot
 .godot/
-*.import
-export_presets.cfg
+
+# 서명 자격증명만 제외 (export_presets.cfg 는 커밋 — IMPL-006)
+# Godot이 어느 형태로 떨구든 잡히도록 양형 모두 기재
+export_credentials.cfg
 .export_credentials/
+
+# godot-mcp-runtime 런타임 임시/감사
+.mcp/
+
+# oh-my-claudecode 운영 상태
+.omc/
+
 # 빌드 산출물
 build/
 *.aab
 *.apk
 *.ipa
+
 # OS/편집기
 .DS_Store
 Thumbs.db
+
+# 주의 — 아래 셋은 반드시 커밋한다 (CLAUDE.md 공통 불변 규칙). 무시 목록에 넣지 말 것:
+#   *.uid                교차 머신 uid:// 참조 안정성
+#   *.import             임포트 설정(니어리스트 필터·정수 스케일). 누락 시 반대편 머신이
+#                        기본값으로 재임포트 → D12 §9.1 도트 파이프라인·D10 §2.2 믹셀 금지가 조용히 깨진다
+#   export_presets.cfg   포함/제외 규칙·피처 태그가 곧 혼입 0의 이행 장치(D12 §2.3).
+#                        제외하면 두 머신 preset이 갈리고 CI(TL-1)가 빌드를 재현하지 못한다.
+#                        서명 자격증명은 위 export_credentials 로 분리 — 평문 유출 없음

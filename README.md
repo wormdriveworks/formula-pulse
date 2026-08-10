@@ -1,6 +1,6 @@
 # Formula Pulse: Spin the Grid — 구현 리포지토리
 
-내러티브 턴제 레이싱 로그라이트 · Godot 4.4 · Steam(유료) + 모바일(광고) — 원 코어 투 플랫폼.
+내러티브 턴제 레이싱 로그라이트 · Godot 4.7 · Steam(유료) + 모바일(광고) — 원 코어 투 플랫폼.
 
 | 경로 | 내용 |
 |---|---|
@@ -10,7 +10,7 @@
 | `docs/reverse_design/` | 역기획 1~4단계 (참고 자료) |
 | `docs/decisions/impl_log.md` | 구현 단계 결정 로그 |
 | `prompts/MS1_kickoff.md` | 현 마일스톤(MS-1 프로토타입) 착수 프롬프트 |
-| `godot/` | Godot 4.4 프로젝트 (core = 플랫폼 규칙 0 / adapters / platform / ui / data) |
+| `godot/` | Godot 4.7 프로젝트 (core = 플랫폼 규칙 0 / adapters / platform / ui / data) |
 | `tools/validators/` | 빌드 기계 검증기 V1~V8 + 혼입 0 스캔 (CI = TL-1) |
 
 마일스톤: **MS-1 프로토타입 → MS-2 버티컬 슬라이스 → MS-3 Steam EA → MS-4 Steam 1.0 → MS-5 모바일 소프트 런칭 → MS-6 모바일 글로벌** (D15 §1.1 — 직렬).
