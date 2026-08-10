@@ -1,0 +1,129 @@
+{
+	"schema_version": 1,
+	"tables_dir": "godot/data/tables",
+	"structures_dir": "godot/data/structures",
+	"strings_csv": "godot/data/strings/strings.csv",
+	"string_language_columns": ["ko"],
+	"code_dir": "godot",
+	"core_dir": "godot/core",
+
+	"tables": {
+		"core_params.csv": {
+			"id_prefix": "param_",
+			"root": true,
+			"columns": {"id": "id", "value": "float"}
+		},
+		"symbol_distribution.csv": {
+			"id_prefix": "symbol_",
+			"root": true,
+			"columns": {
+				"id": "id",
+				"class": "enum:forward,defense,control,resource,hazard,rare",
+				"name_key": "string_key",
+				"prob_reel1": "float",
+				"prob_reel2": "float",
+				"prob_reel3": "float"
+			}
+		},
+		"symbol_match_effects.csv": {
+			"id_prefix": "match_",
+			"root": true,
+			"columns": {
+				"id": "id",
+				"symbol_id": "fk:symbol_distribution.csv",
+				"match_count": "int:1,3",
+				"front_gauge": "float",
+				"rear_gauge": "float",
+				"charge": "float",
+				"chassis": "float",
+				"special": "enum_optional:duel_trigger"
+			}
+		},
+		"duel_conversion.csv": {
+			"id_prefix": "duel_",
+			"root": true,
+			"columns": {
+				"id": "id",
+				"symbol_id": "fk:symbol_distribution.csv",
+				"mode": "enum:overtake_primary,defense_primary,always",
+				"match1": "float",
+				"match2": "float",
+				"match3": "float",
+				"per_symbol": "float"
+			}
+		},
+		"ai_teams.csv": {
+			"id_prefix": "team_",
+			"root": false,
+			"columns": {
+				"id": "id",
+				"name_key": "string_key",
+				"pace_add": "float",
+				"aggression_add": "float",
+				"stability_add": "float",
+				"rush_lap_final_add": "float",
+				"pressure_mult": "float"
+			}
+		},
+		"ai_rivals.csv": {
+			"id_prefix": "ai_",
+			"root": false,
+			"columns": {
+				"id": "id",
+				"name_key": "string_key",
+				"team_id": "fk:ai_teams.csv",
+				"pace": "float",
+				"aggression": "float",
+				"rush_lap1": "float",
+				"rush_lap_final": "float",
+				"rush_random": "float",
+				"stability": "float",
+				"start_mod": "float",
+				"form_var": "float",
+				"duel_overtake_add": "float",
+				"duel_defense_override": "float_optional"
+			}
+		},
+		"points_tier1.csv": {
+			"id_prefix": "point_",
+			"root": true,
+			"columns": {"id": "id", "position": "int:1,16", "points": "int"}
+		}
+	},
+
+	"structures": {
+		"circuit_debug.json": {
+			"root": true,
+			"required": {"id": "string", "name_key": "string_key", "laps": "int", "sectors_per_lap": "int"}
+		},
+		"grid_debug.json": {
+			"root": true,
+			"required": {"id": "string", "rivals": "fk_array:ai_rivals.csv", "filler_count": "int", "player_start_position": "int"}
+		}
+	},
+
+	"anchor_rule": {
+		"anchor_field": "anchor_type",
+		"allowed_anchor_types": ["milestone_act", "stage", "tour_slot"],
+		"tour_slot_field": "tour_slot",
+		"allowed_tour_slots": [1, 5]
+	},
+
+	"string_write_rules": [
+		{"domain_prefixes": ["raceLog.", "relay.", "vane."], "max_lines": 2, "max_chars_full": 22},
+		{"domain_prefixes": ["vn."], "max_lines": 2, "max_chars_full": 24}
+	],
+
+	"v7_domains": ["raceLog.", "relay.", "vane.", "vn."],
+	"v7_terms": ["FP", "확률", "슬롯", "스핀", "홀드", "릴"],
+
+	"key_regex": "^[a-z][a-zA-Z0-9]*(\\.[a-z][a-zA-Z0-9]*){1,2}$",
+	"v4_whitelist_marker": "V4-except",
+
+	"contamination_patterns": [
+		"OS.get_name", "OS.has_feature", "DisplayServer.", "Engine.has_singleton",
+		"platform ==", "platform==",
+		"AdMob", "admob", "Steamworks", "GameCenter", "Play Games", "iCloud",
+		"res://platform/", "advert", "iap_", "purchase", "reward_video"
+	]
+}

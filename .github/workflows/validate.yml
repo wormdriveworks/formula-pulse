@@ -1,0 +1,33 @@
+# TL-1 CI 래퍼 [가안 — IMPL 로그 참조: 로컬 스크립트(tools/validators)가 정본, Actions는 래퍼]
+# 검증기 V1~V8 + 혼입 0 스캔 = 빌드 전 단계 고정. 위반 1건 = 실패 (V7은 경고 전용).
+name: TL-1 validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 엔진 핀 4.7 계열 (D12 §1.1) — godot-builds 공식 배포 [가안: 러너 조달 경로]
+      - name: Install Godot 4.7.1-stable
+        run: |
+          curl -sSL -o godot.zip \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          sudo mv Godot_v4.7.1-stable_linux.x86_64 /usr/local/bin/godot
+          godot --version
+
+      - name: Validators V1~V8 + mix-0 scan
+        run: bash tools/validators/validate.sh
+
+      - name: Import cache
+        run: godot --headless --path godot --import || true
+
+      - name: Logic tests
+        run: |
+          godot --headless --path godot --script tests/test_core_loop.gd
+          godot --headless --path godot --script tests/test_save_reload.gd

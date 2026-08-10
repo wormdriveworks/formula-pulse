@@ -1,0 +1,551 @@
+# 빌드 기계 검증기 V1~V8 + 혼입 0 스캔 (D12 §4.2 · D14 §2.1 TL-1 / CLAUDE.md 불변규칙 7)
+#
+# 실행 (리포지토리 루트에서 — 로컬 단일 명령):
+#   godot --headless --path . --script tools/validators/run_validators.gd
+#
+# 차단 규칙: V1~V6·V8 + 혼입 0 스캔 = 위반 1건이면 실패(exit 1).
+# V7(금칙 어휘)은 경고 전용 — 빌드를 차단하지 않는다 (D12 §4.2 V7 행 · D14 TL-1 명문).
+# V6 내부: ID 중복·접두 위반 = 차단 / 고아 데이터 = 경고 (D12 §4.2 V6 행 "고아 데이터 … 경고").
+#
+# 자기 완결형: 프로젝트 클래스 캐시에 의존하지 않는다 (프로젝트리스 실행 가능).
+extends SceneTree
+
+var _fail_count := 0
+var _warn_count := 0
+var _config: Dictionary = {}
+var _tables: Dictionary = {}        # 파일명 -> Array[Dictionary]
+var _structures: Dictionary = {}    # 파일명 -> Dictionary
+var _strings: Dictionary = {}       # key -> {언어: 값}
+var _code_files: Array = []         # {path, source}
+
+
+func _init() -> void:
+	if not _load_inputs():
+		print("VALIDATORS_FAIL input load error")
+		quit(1)
+		return
+	_run_v1_schema()
+	_run_v2_references()
+	_run_v3_string_format()
+	_run_v4_hardcoded_text()
+	_run_v5_anchor_binding()
+	_run_v6_id_hygiene()
+	_run_v7_forbidden_vocab()
+	_run_v8_key_grammar()
+	_run_contamination_scan()
+	print("")
+	if _fail_count == 0:
+		print("VALIDATORS_PASS warnings=%d" % _warn_count)
+		quit(0)
+	else:
+		print("VALIDATORS_FAIL failures=%d warnings=%d" % [_fail_count, _warn_count])
+		quit(1)
+
+
+func _fail(rule: String, message: String) -> void:
+	_fail_count += 1
+	print("  [FAIL] %s: %s" % [rule, message])
+
+
+func _warn(rule: String, message: String) -> void:
+	_warn_count += 1
+	print("  [WARN] %s: %s" % [rule, message])
+
+
+func _report(rule: String, label: String, checked: int, before_fail: int, before_warn: int) -> void:
+	var status := "PASS"
+	if _fail_count > before_fail:
+		status = "FAIL"
+	elif _warn_count > before_warn:
+		status = "WARN"
+	print("%s %s: %s (%d checks)" % [rule, label, status, checked])
+
+
+# ── 입력 적재 ──
+func _load_inputs() -> bool:
+	var config_text := _read_text("tools/validators/config.json")
+	if config_text == "":
+		return false
+	var parsed: Variant = JSON.parse_string(config_text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return false
+	_config = parsed
+	var tables_dir := String(_config["tables_dir"])
+	for file_name in _config["tables"]:
+		_tables[file_name] = _parse_csv(_read_text(tables_dir + "/" + String(file_name)))
+	var structures_dir := String(_config["structures_dir"])
+	for file_name in _config["structures"]:
+		var structure: Variant = JSON.parse_string(_read_text(structures_dir + "/" + String(file_name)))
+		_structures[file_name] = structure if typeof(structure) == TYPE_DICTIONARY else {}
+	for row in _parse_csv(_read_text(String(_config["strings_csv"]))):
+		var key := String(row.get("key", ""))
+		if key != "":
+			_strings[key] = row
+	_collect_code_files(String(_config["code_dir"]))
+	return true
+
+
+func _read_text(path: String) -> String:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		print("  [ERROR] cannot open: ", path)
+		return ""
+	var text := file.get_as_text()
+	file.close()
+	return text
+
+
+func _collect_code_files(dir_path: String) -> void:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var entry := dir.get_next()
+	while entry != "":
+		var full_path := dir_path + "/" + entry
+		if dir.current_is_dir():
+			if not entry.begins_with("."):
+				_collect_code_files(full_path)
+		elif entry.ends_with(".gd"):
+			_code_files.append({"path": full_path, "source": _read_text(full_path)})
+		entry = dir.get_next()
+	dir.list_dir_end()
+
+
+# CSV 파서 (RFC 4180 기본형 — 코어 CsvTable과 동일 규격의 자기 완결 복제)
+func _parse_csv(text: String) -> Array:
+	var rows: Array = []
+	if text == "":
+		return rows
+	var records: Array = []
+	var field := ""
+	var record: Array = []
+	var in_quotes := false
+	var i := 0
+	var n := text.length()
+	while i < n:
+		var ch := text[i]
+		if in_quotes:
+			if ch == '"':
+				if i + 1 < n and text[i + 1] == '"':
+					field += '"'
+					i += 1
+				else:
+					in_quotes = false
+			else:
+				field += ch
+		else:
+			match ch:
+				'"': in_quotes = true
+				',':
+					record.append(field)
+					field = ""
+				'\r': pass
+				'\n':
+					record.append(field)
+					field = ""
+					records.append(record)
+					record = []
+				_: field += ch
+		i += 1
+	if field != "" or not record.is_empty():
+		record.append(field)
+		records.append(record)
+	if records.is_empty():
+		return rows
+	var header: Array = records[0]
+	for r in range(1, records.size()):
+		if records[r].size() == 1 and String(records[r][0]).strip_edges() == "":
+			continue
+		var row := {}
+		for c in range(header.size()):
+			row[header[c]] = records[r][c] if c < records[r].size() else ""
+		rows.append(row)
+	return rows
+
+
+# 주석 제거 (문자열 리터럴 내 '#' 보존)
+func _strip_comment(line: String) -> String:
+	var in_string := false
+	var quote := ""
+	for i in range(line.length()):
+		var ch := line[i]
+		if in_string:
+			if ch == quote:
+				in_string = false
+		elif ch == '"' or ch == "'":
+			in_string = true
+			quote = ch
+		elif ch == "#":
+			return line.substr(0, i)
+	return line
+
+
+# 문자열 리터럴 추출
+func _extract_literals(line: String) -> Array:
+	var literals: Array = []
+	var in_string := false
+	var quote := ""
+	var current := ""
+	for i in range(line.length()):
+		var ch := line[i]
+		if in_string:
+			if ch == quote:
+				literals.append(current)
+				current = ""
+				in_string = false
+			else:
+				current += ch
+		elif ch == '"' or ch == "'":
+			in_string = true
+			quote = ch
+	return literals
+
+
+func _has_hangul(text: String) -> bool:
+	for i in range(text.length()):
+		var code := text.unicode_at(i)
+		if (code >= 0xAC00 and code <= 0xD7A3) or (code >= 0x1100 and code <= 0x11FF) \
+			or (code >= 0x3130 and code <= 0x318F):
+			return true
+	return false
+
+
+# 전각/반각 가중 자수 (D09 §6.6 산출법 계열 — 전각 1.0 / 반각 0.5)
+func _weighted_chars(text: String) -> float:
+	var total := 0.0
+	for i in range(text.length()):
+		var code := text.unicode_at(i)
+		var full_width := (code >= 0x1100 and code <= 0x11FF) \
+			or (code >= 0x2E80 and code <= 0x9FFF) \
+			or (code >= 0xAC00 and code <= 0xD7A3) \
+			or (code >= 0xF900 and code <= 0xFAFF) \
+			or (code >= 0xFF00 and code <= 0xFF60) \
+			or (code >= 0x3000 and code <= 0x303F)
+		total += 1.0 if full_width else 0.5
+	return total
+
+
+# ── V1 스키마: 타입·필수 필드·enum 범위 ──
+func _run_v1_schema() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	for file_name in _config["tables"]:
+		var spec: Dictionary = _config["tables"][file_name]
+		var rows: Array = _tables[file_name]
+		if rows.is_empty():
+			_fail("V1", "%s: empty or unreadable" % file_name)
+			continue
+		var columns: Dictionary = spec["columns"]
+		var first_row: Dictionary = rows[0]
+		for column_name in columns:
+			if not first_row.has(column_name):
+				_fail("V1", "%s: missing column '%s'" % [file_name, column_name])
+		for row in rows:
+			checked += 1
+			for column_name in columns:
+				if not row.has(column_name):
+					continue
+				_check_value(String(file_name), String(columns[column_name]), String(row[column_name]), String(row.get("id", "?")), column_name)
+	for file_name in _config["structures"]:
+		var spec: Dictionary = _config["structures"][file_name]
+		var structure: Dictionary = _structures[file_name]
+		checked += 1
+		if structure.is_empty():
+			_fail("V1", "%s: empty or invalid JSON" % file_name)
+			continue
+		for field_name in spec["required"]:
+			if not structure.has(field_name):
+				_fail("V1", "%s: missing field '%s'" % [file_name, field_name])
+	_report("V1", "schema", checked, before_fail, before_warn)
+
+
+func _check_value(file_name: String, type_spec: String, value: String, row_id: String, column_name: String) -> void:
+	var trimmed := value.strip_edges()
+	var parts := type_spec.split(":")
+	var kind := parts[0]
+	match kind:
+		"id":
+			if trimmed == "":
+				_fail("V1", "%s[%s]: empty id" % [file_name, row_id])
+		"float", "int":
+			if trimmed == "":
+				_fail("V1", "%s[%s].%s: empty numeric" % [file_name, row_id, column_name])
+				return
+			if not trimmed.is_valid_float():
+				_fail("V1", "%s[%s].%s: not numeric '%s'" % [file_name, row_id, column_name, trimmed])
+				return
+			if parts.size() > 1:
+				var bounds := parts[1].split(",")
+				var numeric := trimmed.to_float()
+				if numeric < bounds[0].to_float() or numeric > bounds[1].to_float():
+					_fail("V1", "%s[%s].%s: %s out of range %s" % [file_name, row_id, column_name, trimmed, parts[1]])
+		"float_optional":
+			if trimmed != "" and not trimmed.is_valid_float():
+				_fail("V1", "%s[%s].%s: not numeric '%s'" % [file_name, row_id, column_name, trimmed])
+		"enum":
+			if not Array(parts[1].split(",")).has(trimmed):
+				_fail("V1", "%s[%s].%s: '%s' not in enum {%s}" % [file_name, row_id, column_name, trimmed, parts[1]])
+		"enum_optional":
+			if trimmed != "" and not Array(parts[1].split(",")).has(trimmed):
+				_fail("V1", "%s[%s].%s: '%s' not in enum {%s}" % [file_name, row_id, column_name, trimmed, parts[1]])
+		"string_key", "fk", "fk_array", "string":
+			pass  # V2 소관
+		_:
+			_warn("V1", "unknown type spec '%s'" % type_spec)
+
+
+# ── V2 참조 무결성: 스트링 키·테이블 간 FK ──
+func _run_v2_references() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	# 테이블 FK·name_key
+	for file_name in _config["tables"]:
+		var spec: Dictionary = _config["tables"][file_name]
+		var columns: Dictionary = spec["columns"]
+		for row in _tables[file_name]:
+			for column_name in columns:
+				var type_spec := String(columns[column_name])
+				var value := String(row.get(column_name, "")).strip_edges()
+				if type_spec == "string_key":
+					checked += 1
+					if not _strings.has(value):
+						_fail("V2", "%s[%s].%s: string key '%s' not found" % [file_name, row.get("id", "?"), column_name, value])
+				elif type_spec.begins_with("fk:"):
+					checked += 1
+					if not _table_ids(type_spec.substr(3)).has(value):
+						_fail("V2", "%s[%s].%s: FK '%s' not found in %s" % [file_name, row.get("id", "?"), column_name, value, type_spec.substr(3)])
+	# 구조 JSON
+	for file_name in _config["structures"]:
+		var spec: Dictionary = _config["structures"][file_name]
+		var structure: Dictionary = _structures[file_name]
+		for field_name in spec["required"]:
+			var type_spec := String(spec["required"][field_name])
+			if type_spec == "string_key":
+				checked += 1
+				if not _strings.has(String(structure.get(field_name, ""))):
+					_fail("V2", "%s.%s: string key '%s' not found" % [file_name, field_name, structure.get(field_name, "")])
+			elif type_spec.begins_with("fk_array:"):
+				var target_ids := _table_ids(type_spec.substr(9))
+				for item in structure.get(field_name, []):
+					checked += 1
+					if not target_ids.has(String(item)):
+						_fail("V2", "%s.%s: FK '%s' not found" % [file_name, field_name, item])
+	# 코드가 발행하는 스트링 키 (리터럴 스캔)
+	var key_regex := RegEx.new()
+	key_regex.compile(String(_config["key_regex"]))
+	for entry in _code_files:
+		var lines: Array = String(entry["source"]).split("\n")
+		for line_index in range(lines.size()):
+			for literal in _extract_literals(_strip_comment(lines[line_index])):
+				if literal.contains("/") or literal.contains(":") or literal.contains(" ") or literal.contains("%"):
+					continue
+				if key_regex.search(literal) == null:
+					continue
+				checked += 1
+				if not _strings.has(literal):
+					_fail("V2", "%s:%d: code-emitted key '%s' not in strings" % [entry["path"], line_index + 1, literal])
+	_report("V2", "references", checked, before_fail, before_warn)
+
+
+func _table_ids(file_name: String) -> Array:
+	var ids: Array = []
+	for row in _tables.get(file_name, []):
+		ids.append(String(row.get("id", "")))
+	return ids
+
+
+# ── V3 스트링 작성 규격: 최대 줄 수·줄당 자수 (상한값 = D04 §5.1~5.3 → 설정 데이터) ──
+func _run_v3_string_format() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	for key in _strings:
+		var rule := _write_rule_for(String(key))
+		if rule.is_empty():
+			continue
+		for language in _config["string_language_columns"]:
+			var value := String(_strings[key].get(language, ""))
+			if value == "":
+				continue
+			checked += 1
+			var value_lines := value.split("\n")
+			if value_lines.size() > int(rule["max_lines"]):
+				_fail("V3", "'%s' (%s): %d lines > max %d" % [key, language, value_lines.size(), int(rule["max_lines"])])
+			for value_line in value_lines:
+				var width := _weighted_chars(value_line)
+				if width > float(rule["max_chars_full"]):
+					_fail("V3", "'%s' (%s): line width %.1f > max %d" % [key, language, width, int(rule["max_chars_full"])])
+	_report("V3", "string format", checked, before_fail, before_warn)
+
+
+func _write_rule_for(key: String) -> Dictionary:
+	for rule in _config["string_write_rules"]:
+		for prefix in rule["domain_prefixes"]:
+			if key.begins_with(String(prefix)):
+				return rule
+	return {}
+
+
+# ── V4 텍스트 하드코딩: 코드 내 한글 리터럴 금지 (화이트리스트 = 마커 주석) ──
+func _run_v4_hardcoded_text() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	var marker := String(_config["v4_whitelist_marker"])
+	for entry in _code_files:
+		var lines: Array = String(entry["source"]).split("\n")
+		for line_index in range(lines.size()):
+			var raw_line := String(lines[line_index])
+			var code_line := _strip_comment(raw_line)
+			for literal in _extract_literals(code_line):
+				checked += 1
+				if _has_hangul(literal) and not raw_line.contains(marker):
+					_fail("V4", "%s:%d: hangul literal '%s'" % [entry["path"], line_index + 1, literal])
+	_report("V4", "hardcoded text", checked, before_fail, before_warn)
+
+
+# ── V5 앵커 결속 유형: anchor_type ∈ 허용 / tour_slot ∈ {1,5} (D08 §2.3 기계 이행) ──
+func _run_v5_anchor_binding() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	var rule: Dictionary = _config["anchor_rule"]
+	var anchor_field := String(rule["anchor_field"])
+	var slot_field := String(rule["tour_slot_field"])
+	for file_name in _tables:
+		for row in _tables[file_name]:
+			if row.has(anchor_field):
+				checked += 1
+				if not Array(rule["allowed_anchor_types"]).has(String(row[anchor_field]).strip_edges()):
+					_fail("V5", "%s[%s]: anchor_type '%s' not allowed" % [file_name, row.get("id", "?"), row[anchor_field]])
+			if row.has(slot_field):
+				checked += 1
+				var slot := String(row[slot_field]).strip_edges().to_int()
+				if not Array(rule["allowed_tour_slots"]).has(slot):
+					_fail("V5", "%s[%s]: tour_slot %d not in {1,5}" % [file_name, row.get("id", "?"), slot])
+	for file_name in _structures:
+		var structure: Dictionary = _structures[file_name]
+		if structure.has(anchor_field):
+			checked += 1
+			if not Array(rule["allowed_anchor_types"]).has(String(structure[anchor_field])):
+				_fail("V5", "%s: anchor_type '%s' not allowed" % [file_name, structure[anchor_field]])
+		if structure.has(slot_field):
+			checked += 1
+			if not Array(rule["allowed_tour_slots"]).has(int(structure[slot_field])):
+				_fail("V5", "%s: tour_slot not in {1,5}" % file_name)
+	_report("V5", "anchor binding", checked, before_fail, before_warn)
+
+
+# ── V6 ID 위생: 전역 유일·도메인 접두 = 차단 / 고아 데이터 = 경고 (D12 §4.2 V6 행) ──
+func _run_v6_id_hygiene() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	var seen: Dictionary = {}
+	var all_referenced: Dictionary = {}
+	# 참조 수집: FK 값 + 구조 참조 + 코드 리터럴
+	for file_name in _tables:
+		var columns: Dictionary = _config["tables"][file_name]["columns"]
+		for row in _tables[file_name]:
+			for column_name in columns:
+				if String(columns[column_name]).begins_with("fk:"):
+					all_referenced[String(row.get(column_name, "")).strip_edges()] = true
+	for file_name in _structures:
+		var spec: Dictionary = _config["structures"][file_name]
+		for field_name in spec["required"]:
+			if String(spec["required"][field_name]).begins_with("fk_array:"):
+				for item in _structures[file_name].get(field_name, []):
+					all_referenced[String(item)] = true
+	for entry in _code_files:
+		for line in String(entry["source"]).split("\n"):
+			for literal in _extract_literals(_strip_comment(line)):
+				all_referenced[literal] = true
+	# 유일성·접두·고아
+	for file_name in _tables:
+		var spec: Dictionary = _config["tables"][file_name]
+		var prefix := String(spec["id_prefix"])
+		var is_root := bool(spec.get("root", false))
+		for row in _tables[file_name]:
+			var row_id := String(row.get("id", "")).strip_edges()
+			checked += 1
+			if seen.has(row_id):
+				_fail("V6", "duplicate id '%s' (%s, %s)" % [row_id, seen[row_id], file_name])
+			seen[row_id] = file_name
+			if not row_id.begins_with(prefix):
+				_fail("V6", "%s: id '%s' missing domain prefix '%s'" % [file_name, row_id, prefix])
+			if not is_root and not all_referenced.has(row_id):
+				_warn("V6", "orphan instance '%s' in %s (unreferenced)" % [row_id, file_name])
+	# 스트링 키 고아 (경고): 코드·테이블·구조 어디서도 참조되지 않는 키
+	for file_name in _tables:
+		var columns: Dictionary = _config["tables"][file_name]["columns"]
+		for row in _tables[file_name]:
+			for column_name in columns:
+				if String(columns[column_name]) == "string_key":
+					all_referenced[String(row.get(column_name, "")).strip_edges()] = true
+	for file_name in _structures:
+		for field_name in _structures[file_name]:
+			if typeof(_structures[file_name][field_name]) == TYPE_STRING:
+				all_referenced[String(_structures[file_name][field_name])] = true
+	for key in _strings:
+		checked += 1
+		if not all_referenced.has(String(key)):
+			_warn("V6", "orphan string key '%s'" % key)
+	_report("V6", "id hygiene", checked, before_fail, before_warn)
+
+
+# ── V7 금칙 어휘 (경고 전용 — 차단 아님, D12 §4.2 확정): 발화 도메인 값 내 시스템 언어 후보 ──
+func _run_v7_forbidden_vocab() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	for key in _strings:
+		var in_domain := false
+		for prefix in _config["v7_domains"]:
+			if String(key).begins_with(String(prefix)):
+				in_domain = true
+				break
+		if not in_domain:
+			continue
+		for language in _config["string_language_columns"]:
+			var value := String(_strings[key].get(language, ""))
+			checked += 1
+			for term in _config["v7_terms"]:
+				if value.contains(String(term)):
+					_warn("V7", "'%s' (%s): candidate term '%s' — D04 트랙 검토 대상" % [key, language, term])
+	_report("V7", "forbidden vocab (warn-only)", checked, before_fail, before_warn)
+
+
+# ── V8 스트링 키 문법: camelCase 세그먼트·`.` 구분자 전속 (D12 §8.1 결정 #9) ──
+func _run_v8_key_grammar() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	var key_regex := RegEx.new()
+	key_regex.compile(String(_config["key_regex"]))
+	for key in _strings:
+		checked += 1
+		if key_regex.search(String(key)) == null:
+			_fail("V8", "invalid key grammar: '%s'" % key)
+	_report("V8", "key grammar", checked, before_fail, before_warn)
+
+
+# ── 혼입 0 스캔: core 디렉토리 내 플랫폼 API·분기·수익 코드 검출 (D12 §2.1) ──
+func _run_contamination_scan() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	var core_prefix := String(_config["core_dir"])
+	for entry in _code_files:
+		if not String(entry["path"]).begins_with(core_prefix):
+			continue
+		var lines: Array = String(entry["source"]).split("\n")
+		for line_index in range(lines.size()):
+			var code_line := _strip_comment(String(lines[line_index]))
+			checked += 1
+			for pattern in _config["contamination_patterns"]:
+				if code_line.contains(String(pattern)):
+					_fail("MIX0", "%s:%d: platform pattern '%s'" % [entry["path"], line_index + 1, pattern])
+	_report("MIX0", "core contamination scan", checked, before_fail, before_warn)

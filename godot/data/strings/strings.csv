@@ -11,7 +11,6 @@ ui.team.vulka,불카
 ui.team.gryphon,그리폰
 ui.team.silvertrail,실버트레일
 ui.team.cometworks,코멧 웍스
-ui.team.northwind,노스윈드
 ui.rival.lorentz,빅터 로렌츠
 ui.rival.maro,셀린 마로
 ui.rival.diaz,라몬 디아스
@@ -43,7 +42,6 @@ ui.debug.standings,순위표
 raceLog.gpStart01,{circuit} — 그리드 정렬 완료.
 raceLog.sectorStart01,랩 {lap} 섹터 {sector} 진입.
 raceLog.overtakeSuccess01,{target} 추월. 포지션 {rank}.
-raceLog.overtakeFail01,추월 불발. 대열 유지.
 raceLog.defendSuccess01,{target}의 공세를 막아냈다.
 raceLog.defendFail01,{target}에게 자리를 내줬다.
 raceLog.troubleHit01,머신 이상. 섀시 {amount}.
