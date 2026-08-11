@@ -32,12 +32,15 @@ bash tools/validators/run_tests.sh    # 또는 각 테스트를 console.exe로 �
 | 세이브 정책 층 | `godot/core/save/save_manager.gd` | 백업 1세대·마이그레이션(판번 3)·프로필 3·충돌 정책. **저장 전 `SaveManager.configure(data)` 필수** — 미설정 시 저장·로드가 실패한다 |
 | 연출 등급 | `godot/core/state/presentation_grade.gd` + `presentation_grades/triggers.csv` | 데이터·규칙 층 성립. **표현 채널 결선은 주력 머신 몫** (아트·사운드 유입 시점) |
 | 이벤트 시스템 | `godot/core/state/event_service.gd` · `condition_dsl.gd` · `events/event_categories.csv` | 발생 80% · 카테고리 배분 · 쿨다운 3회 · 변형 4축. 공통 풀 28종 + 무대 1 전용 4종 |
+| 아웃게임 전량 | `godot/core/state/outgame_state.gd` + 데이터 10표 | 재화·정비·튜닝 6계통·오버홀 12종·스킬 16종·크루·스폰서·관계 카운터·시설·소모품·결산 보상. **G1 역방향 환전 금지는 경로 부재로 이행** |
+| 서사 층 | `godot/core/state/narrative_service.gd` + `vn_slots/vane_lines/milestone_vn.csv` | VN 슬롯 상한 · 형식 A 전이(스킵 무관·재열람 멱등) · 베인 대사 3단계 필터 |
 | 시즌·투어 층 | `godot/core/state/season_state.gd` · `points_tier2.csv` · `season_calendar.json` | 챔피언십 2계층 · 결산 · 그리드 레벨 · 캘린더 셔플 · **레조넌스 추첨(투어 개막)** |
-| 테스트 스위트 6종 | `godot/tests/` | **8890검사** — TC-C 785 · TC-P 108 · EVENTS 7019 · SEASON 471 + 코어루프·세이브. 실행 = `bash tools/validators/run_tests.sh` |
+| 테스트 스위트 8종 | `godot/tests/` | **8809검사** — TC-C 895 · TC-P 119 · EVENTS 7019 · SEASON 471 · TC-O 237 · NARRATIVE 68 + 코어루프·세이브 |
+| **3중 게이트** | `tools/validators/run_tests.sh` · `tests/compile_gate.gd` | ①컴파일 게이트(전 `.gd` 로드) ②스위트 종료코드 ③**검사 수 하한**. 파스 에러가 게이트를 통과하던 구멍을 막았다 — 실측: 클래스 로드 실패 시 검사 수가 108 → 2로 붕괴했는데 exit=0이었다 (IMPL-054) |
 | 검증기 확장 | `tools/validators/` | 구조 중첩 배열 검사 · V4 표시 싱크 규칙 · V5 결함 교정 |
 | **아키텍처 정적 규칙** | `tools/validators/config.json` → `architecture_rules` | ①세이브 정책 층 우회 금지(`SaveService.*` 직접 호출은 `core/save`·`tests` 밖에서 차단) ②**코어 표준출력 금지**(`godot/core`의 `print(` 계열) — 테스트로 닫을 수 없는 두 축이다 |
 
-- **결정·[가안] 전량은 `docs/decisions/impl_log.md` IMPL-001~051.** 특히 IMPL-008~012·022·030·038은 D05/D13 해석 확정분이라 뒤집으면 정합이 깨진다 (IMPL-038은 IMPL-012의 압박 산식 부분 개정 — 시드 공격성 기준).
+- **결정·[가안] 전량은 `docs/decisions/impl_log.md` IMPL-001~058.** 특히 IMPL-008~012·022·030·038은 D05/D13 해석 확정분이라 뒤집으면 정합이 깨진다 (IMPL-038은 IMPL-012의 압박 산식 부분 개정 — 시드 공격성 기준).
 - **autoload는 여전히 0개다.** 추가하려면 대가(원격 헤드리스 작업 전체가 autoload 파손에 인질)를 먼저 검토하고 impl_log에 근거를 남긴다.
 
 ---
@@ -97,15 +100,21 @@ bash tools/validators/run_tests.sh    # 또는 각 테스트를 console.exe로 �
 
 ---
 
-## 3. 원격 레인이 계속 담당하는 것 (중복 작업 방지)
+## 3. 원격 레인 진행 상황 — **MS-2 원격 몫 완료**
 
 데이터 충전 · 로직·상태 머신 · 세이브 · 검증기 · 헤드리스 테스트.
 
-**완료:** 무대 1 서킷·속성 6축 · 레조넌스 · 세이브 정책 층 · 연출 등급 · 이벤트 시스템 · 조건 DSL · 시즌·투어 층(TC-C13) · 검증기 확장 · 아키텍처 정적 규칙.
+**완료 (전량):** 무대 1 서킷 4종·속성 6축 · 레조넌스 오버레이 · 세이브 정책 층(TC-P8·P9) ·
+연출 등급 L0~L3 · 이벤트 시스템·조건 DSL · 시즌·투어 층(TC-C13) · 아웃게임 전량(TC-O 8항) ·
+서사 층(TC-O4·TC-C8) · 검증기 확장 · 아키텍처 정적 규칙 · 3중 게이트.
 
-**남은 순번:** ①아웃게임 시스템 전량(D06·D07 — TC-O 8항. 개러지 G1~G4 · 튜닝·오버홀 12종 · 스폰서 · 스킬 16종 · 크루 · 관계 카운터 · 아카이브 · 환전 가드 G1~G4) ②스트링·VN 충전(D04 — 중계 로그 실텍스트 · 베인 대사 3단계 필터 · TC-O4 기록실 재열람) ③TC-C8 소프트 타임 리미트.
+**D14 시나리오 자동화 현황:** TC-C **13/13** · TC-O **8/8** · TC-P8·P9.
+남은 TC-P1~P7·P10·P11은 모바일 광고 빌드·스토어 제출물 전제로 MS-5 이후다.
 
----
+**원격에서 더 진행할 수 있는 것이 없다.** 다음 진전은 이 문서 §2의 주력 머신 몫 —
+D09 실화면(씬 소유권) · 아트 · 사운드 · G-1·G-2·G-5 실기 판정 — 에서만 나온다.
+그 결과가 나오면 원격이 이어받을 항목: 실화면 결속 후의 TL-2 기능 체크리스트,
+G-1·G-2 불통과 시의 데이터 조정 반영(총괄 경유), 무대 2~5 콘텐츠(MS-3 이후).
 
 ## 4. 사용자 판정 대기 — 작업 전 확인 필요
 
