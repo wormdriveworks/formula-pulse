@@ -13,8 +13,14 @@ cd "$(dirname "$0")/../.."
 GODOT="${GODOT:-godot}"
 
 printf '── compile gate\n'
-if ! "$GODOT" --headless --path godot --script tests/compile_gate.gd; then
-	printf '\nTESTS_FAIL compile gate\n'
+gate_output=$("$GODOT" --headless --path godot --script tests/compile_gate.gd 2>&1)
+gate_code=$?
+printf '%s\n' "$gate_output"
+# 게이트가 자기 파스 에러로 죽으면 종료코드는 잡히지만 진단이 사라진다 —
+# **성공 토큰의 부재 자체**를 실패로 본다 (게이트는 자기 자신을 검사하지 못한다).
+if [ "$gate_code" -ne 0 ] || ! printf '%s' "$gate_output" | grep -q "COMPILE_GATE_PASS"; then
+	printf '\nTESTS_FAIL compile gate (종료코드 %d · 성공 토큰 %s)\n' \
+		"$gate_code" "$(printf '%s' "$gate_output" | grep -q COMPILE_GATE_PASS && echo 있음 || echo 없음)"
 	exit 1
 fi
 
@@ -28,6 +34,7 @@ TESTS=(
 	"tests/test_season.gd:450"
 	"tests/test_tc_o.gd:239"
 	"tests/test_narrative.gd:68"
+	"tests/test_data_driven.gd:34"
 )
 failures=0
 for entry in "${TESTS[@]}"; do

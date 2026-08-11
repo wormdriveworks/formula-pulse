@@ -4,6 +4,12 @@ class_name GameData
 extends RefCounted
 
 const TABLES_DIR := "res://data/tables/"
+
+# 테이블 디렉토리 오버라이드 — **테스트가 값을 갈아 끼울 수 있게** 하는 유일한 목적이다.
+# 이것이 없으면 "코드가 데이터 대신 현재 값과 같은 리터럴을 쓰는" 결함을 잡을 방법이 없다:
+# 테스트가 기대값을 같은 데이터에서 읽는 한, 리터럴과 데이터가 일치하는 동안은 구분되지 않는다.
+# 오버라이드 디렉토리에 없는 파일은 기본 디렉토리에서 읽으므로 필요한 표만 갈아 끼운다.
+var tables_override_dir := ""
 const STRUCTURES_DIR := "res://data/structures/"
 const STRINGS_PATH := "res://data/strings/strings.csv"
 
@@ -183,7 +189,7 @@ func _structure_value(source: Dictionary, key: String, source_name: String, fall
 
 func _load_params() -> void:
 	params.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "core_params.csv"):
+	for row in CsvTable.load_rows(_table_path("core_params.csv")):
 		params[String(row["id"])] = CsvTable.to_float(String(row["value"]))
 	if params.is_empty():
 		_load_ok = false
@@ -191,7 +197,7 @@ func _load_params() -> void:
 
 func _load_symbols() -> void:
 	symbols.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "symbol_distribution.csv"):
+	for row in CsvTable.load_rows(_table_path("symbol_distribution.csv")):
 		symbols.append(row)
 	if symbols.is_empty():
 		_load_ok = false
@@ -199,7 +205,7 @@ func _load_symbols() -> void:
 
 func _load_match_effects() -> void:
 	match_effects.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "symbol_match_effects.csv"):
+	for row in CsvTable.load_rows(_table_path("symbol_match_effects.csv")):
 		var symbol_id := String(row["symbol_id"])
 		if not match_effects.has(symbol_id):
 			match_effects[symbol_id] = {}
@@ -210,19 +216,19 @@ func _load_match_effects() -> void:
 
 func _load_duel_conversion() -> void:
 	duel_conversion.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "duel_conversion.csv"):
+	for row in CsvTable.load_rows(_table_path("duel_conversion.csv")):
 		duel_conversion[String(row["symbol_id"])] = row
 
 
 func _load_teams() -> void:
 	teams.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "ai_teams.csv"):
+	for row in CsvTable.load_rows(_table_path("ai_teams.csv")):
 		teams[String(row["id"])] = row
 
 
 func _load_rivals() -> void:
 	rivals.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "ai_rivals.csv"):
+	for row in CsvTable.load_rows(_table_path("ai_rivals.csv")):
 		rivals.append(row)
 	if rivals.is_empty():
 		_load_ok = false
@@ -230,7 +236,7 @@ func _load_rivals() -> void:
 
 func _load_sector_attrs() -> void:
 	sector_attrs.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "sector_attributes.csv"):
+	for row in CsvTable.load_rows(_table_path("sector_attributes.csv")):
 		sector_attrs[String(row["id"])] = row
 	if sector_attrs.is_empty():
 		_load_ok = false
@@ -239,9 +245,9 @@ func _load_sector_attrs() -> void:
 func _load_presentation() -> void:
 	presentation_grades.clear()
 	presentation_triggers.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "presentation_grades.csv"):
+	for row in CsvTable.load_rows(_table_path("presentation_grades.csv")):
 		presentation_grades[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "presentation_triggers.csv"):
+	for row in CsvTable.load_rows(_table_path("presentation_triggers.csv")):
 		presentation_triggers[String(row["id"])] = row
 	if presentation_grades.is_empty() or presentation_triggers.is_empty():
 		_load_ok = false
@@ -267,9 +273,9 @@ func _load_events() -> void:
 	events.clear()
 	event_categories.clear()
 	event_variants.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "event_categories.csv"):
+	for row in CsvTable.load_rows(_table_path("event_categories.csv")):
 		event_categories[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "events.csv"):
+	for row in CsvTable.load_rows(_table_path("events.csv")):
 		events[String(row["id"])] = row
 	var variants_file := _load_json(STRUCTURES_DIR + "event_variants.json")
 	var variants: Variant = _structure_value(variants_file, "variants", "event_variants.json", {})
@@ -312,25 +318,25 @@ func _load_outgame() -> void:
 	relation_axes.clear()
 	consumables.clear()
 	settlement_rewards.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "garage_facilities.csv"):
+	for row in CsvTable.load_rows(_table_path("garage_facilities.csv")):
 		facilities[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "tuning_lines.csv"):
+	for row in CsvTable.load_rows(_table_path("tuning_lines.csv")):
 		tuning_lines[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "overhauls.csv"):
+	for row in CsvTable.load_rows(_table_path("overhauls.csv")):
 		overhauls[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "overhaul_slots.csv"):
+	for row in CsvTable.load_rows(_table_path("overhaul_slots.csv")):
 		overhaul_slots[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "skills.csv"):
+	for row in CsvTable.load_rows(_table_path("skills.csv")):
 		skills[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "crew.csv"):
+	for row in CsvTable.load_rows(_table_path("crew.csv")):
 		crew[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "sponsors.csv"):
+	for row in CsvTable.load_rows(_table_path("sponsors.csv")):
 		sponsors[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "relation_axes.csv"):
+	for row in CsvTable.load_rows(_table_path("relation_axes.csv")):
 		relation_axes[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "consumables.csv"):
+	for row in CsvTable.load_rows(_table_path("consumables.csv")):
 		consumables[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "settlement_rewards.csv"):
+	for row in CsvTable.load_rows(_table_path("settlement_rewards.csv")):
 		settlement_rewards[String(row["id"])] = row
 	if facilities.is_empty() or tuning_lines.is_empty() or overhauls.is_empty() or overhaul_slots.is_empty() or skills.is_empty() or crew.is_empty() or sponsors.is_empty() or relation_axes.is_empty() or consumables.is_empty() or settlement_rewards.is_empty():
 		_load_ok = false
@@ -388,11 +394,11 @@ func _load_narrative() -> void:
 	vn_slots.clear()
 	vane_lines.clear()
 	milestone_vn.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "vn_slots.csv"):
+	for row in CsvTable.load_rows(_table_path("vn_slots.csv")):
 		vn_slots[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "vane_lines.csv"):
+	for row in CsvTable.load_rows(_table_path("vane_lines.csv")):
 		vane_lines[String(row["id"])] = row
-	for row in CsvTable.load_rows(TABLES_DIR + "milestone_vn.csv"):
+	for row in CsvTable.load_rows(_table_path("milestone_vn.csv")):
 		milestone_vn[String(row["id"])] = row
 	if vn_slots.is_empty() or vane_lines.is_empty() or milestone_vn.is_empty():
 		_load_ok = false
@@ -414,16 +420,25 @@ func milestone_vn_row(vn_id: String) -> Dictionary:
 
 func _load_points() -> void:
 	points_tier1.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "points_tier1.csv"):
+	for row in CsvTable.load_rows(_table_path("points_tier1.csv")):
 		points_tier1[CsvTable.to_int(String(row["position"]))] = CsvTable.to_int(String(row["points"]))
 
 
 func _load_points_tier2() -> void:
 	points_tier2.clear()
-	for row in CsvTable.load_rows(TABLES_DIR + "points_tier2.csv"):
+	for row in CsvTable.load_rows(_table_path("points_tier2.csv")):
 		points_tier2[CsvTable.to_int(String(row["position"]))] = CsvTable.to_int(String(row["points"]))
 	if points_tier2.is_empty():
 		_load_ok = false
+
+
+# 오버라이드에 파일이 있으면 그쪽, 없으면 기본. 파일 단위 대체이므로 픽스처가 최소로 유지된다.
+func _table_path(file_name: String) -> String:
+	if tables_override_dir != "":
+		var candidate := tables_override_dir + file_name
+		if FileAccess.file_exists(candidate):
+			return candidate
+	return TABLES_DIR + file_name
 
 
 func _load_json(path: String) -> Dictionary:
