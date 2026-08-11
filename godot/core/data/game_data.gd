@@ -14,6 +14,8 @@ var duel_conversion: Dictionary = {}   # symbol_id -> 환산 행
 var teams: Dictionary = {}             # team_id -> 행
 var rivals: Array[Dictionary] = []     # ai_rivals 행 (등재 순서 유지)
 var points_tier1: Dictionary = {}      # position(int) -> points(int)
+var points_tier2: Dictionary = {}      # position(int) -> 챔피언십 포인트 (D05 §9.4 2층)
+var season_calendar: Dictionary = {}   # 구조 JSON (D08 §2 캘린더 규칙)
 var sector_attrs: Dictionary = {}      # attr_* id -> 행 (속성 6축 — D13 별첨A §1.3)
 var presentation_grades: Dictionary = {}   # grade_* id -> 행 (연출 등급 — D12 §5.8)
 var events: Dictionary = {}            # event_* id -> 행 (D08 §7 · D12 §5.4)
@@ -46,11 +48,13 @@ func load_all() -> bool:
 	_load_teams()
 	_load_rivals()
 	_load_points()
+	_load_points_tier2()
 	_load_sector_attrs()
 	_load_presentation()
 	_load_events()
 	_load_content()
 	grid = _load_json(STRUCTURES_DIR + "grid_debug.json")
+	season_calendar = _load_json(STRUCTURES_DIR + "season_calendar.json")
 	if not strings.load_file(STRINGS_PATH):
 		_load_ok = false
 	return _load_ok
@@ -286,6 +290,14 @@ func _load_points() -> void:
 	points_tier1.clear()
 	for row in CsvTable.load_rows(TABLES_DIR + "points_tier1.csv"):
 		points_tier1[CsvTable.to_int(String(row["position"]))] = CsvTable.to_int(String(row["points"]))
+
+
+func _load_points_tier2() -> void:
+	points_tier2.clear()
+	for row in CsvTable.load_rows(TABLES_DIR + "points_tier2.csv"):
+		points_tier2[CsvTable.to_int(String(row["position"]))] = CsvTable.to_int(String(row["points"]))
+	if points_tier2.is_empty():
+		_load_ok = false
 
 
 func _load_json(path: String) -> Dictionary:

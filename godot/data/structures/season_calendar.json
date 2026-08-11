@@ -1,0 +1,9 @@
+{
+	"schema_version": 1,
+	"id": "season_calendar",
+	"tours_per_season": 5,
+	"races_per_tour": 4,
+	"fixed_opening_stage": "stage_metro_night",
+	"fixed_final_stage": "",
+	"shuffle_pool": []
+}

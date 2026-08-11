@@ -162,6 +162,15 @@
     "name_key": "string_key",
     "scope": "enum:common,stage"
    }
+  },
+  "points_tier2.csv": {
+   "id_prefix": "point2_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "position": "int:1,16",
+    "points": "int"
+   }
   }
  },
  "structures": {
@@ -230,6 +239,17 @@
    "root": true,
    "required": {
     "id": "string"
+   }
+  },
+  "season_calendar.json": {
+   "root": true,
+   "required": {
+    "id": "string",
+    "tours_per_season": "int:1,9",
+    "races_per_tour": "int:1,9",
+    "fixed_opening_stage": "structure_ref",
+    "fixed_final_stage": "string",
+    "shuffle_pool": "structure_ref_array"
    }
   }
  },

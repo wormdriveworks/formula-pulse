@@ -11,6 +11,7 @@ TESTS=(
 	tests/test_tc_c.gd
 	tests/test_tc_p.gd
 	tests/test_events.gd
+	tests/test_season.gd
 )
 failures=0
 for test_path in "${TESTS[@]}"; do
