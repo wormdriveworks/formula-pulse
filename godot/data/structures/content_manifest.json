@@ -1,0 +1,8 @@
+{
+	"schema_version": 1,
+	"id": "content_manifest",
+	"stages": ["stage_metro_night"],
+	"circuits": ["circuit_mn1", "circuit_mn2", "circuit_mn3", "circuit_mn4"],
+	"scripted_losses": ["scripted_loss_s1"],
+	"default_circuit": "circuit_mn1"
+}

@@ -5,7 +5,6 @@ ui.symbol.line,라인
 ui.symbol.pulse,펄스
 ui.symbol.trouble,트러블
 ui.symbol.chance,찬스
-ui.circuit.debug01,디버그 서킷
 ui.stage.metroNight,메트로 나이트
 ui.circuit.mn1,하버 프런트
 ui.circuit.mn2,크로스타운
@@ -93,3 +92,5 @@ vane.brief.holdRespin01,후보 고정. 잔여 재연산.
 vane.brief.negate01,트러블 변수 소거.
 vane.brief.timeout01,궤도 재계산. 계속합니다.
 vane.brief.duel01,결판 국면. 연산 집중.
+raceLog.resonanceEnter01,미승인 출력이 감지된다.
+raceLog.resonanceProc01,레조넌스 — 출력이 넘친다.

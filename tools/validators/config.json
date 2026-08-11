@@ -109,9 +109,15 @@
 	},
 
 	"structures": {
-		"circuit_debug.json": {
+		"content_manifest.json": {
 			"root": true,
-			"required": {"id": "string", "name_key": "string_key", "laps": "int", "sectors_per_lap": "int"}
+			"required": {
+				"id": "string",
+				"stages": "structure_ref_array",
+				"circuits": "structure_ref_array",
+				"scripted_losses": "structure_ref_array",
+				"default_circuit": "structure_ref"
+			}
 		},
 		"grid_debug.json": {
 			"root": true,

@@ -46,6 +46,13 @@ var duel_opponent: String = ""
 var current_turn_is_duel: bool = false
 var _armed_duel: int = RaceTypes.DuelType.NONE
 
+# 레조넌스 섹터 오버레이 (D08 §3.7 · D13 별첨A §6.6)
+# 추첨은 투어 층 소관(투어 개막 1회 · resonance 스트림) — 엔진은 주입된 슬롯을 소비한다.
+# 위치는 진입 전까지 어떤 출력 경로에도 노출하지 않는다 (R6 위치 비공개).
+var resonance_sector_slot: int = 0     # 0 = 이 서킷에 오버레이 없음
+var resonance_announced: bool = false
+var resonance_duel_bonus: float = 0.0  # 차기 듀얼 판정 보정 (D13 별첨A §2.4 '레조넌스 보정')
+
 var finished: bool = false
 var result: Dictionary = {}
 
@@ -79,6 +86,8 @@ func start_gp() -> Array:
 	front_gauge = 0.0
 	rear_gauge = 0.0
 	pending_duel = RaceTypes.DuelType.NONE
+	resonance_announced = false
+	resonance_duel_bonus = 0.0
 	finished = false
 	result = {}
 	_build_entrants()
@@ -204,6 +213,10 @@ func begin_turn() -> Dictionary:
 				_ev("T1", "vane.brief.sector01", {"sector": sector}),
 			],
 		}
+		# 레조넌스 위치는 비공개이며 진입 시점에만 공표한다 (D08 §3.7 R6).
+		if _is_resonance_sector() and not resonance_announced:
+			resonance_announced = true
+			info["events"].append(_ev("T1", "raceLog.resonanceEnter01", {}))
 	turn_number += 1
 	turn_phase = RaceTypes.TurnPhase.T1_SECTOR_OPEN
 	provisional = []
@@ -225,12 +238,48 @@ func spin() -> void:
 
 
 func _roll_reel(reel_index: int) -> String:
-	var weights: Array = []
-	var column := "prob_reel%d" % (reel_index + 1)
-	for row in data.symbols:
-		weights.append(CsvTable.to_float(String(row[column])))
+	var weights := _reel_weights(reel_index)
 	var picked := rng.pick_weighted("reel", weights)
 	return String(data.symbols[picked]["id"])
+
+
+# 섹터 속성 가중 (D13 별첨A §1.3): 기본 분포에 주속성 Δ 가산, 부속성은 ½ 적용.
+# 음수는 0으로 절단 후 재정규화 — pick_weighted가 합으로 나누므로 비례는 유지된다.
+func _reel_weights(reel_index: int) -> Array:
+	var column := "prob_reel%d" % (reel_index + 1)
+	var main_attr := data.sector_attr(_sector_attr_id("main_attr"))
+	var sub_attr := data.sector_attr(_sector_attr_id("sub_attr"))
+	var weights: Array = []
+	for row in data.symbols:
+		var weight := CsvTable.to_float(String(row[column]))
+		var column_name := "w_%s" % String(row["class"])
+		if not main_attr.is_empty():
+			weight += CsvTable.to_float(String(main_attr[column_name]))
+		if not sub_attr.is_empty():
+			weight += CsvTable.to_float(String(sub_attr[column_name])) * 0.5
+		weights.append(maxf(weight, 0.0))
+	return weights
+
+
+# 듀얼 턴은 섹터 비소모 삽입 턴이므로 직전 섹터의 속성을 유지한다 (IMPL-008).
+func _sector_attr_id(field: String) -> String:
+	var entry := data.sector_entry(clampi(sector, 1, data.circuit_int("sectors_per_lap")))
+	return String(entry.get(field, ""))
+
+
+# 속성 규칙 계수 — 주속성 전액 · 부속성은 ½ 적용분을 1.0 기준으로 환산.
+# [가안] D13 별첨A §1.3의 "부속성은 ½ 적용"은 심볼 분포 가산에 대한 문면이고
+# 규칙 계수(섀시 ×1.15 · 게이지 ×1.5)의 부속성 처리는 정본이 침묵한다.
+# 문서 자체의 ½ 관용을 배수에 동형 적용했다(1.5 → 1.25). impl_log 등재.
+func _attr_rule_mult(column_name: String) -> float:
+	var mult := 1.0
+	var main_attr := data.sector_attr(_sector_attr_id("main_attr"))
+	if not main_attr.is_empty():
+		mult *= CsvTable.to_float(String(main_attr[column_name]), 1.0)
+	var sub_attr := data.sector_attr(_sector_attr_id("sub_attr"))
+	if not sub_attr.is_empty():
+		mult *= 1.0 + (CsvTable.to_float(String(sub_attr[column_name]), 1.0) - 1.0) * 0.5
+	return mult
 
 
 # T3 전개 후보 — 표시 층이 릴 정지 연출 완료 후 조회 (봉인 규칙 §6.3)
@@ -318,10 +367,15 @@ func _settle_sector(momentum: bool) -> Array:
 	for stage in RaceTypes.SETTLE_ORDER:
 		match stage:
 			RaceTypes.SettleStage.STAGE_1_HAZARD:
+				# 해저드 속성의 턴당 가산 소모 −1.0 (D13 별첨A §2.3 — ×1.15 계수와 별도).
+				# 위험 단계에 둔다: 트러블 유무와 무관한 속성 소모이고 단계 ①이 위험 소관이다.
+				var hazard_wear := _attr_rule_mult("chassis_wear_mult")
+				if hazard_wear > 1.0:
+					chassis -= data.param("param_chassis_hazard_per_turn")
 				if trouble_count > 0:
 					trouble_fired = true
 					var effect := _match_effect(RaceTypes.SYMBOL_TROUBLE, trouble_count)
-					var chassis_delta := CsvTable.to_float(String(effect["chassis"]))
+					var chassis_delta := CsvTable.to_float(String(effect["chassis"])) * hazard_wear
 					chassis += chassis_delta
 					rear_gauge += CsvTable.to_float(String(effect["rear_gauge"])) * gauge_mult
 					events.append(_ev("T5", "raceLog.troubleHit01", {"amount": chassis_delta}))
@@ -333,6 +387,7 @@ func _settle_sector(momentum: bool) -> Array:
 					var stable_gain := data.param_int("param_charge_stable_sector")
 					_gain_charge(stable_gain)
 					events.append(_ev("T5", "raceLog.stableSector01", {"amount": stable_gain}))
+				events.append_array(_apply_resonance_bonus(gauge_mult))
 			RaceTypes.SettleStage.STAGE_3_DEFENSE:
 				var braking_count := _count_symbol(RaceTypes.SYMBOL_BRAKING)
 				if braking_count > 0:
@@ -382,6 +437,47 @@ func _settle_sector(momentum: bool) -> Array:
 			RaceTypes.SettleStage.STAGE_8_BACKGROUND_AI:
 				events.append_array(_background_ai())
 	return events
+
+
+# 레조넌스 보너스 (D08 §3.7 R3 · D13 별첨A §6.6) — 임의 분류 3매치 성립 시 무대별 보너스 추가.
+# 통상 정산은 그대로 유지하며 여기서 '추가'만 한다 (트러블 3매치도 성공 인정 — R3 명문).
+# C-2 구속: 신규 단계·신규 타이밍 창 없이 단계 ②의 파라미터 가산으로만 소비한다.
+func _apply_resonance_bonus(gauge_mult: float) -> Array:
+	if not _is_resonance_sector():
+		return []
+	if not _has_any_three_match():
+		return []
+	var stage := data.stage_of_active_circuit()
+	var bonus_type := String(stage.get("resonance_bonus_type", ""))
+	var bonus_value := float(stage.get("resonance_bonus_value", 0.0))
+	var events: Array = [_ev("T5", "raceLog.resonanceProc01", {})]
+	match bonus_type:
+		"charge":
+			_gain_charge(int(bonus_value))
+		"front_gauge":
+			# [가안] 보너스는 명시 절대값으로 가산 — 게이지 계수(×1.5·×1.2)를 곱하지 않는다.
+			# (무대 1 보너스는 차지이므로 MS-2 범위에서는 비활성 경로. impl_log 등재)
+			front_gauge += bonus_value
+		"front_gauge_full":
+			front_gauge = data.param("param_gauge_full_threshold")
+		"duel_judgment":
+			resonance_duel_bonus += bonus_value
+		"chassis":
+			chassis = minf(chassis + bonus_value, data.param("param_chassis_max"))
+		_:
+			push_error("RaceEngine: unknown resonance bonus type '%s'" % bonus_type)
+	return events
+
+
+# 플레이어 전용 · 섹터 릴 정산 전속 (R7) — 듀얼 정산은 단계 ②를 돌지 않으므로 구조적으로 무관여.
+func _is_resonance_sector() -> bool:
+	return resonance_sector_slot > 0 and sector == resonance_sector_slot and not current_turn_is_duel
+
+
+func _has_any_three_match() -> bool:
+	if provisional.size() < 3:
+		return false
+	return provisional[0] == provisional[1] and provisional[1] == provisional[2]
 
 
 # 듀얼 턴 정산 — 전용 스핀: 심볼은 판정 환산 전속, 통상 효과 미적용 [가안 — impl_log]
@@ -435,6 +531,7 @@ func _resolve_duel() -> Array:
 			_swap_with(opponent_id)
 			events.append(_ev("T5", "raceLog.duelLoseDefense01", {}))
 			events.append(_ev("T5", "raceLog.defendFail01", {"target": entrants[opponent_id]["name_key"]}))
+	resonance_duel_bonus = 0.0  # 차기 듀얼 1회 소비 (D13 별첨A §6.6 '차기 듀얼 판정')
 	front_gauge = 0.0
 	rear_gauge = 0.0
 	_retarget(true, true)
@@ -455,6 +552,7 @@ func _duel_judgment(duel_type: int) -> float:
 	var trouble_count := _count_symbol(RaceTypes.SYMBOL_TROUBLE) - negated_troubles
 	judgment += CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_TROUBLE]["per_symbol"])) * maxi(trouble_count, 0)
 	judgment += float(duel_boost) * data.param("param_charge_boost_per_judgment")
+	judgment += resonance_duel_bonus
 	return judgment
 
 
@@ -474,8 +572,12 @@ func _duel_threshold(duel_type: int, opponent_id: String) -> float:
 
 # ── 게이지 보조 ──
 # 최종 랩 계수 ×1.2 전역 (D13 별첨A §1.3) — 게이지 증감 전체에 곱 적용 [가안]
+# 배틀 존 ×1.5와는 곱 적용 (별첨A §1.3 명문 — 최대 ×1.8)
 func _gauge_mult() -> float:
-	return data.param("param_gauge_final_lap_mult") if lap >= data.circuit_int("laps") else 1.0
+	var mult := _attr_rule_mult("gauge_mult")
+	if lap >= data.circuit_int("laps"):
+		mult *= data.param("param_gauge_final_lap_mult")
+	return mult
 
 
 # 앞차 저항·뒤차 압박 (D13 별첨A §2.1) — 만충 판정 직전 적용 [가안 — 8단계 내 배치]
@@ -704,6 +806,9 @@ func serialize() -> Dictionary:
 		"duel_boost": duel_boost,
 		"pending_duel": pending_duel, "duel_opponent": duel_opponent,
 		"current_turn_is_duel": current_turn_is_duel,
+		"resonance_sector_slot": resonance_sector_slot,
+		"resonance_announced": resonance_announced,
+		"resonance_duel_bonus": resonance_duel_bonus,
 		"finished": finished, "result": result.duplicate(true),
 		"rng": rng.serialize(),
 	}
@@ -735,6 +840,9 @@ func restore(payload: Dictionary) -> bool:
 	pending_duel = int(payload["pending_duel"])
 	duel_opponent = String(payload["duel_opponent"])
 	current_turn_is_duel = bool(payload["current_turn_is_duel"])
+	resonance_sector_slot = int(payload["resonance_sector_slot"])
+	resonance_announced = bool(payload["resonance_announced"])
+	resonance_duel_bonus = float(payload["resonance_duel_bonus"])
 	finished = bool(payload["finished"])
 	result = payload.get("result", {})
 	return true
