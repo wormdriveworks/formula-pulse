@@ -273,5 +273,18 @@
   "text",
   "tooltip_text",
   "placeholder_text"
+ ],
+ "key_scan_excluded_suffixes": [
+  ".json",
+  ".csv",
+  ".tsv",
+  ".tres",
+  ".tscn",
+  ".gd",
+  ".cfg",
+  ".png",
+  ".ogg",
+  ".wav",
+  ".bak"
  ]
 }

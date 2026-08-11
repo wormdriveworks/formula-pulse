@@ -440,6 +440,10 @@ func _run_v2_references() -> void:
 			for literal in _extract_literals(_strip_comment(lines[line_index])):
 				if literal.contains("/") or literal.contains(":") or literal.contains(" ") or literal.contains("%"):
 					continue
+				# 파일명은 스트링 키와 형태가 겹친다(`progress.json` = 2단 키 문법 통과).
+				# 스트링 키의 마지막 단이 파일 확장자인 경우는 없으므로 확장자로 갈라낸다.
+				if _has_file_suffix(literal):
+					continue
 				if key_regex.search(literal) == null:
 					continue
 				checked += 1
@@ -482,6 +486,13 @@ func _check_reference(location: String, type_spec: String, value: String, struct
 			_fail("V2", "%s: FK '%s' not found in %s" % [location, value, type_spec.substr(3)])
 		return 1
 	return 0
+
+
+func _has_file_suffix(literal: String) -> bool:
+	for suffix in _config.get("key_scan_excluded_suffixes", []):
+		if literal.ends_with(String(suffix)):
+			return true
+	return false
 
 
 func _table_ids(file_name: String) -> Array:

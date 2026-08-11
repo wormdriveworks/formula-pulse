@@ -28,6 +28,4 @@ jobs:
         run: godot --headless --path godot --import || true
 
       - name: Logic tests
-        run: |
-          godot --headless --path godot --script tests/test_core_loop.gd
-          godot --headless --path godot --script tests/test_save_reload.gd
+        run: bash tools/validators/run_tests.sh
