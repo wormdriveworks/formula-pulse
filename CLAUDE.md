@@ -127,6 +127,9 @@ godot/adapters/  플랫폼 어댑터 인터페이스 (추상 계약 — D12 §2.
 godot/platform/  desktop(Steam·IAdService 널 구현) / mobile(광고·수명주기)
 godot/ui/        화면 층 (D09/D09-2)
 godot/data/      콘텐츠 데이터 (tables=CSV·structures=JSON·strings=CSV)
+godot/assets/    아트·사운드 실물 — D10 §8.2 카테고리별 하위 (characters/vane/machines/
+                 scenecuts/ui/{icons,frames}/glyphs/fonts/palettes/backgrounds/illustrations)
+                 에셋 ID = `A-<분류>-##` (D10 §8.1) · `.import` 커밋 필수 (IMPL-003·IMPL-021)
 tools/validators/ 빌드 기계 검증기 V1~V8 + 혼입 0 스캔 (CI = TL-1)
 ```
 

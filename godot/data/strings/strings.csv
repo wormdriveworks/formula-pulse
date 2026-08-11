@@ -6,6 +6,35 @@ ui.symbol.pulse,펄스
 ui.symbol.trouble,트러블
 ui.symbol.chance,찬스
 ui.circuit.debug01,디버그 서킷
+ui.stage.metroNight,메트로 나이트
+ui.circuit.mn1,하버 프런트
+ui.circuit.mn2,크로스타운
+ui.circuit.mn3,올드 쿼터
+ui.circuit.mn4,그랜드 서큘러
+ui.sector.mn1s1,하버 대로
+ui.sector.mn1s2,창고 지구 시케인
+ui.sector.mn1s3,베이사이드 커브
+ui.sector.mn1s4,피니시 스트레치
+ui.sector.mn2s1,고가 하이웨이
+ui.sector.mn2s2,인터체인지 램프
+ui.sector.mn2s3,교차로 시케인
+ui.sector.mn2s4,리버사이드 대로
+ui.sector.mn2s5,스타디움 앞 직선
+ui.sector.mn3s1,골목 에스
+ui.sector.mn3s2,전차 궤도 구간
+ui.sector.mn3s3,강변 지하차도
+ui.sector.mn3s4,시계탑 광장 헤어핀
+ui.sector.mn4s1,개선 대로
+ui.sector.mn4s2,서큘러 스위프
+ui.sector.mn4s3,관청가 시케인
+ui.sector.mn4s4,구시가 접속부
+ui.sector.mn4s5,그랜드 피니시
+ui.sectorAttr.straight,스트레이트
+ui.sectorAttr.technical,테크니컬
+ui.sectorAttr.sweeper,스위퍼
+ui.sectorAttr.hazard,해저드
+ui.sectorAttr.battleZone,배틀 존
+ui.sectorAttr.pulseSection,펄스 섹션
 ui.team.axion,악시온
 ui.team.vulka,불카
 ui.team.gryphon,그리폰

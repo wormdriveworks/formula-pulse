@@ -1,0 +1,16 @@
+{
+	"schema_version": 1,
+	"id": "circuit_mn4",
+	"name_key": "ui.circuit.mn4",
+	"stage_id": "stage_metro_night",
+	"tour_slot_role": "finisher",
+	"laps": 3,
+	"sectors_per_lap": 5,
+	"sectors": [
+		{"slot": 1, "name_key": "ui.sector.mn4s1", "main_attr": "attr_straight", "sub_attr": ""},
+		{"slot": 2, "name_key": "ui.sector.mn4s2", "main_attr": "attr_sweeper", "sub_attr": ""},
+		{"slot": 3, "name_key": "ui.sector.mn4s3", "main_attr": "attr_technical", "sub_attr": ""},
+		{"slot": 4, "name_key": "ui.sector.mn4s4", "main_attr": "attr_hazard", "sub_attr": "attr_technical"},
+		{"slot": 5, "name_key": "ui.sector.mn4s5", "main_attr": "attr_battle_zone", "sub_attr": "attr_straight"}
+	]
+}

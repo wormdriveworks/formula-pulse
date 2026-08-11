@@ -1,0 +1,10 @@
+{
+	"schema_version": 1,
+	"id": "stage_metro_night",
+	"name_key": "ui.stage.metroNight",
+	"season1_tour_slot": 1,
+	"circuits": ["circuit_mn1", "circuit_mn2", "circuit_mn3", "circuit_mn4"],
+	"wall_rival": "",
+	"resonance_bonus_type": "charge",
+	"resonance_bonus_value": 2
+}

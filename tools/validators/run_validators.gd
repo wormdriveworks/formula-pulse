@@ -249,16 +249,95 @@ func _run_v1_schema() -> void:
 					continue
 				_check_value(String(file_name), String(columns[column_name]), String(row[column_name]), String(row.get("id", "?")), column_name)
 	for file_name in _config["structures"]:
-		var spec: Dictionary = _config["structures"][file_name]
+		var spec := _structure_spec(String(file_name))
 		var structure: Dictionary = _structures[file_name]
 		checked += 1
 		if structure.is_empty():
 			_fail("V1", "%s: empty or invalid JSON" % file_name)
 			continue
-		for field_name in spec["required"]:
+		var required: Dictionary = spec["required"]
+		for field_name in required:
 			if not structure.has(field_name):
 				_fail("V1", "%s: missing field '%s'" % [file_name, field_name])
+				continue
+			# 구조 JSON도 테이블과 동일하게 타입 검사한다 — 존재만 확인하면
+			# `"laps": "three"` 류가 통과해 런타임까지 흘러간다.
+			_check_value(String(file_name), String(required[field_name]),
+				_scalar_text(structure[field_name]), String(structure.get("id", "?")), String(field_name))
+		for array_field in spec["arrays"]:
+			checked += _check_structure_array(String(file_name), structure, String(array_field), spec["arrays"][array_field])
 	_report("V1", "schema", checked, before_fail, before_warn)
+
+
+# 구조 JSON의 `template` 참조를 해소한다 (동형 구조 반복 정의 방지 — 서킷 20종 대비).
+func _structure_spec(file_name: String) -> Dictionary:
+	var spec: Dictionary = _config["structures"][file_name]
+	if spec.has("template"):
+		var templates: Dictionary = _config.get("structure_templates", {})
+		var template_name := String(spec["template"])
+		if not templates.has(template_name):
+			_fail("V1", "%s: unknown structure template '%s'" % [file_name, template_name])
+			return {"required": {}, "arrays": {}}
+		spec = templates[template_name]
+	return {"required": spec.get("required", {}), "arrays": spec.get("arrays", {})}
+
+
+# 중첩 배열(서킷의 sectors 등) 검사: 원소 수 = 선언 필드와 일치 · 원소별 필수 필드 타입 검사.
+func _check_structure_array(file_name: String, structure: Dictionary, array_field: String, array_spec: Dictionary) -> int:
+	var checked := 0
+	if not structure.has(array_field):
+		_fail("V1", "%s: missing array '%s'" % [file_name, array_field])
+		return 1
+	var items: Variant = structure[array_field]
+	if typeof(items) != TYPE_ARRAY:
+		_fail("V1", "%s.%s: not an array" % [file_name, array_field])
+		return 1
+	var count_field := String(array_spec.get("count_field", ""))
+	if count_field != "":
+		var declared := int(structure.get(count_field, -1))
+		if Array(items).size() != declared:
+			_fail("V1", "%s.%s: %d entries but %s = %d" % [file_name, array_field, Array(items).size(), count_field, declared])
+	var required: Dictionary = array_spec.get("required", {})
+	for index in range(Array(items).size()):
+		var item: Variant = Array(items)[index]
+		checked += 1
+		if typeof(item) != TYPE_DICTIONARY:
+			_fail("V1", "%s.%s[%d]: not an object" % [file_name, array_field, index])
+			continue
+		var entry: Dictionary = item
+		for field_name in required:
+			if not entry.has(field_name):
+				_fail("V1", "%s.%s[%d]: missing field '%s'" % [file_name, array_field, index, field_name])
+				continue
+			_check_value("%s.%s[%d]" % [file_name, array_field, index], String(required[field_name]),
+				_scalar_text(entry[field_name]), String(structure.get("id", "?")), String(field_name))
+	return checked
+
+
+# JSON 스칼라를 검사용 문자열로 — 정수는 "3.0"이 아니라 "3"으로 (int 범위 검사 표기 보존).
+func _scalar_text(value: Variant) -> String:
+	match typeof(value):
+		TYPE_STRING:
+			return String(value)
+		TYPE_INT:
+			return str(int(value))
+		TYPE_FLOAT:
+			return str(float(value))
+		TYPE_BOOL:
+			return "true" if bool(value) else "false"
+		TYPE_ARRAY:
+			return "[array]"
+		_:
+			return "[object]"
+
+
+func _structure_ids() -> Array:
+	var ids: Array = []
+	for file_name in _structures:
+		var id_value := String(_structures[file_name].get("id", ""))
+		if id_value != "":
+			ids.append(id_value)
+	return ids
 
 
 func _check_value(file_name: String, type_spec: String, value: String, row_id: String, column_name: String) -> void:
@@ -290,7 +369,7 @@ func _check_value(file_name: String, type_spec: String, value: String, row_id: S
 		"enum_optional":
 			if trimmed != "" and not Array(parts[1].split(",")).has(trimmed):
 				_fail("V1", "%s[%s].%s: '%s' not in enum {%s}" % [file_name, row_id, column_name, trimmed, parts[1]])
-		"string_key", "fk", "fk_array", "string":
+		"string_key", "fk", "fk_optional", "fk_array", "string", "structure_ref", "structure_ref_array":
 			pass  # V2 소관
 		_:
 			_warn("V1", "unknown type spec '%s'" % type_spec)
@@ -317,22 +396,41 @@ func _run_v2_references() -> void:
 					checked += 1
 					if not _table_ids(type_spec.substr(3)).has(value):
 						_fail("V2", "%s[%s].%s: FK '%s' not found in %s" % [file_name, row.get("id", "?"), column_name, value, type_spec.substr(3)])
-	# 구조 JSON
+	# 구조 JSON (중첩 배열 포함 — 배열 안의 참조도 동일 규격으로 검사)
+	var structure_ids := _structure_ids()
 	for file_name in _config["structures"]:
-		var spec: Dictionary = _config["structures"][file_name]
+		var spec := _structure_spec(String(file_name))
 		var structure: Dictionary = _structures[file_name]
-		for field_name in spec["required"]:
-			var type_spec := String(spec["required"][field_name])
-			if type_spec == "string_key":
-				checked += 1
-				if not _strings.has(String(structure.get(field_name, ""))):
-					_fail("V2", "%s.%s: string key '%s' not found" % [file_name, field_name, structure.get(field_name, "")])
+		var required: Dictionary = spec["required"]
+		for field_name in required:
+			var type_spec := String(required[field_name])
+			if type_spec == "structure_ref_array":
+				for item in structure.get(field_name, []):
+					checked += 1
+					if not structure_ids.has(String(item)):
+						_fail("V2", "%s.%s: structure ref '%s' not found" % [file_name, field_name, item])
 			elif type_spec.begins_with("fk_array:"):
 				var target_ids := _table_ids(type_spec.substr(9))
 				for item in structure.get(field_name, []):
 					checked += 1
 					if not target_ids.has(String(item)):
 						_fail("V2", "%s.%s: FK '%s' not found" % [file_name, field_name, item])
+			else:
+				checked += _check_reference("%s.%s" % [file_name, field_name], type_spec,
+					_scalar_text(structure.get(field_name, "")), structure_ids)
+		for array_field in spec["arrays"]:
+			var array_required: Dictionary = spec["arrays"][array_field].get("required", {})
+			var items: Variant = structure.get(array_field, [])
+			if typeof(items) != TYPE_ARRAY:
+				continue
+			for index in range(Array(items).size()):
+				var item: Variant = Array(items)[index]
+				if typeof(item) != TYPE_DICTIONARY:
+					continue
+				var entry: Dictionary = item
+				for field_name2 in array_required:
+					checked += _check_reference("%s.%s[%d].%s" % [file_name, array_field, index, field_name2],
+						String(array_required[field_name2]), _scalar_text(entry.get(field_name2, "")), structure_ids)
 	# 코드가 발행하는 스트링 키 (리터럴 스캔)
 	var key_regex := RegEx.new()
 	key_regex.compile(String(_config["key_regex"]))
@@ -348,6 +446,42 @@ func _run_v2_references() -> void:
 				if not _strings.has(literal):
 					_fail("V2", "%s:%d: code-emitted key '%s' not in strings" % [entry["path"], line_index + 1, literal])
 	_report("V2", "references", checked, before_fail, before_warn)
+
+
+func _collect_strings_deep(value: Variant, sink: Dictionary) -> void:
+	match typeof(value):
+		TYPE_STRING:
+			sink[String(value)] = true
+		TYPE_ARRAY:
+			for item in Array(value):
+				_collect_strings_deep(item, sink)
+		TYPE_DICTIONARY:
+			for key in Dictionary(value):
+				_collect_strings_deep(Dictionary(value)[key], sink)
+
+
+# 단일 참조 검사 (스트링 키 · 테이블 FK · 구조 id). 반환 = 수행한 검사 수.
+# fk_optional의 공란은 "참조 없음"으로 통과 — 필수 참조는 fk를 쓴다.
+func _check_reference(location: String, type_spec: String, value: String, structure_ids: Array) -> int:
+	if type_spec == "string_key":
+		if not _strings.has(value):
+			_fail("V2", "%s: string key '%s' not found" % [location, value])
+		return 1
+	if type_spec == "structure_ref":
+		if not structure_ids.has(value):
+			_fail("V2", "%s: structure ref '%s' not found" % [location, value])
+		return 1
+	if type_spec.begins_with("fk_optional:"):
+		if value == "":
+			return 0
+		if not _table_ids(type_spec.substr(12)).has(value):
+			_fail("V2", "%s: FK '%s' not found in %s" % [location, value, type_spec.substr(12)])
+		return 1
+	if type_spec.begins_with("fk:"):
+		if not _table_ids(type_spec.substr(3)).has(value):
+			_fail("V2", "%s: FK '%s' not found in %s" % [location, value, type_spec.substr(3)])
+		return 1
+	return 0
 
 
 func _table_ids(file_name: String) -> Array:
@@ -415,6 +549,12 @@ func _run_v5_anchor_binding() -> void:
 	var rule: Dictionary = _config["anchor_rule"]
 	var anchor_field := String(rule["anchor_field"])
 	var slot_field := String(rule["tour_slot_field"])
+	# 허용 슬롯을 정수로 정규화한다. JSON 수치는 float로 적재되므로 int 슬롯 값과
+	# Array.has() 비교가 어긋나 허용값(1)이 위반으로 잡혔다 — MS-1에는 앵커 필드를 가진
+	# 구조 JSON이 없어 이 경로가 실행되지 않았고, 결함이 드러나지 않았다.
+	var allowed_slots: Array = []
+	for slot_value in Array(rule["allowed_tour_slots"]):
+		allowed_slots.append(int(slot_value))
 	for file_name in _tables:
 		for row in _tables[file_name]:
 			if row.has(anchor_field):
@@ -424,8 +564,8 @@ func _run_v5_anchor_binding() -> void:
 			if row.has(slot_field):
 				checked += 1
 				var slot := String(row[slot_field]).strip_edges().to_int()
-				if not Array(rule["allowed_tour_slots"]).has(slot):
-					_fail("V5", "%s[%s]: tour_slot %d not in {1,5}" % [file_name, row.get("id", "?"), slot])
+				if not allowed_slots.has(slot):
+					_fail("V5", "%s[%s]: tour_slot %d not in %s" % [file_name, row.get("id", "?"), slot, str(allowed_slots)])
 	for file_name in _structures:
 		var structure: Dictionary = _structures[file_name]
 		if structure.has(anchor_field):
@@ -434,8 +574,8 @@ func _run_v5_anchor_binding() -> void:
 				_fail("V5", "%s: anchor_type '%s' not allowed" % [file_name, structure[anchor_field]])
 		if structure.has(slot_field):
 			checked += 1
-			if not Array(rule["allowed_tour_slots"]).has(int(structure[slot_field])):
-				_fail("V5", "%s: tour_slot not in {1,5}" % file_name)
+			if not allowed_slots.has(int(structure[slot_field])):
+				_fail("V5", "%s: tour_slot %d not in %s" % [file_name, int(structure[slot_field]), str(allowed_slots)])
 	_report("V5", "anchor binding", checked, before_fail, before_warn)
 
 
@@ -453,12 +593,10 @@ func _run_v6_id_hygiene() -> void:
 			for column_name in columns:
 				if String(columns[column_name]).begins_with("fk:"):
 					all_referenced[String(row.get(column_name, "")).strip_edges()] = true
+	# 구조 JSON은 중첩 깊이를 가정하지 않고 전 문자열 값을 참조로 수집한다 —
+	# 배열 안(서킷 sectors의 main_attr 등)의 참조가 고아 오탐으로 새지 않게.
 	for file_name in _structures:
-		var spec: Dictionary = _config["structures"][file_name]
-		for field_name in spec["required"]:
-			if String(spec["required"][field_name]).begins_with("fk_array:"):
-				for item in _structures[file_name].get(field_name, []):
-					all_referenced[String(item)] = true
+		_collect_strings_deep(_structures[file_name], all_referenced)
 	for entry in _code_files:
 		for line in String(entry["source"]).split("\n"):
 			for literal in _extract_literals(_strip_comment(line)):
@@ -486,9 +624,7 @@ func _run_v6_id_hygiene() -> void:
 				if String(columns[column_name]) == "string_key":
 					all_referenced[String(row.get(column_name, "")).strip_edges()] = true
 	for file_name in _structures:
-		for field_name in _structures[file_name]:
-			if typeof(_structures[file_name][field_name]) == TYPE_STRING:
-				all_referenced[String(_structures[file_name][field_name])] = true
+		_collect_strings_deep(_structures[file_name], all_referenced)
 	for key in _strings:
 		checked += 1
 		if not all_referenced.has(String(key)):

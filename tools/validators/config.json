@@ -88,6 +88,23 @@
 			"id_prefix": "point_",
 			"root": true,
 			"columns": {"id": "id", "position": "int:1,16", "points": "int"}
+		},
+		"sector_attributes.csv": {
+			"id_prefix": "attr_",
+			"root": false,
+			"columns": {
+				"id": "id",
+				"code": "enum:A1,A2,A3,A4,A5,A6",
+				"name_key": "string_key",
+				"w_forward": "float",
+				"w_defense": "float",
+				"w_control": "float",
+				"w_resource": "float",
+				"w_hazard": "float",
+				"w_rare": "float",
+				"chassis_wear_mult": "float",
+				"gauge_mult": "float"
+			}
 		}
 	},
 
@@ -99,6 +116,59 @@
 		"grid_debug.json": {
 			"root": true,
 			"required": {"id": "string", "rivals": "fk_array:ai_rivals.csv", "filler_count": "int", "player_start_position": "int"}
+		},
+		"circuit_mn1.json": {"root": true, "template": "circuit"},
+		"circuit_mn2.json": {"root": true, "template": "circuit"},
+		"circuit_mn3.json": {"root": true, "template": "circuit"},
+		"circuit_mn4.json": {"root": true, "template": "circuit"},
+		"stage_metro_night.json": {
+			"root": true,
+			"required": {
+				"id": "string",
+				"name_key": "string_key",
+				"season1_tour_slot": "int:1,5",
+				"circuits": "structure_ref_array",
+				"wall_rival": "fk_optional:ai_rivals.csv",
+				"resonance_bonus_type": "enum:charge,front_gauge,duel_judgment,chassis,front_gauge_full",
+				"resonance_bonus_value": "float"
+			}
+		},
+		"scripted_loss_s1.json": {
+			"root": true,
+			"required": {
+				"id": "string",
+				"anchor_type": "string",
+				"tour_slot": "int:1,5",
+				"season": "int",
+				"circuit_id": "structure_ref",
+				"rival_id": "fk:ai_rivals.csv",
+				"rule": "enum:overtake_duel_never",
+				"player_best_rank": "int:1,16"
+			}
+		}
+	},
+
+	"structure_templates": {
+		"circuit": {
+			"required": {
+				"id": "string",
+				"name_key": "string_key",
+				"stage_id": "structure_ref",
+				"tour_slot_role": "enum:opener,build_a,build_b,finisher",
+				"laps": "int:1,9",
+				"sectors_per_lap": "int:1,9"
+			},
+			"arrays": {
+				"sectors": {
+					"count_field": "sectors_per_lap",
+					"required": {
+						"slot": "int:1,9",
+						"name_key": "string_key",
+						"main_attr": "fk:sector_attributes.csv",
+						"sub_attr": "fk_optional:sector_attributes.csv"
+					}
+				}
+			}
 		}
 	},
 

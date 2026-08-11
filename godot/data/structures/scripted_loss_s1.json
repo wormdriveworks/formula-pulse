@@ -1,0 +1,11 @@
+{
+	"schema_version": 1,
+	"id": "scripted_loss_s1",
+	"anchor_type": "tour_slot",
+	"tour_slot": 1,
+	"season": 1,
+	"circuit_id": "circuit_mn4",
+	"rival_id": "ai_lorentz",
+	"rule": "overtake_duel_never",
+	"player_best_rank": 2
+}

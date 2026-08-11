@@ -1,0 +1,7 @@
+id,code,name_key,w_forward,w_defense,w_control,w_resource,w_hazard,w_rare,chassis_wear_mult,gauge_mult
+attr_straight,A1,ui.sectorAttr.straight,0.06,-0.03,-0.03,0,0,0,1.0,1.0
+attr_technical,A2,ui.sectorAttr.technical,-0.05,0.04,0.04,0,-0.03,0,1.0,1.0
+attr_sweeper,A3,ui.sectorAttr.sweeper,-0.04,-0.03,0.05,0,0.02,0,1.0,1.0
+attr_hazard,A4,ui.sectorAttr.hazard,-0.03,0,-0.04,0,0.07,0,1.15,1.0
+attr_battle_zone,A5,ui.sectorAttr.battleZone,0,0,-0.04,0.01,0.01,0.03,1.0,1.5
+attr_pulse_section,A6,ui.sectorAttr.pulseSection,-0.04,-0.04,0,0.08,0,0,1.0,1.0
