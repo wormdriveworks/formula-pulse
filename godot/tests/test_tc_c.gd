@@ -24,6 +24,11 @@ func _init() -> void:
 	_tc_c9_chassis_retire()
 	_tc_c11_seal()
 	_tc_c12_scumming()
+	_neighbor_passive_runtime()
+	_negative_guards()
+	_result_and_ranking()
+	_sector_attribute_weights()
+	_resonance_runtime()
 	_presentation_grade_caps()
 	_check_global_postconditions()
 	print("")
@@ -159,7 +164,32 @@ func _d13_anchor_values() -> void:
 				float(expected_probability.get(symbol_id, -1.0)))
 		probability_sum += CsvTable.to_float(String(row["prob_reel1"]))
 	_eq_float("D13 §1.1 릴 확률 합 1.0", probability_sum, 1.0)
-	# D13 별첨A §1.3 속성 6축 규칙 계수
+	# D13 별첨A §1.3 속성 6축 심볼 가중 계수 — 36칸 전수 전사.
+	# 여기 없으면 계수를 어떻게 바꿔도(부호 반전 포함) 검출되지 않는다: 다른 검사는
+	# 기대값을 같은 CSV에서 읽어 자기 일관성에 걸린다 (독립 검증 G-1에서 44칸 미검출로 확인).
+	var expected_attr_weights := {
+		"attr_straight":      {"w_forward": 0.06, "w_defense": -0.03, "w_control": -0.03, "w_resource": 0.0, "w_hazard": 0.0, "w_rare": 0.0},
+		"attr_technical":     {"w_forward": -0.05, "w_defense": 0.04, "w_control": 0.04, "w_resource": 0.0, "w_hazard": -0.03, "w_rare": 0.0},
+		"attr_sweeper":       {"w_forward": -0.04, "w_defense": -0.03, "w_control": 0.05, "w_resource": 0.0, "w_hazard": 0.02, "w_rare": 0.0},
+		"attr_hazard":        {"w_forward": -0.03, "w_defense": 0.0, "w_control": -0.04, "w_resource": 0.0, "w_hazard": 0.07, "w_rare": 0.0},
+		"attr_battle_zone":   {"w_forward": 0.0, "w_defense": 0.0, "w_control": -0.04, "w_resource": 0.01, "w_hazard": 0.01, "w_rare": 0.03},
+		"attr_pulse_section": {"w_forward": -0.04, "w_defense": -0.04, "w_control": 0.0, "w_resource": 0.08, "w_hazard": 0.0, "w_rare": 0.0},
+	}
+	for attr_id in expected_attr_weights:
+		var attr_row := data.sector_attr(String(attr_id))
+		for column in expected_attr_weights[attr_id]:
+			_eq_float("D13 §1.3 %s.%s" % [attr_id, column],
+				CsvTable.to_float(String(attr_row[column])),
+				float(expected_attr_weights[attr_id][column]), 0.0001)
+	# 규칙 계수: A4·A5만 1.0이 아니다 (나머지 4속성이 계수를 얻으면 설계 의미가 달라진다)
+	for attr_id in expected_attr_weights:
+		var attr_row2 := data.sector_attr(String(attr_id))
+		var expected_gauge := 1.5 if attr_id == "attr_battle_zone" else 1.0
+		var expected_wear := 1.15 if attr_id == "attr_hazard" else 1.0
+		_eq_float("D13 §1.3 %s 게이지 계수" % attr_id,
+			CsvTable.to_float(String(attr_row2["gauge_mult"])), expected_gauge)
+		_eq_float("D13 §1.3 %s 섀시 소모 계수" % attr_id,
+			CsvTable.to_float(String(attr_row2["chassis_wear_mult"])), expected_wear)
 	_eq_float("D13 §1.3 배틀 존 게이지 ×1.5",
 		CsvTable.to_float(String(data.sector_attr("attr_battle_zone")["gauge_mult"])), 1.5)
 	_eq_float("D13 §1.3 해저드 섀시 소모 ×1.15",
@@ -181,6 +211,25 @@ func _d13_anchor_values() -> void:
 	_ok("D13 §6.6 메트로 나이트 보너스 유형 = 차지",
 		String(stage["resonance_bonus_type"]) == "charge", str(stage))
 	_eq_float("D13 §6.6 메트로 나이트 보너스 +2", float(stage["resonance_bonus_value"]), 2.0)
+	# D13 별첨A §2.1 앞차 저항·뒤차 압박 — **인쇄된 산출 예에 도달하는지** 대조.
+	# 산식만 맞고 입력이 틀리면(팀 가산 포함 등) 정본에 인쇄된 값이 도달 불가능해진다.
+	var resist_base := data.param("param_gauge_front_resist_base")
+	var resist_coef := data.param("param_gauge_front_resist_pace_coef")
+	_eq_float("D13 §2.1 필러 앞차 저항 7.5", resist_base + 3.0 * resist_coef, 7.5)
+	_eq_float("D13 §2.1 로렌츠 앞차 저항 10.8", resist_base + 5.2 * resist_coef, 10.8)
+	var pressure_base := data.param("param_gauge_rear_pressure_base")
+	var pressure_coef := data.param("param_gauge_rear_pressure_aggr_coef")
+	_eq_float("D13 §2.1 필러 뒤차 압박 8.6", pressure_base + 3.0 * pressure_coef, 8.6)
+	var diaz_aggression := 0.0
+	var vulka_pressure := 0.0
+	for row in data.rivals:
+		if String(row["id"]) == "ai_diaz":
+			diaz_aggression = CsvTable.to_float(String(row["aggression"]))
+	if data.teams.has("team_vulka"):
+		vulka_pressure = CsvTable.to_float(String(data.teams["team_vulka"]["pressure_mult"]), 1.0)
+	_eq_float("D13 §2.1 디아스 뒤차 압박 13.0", pressure_base + diaz_aggression * pressure_coef, 13.0)
+	_eq_float("D13 §2.1 디아스 압박 ×1.3 = 16.9",
+		(pressure_base + diaz_aggression * pressure_coef) * vulka_pressure, 16.9, 0.01)
 	# D13 별첨A §6.1 1층 챔피언십 포인트
 	var expected_points := {1: 10, 2: 8, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1, 9: 0}
 	for position in expected_points:
@@ -569,27 +618,91 @@ func _tc_c9_chassis_retire() -> void:
 
 
 # ── TC-C11 봉인 규칙 — 릴 정지 연출 완료 전 결과·결과 상관 신호 노출 0 (D02 §4 · D12 §6.3) ──
+# 앞선 판정식은 항진명제였다: `info.get("events")`가 같은 배열의 **참조**를 돌려주므로
+# 스핀이 events에 결과를 append해도 비교가 항상 true였다. 사본을 떠서 비교한다.
+# 그리고 5경로(UI·로그·사운드·햅틱·디버그 오버레이) 중 엔진이 책임지는 축 —
+# "결과가 어떤 공개 표면으로도 새지 않는가" — 를 속성 전수 스캔으로 검사한다.
 func _tc_c11_seal() -> void:
 	var engine := _new_engine(99)
 	if engine == null:
 		return
 	engine.start_gp()
 	var info := engine.begin_turn()
-	# T1 이벤트에는 결과·결과 상관 신호가 없어야 한다 (스핀 이전이므로 결과 자체가 부재)
 	_ok("TC-C11 스핀 전 전개 후보 공백", engine.get_provisional().is_empty(),
 		"provisional=%s" % str(engine.get_provisional()))
-	var t1_events: Array = info.get("events", [])
+	var events_before: Array = Array(info.get("events", [])).duplicate(true)
 	engine.spin()
-	# 스핀 직후: 엔진은 결과를 내부 확정하되 이벤트를 자발 발행하지 않는다.
-	# (노출 시점 통제 = 표시 층의 get_provisional() 호출 — 엔진이 결과 이벤트를 밀어내면 봉인이 깨진다)
-	_ok("TC-C11 스핀이 이벤트를 발행하지 않음", info.get("events", []) == t1_events,
-		"events=%s" % str(info.get("events", [])))
-	# 결과 상관 신호(정산 로그)는 확정 이후에만 생성된다
+	var events_after: Array = info.get("events", [])
+	_ok("TC-C11 스핀이 이벤트를 발행하지 않음", events_after.size() == events_before.size(),
+		"before=%d after=%d %s" % [events_before.size(), events_after.size(), str(events_after)])
+	_ok("TC-C11 T1 이벤트에 결과 없음", not _leaks_symbol(events_before),
+		str(events_before))
+	_ok("TC-C11 스핀 후에도 T1 이벤트에 결과 없음", not _leaks_symbol(events_after),
+		str(events_after))
+	# 결과는 get_provisional() 단일 창구로만 나간다 — 다른 공개 표면에 실려 있으면 봉인 위반.
+	var leaked := _leaking_properties(engine)
+	_ok("TC-C11 결과가 실린 공개 표면 = provisional 단독", leaked.is_empty(),
+		"leaked=%s" % str(leaked))
 	_ok("TC-C11 확정 전 정산 로그 공백", engine.settle_log.is_empty(),
 		"settle_log=%s" % str(engine.settle_log))
 	var events: Array = engine.confirm(0.0)
 	_ok("TC-C11 확정 후 정산 로그 생성", not engine.settle_log.is_empty())
 	_ok("TC-C11 결과 이벤트는 T5 이후 페이즈", _all_events_after_spin(events), "events=%s" % str(events))
+	# 릴 정지 전 구간에서 연출 등급(사운드·햅틱 축)이 발화하지 않는다
+	var engine2 := _new_engine(99)
+	engine2.start_gp()
+	var info2 := engine2.begin_turn()
+	engine2.spin()
+	var all_events: Array = Array(info2.get("events", []))
+	for event in all_events:
+		_ok("TC-C11 정지 전 연출 채널 무발화",
+			not String(event.get("key", "")).begins_with("grade."), str(event))
+
+
+# 심볼 id가 이벤트 어딘가(키·파라미터)에 실려 있으면 결과 누출이다.
+func _leaks_symbol(events: Array) -> bool:
+	for event in events:
+		if _contains_symbol_id(event):
+			return true
+	return false
+
+
+# 엔진의 공개 표면 전수 스캔 — provisional 외의 속성에 심볼 id가 실려 있는지.
+# 개별 필드를 열거하지 않는다: 새 필드가 추가될 때 검사가 자동으로 따라붙어야 한다.
+func _leaking_properties(engine: RaceEngine) -> Array:
+	var leaked: Array = []
+	for property in engine.get_property_list():
+		var name := String(property.get("name", ""))
+		if name == "provisional" or name.begins_with("_") or name == "script":
+			continue
+		if int(property.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
+			continue
+		if _contains_symbol_id(engine.get(name)):
+			leaked.append(name)
+	return leaked
+
+
+func _contains_symbol_id(value: Variant) -> bool:
+	match typeof(value):
+		TYPE_STRING:
+			var text := String(value)
+			for symbol_id in [RaceTypes.SYMBOL_SLIPSTREAM, RaceTypes.SYMBOL_BRAKING,
+					RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_PULSE,
+					RaceTypes.SYMBOL_TROUBLE, RaceTypes.SYMBOL_CHANCE]:
+				if text.contains(symbol_id):
+					return true
+			return false
+		TYPE_ARRAY:
+			for item in Array(value):
+				if _contains_symbol_id(item):
+					return true
+			return false
+		TYPE_DICTIONARY:
+			for key in Dictionary(value):
+				if _contains_symbol_id(key) or _contains_symbol_id(Dictionary(value)[key]):
+					return true
+			return false
+	return false
 
 
 func _all_events_after_spin(events: Array) -> bool:
@@ -698,3 +811,464 @@ func _presentation_grade_caps() -> void:
 		String(resolved[2]["trigger"]) == "trigger_chance_three_match"
 		and String(resolved[2]["grade"]) == "grade_l1" and bool(resolved[2]["demoted"]), str(resolved))
 	_ok("연출 등급 조회 중 데이터 침묵 기본값 0", data.is_ok())
+
+
+# ── 섹터 속성 6축 가중 — 릴 분포 대조 (D13 별첨A §1.3 · D08 별첨A §1) ──
+# 독립 검증에서 이 축이 전량 무검증으로 드러났다: 주속성 Δ를 통째로 빼도, 계수 부호를
+# 반전해도, 섹터 속성 배정을 바꿔도 4스위트가 통과했다. 여기서 닫는다.
+func _sector_attribute_weights() -> void:
+	var engine := _new_engine(101, "circuit_mn1")
+	if engine == null:
+		return
+	var data := engine.data
+	# 기대 가중 = 기본 분포 + 주속성 Δ + 부속성 Δ/2 (음수 절단). 재정규화는 추첨 시점 소관.
+	for circuit_id in ["circuit_mn1", "circuit_mn2", "circuit_mn3", "circuit_mn4"]:
+		var probe := _new_engine(101, circuit_id)
+		if probe == null:
+			return
+		for slot in range(1, probe.data.circuit_int("sectors_per_lap") + 1):
+			probe.sector = slot
+			var entry := probe.data.sector_entry(slot)
+			var main_attr := probe.data.sector_attr(String(entry["main_attr"]))
+			var sub_attr := probe.data.sector_attr(String(entry.get("sub_attr", "")))
+			var actual: Array = probe.reel_weights(0)
+			for index in range(probe.data.symbols.size()):
+				var row: Dictionary = probe.data.symbols[index]
+				var column := "w_%s" % String(row["class"])
+				var expected := CsvTable.to_float(String(row["prob_reel1"]))
+				if not main_attr.is_empty():
+					expected += CsvTable.to_float(String(main_attr[column]))
+				if not sub_attr.is_empty():
+					expected += CsvTable.to_float(String(sub_attr[column])) * 0.5
+				_eq_float("%s s%d %s 가중" % [circuit_id, slot, String(row["id"])],
+					float(actual[index]), maxf(expected, 0.0), 0.0001)
+	# 속성 배정이 D08 별첨A §1 표와 일치하는지 (배정 변조 = 서킷 정체성 변조)
+	var expected_layout := {
+		"circuit_mn1": [["attr_straight", ""], ["attr_technical", ""], ["attr_sweeper", ""],
+			["attr_battle_zone", "attr_straight"]],
+		"circuit_mn2": [["attr_straight", ""], ["attr_sweeper", ""], ["attr_technical", ""],
+			["attr_straight", "attr_battle_zone"], ["attr_battle_zone", ""]],
+		"circuit_mn3": [["attr_technical", ""], ["attr_hazard", "attr_technical"],
+			["attr_pulse_section", ""], ["attr_technical", "attr_battle_zone"]],
+		"circuit_mn4": [["attr_straight", ""], ["attr_sweeper", ""], ["attr_technical", ""],
+			["attr_hazard", "attr_technical"], ["attr_battle_zone", "attr_straight"]],
+	}
+	for circuit_id in expected_layout:
+		var probe2 := _new_engine(101, circuit_id)
+		if probe2 == null:
+			return
+		var expected_sectors: Array = expected_layout[circuit_id]
+		_ok("D08 별첨A %s 섹터 수" % circuit_id,
+			probe2.data.circuit_int("sectors_per_lap") == expected_sectors.size(),
+			"actual=%d" % probe2.data.circuit_int("sectors_per_lap"))
+		for slot in range(1, expected_sectors.size() + 1):
+			var entry2 := probe2.data.sector_entry(slot)
+			var expected_pair: Array = expected_sectors[slot - 1]
+			_ok("D08 별첨A %s s%d 주속성" % [circuit_id, slot],
+				String(entry2["main_attr"]) == String(expected_pair[0]),
+				"actual=%s expected=%s" % [entry2["main_attr"], expected_pair[0]])
+			_ok("D08 별첨A %s s%d 부속성" % [circuit_id, slot],
+				String(entry2.get("sub_attr", "")) == String(expected_pair[1]),
+				"actual=%s expected=%s" % [entry2.get("sub_attr", ""), expected_pair[1]])
+		# 펄스 섹션은 무대 제3전(빌드B)에만 (D08 별첨A §0 공통 규칙 ④)
+		var has_pulse := false
+		for slot2 in range(1, probe2.data.circuit_int("sectors_per_lap") + 1):
+			if String(probe2.data.sector_entry(slot2)["main_attr"]) == "attr_pulse_section":
+				has_pulse = true
+		_ok("D08 별첨A 펄스 섹션 배치 = 제3전 전속 (%s)" % circuit_id,
+			has_pulse == (circuit_id == "circuit_mn3"), "has_pulse=%s" % str(has_pulse))
+		# 서킷당 배틀 존 최소 1 (D08 별첨A §0 공통 규칙 ③)
+		var battle_zones := 0
+		for slot3 in range(1, probe2.data.circuit_int("sectors_per_lap") + 1):
+			var entry3 := probe2.data.sector_entry(slot3)
+			if String(entry3["main_attr"]) == "attr_battle_zone" \
+				or String(entry3.get("sub_attr", "")) == "attr_battle_zone":
+				battle_zones += 1
+		_ok("D08 별첨A 배틀 존 최소 1 (%s)" % circuit_id, battle_zones >= 1,
+			"count=%d" % battle_zones)
+	# ×1.8 상한 (D13 별첨A §1.3 명문) — 전 서킷 전 섹터 × 최종 랩
+	for circuit_id in expected_layout:
+		var probe3 := _new_engine(101, circuit_id)
+		if probe3 == null:
+			return
+		probe3.start_gp()
+		probe3.lap = probe3.data.circuit_int("laps")   # 최종 랩 = 계수 최대
+		for slot4 in range(1, probe3.data.circuit_int("sectors_per_lap") + 1):
+			probe3.sector = slot4
+			_ok("%s s%d 게이지 계수 ≤ 1.8" % [circuit_id, slot4], probe3._gauge_mult() <= 1.8 + 0.0001,
+				"mult=%f" % probe3._gauge_mult())
+
+
+# ── 레조넌스 오버레이 런타임 (D08 §3.7 R3·R6·R7 · D13 별첨A §6.6) ──
+# 독립 검증에서 런타임 전체가 무검증으로 드러났다 — 슬롯에 0 이외를 넣는 코드가 0건이었다.
+func _resonance_runtime() -> void:
+	var stage_bonus := 0.0
+	# R3: 임의 분류 3매치 성립 시 통상 정산 유지 + 보너스 추가 (트러블 3매치 포함)
+	var probe := _new_engine(202, "circuit_mn1")
+	if probe == null:
+		return
+	stage_bonus = float(probe.data.stages["stage_metro_night"]["resonance_bonus_value"])
+	probe.start_gp()
+	_flatten_neighbors(probe)
+	probe.resonance_circuit_id = "circuit_mn1"
+	probe.resonance_sector_slot = 1
+	probe.begin_turn()
+	probe.spin()
+	probe.charge = 0
+	probe.chassis = 100.0
+	probe.provisional = _combo(RaceTypes.SYMBOL_TROUBLE, 3, RaceTypes.SYMBOL_TROUBLE)
+	probe.confirm(0.0)
+	var trouble_chassis := CsvTable.to_float(String(probe.data.match_effects[RaceTypes.SYMBOL_TROUBLE][3]["chassis"]))
+	_eq_float("R3 트러블 3매치 통상 정산 유지", probe.chassis, 100.0 + trouble_chassis)
+	_eq_float("R3 트러블 3매치도 보너스 성립", float(probe.charge), stage_bonus)
+	# 비3매치는 보너스 없음
+	var probe2 := _new_engine(202, "circuit_mn1")
+	probe2.start_gp()
+	_flatten_neighbors(probe2)
+	probe2.resonance_circuit_id = "circuit_mn1"
+	probe2.resonance_sector_slot = 1
+	probe2.begin_turn()
+	probe2.spin()
+	probe2.charge = 0
+	probe2.provisional = [RaceTypes.SYMBOL_PULSE, RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_BRAKING]
+	probe2.confirm(0.0)
+	var pulse_charge := CsvTable.to_int(String(probe2.data.match_effects[RaceTypes.SYMBOL_PULSE][1]["charge"]))
+	var stable := probe2.data.param_int("param_charge_stable_sector")
+	_ok("R3 비3매치 = 보너스 없음", probe2.charge == pulse_charge + stable,
+		"charge=%d expected=%d" % [probe2.charge, pulse_charge + stable])
+	# 오버레이 없는 섹터는 무지급
+	var probe3 := _new_engine(202, "circuit_mn1")
+	probe3.start_gp()
+	_flatten_neighbors(probe3)
+	probe3.resonance_circuit_id = "circuit_mn1"
+	probe3.resonance_sector_slot = 3          # 현재 진입은 s1
+	probe3.begin_turn()
+	probe3.spin()
+	probe3.charge = 0
+	probe3.provisional = _combo(RaceTypes.SYMBOL_LINE, 3, RaceTypes.SYMBOL_LINE)
+	probe3.confirm(0.0)
+	_ok("R6 오버레이 없는 섹터 무지급", probe3.charge == probe3.data.param_int("param_charge_stable_sector"),
+		"charge=%d" % probe3.charge)
+	# R6 서킷 축: 다른 서킷에서는 발동하지 않는다 (무대당 1회의 서킷 축)
+	var probe4 := _new_engine(202, "circuit_mn3")
+	probe4.start_gp()
+	_flatten_neighbors(probe4)
+	probe4.resonance_circuit_id = "circuit_mn1"   # 추첨은 mn1이었다
+	probe4.resonance_sector_slot = 1
+	probe4.begin_turn()
+	probe4.spin()
+	probe4.charge = 0
+	probe4.provisional = _combo(RaceTypes.SYMBOL_LINE, 3, RaceTypes.SYMBOL_LINE)
+	probe4.confirm(0.0)
+	_ok("R6 다른 서킷에서 미발동", probe4.charge == probe4.data.param_int("param_charge_stable_sector"),
+		"charge=%d" % probe4.charge)
+	# R6 무대당 1회: 같은 섹터를 랩마다 다시 지나도 재지급하지 않는다
+	var probe5 := _new_engine(202, "circuit_mn1")
+	probe5.start_gp()
+	_flatten_neighbors(probe5)
+	probe5.resonance_circuit_id = "circuit_mn1"
+	probe5.resonance_sector_slot = 1
+	probe5.begin_turn()
+	probe5.spin()
+	probe5.charge = 0
+	probe5.provisional = _combo(RaceTypes.SYMBOL_LINE, 3, RaceTypes.SYMBOL_LINE)
+	probe5.confirm(0.0)
+	var after_first := probe5.charge
+	_ok("R6 1회차 지급", after_first > probe5.data.param_int("param_charge_stable_sector"),
+		"charge=%d" % after_first)
+	# 다음 랩 같은 슬롯으로 강제 진입
+	probe5.lap = 2
+	probe5.sector = 0
+	probe5.begin_turn()
+	probe5.spin()
+	probe5.provisional = _combo(RaceTypes.SYMBOL_LINE, 3, RaceTypes.SYMBOL_LINE)
+	probe5.confirm(0.0)
+	_ok("R6 무대당 1회 — 재지급 없음",
+		probe5.charge == after_first + probe5.data.param_int("param_charge_stable_sector"),
+		"charge=%d after_first=%d" % [probe5.charge, after_first])
+	# R7 듀얼 무관여: 듀얼 턴에서는 3매치여도 보너스가 없다
+	var probe6 := _new_engine(202, "circuit_mn1")
+	probe6.start_gp()
+	_flatten_neighbors(probe6)
+	probe6.resonance_circuit_id = "circuit_mn1"
+	_force_duel(probe6, RaceTypes.DuelType.OVERTAKE)
+	probe6.resonance_sector_slot = probe6.sector
+	probe6.begin_turn()
+	_ok("R7 듀얼 턴 진입", probe6.current_turn_is_duel)
+	probe6.spin()
+	probe6.charge = 0
+	probe6.provisional = _combo(RaceTypes.SYMBOL_LINE, 3, RaceTypes.SYMBOL_LINE)
+	probe6.confirm(0.0)
+	_ok("R7 듀얼 턴 레조넌스 무관여", probe6.charge <= probe6.data.param_int("param_charge_duel_win"),
+		"charge=%d" % probe6.charge)
+	# R6 위치 비공개: 진입 전 턴의 이벤트에 레조넌스 공표가 없다
+	var probe7 := _new_engine(202, "circuit_mn1")
+	probe7.start_gp()
+	_flatten_neighbors(probe7)
+	probe7.resonance_circuit_id = "circuit_mn1"
+	probe7.resonance_sector_slot = 3
+	var info := probe7.begin_turn()     # s1 진입 — 오버레이는 s3
+	_ok("R6 진입 전 공표 없음", not _events_contain(info.get("events", []), "raceLog.resonanceEnter01"),
+		str(info.get("events", [])))
+	probe7.spin()
+	probe7.provisional = _combo(RaceTypes.SYMBOL_PULSE, 1, RaceTypes.SYMBOL_LINE)
+	probe7.confirm(0.0)
+	probe7.begin_turn()                 # s2
+	probe7.spin()
+	probe7.provisional = _combo(RaceTypes.SYMBOL_PULSE, 1, RaceTypes.SYMBOL_LINE)
+	probe7.confirm(0.0)
+	var enter_info := probe7.begin_turn()   # s3 = 오버레이 섹터
+	_ok("R6 진입 시 공표", _events_contain(enter_info.get("events", []), "raceLog.resonanceEnter01"),
+		str(enter_info.get("events", [])))
+
+
+func _events_contain(events: Array, key: String) -> bool:
+	for event in events:
+		if String(event.get("key", "")) == key:
+			return true
+	return false
+
+
+# ── 압박·저항 런타임 대조 (D13 별첨A §2.1 인쇄값 도달성) ──
+# 산식 대조만으로는 엔진이 어떤 입력을 먹이는지 알 수 없다. 실제 주행에서 인쇄값이 나오는지 본다.
+func _neighbor_passive_runtime() -> void:
+	var engine := _new_engine(1313, "circuit_mn1")
+	if engine == null:
+		return
+	engine.start_gp()
+	# 디아스를 플레이어 뒤차로 강제 배치 (다른 인접 영향 제거)
+	var player_index := engine.positions.find(RaceEngine.PLAYER_ID)
+	if player_index >= engine.positions.size() - 1:
+		player_index = engine.positions.size() - 2
+		engine.positions.erase(RaceEngine.PLAYER_ID)
+		engine.positions.insert(player_index, RaceEngine.PLAYER_ID)
+	engine.positions.erase("ai_diaz")
+	engine.positions.insert(engine.positions.find(RaceEngine.PLAYER_ID) + 1, "ai_diaz")
+	engine._retarget(true, true)
+	_ok("디아스 뒤차 배치", engine.rear_target == "ai_diaz", "rear=%s" % engine.rear_target)
+	engine.begin_turn()
+	engine.spin()
+	engine.rear_gauge = 0.0
+	engine.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
+	engine.confirm(0.0)
+	# 펄스 3매치는 후방 게이지에 영향이 없으므로 남는 것은 압박 가산뿐 (s1 = 스트레이트, 계수 1.0)
+	_eq_float("D13 §2.1 디아스 압박 실측 = 16.9", engine.rear_gauge, 16.9, 0.05)
+
+
+# ── 음성 검사 — "강제가 살아 있는가" (독립 검증 G-3) ──
+# 사후 조건 `transition_errors == 0`은 강제 코드가 살아 있을 때만 의미가 있다.
+# 전이 검사를 무력화하면 카운터가 0을 읽어 초록이 되므로, 위반을 실제로 시도해 거부를 단언한다.
+func _negative_guards() -> void:
+	var engine := _new_engine(303)
+	if engine == null:
+		return
+	engine.start_gp()          # → LAP_LOOP
+	var before_state := engine.gp_state
+	var before_errors := engine.transition_errors
+	engine._transition(RaceTypes.GpState.RESULT)   # LAP_LOOP → RESULT = 전이표에 없음
+	_ok("음성 검사: 비정의 전이 거부", engine.gp_state == before_state,
+		"state=%d expected=%d" % [engine.gp_state, before_state])
+	_ok("음성 검사: 비정의 전이 계수", engine.transition_errors == before_errors + 1,
+		"errors=%d" % engine.transition_errors)
+	engine.transition_errors = 0   # 의도된 위반이므로 전역 사후 조건에서 제외
+	# 침묵 기본값 금지 가드 자체를 검사한다 — 미등재 param 조회가 is_ok()를 내려야 한다
+	var data := GameData.new()
+	if not data.load_all():
+		_failures += 1
+		print("  [FAIL] data load")
+		return
+	_ok("음성 검사: 로드 직후 is_ok", data.is_ok())
+	data.param("param_this_key_does_not_exist")
+	_ok("음성 검사: 미등재 param 조회가 is_ok를 내린다", not data.is_ok())
+	var data2 := GameData.new()
+	data2.load_all()
+	data2.sector_attr("attr_this_does_not_exist")
+	_ok("음성 검사: 미등재 속성 조회가 is_ok를 내린다", not data2.is_ok())
+	var data3 := GameData.new()
+	data3.load_all()
+	data3.presentation_grade("grade_nope")
+	_ok("음성 검사: 미등재 등급 조회가 is_ok를 내린다", not data3.is_ok())
+	# T4 개입 창 게이트 — 잔액을 충분히 준 상태에서 창 밖 개입이 거부돼야 한다.
+	# (잔액 0으로 시험하면 게이트가 없어도 '잔액 부족'으로 거부되어 게이트를 검증하지 못한다)
+	var gated := _new_engine(303)
+	gated.start_gp()
+	gated.begin_turn()
+	gated.charge = gated.data.param_int("param_charge_cap")
+	gated.provisional = [RaceTypes.SYMBOL_TROUBLE, RaceTypes.SYMBOL_TROUBLE, RaceTypes.SYMBOL_TROUBLE]
+	var hold_result: Dictionary = gated.hold_respin([0])
+	_ok("음성 검사: 창 외 홀드 거부 이유 = phase",
+		not bool(hold_result.get("ok", false)) and String(hold_result.get("error", "")) == "phase",
+		str(hold_result))
+	var negate_result: Dictionary = gated.negate_trouble()
+	_ok("음성 검사: 창 외 트러블무효 거부 이유 = phase",
+		not bool(negate_result.get("ok", false)) and String(negate_result.get("error", "")) == "phase",
+		str(negate_result))
+	var boost_result: Dictionary = gated.add_duel_boost()
+	_ok("음성 검사: 창 외 부스트 거부 이유 = phase",
+		not bool(boost_result.get("ok", false)) and String(boost_result.get("error", "")) == "phase",
+		str(boost_result))
+
+
+# ── 결과·순위·시간 모델 (독립 검증 G-4) ──
+func _result_and_ranking() -> void:
+	# 완주 순위 → 포인트가 D13 별첨A §6.1 표와 1:1 (순위 오프바이원이면 포인트가 밀린다)
+	var engine := _new_engine(404)
+	if engine == null:
+		return
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	# 플레이어를 P8로 강제 배치한 뒤 GP를 끝까지 돌린다
+	var guard := 300
+	while not engine.finished and guard > 0:
+		guard -= 1
+		var info := engine.begin_turn()
+		if String(info.get("type", "")) == "finished":
+			break
+		engine.spin()
+		engine.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
+		engine.confirm(0.0)
+	_ok("결과 성립", engine.finished and not engine.result.is_empty())
+	var rank := int(engine.result["player_rank"])
+	var expected_points := int(engine.data.points_tier1.get(rank, -1))
+	_ok("순위 → 포인트 = D13 §6.1 표", int(engine.result["tour_points"]) == expected_points,
+		"rank=P%d points=%s expected=%d" % [rank, str(engine.result["tour_points"]), expected_points])
+	_ok("순위 범위 P1~P16", rank >= 1 and rank <= 16, "rank=%d" % rank)
+	# standings에서의 위치와 player_rank가 일치 (오프바이원 검출)
+	var standings: Array = engine.result["standings"]
+	_ok("player_rank = standings 인덱스 + 1", standings.find(RaceEngine.PLAYER_ID) + 1 == rank,
+		"index=%d rank=%d" % [standings.find(RaceEngine.PLAYER_ID), rank])
+	# 리타이어 순서: 가장 이른 리타이어가 최하위
+	var retire := _new_engine(505)
+	retire.start_gp()
+	_flatten_neighbors(retire)
+	var first_out := String(retire.positions[0])
+	var second_out := String(retire.positions[1])
+	retire._retire_entrant(first_out)
+	retire._retire_entrant(second_out)
+	# 합법 경로로 종료 상태에 들어간다 — LAP_LOOP에서 _finish_gp를 직접 부르면
+	# RESULT가 전이표에 없어 테스트가 스스로 비정의 전이를 만든다.
+	retire._transition(RaceTypes.GpState.GP_FINISH)
+	retire._finish_gp()
+	var final_order: Array = retire.result["standings"]
+	_ok("리타이어 정렬 = 이른 리타이어가 최하위",
+		final_order[final_order.size() - 1] == first_out
+		and final_order[final_order.size() - 2] == second_out,
+		"tail=%s" % str(final_order.slice(final_order.size() - 2)))
+	# 시간 모델: 섹터 턴 × 턴 시간 + 듀얼 × 듀얼 시간 + 마무리 (계수 교환 검출)
+	var timing := _new_engine(606)
+	timing.start_gp()
+	timing.turn_number = 12
+	timing.duel_count = 2
+	var expected_seconds := 10.0 * timing.data.param("param_time_turn_sec") \
+		+ 2.0 * timing.data.param("param_time_duel_sec") \
+		+ timing.data.param("param_time_wrapup_sec")
+	_eq_float("GP 소요 모델 = D13 §4.1 산식", timing.estimated_minutes(), expected_seconds / 60.0, 0.01)
+	# 타임아웃에 추가 페널티가 없다 (D05 §7.3 확정)
+	var timeout_probe := _new_engine(707)
+	timeout_probe.start_gp()
+	_flatten_neighbors(timeout_probe)
+	timeout_probe.begin_turn()
+	timeout_probe.spin()
+	timeout_probe.provisional = _combo(RaceTypes.SYMBOL_LINE, 1, RaceTypes.SYMBOL_LINE)
+	timeout_probe.chassis = 80.0
+	timeout_probe.charge = 5
+	var confirm_probe := _new_engine(707)
+	confirm_probe.start_gp()
+	_flatten_neighbors(confirm_probe)
+	confirm_probe.begin_turn()
+	confirm_probe.spin()
+	confirm_probe.provisional = _combo(RaceTypes.SYMBOL_LINE, 1, RaceTypes.SYMBOL_LINE)
+	confirm_probe.chassis = 80.0
+	confirm_probe.charge = 5
+	timeout_probe.timeout()
+	confirm_probe.confirm(0.0)     # 동일 잔여 비율(모멘텀 없음)로 확정
+	_eq_float("타임아웃 추가 페널티 0 (섀시)", timeout_probe.chassis, confirm_probe.chassis)
+	_ok("타임아웃 추가 페널티 0 (차지)", timeout_probe.charge == confirm_probe.charge,
+		"timeout=%d confirm=%d" % [timeout_probe.charge, confirm_probe.charge])
+	# 모멘텀 보너스: 여유 구간 확정이 전방 게이지를 D13 값만큼 더한다
+	var momentum_on := _new_engine(808)
+	momentum_on.start_gp()
+	_flatten_neighbors(momentum_on)
+	momentum_on.begin_turn()
+	momentum_on.spin()
+	momentum_on.front_gauge = 0.0
+	momentum_on.provisional = _combo(RaceTypes.SYMBOL_LINE, 1, RaceTypes.SYMBOL_LINE)
+	momentum_on.confirm(1.0)
+	var momentum_off := _new_engine(808)
+	momentum_off.start_gp()
+	_flatten_neighbors(momentum_off)
+	momentum_off.begin_turn()
+	momentum_off.spin()
+	momentum_off.front_gauge = 0.0
+	momentum_off.provisional = _combo(RaceTypes.SYMBOL_LINE, 1, RaceTypes.SYMBOL_LINE)
+	momentum_off.confirm(0.0)
+	_eq_float("모멘텀 보너스 = D13 §2.1 +5G",
+		momentum_on.front_gauge - momentum_off.front_gauge,
+		momentum_on.data.param("param_gauge_momentum_bonus"))
+	# 최종 랩 계수 ×1.2: 같은 조합이 최종 랩에서 더 큰 게이지를 만든다
+	var final_lap := _new_engine(909, "circuit_mn1")
+	final_lap.start_gp()
+	_flatten_neighbors(final_lap)
+	final_lap.lap = final_lap.data.circuit_int("laps")
+	final_lap.begin_turn()
+	final_lap.spin()
+	final_lap.front_gauge = 0.0
+	final_lap.provisional = _combo(RaceTypes.SYMBOL_SLIPSTREAM, 1, RaceTypes.SYMBOL_BRAKING)
+	final_lap.confirm(0.0)
+	var first_lap := _new_engine(909, "circuit_mn1")
+	first_lap.start_gp()
+	_flatten_neighbors(first_lap)
+	first_lap.begin_turn()
+	first_lap.spin()
+	first_lap.front_gauge = 0.0
+	first_lap.provisional = _combo(RaceTypes.SYMBOL_SLIPSTREAM, 1, RaceTypes.SYMBOL_BRAKING)
+	first_lap.confirm(0.0)
+	var effect := CsvTable.to_float(String(first_lap.data.match_effects[RaceTypes.SYMBOL_SLIPSTREAM][1]["front_gauge"]))
+	var resist := first_lap.data.param("param_gauge_front_resist_base")
+	var final_mult := first_lap.data.param("param_gauge_final_lap_mult")
+	_eq_float("최종 랩 게이지 계수 ×1.2 적용", final_lap.front_gauge, (effect - resist) * final_mult, 0.01)
+	# 듀얼 부스트가 판정치에 실제로 작용한다 (차지만 소비되고 무효면 개입 문법이 무너진다)
+	var boosted := _new_engine(111)
+	boosted.start_gp()
+	_flatten_neighbors(boosted)
+	_force_duel(boosted, RaceTypes.DuelType.OVERTAKE)
+	var rank_before := boosted.player_position()
+	boosted.begin_turn()
+	boosted.spin()
+	boosted.charge = boosted.data.param_int("param_charge_cap")
+	while bool(boosted.add_duel_boost().get("ok", false)):
+		pass
+	boosted.provisional = [RaceTypes.SYMBOL_SLIPSTREAM, RaceTypes.SYMBOL_BRAKING, RaceTypes.SYMBOL_BRAKING]
+	boosted.confirm(0.0)
+	var unboosted := _new_engine(111)
+	unboosted.start_gp()
+	_flatten_neighbors(unboosted)
+	_force_duel(unboosted, RaceTypes.DuelType.OVERTAKE)
+	unboosted.begin_turn()
+	unboosted.spin()
+	unboosted.charge = 0
+	unboosted.provisional = [RaceTypes.SYMBOL_SLIPSTREAM, RaceTypes.SYMBOL_BRAKING, RaceTypes.SYMBOL_BRAKING]
+	unboosted.confirm(0.0)
+	_ok("듀얼 부스트가 판정치에 작용 (부스트 승 / 무부스트 패)",
+		boosted.player_position() == rank_before - 1 and unboosted.player_position() == rank_before,
+		"boosted=P%d unboosted=P%d before=P%d" % [boosted.player_position(), unboosted.player_position(), rank_before])
+	# 게이지 계수가 심볼별로 빠지지 않는지 — 방어(브레이킹)·공략(라인) 경로도 확인
+	var battle := _new_engine(222, "circuit_mn1")
+	battle.start_gp()
+	_flatten_neighbors(battle)
+	battle.sector = 3
+	battle.begin_turn()
+	battle.spin()
+	battle.rear_gauge = 90.0
+	battle.provisional = _combo(RaceTypes.SYMBOL_BRAKING, 1, RaceTypes.SYMBOL_PULSE)
+	battle.confirm(0.0)
+	var plain := _new_engine(222, "circuit_mn1")
+	plain.start_gp()
+	_flatten_neighbors(plain)
+	plain.begin_turn()
+	plain.spin()
+	plain.rear_gauge = 90.0
+	plain.provisional = _combo(RaceTypes.SYMBOL_BRAKING, 1, RaceTypes.SYMBOL_PULSE)
+	plain.confirm(0.0)
+	_ok("배틀 존 계수가 방어(브레이킹) 경로에도 적용", battle.rear_gauge < plain.rear_gauge,
+		"battle=%f plain=%f" % [battle.rear_gauge, plain.rear_gauge])

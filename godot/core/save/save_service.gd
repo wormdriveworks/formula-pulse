@@ -5,8 +5,8 @@ class_name SaveService
 extends RefCounted
 
 # 진행 세이브 스키마 판번 (단일 정의 — SaveManager가 이 상수를 승계한다).
-# MS-1 = 1 / MS-2 = 2 (레조넌스 오버레이 필드 신설).
-const SCHEMA_VERSION := 2
+# MS-1 = 1 / MS-2 = 2 (레조넌스 오버레이 필드) / 3 (레조넌스 서킷 축·1회성 신설).
+const SCHEMA_VERSION := 3
 
 
 # payload는 문자열로 내장 — 체크섬 검증이 JSON 재직렬화 정밀도에 오염되지 않도록 (손상 감지 정확성)
@@ -28,7 +28,7 @@ static func save_to(path: String, payload: Dictionary) -> bool:
 
 # 반환: {"ok": bool, "payload": Dictionary, "error": String}
 static func load_from(path: String) -> Dictionary:
-	var result := {"ok": false, "payload": {}, "error": "", "schema_version": -1}
+	var result := {"ok": false, "payload": {}, "error": "", "schema_version": -1, "content_checksum": ""}
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		result["error"] = "not_found"
@@ -57,6 +57,7 @@ static func load_from(path: String) -> Dictionary:
 		return result
 	result["ok"] = true
 	result["payload"] = payload
+	result["content_checksum"] = String(envelope.get("checksum", ""))
 	return result
 
 

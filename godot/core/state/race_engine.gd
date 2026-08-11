@@ -54,7 +54,9 @@ var _armed_duel: int = RaceTypes.DuelType.NONE
 # 레조넌스 섹터 오버레이 (D08 §3.7 · D13 별첨A §6.6)
 # 추첨은 투어 층 소관(투어 개막 1회 · resonance 스트림) — 엔진은 주입된 슬롯을 소비한다.
 # 위치는 진입 전까지 어떤 출력 경로에도 노출하지 않는다 (R6 위치 비공개).
-var resonance_sector_slot: int = 0     # 0 = 이 서킷에 오버레이 없음
+var resonance_circuit_id: String = ""  # 추첨된 서킷 (R6의 "서킷 슬롯 × 섹터 슬롯" 중 서킷 축)
+var resonance_sector_slot: int = 0     # 0 = 오버레이 없음
+var resonance_consumed: bool = false   # 무대당 1회 — 발동 후 재발동 차단
 var resonance_announced: bool = false
 var resonance_duel_bonus: float = 0.0  # 차기 듀얼 판정 보정 (D13 별첨A §2.4 '레조넌스 보정')
 
@@ -259,14 +261,16 @@ func _enter_phase(phase: int) -> void:
 
 
 func _roll_reel(reel_index: int) -> String:
-	var weights := _reel_weights(reel_index)
+	var weights := reel_weights(reel_index)
 	var picked := rng.pick_weighted("reel", weights)
 	return String(data.symbols[picked]["id"])
 
 
 # 섹터 속성 가중 (D13 별첨A §1.3): 기본 분포에 주속성 Δ 가산, 부속성은 ½ 적용.
 # 음수는 0으로 절단 후 재정규화 — pick_weighted가 합으로 나누므로 비례는 유지된다.
-func _reel_weights(reel_index: int) -> Array:
+# 공개 조회: 분포는 '결과'가 아니라 '규칙'이므로 봉인 규칙과 무접촉하다.
+# (결과 = 어느 심볼이 나왔는가 = provisional. 이 함수는 확률만 돌려준다.)
+func reel_weights(reel_index: int) -> Array:
 	var column := "prob_reel%d" % (reel_index + 1)
 	var main_attr := data.sector_attr(_sector_attr_id("main_attr"))
 	var sub_attr := data.sector_attr(_sector_attr_id("sub_attr"))
@@ -470,6 +474,9 @@ func _apply_resonance_bonus(gauge_mult: float) -> Array:
 		return []
 	if not _has_any_three_match():
 		return []
+	if resonance_consumed:
+		return []   # 무대당 1회 (R6) — 같은 섹터를 랩마다 다시 지나도 재지급하지 않는다
+	resonance_consumed = true
 	var stage := data.stage_of_active_circuit()
 	var bonus_type := String(stage.get("resonance_bonus_type", ""))
 	var bonus_value := float(stage.get("resonance_bonus_value", 0.0))
@@ -494,7 +501,13 @@ func _apply_resonance_bonus(gauge_mult: float) -> Array:
 
 # 플레이어 전용 · 섹터 릴 정산 전속 (R7) — 듀얼 정산은 단계 ②를 돌지 않으므로 구조적으로 무관여.
 func _is_resonance_sector() -> bool:
-	return resonance_sector_slot > 0 and sector == resonance_sector_slot and not current_turn_is_duel
+	if resonance_sector_slot <= 0 or current_turn_is_duel:
+		return false
+	# 추첨은 (서킷 슬롯 × 섹터 슬롯) 두 축이다 (D08 §3.7 R6). 섹터 슬롯만 보면
+	# 같은 무대의 서킷 4종 전부에서 발동해 '무대당 1회'가 성립하지 않는다.
+	if resonance_circuit_id != String(data.circuit.get("id", "")):
+		return false
+	return sector == resonance_sector_slot
 
 
 func _has_any_three_match() -> bool:
@@ -614,8 +627,12 @@ func _apply_neighbor_passives(gauge_mult: float) -> void:
 		front_gauge -= resist * gauge_mult
 	if rear_target != "":
 		var rear: Dictionary = entrants[rear_target]
+		# 압박 산식의 공격성은 **시드값** 기준이다 (D13 별첨A §2.1 산출 예: 필러 8.6 =
+		# 2.0+3.0×2.2 / 디아스 13.0 = 2.0+5.0×2.2 → ×1.3 = 16.9). 팀 스탯 가산을 넣으면
+		# 디아스가 5.5가 되어 18.33이 나오고 정본에 인쇄된 16.9가 도달 불가능해진다.
+		# 소속 계수(pressure_mult ×1.3)는 그 예시 안에 이미 포함돼 있으므로 그대로 곱한다.
 		var pressure := (data.param("param_gauge_rear_pressure_base") \
-			+ float(rear["aggression"]) * data.param("param_gauge_rear_pressure_aggr_coef")) \
+			+ float(rear["seed_aggression"]) * data.param("param_gauge_rear_pressure_aggr_coef")) \
 			* float(rear["pressure_mult"])
 		rear_gauge += pressure * gauge_mult
 
@@ -838,7 +855,9 @@ func serialize() -> Dictionary:
 		"duel_boost": duel_boost,
 		"pending_duel": pending_duel, "duel_opponent": duel_opponent,
 		"current_turn_is_duel": current_turn_is_duel,
+		"resonance_circuit_id": resonance_circuit_id,
 		"resonance_sector_slot": resonance_sector_slot,
+		"resonance_consumed": resonance_consumed,
 		"resonance_announced": resonance_announced,
 		"resonance_duel_bonus": resonance_duel_bonus,
 		"finished": finished, "result": result.duplicate(true),
@@ -872,7 +891,9 @@ func restore(payload: Dictionary) -> bool:
 	pending_duel = int(payload["pending_duel"])
 	duel_opponent = String(payload["duel_opponent"])
 	current_turn_is_duel = bool(payload["current_turn_is_duel"])
+	resonance_circuit_id = String(payload["resonance_circuit_id"])
 	resonance_sector_slot = int(payload["resonance_sector_slot"])
+	resonance_consumed = bool(payload["resonance_consumed"])
 	resonance_announced = bool(payload["resonance_announced"])
 	resonance_duel_bonus = float(payload["resonance_duel_bonus"])
 	finished = bool(payload["finished"])

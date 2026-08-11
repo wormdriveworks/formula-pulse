@@ -10,12 +10,18 @@ var _checked := 0
 
 
 func _init() -> void:
+	_configure()
 	_clean_profiles()
 	_tc_p8_corruption_recovery()
 	_tc_p9_migration()
 	_tc_p9_conflict_policy()
 	_tc_p9_profile_isolation()
 	_snapshot_is_single_use()
+	_profile_range_enforced()
+	_backup_never_takes_corrupt_primary()
+	_progress_counter_monotonic()
+	_disk_envelope_end_to_end()
+	_paths_are_distinct()
 	_clean_profiles()
 	print("")
 	if _failures == 0:
@@ -34,10 +40,13 @@ func _ok(label: String, condition: bool, detail: String = "") -> void:
 
 
 func _clean_profiles() -> void:
-	for profile_index in range(1, 5):
+	# 범위 밖 인덱스까지 지운다. 사본 프로젝트도 같은 user:// 디렉토리를 공유하므로
+	# 다른 실행이 남긴 profile_-1·profile_9 류가 '미생성' 단언을 오염시킨다.
+	for profile_index in range(-2, 12):
 		SaveService.delete_save(SaveManager.progress_path(profile_index))
 		SaveService.delete_save(SaveManager.backup_path(profile_index))
 		SaveService.delete_save(SaveManager.snapshot_path(profile_index))
+		SaveService.delete_save(SaveManager.quarantine_path(profile_index))
 
 
 # 정본을 훼손해 체크섬 불일치를 만든다 (D14 TC-P8 '체크섬 불일치 파일 주입').
@@ -217,3 +226,154 @@ func _snapshot_is_single_use() -> void:
 	_ok("스냅샷 소비 후 소거", not SaveManager.has_snapshot(1))
 	var second := SaveManager.consume_snapshot(1)
 	_ok("스냅샷 재소비 불가", not bool(second["ok"]), str(second))
+
+
+# SaveManager는 설정된 프로필 범위 밖의 저장·로드를 거부해야 한다.
+func _configure() -> void:
+	var data := GameData.new()
+	if not data.load_all():
+		_failures += 1
+		print("  [FAIL] data load")
+		return
+	SaveManager.configure(data)
+
+
+# ── 프로필 범위 강제 (독립 검증: 범위 밖 프로필 디렉토리가 실제로 생성됐다) ──
+# is_valid_profile()의 정확성만 검사하면 '강제되는가'는 무검증이다 — 강제를 직접 시험한다.
+func _profile_range_enforced() -> void:
+	var data := GameData.new()
+	if not data.load_all():
+		return
+	var count := data.param_int("param_save_profile_count")
+	for invalid_index in [0, -1, count + 1, count + 6]:
+		var result := SaveManager.save_progress(invalid_index, {"lap": 1})
+		_ok("범위 밖 프로필 %d 저장 거부" % invalid_index,
+			not bool(result["ok"]) and String(result["error"]) == "profile_out_of_range", str(result))
+		_ok("범위 밖 프로필 %d 파일 미생성" % invalid_index,
+			not FileAccess.file_exists(SaveManager.progress_path(invalid_index)))
+		var loaded := SaveManager.load_progress(invalid_index)
+		_ok("범위 밖 프로필 %d 로드 거부" % invalid_index,
+			not bool(loaded["ok"]) and String(loaded["error"]) == "profile_out_of_range", str(loaded))
+		_ok("범위 밖 프로필 %d 스냅샷 거부" % invalid_index,
+			not SaveManager.save_snapshot(invalid_index, {"lap": 1}))
+
+
+# ── 백업 회전이 손상본을 백업 슬롯에 올리지 않는다 ──
+# 자동 저장 단일 모델에서는 손상을 모른 채 다음 GP를 끝내면 자동 저장이 일어난다.
+# 그 저장이 손상본을 백업으로 회전하면, 방금 복구에 쓴 유일한 성한 세대가 사라진다.
+func _backup_never_takes_corrupt_primary() -> void:
+	_clean_profiles()
+	SaveManager.save_progress(1, {"lap": 1, "marker": "good_A"})
+	SaveManager.save_progress(1, {"lap": 1, "marker": "good_B"})
+	_ok("손상 전 백업 = good_A",
+		String(Dictionary(SaveManager._load_and_migrate(SaveManager.backup_path(1))["payload"]).get("marker", "")) == "good_A")
+	_ok("정본 훼손 주입", _corrupt(SaveManager.progress_path(1)))
+	var recovered := SaveManager.load_progress(1)
+	_ok("백업 복구 성립", bool(recovered["ok"]) and String(recovered["source"]) == "backup", str(recovered.get("source")))
+	# 손상 상태에서 자동 저장이 일어난다
+	var saved := SaveManager.save_progress(1, {"lap": 2, "marker": "good_C"})
+	_ok("손상 상태 저장 성립", bool(saved["ok"]), str(saved))
+	_ok("손상본을 백업으로 회전하지 않음", not bool(saved["backup_rotated"]), str(saved))
+	_ok("회전 보류 사유 기록", String(saved["backup_kept_reason"]) == "checksum_mismatch",
+		str(saved.get("backup_kept_reason")))
+	var backup_after := SaveManager._load_and_migrate(SaveManager.backup_path(1))
+	_ok("백업이 성한 세대로 남아 있다", bool(backup_after["ok"])
+		and String(Dictionary(backup_after["payload"]).get("marker", "")) == "good_A",
+		str(backup_after.get("payload")))
+	# 그 다음 손상도 여전히 복구 가능하다 (복구 창이 닫히지 않았다)
+	_ok("2차 훼손 주입", _corrupt(SaveManager.progress_path(1)))
+	var recovered2 := SaveManager.load_progress(1)
+	_ok("복구 창 유지", bool(recovered2["ok"]) and String(recovered2["source"]) == "backup", str(recovered2))
+
+
+# ── 진행도 카운터 단조 증가 (충돌 정책 1차 축의 실효) ──
+# 호출 층이 카운터 없는 payload를 반복 저장해도 디스크 값이 올라가야 한다.
+func _progress_counter_monotonic() -> void:
+	_clean_profiles()
+	var previous := 0
+	for iteration in range(5):
+		var result := SaveManager.save_progress(1, {"lap": iteration + 1})
+		_ok("저장 %d회차 성립" % (iteration + 1), bool(result["ok"]), str(result))
+		var counter := int(result["progress_counter"])
+		_ok("카운터 단조 증가 (%d → %d)" % [previous, counter], counter == previous + 1,
+			"counter=%d previous=%d" % [counter, previous])
+		previous = counter
+		var loaded := SaveManager.load_progress(1)
+		_ok("디스크 카운터 일치 %d" % counter,
+			int(Dictionary(loaded["payload"]).get("progress_counter", -1)) == counter,
+			str(loaded.get("payload")))
+	_ok("저장 결과가 갱신된 payload를 돌려준다",
+		int(Dictionary(SaveManager.save_progress(1, {"lap": 9})["payload"]).get("progress_counter", -1)) == previous + 1)
+	# 내용이 다른데 진행도·시각이 동률이면 자동 폐기하지 않는다 (체크섬 축)
+	_ok("동률 + 내용 상이 = 사용자 선택",
+		SaveManager.resolve_cloud_conflict(
+			{"progress_counter": 4, "saved_at": 100, "content_checksum": "aaa"},
+			{"progress_counter": 4, "saved_at": 100, "content_checksum": "bbb"}) == SaveManager.ConflictChoice.ASK)
+	_ok("동률 + 내용 동일 = 전송 불요",
+		SaveManager.resolve_cloud_conflict(
+			{"progress_counter": 4, "saved_at": 100, "content_checksum": "aaa"},
+			{"progress_counter": 4, "saved_at": 100, "content_checksum": "aaa"}) == SaveManager.ConflictChoice.LOCAL)
+
+
+# ── 디스크 봉투 → 마이그레이션 결선 (migrate()를 직접 부르는 검사로는 볼 수 없는 축) ──
+# SaveService.save_to는 항상 최신 판번을 적으므로, 구버전 봉투를 손으로 만들어 놓고
+# load_progress가 그것을 읽어 마이그레이션하는지 확인한다.
+func _disk_envelope_end_to_end() -> void:
+	_clean_profiles()
+	SaveManager.ensure_profile_dir(1)
+	var v1_payload := {"lap": 3, "sector": 2, "marker": "legacy"}
+	var payload_json := JSON.stringify(v1_payload, "", true)
+	var envelope := {
+		"schema_version": 1,
+		"checksum": payload_json.md5_text(),
+		"payload_json": payload_json,
+	}
+	var file := FileAccess.open(SaveManager.progress_path(1), FileAccess.WRITE)
+	if file == null:
+		_failures += 1
+		print("  [FAIL] cannot write legacy envelope")
+		return
+	file.store_string(JSON.stringify(envelope, "", true))
+	file.close()
+	var loaded := SaveManager.load_progress(1)
+	_ok("디스크 v1 봉투 로드 성립", bool(loaded["ok"]), str(loaded.get("error")))
+	_ok("마이그레이션 출처 판번 기록", int(loaded["migrated_from"]) == 1,
+		"migrated_from=%s" % str(loaded.get("migrated_from")))
+	var payload: Dictionary = loaded["payload"]
+	_ok("v1 → 최신 필드 전량 충전",
+		payload.has("resonance_sector_slot") and payload.has("resonance_circuit_id")
+		and payload.has("resonance_consumed"), str(payload))
+	_ok("원 내용 보존", String(payload.get("marker", "")) == "legacy" and int(payload.get("lap", 0)) == 3,
+		str(payload))
+	# 상위 판번 봉투는 손상이 아니라 '너무 새 버전'으로 구분 보고된다
+	var future_envelope := {
+		"schema_version": SaveManager.SCHEMA_VERSION + 5,
+		"checksum": payload_json.md5_text(),
+		"payload_json": payload_json,
+	}
+	var file2 := FileAccess.open(SaveManager.progress_path(2), FileAccess.WRITE)
+	if file2 != null:
+		file2.store_string(JSON.stringify(future_envelope, "", true))
+		file2.close()
+	var future := SaveManager.load_progress(2)
+	_ok("상위 판번 = version_too_new (손상과 구분)",
+		not bool(future["ok"]) and String(future["source"]) == "version_too_new", str(future))
+
+
+# ── 경로 분리 — 스냅샷이 진행 세이브를 덮지 않는다 ──
+func _paths_are_distinct() -> void:
+	_ok("파일명 4종 상호 구분", SaveManager.paths_are_distinct())
+	var seen: Dictionary = {}
+	for path in [SaveManager.progress_path(1), SaveManager.backup_path(1),
+			SaveManager.snapshot_path(1), SaveManager.quarantine_path(1)]:
+		_ok("경로 유일: %s" % path, not seen.has(path), path)
+		seen[path] = true
+	# 손상 스냅샷은 삭제가 아니라 격리된다 (진단 가능 + 재소비 불가)
+	_clean_profiles()
+	SaveManager.save_snapshot(1, {"lap": 1, "marker": "suspend"})
+	_ok("스냅샷 훼손 주입", _corrupt(SaveManager.snapshot_path(1)))
+	var consumed := SaveManager.consume_snapshot(1)
+	_ok("손상 스냅샷 소비 실패 보고", not bool(consumed["ok"]), str(consumed))
+	_ok("손상 스냅샷 재소비 불가", not SaveManager.has_snapshot(1))
+	_ok("손상 스냅샷 격리 보존", FileAccess.file_exists(SaveManager.quarantine_path(1)))
+	SaveService.delete_save(SaveManager.quarantine_path(1))

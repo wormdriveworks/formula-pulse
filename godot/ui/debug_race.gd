@@ -6,7 +6,9 @@
 # 어떤 표시 경로에도 노출하지 않는다 — 공개 전 릴 표기는 자리 표시 문자.
 extends Control
 
-const SNAPSHOT_PATH := "user://debug_suspend.json"
+# 서스펜드 스냅샷은 SaveManager 정책 층 경유 — 프로필 분리·백업 회전·마이그레이션·
+# 1회성 소거가 전부 그 층에 있다. SaveService를 직접 부르면 그 전부를 우회한다.
+const DEBUG_PROFILE := 1
 const REEL_PLACEHOLDER_KEY := "ui.debug.reelHidden"
 
 var data: GameData
@@ -37,6 +39,7 @@ var _load_button: Button
 func _ready() -> void:
 	data = GameData.new()
 	data.load_all()
+	SaveManager.configure(data)
 	_timer_base = data.param("param_timer_base_sec")
 	_build_layout()
 	_start_new_gp()
@@ -257,14 +260,14 @@ func _show_provisional_now() -> void:
 
 # ── 서스펜드 스냅샷 (D12 §7.2 — 1회성) ──
 func _on_save() -> void:
-	SaveService.save_to(SNAPSHOT_PATH, engine.serialize())
+	SaveManager.save_snapshot(DEBUG_PROFILE, engine.serialize())
 
 
 func _on_load() -> void:
-	var loaded := SaveService.load_from(SNAPSHOT_PATH)
+	# 소거는 consume_snapshot 내부에서 일어난다 (1회성을 호출 층 재량에 두지 않는다)
+	var loaded := SaveManager.consume_snapshot(DEBUG_PROFILE)
 	if not loaded["ok"]:
 		return
-	SaveService.delete_save(SNAPSHOT_PATH)  # 1회성 — 로드 시 소거
 	rng = RngService.new()
 	engine = RaceEngine.new()
 	engine.setup(data, rng)
