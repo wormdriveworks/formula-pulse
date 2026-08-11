@@ -77,6 +77,12 @@ static func ensure_profile_dir(profile_index: int) -> bool:
 # 백업 없이 정본을 덮으면 손상 시 복구 경로(TC-P8)가 사라진다.
 static func save_progress(profile_index: int, payload: Dictionary) -> Dictionary:
 	var result := {"ok": false, "error": "", "backup_rotated": false, "backup_kept_reason": "", "progress_counter": 0}
+	if _profile_count <= 0:
+		# 미설정과 범위 밖은 원인이 다르다 — 같은 코드로 보고하면 호출 층이
+		# "프로필 번호가 잘못됐다"고 읽고 configure() 누락을 영원히 못 찾는다.
+		result["error"] = "not_configured"
+		push_error("SaveManager: configure(data) before saving")
+		return result
 	if not _in_configured_range(profile_index):
 		result["error"] = "profile_out_of_range"
 		push_error("SaveManager: profile %d out of configured range (count=%d)" % [profile_index, _profile_count])
@@ -102,7 +108,11 @@ static func save_progress(profile_index: int, payload: Dictionary) -> Dictionary
 	# 진행도는 **디스크에 적힌 값** 기준으로 올린다. 인자 payload에서만 파생하면
 	# 호출 층이 새 카운터를 돌려받지 못해(인메모리 dict에 없음) 매 저장이 0+1=1이 되고,
 	# 클라우드 충돌 정책의 1차 판정축(D12 §7.3 '진행도 비교')이 상수가 되어 무효화된다.
-	stamped["progress_counter"] = maxi(_disk_counter(target), int(payload.get("progress_counter", 0))) + 1
+	# **백업까지 본다:** 정본이 손상되면 그 값을 신뢰할 수 없어 0이 되는데, 백업을 보지 않으면
+	# 손상 1회로 카운터가 후퇴한다(3 → 1). 후퇴한 카운터는 클라우드 충돌에서 최신 진행을
+	# 뒤진 것으로 오판하게 만든다.
+	stamped["progress_counter"] = maxi(maxi(_disk_counter(target),
+		_disk_counter(backup_path(profile_index))), int(payload.get("progress_counter", 0))) + 1
 	if not SaveService.save_to(target, stamped):
 		result["error"] = "write_failed"
 		return result
@@ -116,6 +126,9 @@ static func save_progress(profile_index: int, payload: Dictionary) -> Dictionary
 # 반환: {ok, payload, error, source: "primary"|"backup", migrated_from}
 # 백업으로 살아난 경우 source = "backup" — 호출 층이 사용자에게 복원 사실을 알린다.
 static func load_progress(profile_index: int) -> Dictionary:
+	if _profile_count <= 0:
+		return {"ok": false, "payload": {}, "error": "not_configured", "source": "none",
+			"migrated_from": -1, "content_checksum": ""}
 	if not _in_configured_range(profile_index):
 		return {"ok": false, "payload": {}, "error": "profile_out_of_range", "source": "none",
 			"migrated_from": -1, "content_checksum": ""}

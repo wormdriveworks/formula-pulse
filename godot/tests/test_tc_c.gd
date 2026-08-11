@@ -24,6 +24,7 @@ func _init() -> void:
 	_tc_c9_chassis_retire()
 	_tc_c11_seal()
 	_tc_c12_scumming()
+	_seal_across_many_spins()
 	_neighbor_passive_runtime()
 	_negative_guards()
 	_result_and_ranking()
@@ -32,6 +33,12 @@ func _init() -> void:
 	_presentation_grade_caps()
 	_check_global_postconditions()
 	print("")
+	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
+	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
+	if _checked < 850:
+		print("TC_C_TEST_FAIL checks=%d < 하한 850 (스위트 축소·로드 실패 의심)" % _checked)
+		quit(1)
+		return
 	if _failures == 0:
 		print("TC_C_TEST_PASS checks=%d" % _checked)
 		quit(0)
@@ -165,6 +172,24 @@ func _d13_anchor_values() -> void:
 					CsvTable.to_float(String(data.match_effects[symbol_id][match_count][column])), 0.0)
 	_ok("D13 §1.2 찬스 3매치 = 즉시 듀얼",
 		String(data.match_effects[RaceTypes.SYMBOL_CHANCE][3]["special"]).strip_edges() == "duel_trigger")
+	# 구조: 듀얼 환산의 축 분리 — {슬립,브레이킹,라인}은 match1~3 축, {찬스,트러블}은 per_symbol 축.
+	# 축 밖 값이 0이라는 사실을 고정한다 (찬스가 match 값을 얻거나 슬립이 per_symbol을 얻으면 위반).
+	var match_axis := [RaceTypes.SYMBOL_SLIPSTREAM, RaceTypes.SYMBOL_BRAKING, RaceTypes.SYMBOL_LINE]
+	var per_symbol_axis := [RaceTypes.SYMBOL_CHANCE, RaceTypes.SYMBOL_TROUBLE]
+	for symbol_id in match_axis:
+		_eq_float("구조: %s는 per_symbol 축 밖" % symbol_id,
+			CsvTable.to_float(String(data.duel_conversion[symbol_id]["per_symbol"])), 0.0)
+		var nonzero := false
+		for match_count in [1, 2, 3]:
+			if absf(CsvTable.to_float(String(data.duel_conversion[symbol_id]["match%d" % match_count]))) > 0.0001:
+				nonzero = true
+		_ok("구조: %s는 match 축에 값을 갖는다" % symbol_id, nonzero)
+	for symbol_id in per_symbol_axis:
+		for match_count in [1, 2, 3]:
+			_eq_float("구조: %s는 match 축 밖 (%d)" % [symbol_id, match_count],
+				CsvTable.to_float(String(data.duel_conversion[symbol_id]["match%d" % match_count])), 0.0)
+		_ok("구조: %s는 per_symbol 축에 값을 갖는다" % symbol_id,
+			absf(CsvTable.to_float(String(data.duel_conversion[symbol_id]["per_symbol"]))) > 0.0001)
 	# D13 별첨A §1.1 기본 심볼 분포 (앵커 A4) — 합 1.0
 	var expected_probability := {
 		"symbol_slipstream": 0.22, "symbol_braking": 0.20, "symbol_line": 0.23,
@@ -264,6 +289,21 @@ func _d13_anchor_values() -> void:
 		CsvTable.to_float(String(rival_rows["ai_lorentz"]["duel_defense_override"])), 55.0)
 	_eq_float("D13 §2.4 로렌츠 추월 가산 +70",
 		CsvTable.to_float(String(rival_rows["ai_lorentz"]["duel_overtake_add"])), 70.0)
+	# 구조: 비0 라이벌은 D13 §6.2가 명시한 그 라이벌뿐이다 (0 = "해당 없음"이라는 대장 사실)
+	var exclusive_owners := {
+		"duel_overtake_add": ["ai_lorentz"],
+		"rush_lap1": ["ai_maro", "ai_volkova"],
+		"rush_lap_final": ["ai_volkova", "ai_holloway"],
+		"rush_random": ["ai_sherwood", "ai_jude"],
+		"stability_under_pressure": ["ai_bianca"],
+	}
+	for column in exclusive_owners:
+		for rival_id in rival_rows:
+			var raw := String(rival_rows[rival_id][column]).strip_edges()
+			var is_zero := raw == "" or absf(raw.to_float()) < 0.0001
+			var should_own: bool = Array(exclusive_owners[column]).has(rival_id)
+			_ok("구조: %s.%s %s" % [rival_id, column, "비0" if should_own else "0"],
+				is_zero != should_own, "raw=%s" % raw)
 	# 팀 프로파일 가산 (D08 §6.2 · D13 별첨A §6.2)
 	var expected_teams := {
 		"team_axion":       {"pace_add": 0.0, "aggression_add": 0.0, "stability_add": 0.5, "rush_lap_final_add": 0.0, "pressure_mult": 1.0},
@@ -800,6 +840,40 @@ func _tc_c11_seal() -> void:
 			not String(event.get("key", "")).begins_with("grade."), str(event))
 
 
+# 다수 스핀에 걸친 봉인 검사 (SEAL-C 계열). 단발 스핀 diff는 **희귀 분기에 숨은 누출**을
+# 놓친다 — 3매치처럼 드문 결과에만 걸린 누출은 그 스핀에서 값이 변하지 않기 때문이다.
+# 수백 회 돌려 "스핀이 바꾼 공개 표면 집합 ⊆ 화이트리스트"를 누적 판정한다.
+func _seal_across_many_spins() -> void:
+	var engine := _new_engine(4242)
+	if engine == null:
+		return
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	var allowed := ["provisional", "turn_phase", "phase_log"]
+	var offenders: Dictionary = {}
+	var three_match_seen := 0
+	for attempt in range(400):
+		if engine.finished:
+			engine = _new_engine(4242 + attempt)
+			engine.start_gp()
+			_flatten_neighbors(engine)
+		var info := engine.begin_turn()
+		if String(info.get("type", "")) == "finished":
+			continue
+		var before := _public_surface(engine)
+		engine.spin()
+		var provisional := engine.get_provisional()
+		if provisional.size() == 3 and provisional[0] == provisional[1] and provisional[1] == provisional[2]:
+			three_match_seen += 1
+		for name in _unexpected_surface_changes(engine, before, allowed):
+			offenders[name] = int(offenders.get(name, 0)) + 1
+		engine.confirm(0.0)
+	_ok("봉인: 3매치 분기 도달 (희귀 분기 표본 확보)", three_match_seen > 0,
+		"three_match=%d" % three_match_seen)
+	_ok("봉인: 다수 스핀에서도 화이트리스트 밖 변화 0", offenders.is_empty(),
+		"offenders=%s" % str(offenders))
+
+
 # 심볼 id가 이벤트 어딘가(키·파라미터)에 실려 있으면 결과 누출이다.
 func _leaks_symbol(events: Array) -> bool:
 	for event in events:
@@ -831,7 +905,9 @@ func _public_surface(engine: RaceEngine) -> Dictionary:
 	var surface: Dictionary = {}
 	for property in engine.get_property_list():
 		var name := String(property.get("name", ""))
-		if name.begins_with("_") or name == "script":
+		# 밑줄 접두 필드도 본다 — 누출을 `_leak` 같은 이름에 담으면 검사가 비켜 간다.
+		# GDScript의 밑줄은 관례이고 접근 제한이 아니므로 누출 경로로 성립한다.
+		if name == "script":
 			continue
 		if int(property.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
 			continue
@@ -925,6 +1001,11 @@ func _presentation_grade_caps() -> void:
 	# D08 §8.5 확정값 대조 (L2 = 2회 · L3 = 1회)
 	_eq_float("D08 §8.5 L2 GP당 상한 2",
 		CsvTable.to_float(String(data.presentation_grade("grade_l2")["gp_cap"])), 2.0)
+	# "상한 0 = 무제한" 규약 — L0·L1이 0이 아니면 무제한 등급이 조용히 제한된다
+	_eq_float("규약: L0 상한 0(무제한)",
+		CsvTable.to_float(String(data.presentation_grade("grade_l0")["gp_cap"])), 0.0)
+	_eq_float("규약: L1 상한 0(무제한)",
+		CsvTable.to_float(String(data.presentation_grade("grade_l1")["gp_cap"])), 0.0)
 	_eq_float("D08 §8.5 L3 GP당 상한 1",
 		CsvTable.to_float(String(data.presentation_grade("grade_l3")["gp_cap"])), 1.0)
 	# D13 별첨A §8.3 등급 스팅 길이

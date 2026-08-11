@@ -1,0 +1,6 @@
+id,name_key,role,recruit_dp,passive,passive_value
+crew_marta,ui.crew.marta,chief_mechanic,0,tuning_refund_ratio,0.90
+crew_theo,ui.crew.theo,logistics,0,repair_cost_ratio,-0.10
+crew_nadia,ui.crew.nadia,sponsor_liaison,65,sponsor_candidates,4
+crew_oscar,ui.crew.oscar,data_analyst,80,overhaul_detail_reveal,1
+crew_sasha,ui.crew.sasha,engineer,100,unlock_cost_ratio,-0.10

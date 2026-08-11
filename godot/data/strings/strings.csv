@@ -144,3 +144,56 @@ ui.eventVariant.neonFestivalReturning,돌아온 개막
 ui.eventVariant.neonFestivalDefault,첫 개막의 야경
 ui.eventVariant.vaneQuestionStage2,조금 더 긴 질문
 ui.eventVariant.vaneQuestionDefault,짧은 질문
+ui.facility.g1,텔레메트리 아카이브
+ui.facility.g2,크루 라운지
+ui.facility.g3,세컨드 워크벤치
+ui.facility.g4,스폰서 부스
+ui.tuning.t1,파워트레인
+ui.tuning.t2,브레이크
+ui.tuning.t3,라인 컨트롤
+ui.tuning.t4,섀시 보강
+ui.tuning.t5,펄스 드라이브 정밀화
+ui.tuning.t6,임팩트 스트럭처
+ui.overhaul.ovT1,노스윈드 인테이크
+ui.overhaul.ovT2,리버스 텔레메트리
+ui.overhaul.ovT3,콜드 스타트
+ui.overhaul.ovT4,라스트 랩 서지
+ui.overhaul.ovS1,경량 모노코크
+ui.overhaul.ovS2,강화 임팩트 링
+ui.overhaul.ovS3,하이 레이크 셋업
+ui.overhaul.ovS4,롱런 패키지
+ui.overhaul.ovP1,프론트 윙 Mk-II
+ui.overhaul.ovP2,리어 디퓨저 Mk-II
+ui.overhaul.ovP3,펄스 코일 확장
+ui.overhaul.ovP4,리인포스드 셀
+ui.skill.sh1,프리시전 홀드
+ui.skill.sh2,풀 스윕
+ui.skill.sh3,스냅샷
+ui.skill.sh4,웜업 스핀
+ui.skill.sc1,노이즈 필터
+ui.skill.sc2,리커버리 라우팅
+ui.skill.sc3,슬립스트림 링크
+ui.skill.sc4,라인 트레이스
+ui.skill.sa1,풀 스로틀
+ui.skill.sa2,펄스 리커버
+ui.skill.sa3,하드 브레이킹
+ui.skill.sa4,오버토크
+ui.skill.si1,임팩트 가드
+ui.skill.si2,섀시 실드
+ui.skill.si3,카운터 스티어
+ui.skill.si4,서바이벌 셀
+ui.crew.marta,마르타 이베르센
+ui.crew.theo,테오 콜리어
+ui.crew.nadia,나디아 리스
+ui.crew.oscar,오스카 브란트
+ui.crew.sasha,사샤 린드
+ui.sponsor.sp1,안정 계약
+ui.sponsor.sp2,공세 계약
+ui.sponsor.sp3,대결 계약
+ui.sponsor.sp4,명성 계약
+ui.relation.kinship,동기
+ui.relation.succession,계승
+ui.relation.throne,왕좌
+ui.consumable.p1,리페어 키트
+ui.consumable.p2,이머전시 실런트
+ui.consumable.p3,쿨런트 차지

@@ -1,0 +1,4 @@
+id,name_key,cost_cr,effect,effect_value
+consumable_p1,ui.consumable.p1,250,chassis_restore,15
+consumable_p2,ui.consumable.p2,320,chassis_restore_and_shield,8
+consumable_p3,ui.consumable.p3,400,chassis_wear_ratio,-0.20

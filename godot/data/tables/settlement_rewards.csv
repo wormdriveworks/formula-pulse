@@ -1,0 +1,13 @@
+id,scope,rank_min,rank_max,credits,dp
+reward_s4_p1,tour,1,1,1200,70
+reward_s4_p2,tour,2,2,900,55
+reward_s4_p3,tour,3,3,700,55
+reward_s4_p45,tour,4,5,500,40
+reward_s4_p68,tour,6,8,350,32
+reward_s4_p9,tour,9,16,200,22
+reward_s6_p1,season,1,1,4000,120
+reward_s6_p2,season,2,2,3000,90
+reward_s6_p3,season,3,3,2400,75
+reward_s6_p45,season,4,5,1800,60
+reward_s6_p68,season,6,8,1200,45
+reward_s6_p9,season,9,16,800,30

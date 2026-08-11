@@ -22,8 +22,16 @@ func _init() -> void:
 	_progress_counter_monotonic()
 	_disk_envelope_end_to_end()
 	_paths_are_distinct()
+	_counter_survives_corruption()
+	_not_configured_is_distinct()
 	_clean_profiles()
 	print("")
+	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
+	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
+	if _checked < 110:
+		print("TC_P_TEST_FAIL checks=%d < 하한 110 (스위트 축소·로드 실패 의심)" % _checked)
+		quit(1)
+		return
 	if _failures == 0:
 		print("TC_P_TEST_PASS checks=%d" % _checked)
 		quit(0)
@@ -377,3 +385,52 @@ func _paths_are_distinct() -> void:
 	_ok("손상 스냅샷 재소비 불가", not SaveManager.has_snapshot(1))
 	_ok("손상 스냅샷 격리 보존", FileAccess.file_exists(SaveManager.quarantine_path(1)))
 	SaveService.delete_save(SaveManager.quarantine_path(1))
+
+
+# ── 손상 복구가 진행도 카운터를 후퇴시키지 않는다 ──
+# 정본이 손상되면 그 값을 신뢰할 수 없어 0이 되는데, 백업을 보지 않으면 카운터가 후퇴한다.
+# 후퇴한 카운터는 클라우드 충돌에서 최신 진행을 뒤진 것으로 오판하게 만든다.
+func _counter_survives_corruption() -> void:
+	_clean_profiles()
+	var counter := 0
+	for iteration in range(3):
+		counter = int(SaveManager.save_progress(1, {"lap": iteration + 1})["progress_counter"])
+	_ok("손상 전 카운터 = 3", counter == 3, "counter=%d" % counter)
+	_ok("손상 주입", _corrupt(SaveManager.progress_path(1)))
+	var after := SaveManager.save_progress(1, {"lap": 9})
+	_ok("손상 상태 저장 성립", bool(after["ok"]), str(after))
+	# 백업은 한 세대 뒤지므로 손상 후 카운터의 '증가'까지 보장되지는 않는다.
+	# 방어 대상은 **후퇴**다 — 백업을 보지 않던 버그 상태에서는 3 → 1로 떨어졌다.
+	_ok("카운터가 후퇴하지 않는다", int(after["progress_counter"]) >= counter,
+		"after=%d before=%d" % [int(after["progress_counter"]), counter])
+	# 후퇴하면 충돌 판정이 원격을 최신으로 오판한다 — 그 귀결까지 확인한다
+	var local := {"progress_counter": int(after["progress_counter"]), "saved_at": 100}
+	var remote := {"progress_counter": counter, "saved_at": 90}
+	_ok("복구 후에도 로컬이 최신으로 판정",
+		SaveManager.resolve_cloud_conflict(local, remote) == SaveManager.ConflictChoice.LOCAL,
+		"local=%s remote=%s" % [str(local), str(remote)])
+
+
+# ── configure() 미호출은 '범위 밖'과 구분돼야 한다 ──
+# 같은 코드로 보고하면 호출 층이 "프로필 번호가 잘못됐다"고 읽고 설정 누락을 영원히 못 찾는다.
+func _not_configured_is_distinct() -> void:
+	SaveManager._profile_count = 0
+	var save_result := SaveManager.save_progress(1, {"lap": 1})
+	_ok("미설정 저장 거부", not bool(save_result["ok"]))
+	_ok("미설정 오류 코드 = not_configured", String(save_result["error"]) == "not_configured",
+		String(save_result["error"]))
+	var load_result := SaveManager.load_progress(1)
+	_ok("미설정 로드 오류 코드 = not_configured", String(load_result["error"]) == "not_configured",
+		String(load_result["error"]))
+	_configure()
+	var valid := SaveManager.save_progress(1, {"lap": 1})
+	_ok("설정 후 정상 저장", bool(valid["ok"]), str(valid))
+	SaveManager._profile_count = 0
+	var out_of_range_probe := SaveManager.save_progress(99, {"lap": 1})
+	_ok("미설정 상태에서는 범위 밖도 not_configured로 보고",
+		String(out_of_range_probe["error"]) == "not_configured", String(out_of_range_probe["error"]))
+	_configure()
+	var real_out_of_range := SaveManager.save_progress(99, {"lap": 1})
+	_ok("설정 후 범위 밖 = profile_out_of_range",
+		String(real_out_of_range["error"]) == "profile_out_of_range", String(real_out_of_range["error"]))
+	_clean_profiles()

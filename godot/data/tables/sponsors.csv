@@ -1,0 +1,5 @@
+id,name_key,kind,regular_cr,bonus_cr,condition
+sponsor_sp1,ui.sponsor.sp1,stable,500,200,tour_all_finish
+sponsor_sp2,ui.sponsor.sp2,aggressive,250,300,race_top3
+sponsor_sp3,ui.sponsor.sp3,rivalry,250,350,beat_named_rival
+sponsor_sp4,ui.sponsor.sp4,prestige,500,400,tour_top5

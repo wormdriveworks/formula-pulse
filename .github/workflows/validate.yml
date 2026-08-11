@@ -27,5 +27,6 @@ jobs:
       - name: Import cache
         run: godot --headless --path godot --import || true
 
-      - name: Logic tests
+      # 컴파일 게이트 + 스위트 종료코드 + 검사 수 하한 3중 (IMPL-054)
+      - name: Compile gate + logic tests
         run: bash tools/validators/run_tests.sh

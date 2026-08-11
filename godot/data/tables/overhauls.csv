@@ -1,0 +1,13 @@
+id,name_key,kind,effect,effect_value,drawback,drawback_value
+overhaul_ov_t1,ui.overhaul.ovT1,trait,stable_sector_charge,2,,0
+overhaul_ov_t2,ui.overhaul.ovT2,trait,hold_twice_per_turn,2,,0
+overhaul_ov_t3,ui.overhaul.ovT3,trait,gp_start_charge,2,,0
+overhaul_ov_t4,ui.overhaul.ovT4,trait,final_lap_gauge_mult,1.35,,0
+overhaul_ov_s1,ui.overhaul.ovS1,sidegrade,front_gauge_ratio,0.08,chassis_max,-10
+overhaul_ov_s2,ui.overhaul.ovS2,sidegrade,trouble_chassis_wear,-0.20,front_gauge_ratio,-0.05
+overhaul_ov_s3,ui.overhaul.ovS3,sidegrade,duel_judgment,8,rear_pressure_ratio,0.10
+overhaul_ov_s4,ui.overhaul.ovS4,sidegrade,free_restore_line,80,pulse_charge_yield,-1
+overhaul_ov_p1,ui.overhaul.ovP1,part,slipstream_coef,0.10,,0
+overhaul_ov_p2,ui.overhaul.ovP2,part,braking_coef,0.10,,0
+overhaul_ov_p3,ui.overhaul.ovP3,part,charge_cap,12,,0
+overhaul_ov_p4,ui.overhaul.ovP4,part,chassis_max,15,,0

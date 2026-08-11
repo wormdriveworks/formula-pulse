@@ -1,0 +1,5 @@
+id,name_key,effect,cost_dp,requires_crew
+facility_g1,ui.facility.g1,archive_deep_tab,45,
+facility_g2,ui.facility.g2,recall_playback,55,
+facility_g3,ui.facility.g3,deck_preset_slot,65,
+facility_g4,ui.facility.g4,sponsor_slot_plus,75,crew_nadia

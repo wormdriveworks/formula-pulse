@@ -19,6 +19,16 @@ var season_calendar: Dictionary = {}   # 구조 JSON (D08 §2 캘린더 규칙)
 var sector_attrs: Dictionary = {}      # attr_* id -> 행 (속성 6축 — D13 별첨A §1.3)
 var presentation_grades: Dictionary = {}   # grade_* id -> 행 (연출 등급 — D12 §5.8)
 var events: Dictionary = {}            # event_* id -> 행 (D08 §7 · D12 §5.4)
+var facilities: Dictionary = {}        # facility_* id -> 행 (D07 §2.2)
+var tuning_lines: Dictionary = {}      # tuning_* id -> 행 (D13 별첨A §3.5)
+var overhauls: Dictionary = {}         # overhaul_* id -> 행 (D13 별첨A §7.2)
+var overhaul_slots: Dictionary = {}    # ovslot_* id -> 행 (D13 별첨A §7.1)
+var skills: Dictionary = {}            # skill_* id -> 행 (D07 §4.2)
+var crew: Dictionary = {}              # crew_* id -> 행 (D07 §5.1 · D13 별첨A §5.1)
+var sponsors: Dictionary = {}          # sponsor_* id -> 행 (D13 별첨A §5.3)
+var relation_axes: Dictionary = {}     # relation_* id -> 행 (D13 별첨A §5.2)
+var consumables: Dictionary = {}       # consumable_* id -> 행 (D13 별첨A §3.6)
+var settlement_rewards: Dictionary = {}  # reward_* id -> 행 (D13 별첨A §3.2)
 var event_categories: Dictionary = {}  # category_* id -> 행 (배분·보상 범위)
 var event_variants: Dictionary = {}    # event id -> 변형 배열 (조건 DSL 포함)
 var presentation_triggers: Dictionary = {} # trigger_* id -> 행 (등급 후보·우선순위)
@@ -52,6 +62,7 @@ func load_all() -> bool:
 	_load_sector_attrs()
 	_load_presentation()
 	_load_events()
+	_load_outgame()
 	_load_content()
 	grid = _load_json(STRUCTURES_DIR + "grid_debug.json")
 	season_calendar = _load_json(STRUCTURES_DIR + "season_calendar.json")
@@ -284,6 +295,89 @@ func event_category(category_id: String) -> Dictionary:
 func event_variants_of(event_id: String) -> Array:
 	var entry: Variant = event_variants.get(event_id, [])
 	return entry if typeof(entry) == TYPE_ARRAY else []
+
+
+func _load_outgame() -> void:
+	facilities.clear()
+	tuning_lines.clear()
+	overhauls.clear()
+	overhaul_slots.clear()
+	skills.clear()
+	crew.clear()
+	sponsors.clear()
+	relation_axes.clear()
+	consumables.clear()
+	settlement_rewards.clear()
+	for row in CsvTable.load_rows(TABLES_DIR + "garage_facilities.csv"):
+		facilities[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "tuning_lines.csv"):
+		tuning_lines[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "overhauls.csv"):
+		overhauls[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "overhaul_slots.csv"):
+		overhaul_slots[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "skills.csv"):
+		skills[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "crew.csv"):
+		crew[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "sponsors.csv"):
+		sponsors[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "relation_axes.csv"):
+		relation_axes[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "consumables.csv"):
+		consumables[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "settlement_rewards.csv"):
+		settlement_rewards[String(row["id"])] = row
+	if facilities.is_empty() or tuning_lines.is_empty() or overhauls.is_empty() or overhaul_slots.is_empty() or skills.is_empty() or crew.is_empty() or sponsors.is_empty() or relation_axes.is_empty() or consumables.is_empty() or settlement_rewards.is_empty():
+		_load_ok = false
+
+
+func facility(row_id: String) -> Dictionary:
+	if not facilities.has(row_id):
+		push_error("GameData: unknown facility '%s'" % row_id)
+		_load_ok = false
+		return {}
+	return facilities[row_id]
+
+
+func tuning_line(row_id: String) -> Dictionary:
+	if not tuning_lines.has(row_id):
+		push_error("GameData: unknown tuning_line '%s'" % row_id)
+		_load_ok = false
+		return {}
+	return tuning_lines[row_id]
+
+
+func overhaul(row_id: String) -> Dictionary:
+	if not overhauls.has(row_id):
+		push_error("GameData: unknown overhaul '%s'" % row_id)
+		_load_ok = false
+		return {}
+	return overhauls[row_id]
+
+
+func skill(row_id: String) -> Dictionary:
+	if not skills.has(row_id):
+		push_error("GameData: unknown skill '%s'" % row_id)
+		_load_ok = false
+		return {}
+	return skills[row_id]
+
+
+func consumable(row_id: String) -> Dictionary:
+	if not consumables.has(row_id):
+		push_error("GameData: unknown consumable '%s'" % row_id)
+		_load_ok = false
+		return {}
+	return consumables[row_id]
+
+
+func relation_axis(relation_id: String) -> Dictionary:
+	if not relation_axes.has(relation_id):
+		push_error("GameData: unknown relation axis '%s'" % relation_id)
+		_load_ok = false
+		return {}
+	return relation_axes[relation_id]
 
 
 func _load_points() -> void:

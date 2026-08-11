@@ -171,6 +171,131 @@
     "position": "int:1,16",
     "points": "int"
    }
+  },
+  "garage_facilities.csv": {
+   "id_prefix": "facility_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "name_key": "string_key",
+    "effect": "enum:archive_deep_tab,recall_playback,deck_preset_slot,sponsor_slot_plus",
+    "cost_dp": "int",
+    "requires_crew": "fk_optional:crew.csv"
+   }
+  },
+  "tuning_lines.csv": {
+   "id_prefix": "tuning_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "name_key": "string_key",
+    "target": "string",
+    "effect_per_step": "float",
+    "effect_unit": "enum:ratio,flat",
+    "cost1": "int",
+    "cost2": "int",
+    "cost3": "int",
+    "cost4": "int",
+    "cost5": "int"
+   }
+  },
+  "overhauls.csv": {
+   "id_prefix": "overhaul_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "name_key": "string_key",
+    "kind": "enum:trait,sidegrade,part",
+    "effect": "string",
+    "effect_value": "float",
+    "drawback": "string",
+    "drawback_value": "float"
+   }
+  },
+  "overhaul_slots.csv": {
+   "id_prefix": "ovslot_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "rank_min": "int:1,16",
+    "rank_max": "int:1,16",
+    "slots": "int:1,4",
+    "candidates": "int:1,12"
+   }
+  },
+  "skills.csv": {
+   "id_prefix": "skill_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "name_key": "string_key",
+    "skill_tier": "int:1,3",
+    "charge_cost": "int:0,9",
+    "uses_per_tour": "int:0,9",
+    "unlock_dp": "int",
+    "family": "enum:hold,convert,amplify,insure",
+    "effect": "string"
+   }
+  },
+  "crew.csv": {
+   "id_prefix": "crew_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "name_key": "string_key",
+    "role": "string",
+    "recruit_dp": "int",
+    "passive": "string",
+    "passive_value": "float"
+   }
+  },
+  "sponsors.csv": {
+   "id_prefix": "sponsor_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "name_key": "string_key",
+    "kind": "enum:stable,aggressive,rivalry,prestige",
+    "regular_cr": "int",
+    "bonus_cr": "int",
+    "condition": "string"
+   }
+  },
+  "relation_axes.csv": {
+   "id_prefix": "relation_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "name_key": "string_key",
+    "rival_id": "fk:ai_rivals.csv",
+    "counter_source": "string",
+    "threshold1": "int:1,99",
+    "threshold2": "int:1,99",
+    "threshold3": "int:1,99"
+   }
+  },
+  "consumables.csv": {
+   "id_prefix": "consumable_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "name_key": "string_key",
+    "cost_cr": "int",
+    "effect": "string",
+    "effect_value": "float"
+   }
+  },
+  "settlement_rewards.csv": {
+   "id_prefix": "reward_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "scope": "enum:tour,season",
+    "rank_min": "int:1,16",
+    "rank_max": "int:1,16",
+    "credits": "int",
+    "dp": "int"
+   }
   }
  },
  "structures": {
@@ -382,16 +507,18 @@
   },
   {
    "name": "코어 표준출력 금지",
-   "reason": "코어는 순수 로직이며 출력 경로를 갖지 않는다 — print는 봉인 규칙의 누출 경로다",
+   "reason": "코어는 순수 로직이며 출력 경로를 갖지 않는다 — print·push_warning은 봉인 규칙의 누출 경로다 (push_error는 값 누락 보고에 정당한 용도가 있어 제외)",
    "forbidden": [
     "print(",
     "print_rich(",
     "printt(",
     "prints(",
-    "printraw("
+    "printraw(",
+    "push_warning("
    ],
    "scope": [
-    "godot/core"
+    "godot/core",
+    "godot/ui"
    ],
    "allow": []
   }

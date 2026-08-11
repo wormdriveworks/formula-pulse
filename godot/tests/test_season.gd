@@ -17,6 +17,12 @@ func _init() -> void:
 	_resonance_draw()
 	_serialization()
 	print("")
+	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
+	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
+	if _checked < 450:
+		print("SEASON_TEST_FAIL checks=%d < 하한 450 (스위트 축소·로드 실패 의심)" % _checked)
+		quit(1)
+		return
 	if _failures == 0:
 		print("SEASON_TEST_PASS checks=%d" % _checked)
 		quit(0)

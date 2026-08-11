@@ -1,0 +1,7 @@
+id,name_key,target,effect_per_step,effect_unit,cost1,cost2,cost3,cost4,cost5
+tuning_t1,ui.tuning.t1,slipstream_coef,0.07,ratio,400,700,1100,1700,2600
+tuning_t2,ui.tuning.t2,braking_coef,0.07,ratio,400,700,1100,1700,2600
+tuning_t3,ui.tuning.t3,line_coef,0.07,ratio,400,700,1100,1700,2600
+tuning_t4,ui.tuning.t4,chassis_max,5,flat,400,700,1100,1700,2600
+tuning_t5,ui.tuning.t5,duel_judgment,4,flat,560,980,1540,2380,3640
+tuning_t6,ui.tuning.t6,trouble_chassis_wear,-0.07,ratio,560,980,1540,2380,3640
