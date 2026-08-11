@@ -40,3 +40,4 @@ param_grid_start_mod_coef,0.5
 param_chassis_hazard_per_turn,1.0
 param_grid_level_pace_add,0.4
 param_save_profile_count,3
+param_time_pacing_beat_sec,1.0

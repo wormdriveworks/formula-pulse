@@ -805,8 +805,11 @@ func _finish_gp() -> void:
 # GP 소요 분량 모델 (D13 §4.1 A1 파생 — 완료 판정 4 로그용)
 func estimated_minutes() -> float:
 	var sector_turns := turn_number - duel_count
+	# D13 §4.1 산식: 턴×21초 + 듀얼×45초 + **완급 비트 턴×1초** + 결산·이벤트 210초.
+	# 완급 비트 항이 빠져 있어 모델이 정본 산출(12턴 = 10.0분)보다 짧게 나왔다.
 	var seconds := float(sector_turns) * data.param("param_time_turn_sec") \
 		+ float(duel_count) * data.param("param_time_duel_sec") \
+		+ float(sector_turns) * data.param("param_time_pacing_beat_sec") \
 		+ data.param("param_time_wrapup_sec")
 	return seconds / 60.0
 

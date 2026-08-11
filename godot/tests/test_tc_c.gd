@@ -211,6 +211,92 @@ func _d13_anchor_values() -> void:
 	_ok("D13 §6.6 메트로 나이트 보너스 유형 = 차지",
 		String(stage["resonance_bonus_type"]) == "charge", str(stage))
 	_eq_float("D13 §6.6 메트로 나이트 보너스 +2", float(stage["resonance_bonus_value"]), 2.0)
+	# D13 별첨A §6.2 AI 파라미터 5층 — 네임드 8인 전수 전사.
+	# 전사 없이는 라이벌 주행 파라미터 72칸이 자기 일관성에 걸려 부호 반전도 미검출이다
+	# (독립 검증 G-1 실측: ai_rivals.csv 72칸 전량 미검출).
+	var expected_rivals := {
+		"ai_lorentz":  {"pace": 5.2, "aggression": 3.0, "stability": 5.0, "start_mod": 4.0, "form_var": 0.0},
+		"ai_maro":     {"pace": 4.0, "aggression": 3.0, "stability": 4.0, "start_mod": 5.0, "rush_lap1": 0.5},
+		"ai_diaz":     {"pace": 4.0, "aggression": 5.0, "stability": 2.0, "start_mod": 3.0},
+		"ai_volkova":  {"pace": 3.0, "aggression": 4.0, "stability": 2.0, "start_mod": 4.0, "rush_lap1": 1.5, "rush_lap_final": -1.0},
+		"ai_holloway": {"pace": 4.0, "aggression": 3.0, "stability": 4.0, "start_mod": 3.0, "rush_lap_final": 1.5},
+		"ai_bianca":   {"pace": 4.0, "aggression": 2.0, "stability": 4.0, "start_mod": 4.0},
+		"ai_sherwood": {"pace": 3.0, "aggression": 4.0, "stability": 3.0, "start_mod": 2.0, "rush_random": 1.0},
+		"ai_jude":     {"pace": 3.0, "aggression": 3.0, "stability": 2.0, "start_mod": 2.0, "rush_random": 1.5},
+	}
+	var rival_rows: Dictionary = {}
+	for row in data.rivals:
+		rival_rows[String(row["id"])] = row
+	for rival_id in expected_rivals:
+		_ok("D13 §6.2 %s 등재" % rival_id, rival_rows.has(rival_id))
+		if not rival_rows.has(rival_id):
+			continue
+		for column in expected_rivals[rival_id]:
+			_eq_float("D13 §6.2 %s.%s" % [rival_id, column],
+				CsvTable.to_float(String(rival_rows[rival_id][column])),
+				float(expected_rivals[rival_id][column]), 0.0001)
+	_eq_float("D13 §6.2 로렌츠 폼 분산 0 (무결점 연산)",
+		CsvTable.to_float(String(rival_rows["ai_lorentz"]["form_var"])), 0.0)
+	_eq_float("D13 §2.4 로렌츠 방어 임계 55",
+		CsvTable.to_float(String(rival_rows["ai_lorentz"]["duel_defense_override"])), 55.0)
+	_eq_float("D13 §2.4 로렌츠 추월 가산 +70",
+		CsvTable.to_float(String(rival_rows["ai_lorentz"]["duel_overtake_add"])), 70.0)
+	# 팀 프로파일 가산 (D08 §6.2 · D13 별첨A §6.2)
+	var expected_teams := {
+		"team_axion":       {"pace_add": 0.0, "aggression_add": 0.0, "stability_add": 0.5, "rush_lap_final_add": 0.0, "pressure_mult": 1.0},
+		"team_vulka":       {"pace_add": 0.0, "aggression_add": 0.5, "stability_add": -0.5, "rush_lap_final_add": 0.0, "pressure_mult": 1.3},
+		"team_gryphon":     {"pace_add": 0.0, "aggression_add": 0.0, "stability_add": 0.3, "rush_lap_final_add": 0.3, "pressure_mult": 1.0},
+		"team_silvertrail": {"pace_add": 0.0, "aggression_add": 0.0, "stability_add": 0.0, "rush_lap_final_add": 0.0, "pressure_mult": 1.0},
+		"team_cometworks":  {"pace_add": 0.0, "aggression_add": 0.0, "stability_add": 0.0, "rush_lap_final_add": 0.0, "pressure_mult": 1.0},
+	}
+	for team_id in expected_teams:
+		_ok("D08 §6.2 %s 등재" % team_id, data.teams.has(team_id))
+		if not data.teams.has(team_id):
+			continue
+		for column in expected_teams[team_id]:
+			_eq_float("D08 §6.2 %s.%s" % [team_id, column],
+				CsvTable.to_float(String(data.teams[team_id][column]), 0.0),
+				float(expected_teams[team_id][column]), 0.0001)
+	# 변동 요소·AI 거동 (D13 별첨A §6.2)
+	_eq_float("D13 §6.2 네임드 폼 분산 0.3", data.param("param_form_var_named"), 0.3)
+	_eq_float("D13 §6.2 필러 폼 분산 0.3", data.param("param_form_var_filler"), 0.3)
+	_eq_float("D13 §6.2 필러 스탯 편차 0.5", data.param("param_filler_stat_var"), 0.5)
+	_eq_float("D13 §6.2 스왑 하한 0.010", data.param("param_ai_swap_min"), 0.010)
+	_eq_float("D13 §6.2 스왑 기저 0.055", data.param("param_ai_swap_base"), 0.055)
+	_eq_float("D13 §6.2 스왑 페이스 계수 0.045", data.param("param_ai_swap_pace_coef"), 0.045)
+	_eq_float("D13 §6.2 리타이어 안정성 계수 0.025", data.param("param_ai_retire_stability_coef"), 0.025)
+	_eq_float("D13 §6.2 리타이어 상수 0.002", data.param("param_ai_retire_const"), 0.002)
+	_eq_float("D13 §6.2 리타이어 GP 상한 2", data.param("param_ai_retire_gp_cap"), 2.0)
+	_eq_float("D13 §6.2 그리드 레벨 페이스 +0.4", data.param("param_grid_level_pace_add"), 0.4)
+	_eq_float("D13 §6.2 그리드 레벨 듀얼 임계 +3", data.param("param_duel_grid_level_coef"), 3.0)
+	_eq_float("D13 §6.3 시작 보정 계수 0.5", data.param("param_grid_start_mod_coef"), 0.5)
+	# D13 별첨A §2.4 방어 primary(브레이킹)·라인 환산 — 추월 축만 전사하면 방어 축이 새 나간다
+	_eq_float("D13 §2.4 브레이킹 1매치 38",
+		CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_BRAKING]["match1"])), 38.0)
+	_eq_float("D13 §2.4 브레이킹 2매치 64",
+		CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_BRAKING]["match2"])), 64.0)
+	_eq_float("D13 §2.4 브레이킹 3매치 95",
+		CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_BRAKING]["match3"])), 95.0)
+	_eq_float("D13 §2.4 라인 1매치 15",
+		CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_LINE]["match1"])), 15.0)
+	_eq_float("D13 §2.4 라인 2매치 30",
+		CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_LINE]["match2"])), 30.0)
+	_eq_float("D13 §2.4 라인 3매치 50",
+		CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_LINE]["match3"])), 50.0)
+	# D13 별첨A §8.1 타이머·연출 값
+	_eq_float("D13 §8.1 타이머 기본 10초", data.param("param_timer_base_sec"), 10.0)
+	_eq_float("D13 §8.1 여유 구간 경계 0.6", data.param("param_timer_leeway_ratio"), 0.6)
+	_eq_float("D13 §8.1 경고 구간 경계 0.3", data.param("param_timer_warning_ratio"), 0.3)
+	_eq_float("D13 §8.1 릴 정지 간격 0.4초", data.param("param_reel_stop_interval_sec"), 0.4)
+	# D13 별첨A §4.1 시간 모델 성분
+	_eq_float("D13 §4.1 턴 21초", data.param("param_time_turn_sec"), 21.0)
+	_eq_float("D13 §4.1 듀얼 45초", data.param("param_time_duel_sec"), 45.0)
+	_eq_float("D13 §4.1 완급 비트 1초/턴", data.param("param_time_pacing_beat_sec"), 1.0)
+	_eq_float("D13 §4.1 결산·이벤트 210초", data.param("param_time_wrapup_sec"), 210.0)
+	# D13 별첨A §6.1 P9↓ = 0 (P10~P16 명시 행 — 침묵 대체가 아니라 데이터로)
+	for position in range(9, 17):
+		_ok("D13 §6.1 P%d = 0점" % position, int(data.points_tier1.get(position, -1)) == 0,
+			"actual=%s" % str(data.points_tier1.get(position)))
 	# D13 별첨A §2.1 앞차 저항·뒤차 압박 — **인쇄된 산출 예에 도달하는지** 대조.
 	# 산식만 맞고 입력이 틀리면(팀 가산 포함 등) 정본에 인쇄된 값이 도달 불가능해진다.
 	var resist_base := data.param("param_gauge_front_resist_base")
@@ -1161,8 +1247,20 @@ func _result_and_ranking() -> void:
 	timing.duel_count = 2
 	var expected_seconds := 10.0 * timing.data.param("param_time_turn_sec") \
 		+ 2.0 * timing.data.param("param_time_duel_sec") \
+		+ 10.0 * timing.data.param("param_time_pacing_beat_sec") \
 		+ timing.data.param("param_time_wrapup_sec")
 	_eq_float("GP 소요 모델 = D13 §4.1 산식", timing.estimated_minutes(), expected_seconds / 60.0, 0.01)
+	# D13 §4.1이 인쇄한 총계에 도달하는가 (12턴 10.0분 / 15턴 11.3분 — 듀얼은 턴 수에 비례).
+	# 12턴의 인쇄값 10.0분은 반올림이다: 성분 산술은 252+112.5+12+210 = 586.5초 = 9.775분.
+	# 성분값이 정본이므로(§4.1 산출 열) 총계는 근사로 단언한다 — 성분 4종은 위에서 전사 대조했다.
+	var turn_sec := timing.data.param("param_time_turn_sec")
+	var duel_sec := timing.data.param("param_time_duel_sec")
+	var beat_sec := timing.data.param("param_time_pacing_beat_sec")
+	var wrapup_sec := timing.data.param("param_time_wrapup_sec")
+	_eq_float("D13 §4.1 12턴 서킷 = 10.0분",
+		(12.0 * turn_sec + 2.5 * duel_sec + 12.0 * beat_sec + wrapup_sec) / 60.0, 10.0, 0.25)
+	_eq_float("D13 §4.1 15턴 서킷 = 11.3분",
+		(15.0 * turn_sec + 3.125 * duel_sec + 15.0 * beat_sec + wrapup_sec) / 60.0, 11.3, 0.06)
 	# 타임아웃에 추가 페널티가 없다 (D05 §7.3 확정)
 	var timeout_probe := _new_engine(707)
 	timeout_probe.start_gp()
