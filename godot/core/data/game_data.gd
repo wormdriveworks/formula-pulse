@@ -29,6 +29,9 @@ var sponsors: Dictionary = {}          # sponsor_* id -> 행 (D13 별첨A §5.3)
 var relation_axes: Dictionary = {}     # relation_* id -> 행 (D13 별첨A §5.2)
 var consumables: Dictionary = {}       # consumable_* id -> 행 (D13 별첨A §3.6)
 var settlement_rewards: Dictionary = {}  # reward_* id -> 행 (D13 별첨A §3.2)
+var vn_slots: Dictionary = {}          # vnslot_* id -> 행 (D08 §8.4)
+var vane_lines: Dictionary = {}        # vane_* id -> 행 (D12 §5.7 — stage 필드)
+var milestone_vn: Dictionary = {}      # mvn_* id -> 행 (형식 A 전이 매핑)
 var event_categories: Dictionary = {}  # category_* id -> 행 (배분·보상 범위)
 var event_variants: Dictionary = {}    # event id -> 변형 배열 (조건 DSL 포함)
 var presentation_triggers: Dictionary = {} # trigger_* id -> 행 (등급 후보·우선순위)
@@ -63,6 +66,7 @@ func load_all() -> bool:
 	_load_presentation()
 	_load_events()
 	_load_outgame()
+	_load_narrative()
 	_load_content()
 	grid = _load_json(STRUCTURES_DIR + "grid_debug.json")
 	season_calendar = _load_json(STRUCTURES_DIR + "season_calendar.json")
@@ -378,6 +382,34 @@ func relation_axis(relation_id: String) -> Dictionary:
 		_load_ok = false
 		return {}
 	return relation_axes[relation_id]
+
+
+func _load_narrative() -> void:
+	vn_slots.clear()
+	vane_lines.clear()
+	milestone_vn.clear()
+	for row in CsvTable.load_rows(TABLES_DIR + "vn_slots.csv"):
+		vn_slots[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "vane_lines.csv"):
+		vane_lines[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "milestone_vn.csv"):
+		milestone_vn[String(row["id"])] = row
+	if vn_slots.is_empty() or vane_lines.is_empty() or milestone_vn.is_empty():
+		_load_ok = false
+
+
+func vn_slot(slot_id: String) -> Dictionary:
+	if not vn_slots.has(slot_id):
+		push_error("GameData: unknown vn slot '%s'" % slot_id)
+		_load_ok = false
+		return {}
+	return vn_slots[slot_id]
+
+
+# 마일스톤 VN 매핑은 **없을 수 있다** — 전이를 부여하지 않는 VN이 정상이므로
+# 미등재를 오류로 보지 않는다 (값 누락과 매핑 부재는 다른 사안이다).
+func milestone_vn_row(vn_id: String) -> Dictionary:
+	return milestone_vn.get(vn_id, {})
 
 
 func _load_points() -> void:

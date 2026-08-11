@@ -1,0 +1,5 @@
+id,name_key,slot_kind,per_season,cap_per_season,trigger
+vnslot_season_open,ui.vnSlot.seasonOpen,season_boundary,1,1,season_start
+vnslot_season_close,ui.vnSlot.seasonClose,season_boundary,1,1,season_end
+vnslot_tour_brief,ui.vnSlot.tourBrief,tour_open,5,5,tour_start
+vnslot_tour_milestone,ui.vnSlot.tourMilestone,tour_close,0,8,milestone

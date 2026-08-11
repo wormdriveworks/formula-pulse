@@ -1,0 +1,10 @@
+id,text_key,stage,situation
+vane_sector_s1,vane.brief.sector01,1,sector_open
+vane_sector_s2,vane.brief.sector02,2,sector_open
+vane_sector_s3,vane.brief.sector03,3,sector_open
+vane_duel_s1,vane.brief.duel01,1,duel_open
+vane_duel_s2,vane.brief.duel02,2,duel_open
+vane_duel_s3,vane.brief.duel03,3,duel_open
+vane_resonance_s1,vane.brief.resonance01,1,resonance_first
+vane_resonance_s2,vane.brief.resonance02,2,resonance_first
+vane_resonance_s3,vane.brief.resonance03,3,resonance_first

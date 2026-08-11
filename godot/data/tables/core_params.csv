@@ -76,3 +76,5 @@ param_vane_stage2_dp,290
 param_vane_stage3_dp,820
 param_parts_cap_per_line,0.1
 param_parts_cap_total,0.2
+param_vn_season_cap,15
+param_vn_milestone_cap,8
