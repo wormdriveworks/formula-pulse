@@ -11,7 +11,7 @@
 extends SceneTree
 
 const FIXTURE_DIR := "res://tests/fixtures/tables/"
-const MIN_CHECKS := 34
+const MIN_CHECKS := 40
 
 var _failures := 0
 var _checked := 0
@@ -22,6 +22,7 @@ func _init() -> void:
 	_engine_reads_data()
 	_outgame_reads_data()
 	_reel_columns_are_distinct()
+	_save_layer_reads_data()
 	print("")
 	if _checked < MIN_CHECKS:
 		print("DATA_DRIVEN_TEST_FAIL checks=%d < 하한 %d (스위트 축소·로드 실패 의심)" % [_checked, MIN_CHECKS])
@@ -273,3 +274,26 @@ func _reel_columns_are_distinct() -> void:
 			"top=%s (%d/%d) counts=%s" % [top_symbol, top_count, spins, str(counts[index])])
 		_ok("릴%d 열이 지배적 (≥80%%)" % (index + 1), float(top_count) / float(spins) >= 0.8,
 			"ratio=%f" % (float(top_count) / float(spins)))
+
+
+# ── 세이브 층이 프로필 수를 데이터에서 읽는가 ──
+# 픽스처는 프로필 수를 2로 내려놨다(기본 3). 코드가 리터럴 3을 쓰면 프로필 3이 유효로 판정된다.
+# 이 스위트가 SaveManager를 부르지 않아 그 리터럴이 드러나지 않고 있었다 (독립 검증 SM10).
+func _save_layer_reads_data() -> void:
+	var data := _fixture_data()
+	if data == null:
+		return
+	var count := data.param_int("param_save_profile_count")
+	_ok("픽스처 프로필 수 = 2 (기본 3과 다름)", count == 2, "count=%d" % count)
+	for valid_index in range(1, count + 1):
+		_ok("프로필 %d 유효" % valid_index, SaveManager.is_valid_profile(data, valid_index))
+	_ok("프로필 %d 무효 = 데이터 값 준수 (리터럴 3이면 유효로 나온다)" % (count + 1),
+		not SaveManager.is_valid_profile(data, count + 1))
+	# 판정 함수뿐 아니라 **강제 경로**도 데이터를 따르는지 본다
+	SaveManager.configure(data)
+	var rejected := SaveManager.save_progress(count + 1, {"lap": 1})
+	_ok("범위 밖 저장 거부 = 데이터 상한 기준",
+		not bool(rejected["ok"]) and String(rejected["error"]) == "profile_out_of_range", str(rejected))
+	_ok("범위 밖 프로필 파일 미생성",
+		not FileAccess.file_exists(SaveManager.progress_path(count + 1)))
+	SaveService.delete_save(SaveManager.progress_path(count + 1))

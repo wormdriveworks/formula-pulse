@@ -35,13 +35,13 @@ bash tools/validators/run_tests.sh    # 또는 각 테스트를 console.exe로 �
 | 아웃게임 전량 | `godot/core/state/outgame_state.gd` + 데이터 10표 | 재화·정비·튜닝 6계통·오버홀 12종·스킬 16종·크루·스폰서·관계 카운터·시설·소모품·결산 보상. **G1 역방향 환전 금지는 경로 부재로 이행** |
 | 서사 층 | `godot/core/state/narrative_service.gd` + `vn_slots/vane_lines/milestone_vn.csv` | VN 슬롯 상한 · 형식 A 전이(스킵 무관·재열람 멱등) · 베인 대사 3단계 필터 |
 | 시즌·투어 층 | `godot/core/state/season_state.gd` · `points_tier2.csv` · `season_calendar.json` | 챔피언십 2계층 · 결산 · 그리드 레벨 · 캘린더 셔플 · **레조넌스 추첨(투어 개막)** |
-| 테스트 스위트 9종 | `godot/tests/` | **8843검사** — TC-C 895 · TC-P 119 · EVENTS 7019 · SEASON 471 · TC-O 237 · NARRATIVE 68 + 코어루프·세이브 |
+| 테스트 스위트 9종 | `godot/tests/` | **8849검사** — TC-C 895 · TC-P 119 · EVENTS 7019 · SEASON 471 · TC-O 237 · NARRATIVE 68 + 코어루프·세이브 |
 | **3중 게이트** | `tools/validators/run_tests.sh` · `tests/compile_gate.gd` | ①컴파일 게이트(전 `.gd` **`reload()` 판정** — `load()`는 파스 에러에도 non-null을 돌려줘 무동작이었다) ②스위트 종료코드 ③**검사 수 하한**. 게이트의 성공 토큰 부재도 실패로 본다 (IMPL-054·059·064) |
 | 데이터 주입 검증 | `godot/tests/fixtures/tables/` · `test_data_driven.gd` | 값을 갈아 끼웠을 때 거동이 따라오는지 검사 — 코드가 데이터 대신 **현재 값과 같은 리터럴**을 쓰는 결함은 이 경로로만 잡힌다 (IMPL-062) |
 | 검증기 확장 | `tools/validators/` | 구조 중첩 배열 검사 · V4 표시 싱크 규칙 · V5 결함 교정 |
 | **아키텍처 정적 규칙** | `tools/validators/config.json` → `architecture_rules` | ①세이브 정책 층 우회 금지(`SaveService.*` 직접 호출은 `core/save`·`tests` 밖에서 차단) ②**코어 표준출력 금지**(`godot/core`의 `print(` 계열) — 테스트로 닫을 수 없는 두 축이다 |
 
-- **결정·[가안] 전량은 `docs/decisions/impl_log.md` IMPL-001~064.** 특히 IMPL-008~012·022·030·038은 D05/D13 해석 확정분이라 뒤집으면 정합이 깨진다 (IMPL-038은 IMPL-012의 압박 산식 부분 개정 — 시드 공격성 기준).
+- **결정·[가안] 전량은 `docs/decisions/impl_log.md` IMPL-001~065.** 특히 IMPL-008~012·022·030·038은 D05/D13 해석 확정분이라 뒤집으면 정합이 깨진다 (IMPL-038은 IMPL-012의 압박 산식 부분 개정 — 시드 공격성 기준).
 - **autoload는 여전히 0개다.** 추가하려면 대가(원격 헤드리스 작업 전체가 autoload 파손에 인질)를 먼저 검토하고 impl_log에 근거를 남긴다.
 
 ---

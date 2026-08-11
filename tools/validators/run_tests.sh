@@ -34,7 +34,7 @@ TESTS=(
 	"tests/test_season.gd:450"
 	"tests/test_tc_o.gd:239"
 	"tests/test_narrative.gd:68"
-	"tests/test_data_driven.gd:34"
+	"tests/test_data_driven.gd:40"
 )
 failures=0
 for entry in "${TESTS[@]}"; do
