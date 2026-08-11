@@ -41,7 +41,8 @@ bash tools/validators/run_tests.sh    # 또는 각 테스트를 console.exe로 �
 | 검증기 확장 | `tools/validators/` | 구조 중첩 배열 검사 · V4 표시 싱크 규칙 · V5 결함 교정 |
 | **아키텍처 정적 규칙** | `tools/validators/config.json` → `architecture_rules` | ①세이브 정책 층 우회 금지(`SaveService.*` 직접 호출은 `core/save`·`tests` 밖에서 차단) ②**코어 표준출력 금지**(`godot/core`의 `print(` 계열) — 테스트로 닫을 수 없는 두 축이다 |
 
-- **결정·[가안] 전량은 `docs/decisions/impl_log.md` IMPL-001~065.** 특히 IMPL-008~012·022·030·038은 D05/D13 해석 확정분이라 뒤집으면 정합이 깨진다 (IMPL-038은 IMPL-012의 압박 산식 부분 개정 — 시드 공격성 기준).
+- **결정·[가안] 전량은 `docs/decisions/impl_log.md` IMPL-001~065.**
+- **검증 절차는 `docs/decisions/verification_protocol.md`.** 돌연변이 주입 반증의 함정 9종과 게이트가 거짓말을 하는 방식 3종이 실측과 함께 정리돼 있다 — 새 구현에 검사를 붙일 때 먼저 읽는다. 특히 IMPL-008~012·022·030·038은 D05/D13 해석 확정분이라 뒤집으면 정합이 깨진다 (IMPL-038은 IMPL-012의 압박 산식 부분 개정 — 시드 공격성 기준).
 - **autoload는 여전히 0개다.** 추가하려면 대가(원격 헤드리스 작업 전체가 autoload 파손에 인질)를 먼저 검토하고 impl_log에 근거를 남긴다.
 
 ---
