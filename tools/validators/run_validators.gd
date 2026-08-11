@@ -532,9 +532,11 @@ func _run_v4_hardcoded_text() -> void:
 	# 비표시 경로 제외 — 테스트 하네스의 진단 라벨은 플레이어에게 렌더되지 않는다.
 	# 우회가 아니라 '표시 문자열'의 범위 선언이며, 제외 대상은 설정에 명시된 경로뿐이다.
 	var exempt_dirs: Array = _config.get("v4_exempt_dirs", [])
+	var sinks: Array = _config.get("v4_display_sinks", [])
 	for entry in _code_files:
 		if _is_exempt_path(String(entry["path"]), exempt_dirs):
 			continue
+		checked += _check_display_sinks(String(entry["path"]), String(entry["source"]), sinks, marker)
 		var lines: Array = String(entry["source"]).split("\n")
 		for line_index in range(lines.size()):
 			var raw_line := String(lines[line_index])
@@ -544,6 +546,91 @@ func _run_v4_hardcoded_text() -> void:
 				if _has_hangul(literal) and not raw_line.contains(marker):
 					_fail("V4", "%s:%d: hangul literal '%s'" % [entry["path"], line_index + 1, literal])
 	_report("V4", "hardcoded text", checked, before_fail, before_warn)
+
+
+# V4 확대: 표시 싱크(.text 등)에 닿는 문자열은 한글 여부와 무관하게 스트링 키여야 한다.
+# 구 V4는 한글 리터럴만 봤으므로 `REEL_PLACEHOLDER := "???"` 류가 그대로 통과했다
+# (MS-2 인계 §0.2-7). 상수를 경유한 우회도 추적한다 — 싱크에 대입된 상수의 값까지 검사.
+func _check_display_sinks(path: String, source: String, sinks: Array, marker: String) -> int:
+	var checked := 0
+	if sinks.is_empty():
+		return 0
+	var lines: Array = source.split("\n")
+	var sink_bound_consts: Dictionary = {}
+	var const_literals: Dictionary = {}
+	var const_regex := RegEx.new()
+	const_regex.compile("^\\s*const\\s+([A-Z][A-Z0-9_]*)\\s*:?=\\s*\"(.*)\"\\s*$")
+	var identifier_regex := RegEx.new()
+	identifier_regex.compile("[A-Z][A-Z0-9_]{2,}")
+	for line_index in range(lines.size()):
+		var raw_line := String(lines[line_index])
+		var const_match := const_regex.search(raw_line)
+		if const_match != null:
+			const_literals[const_match.get_string(1)] = {"value": const_match.get_string(2), "line": line_index + 1}
+			continue
+		var code_line := _strip_comment(raw_line)
+		var assigned := _sink_assignment_expression(code_line, sinks)
+		if assigned == "":
+			continue
+		for literal in _extract_literals(_strip_subscript_literals(assigned)):
+			checked += 1
+			if raw_line.contains(marker) or _is_layout_literal(literal) or _strings.has(literal):
+				continue
+			_fail("V4", "%s:%d: display sink literal '%s' is not a string key" % [path, line_index + 1, literal])
+		for identifier in identifier_regex.search_all(assigned):
+			sink_bound_consts[identifier.get_string()] = line_index + 1
+	for const_name in sink_bound_consts:
+		if not const_literals.has(const_name):
+			continue
+		var literal_value := String(const_literals[const_name]["value"])
+		checked += 1
+		if _is_layout_literal(literal_value) or _strings.has(literal_value):
+			continue
+		_fail("V4", "%s:%d: const '%s' = '%s' reaches a display sink but is not a string key"
+			% [path, const_literals[const_name]["line"], const_name, literal_value])
+	return checked
+
+
+# 딕셔너리·배열 첨자의 문자열(`["name_key"]`)은 데이터 열 이름이므로 표시 문자열이 아니다.
+func _strip_subscript_literals(expression: String) -> String:
+	var regex := RegEx.new()
+	regex.compile("\\[\\s*\"[^\"]*\"\\s*\\]")
+	return regex.sub(expression, "[]", true)
+
+
+# 싱크 대입문의 우변을 돌려준다 (없으면 공란). `label.text = <우변>` / `:=` 모두 대응.
+func _sink_assignment_expression(code_line: String, sinks: Array) -> String:
+	for sink in sinks:
+		var needle := ".%s" % String(sink)
+		var sink_index := code_line.find(needle)
+		while sink_index >= 0:
+			var rest := code_line.substr(sink_index + needle.length())
+			var stripped := rest.strip_edges(true, false)
+			if stripped.begins_with("=") and not stripped.begins_with("=="):
+				return stripped.substr(1)
+			if stripped.begins_with(":="):
+				return stripped.substr(2)
+			sink_index = code_line.find(needle, sink_index + 1)
+	return ""
+
+
+# 표시 문자열이 아닌 레이아웃·구분 리터럴: 공백류 전용 (줄바꿈·구분 공백 등).
+# `"???"`처럼 글자·기호를 담은 것은 여기서 걸러지지 않는다 — 그것이 확대의 목적이다.
+func _is_layout_literal(literal: String) -> bool:
+	if literal == "":
+		return true
+	for i in range(literal.length()):
+		var ch := literal[i]
+		if ch == " " or ch == "\t" or ch == "\n" or ch == "\r":
+			continue
+		# 소스에 적힌 이스케이프 표기("\\n" 두 글자)도 줄바꿈 의도로 인정한다
+		if ch == "\\" and i + 1 < literal.length() and "ntr".contains(literal[i + 1]):
+			continue
+		if ch == "n" or ch == "t" or ch == "r":
+			if i > 0 and literal[i - 1] == "\\":
+				continue
+		return false
+	return true
 
 
 func _is_exempt_path(path: String, exempt_dirs: Array) -> bool:

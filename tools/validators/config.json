@@ -268,5 +268,10 @@
  ],
  "v4_exempt_dirs": [
   "godot/tests"
+ ],
+ "v4_display_sinks": [
+  "text",
+  "tooltip_text",
+  "placeholder_text"
  ]
 }

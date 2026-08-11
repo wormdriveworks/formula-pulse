@@ -7,7 +7,7 @@
 extends Control
 
 const SNAPSHOT_PATH := "user://debug_suspend.json"
-const REEL_PLACEHOLDER := "???"
+const REEL_PLACEHOLDER_KEY := "ui.debug.reelHidden"
 
 var data: GameData
 var rng: RngService
@@ -85,7 +85,7 @@ func _build_layout() -> void:
 		var column := VBoxContainer.new()
 		reel_row.add_child(column)
 		var reel_label := Label.new()
-		reel_label.text = REEL_PLACEHOLDER
+		reel_label.text = data.strings.text(REEL_PLACEHOLDER_KEY)
 		reel_label.add_theme_font_size_override("font_size", 28)
 		column.add_child(reel_label)
 		_reel_labels.append(reel_label)
@@ -290,7 +290,7 @@ func _on_load() -> void:
 # ── 표시 갱신 ──
 func _set_reels_hidden() -> void:
 	for reel_label in _reel_labels:
-		reel_label.text = REEL_PLACEHOLDER
+		reel_label.text = data.strings.text(REEL_PLACEHOLDER_KEY)
 	for hold_toggle in _hold_toggles:
 		hold_toggle.button_pressed = false
 
@@ -316,7 +316,7 @@ func _refresh_status(is_duel: bool) -> void:
 	parts.append("%s %.0f" % [s.text("ui.debug.rearGauge"), engine.rear_gauge])
 	if is_duel:
 		parts.append(s.text("vane.brief.duel01"))
-	_status_label.text = "  |  ".join(parts)
+	_status_label.text = String(data.strings.text("ui.debug.statusSeparator")).join(parts)
 	_refresh_standings(false)
 	_hold_button.disabled = not _timer_active or engine.hold_used
 	_boost_button.disabled = not _timer_active or not engine.current_turn_is_duel
@@ -338,7 +338,11 @@ func _entrant_name(entrant_id: String) -> String:
 
 
 func _update_timer_label() -> void:
-	_timer_label.text = "%s %.1f" % [data.strings.text("ui.debug.timer"), _timer_remaining]
+	# 시간 표기의 어순·소수 자리도 문면에 속하므로 서식을 데이터에 둔다 (D12 §8.2 명명 플레이스홀더)
+	_timer_label.text = data.strings.text("ui.debug.timerFormat", {
+		"label": data.strings.text("ui.debug.timer"),
+		"value": "%.1f" % _timer_remaining,
+	})
 
 
 # 이벤트 → 중계 로그 (T5 규격 — 텍스트 키 발행을 문면으로 번역, 최대 2줄 스텁)

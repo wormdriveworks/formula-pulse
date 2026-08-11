@@ -63,6 +63,9 @@ ui.debug.charge,차지
 ui.debug.frontGauge,전방 게이지
 ui.debug.rearGauge,후방 게이지
 ui.debug.timer,잔여 시간
+ui.debug.reelHidden,???
+ui.debug.statusSeparator,"  |  "
+ui.debug.timerFormat,{label} {value}
 ui.debug.newRace,새 GP
 ui.debug.saveSnapshot,스냅샷 저장
 ui.debug.loadSnapshot,스냅샷 로드
