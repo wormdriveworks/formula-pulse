@@ -338,8 +338,43 @@ func _tc_o6_exchange_guards() -> void:
 		return
 	# G1 역방향 환전 절대 금지 — **경로 부재**로 검사한다.
 	# 조건문으로 막았다면 그 조건문을 지우면 열린다. 함수가 없으면 지울 것이 없다.
+	#
+	# 금지 이름 열거(블랙리스트)는 **닫힘 성질이 아니다** — 이름만 바꾸면 우회된다.
+	# 공개 메서드 집합 전체를 커밋된 기대 집합과 대조해, 새 메서드가 기대 집합을
+	# 함께 고치지 않는 한 통과하지 못하게 한다 (검사 수 하한과 같은 "의도적 변경만 통과" 구조).
+	var expected_methods := [
+		"setup", "gain_credits", "gain_drive_data", "exchange_charge",
+		"field_repair_cost", "field_repair", "begin_tour", "full_repair", "free_restore_line",
+		"tuning_step", "tuning_cost", "buy_tuning", "tuning_refund_ratio", "redistribute_tuning",
+		"overhaul_slots", "install_overhaul", "parts_stat_bonus",
+		"skill_tier_open", "unlock_cost", "unlock_skill", "expand_deck", "set_deck",
+		"recruit_crew",
+		"sponsor_slots", "sponsor_candidate_count", "sign_sponsor", "settle_sponsors",
+		"add_relation", "pending_relation_transitions", "commit_relation_transitions",
+		"relation_stage",
+		"unlock_facility", "archive_available", "buy_consumable",
+		"gp_prize", "finish_bonus", "settlement_reward", "vane_stage",
+		"serialize", "restore",
+	]
+	var baseline := RefCounted.new()
+	var actual_methods: Array = []
+	for method in state.get_method_list():
+		var method_name := String(method.get("name", ""))
+		if method_name.begins_with("_") or method_name.begins_with("@"):
+			continue
+		if baseline.has_method(method_name):
+			continue   # 상속분 제외 — 우리 계약이 아니다
+		if not actual_methods.has(method_name):
+			actual_methods.append(method_name)
+	actual_methods.sort()
+	var expected_sorted := expected_methods.duplicate()
+	expected_sorted.sort()
+	_ok("G1 공개 메서드 집합 = 커밋된 기대 집합", actual_methods == expected_sorted,
+		"신설=%s 소멸=%s" % [str(_missing_from(actual_methods, expected_sorted)),
+			str(_missing_from(expected_sorted, actual_methods))])
+	# 블랙리스트도 유지한다 — 화이트리스트가 놓칠 수 없는 이름을 이중으로 못박는다
 	for forbidden in ["buy_charge", "buy_chassis", "purchase_charge", "credits_to_charge",
-			"exchange_credits_for_charge", "restore_charge"]:
+		"exchange_credits_for_charge", "restore_charge", "top_up_pulse"]:
 		_ok("G1 역방향 환전 경로 부재: %s" % forbidden, not state.has_method(forbidden))
 	# G2 환전 상한 = 5차지
 	var cap := state.data.param_int("param_charge_exchange_cap")
@@ -534,3 +569,11 @@ func _serialization() -> void:
 	_ok("누적 획득 총량 복원", restored.drive_data_earned_total == state.drive_data_earned_total)
 	var broken := _new_state()
 	_ok("결손 payload 거부", not broken.restore({"credits": 1}))
+
+
+func _missing_from(source: Array, reference: Array) -> Array:
+	var missing: Array = []
+	for item in source:
+		if not reference.has(item):
+			missing.append(item)
+	return missing

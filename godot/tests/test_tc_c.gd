@@ -867,6 +867,15 @@ func _seal_across_many_spins() -> void:
 			three_match_seen += 1
 		for name in _unexpected_surface_changes(engine, before, allowed):
 			offenders[name] = int(offenders.get(name, 0)) + 1
+		# 화이트리스트 **안**에 숨기는 경로도 막는다 — 허용 속성의 값 도메인까지 단언한다.
+		# phase_log에 임의 값을 밀어 넣으면 변경 자체는 허용되므로 도메인 검사가 유일한 방어다.
+		if engine.phase_log != [RaceTypes.TurnPhase.T1_SECTOR_OPEN,
+			RaceTypes.TurnPhase.T2_SPIN, RaceTypes.TurnPhase.T3_PROVISIONAL,
+			RaceTypes.TurnPhase.T4_INTERVENTION]:
+			offenders["phase_log_domain"] = int(offenders.get("phase_log_domain", 0)) + 1
+		for stage in engine.settle_log:
+			if not RaceTypes.SETTLE_ORDER.has(stage):
+				offenders["settle_log_domain"] = int(offenders.get("settle_log_domain", 0)) + 1
 		engine.confirm(0.0)
 	_ok("봉인: 3매치 분기 도달 (희귀 분기 표본 확보)", three_match_seen > 0,
 		"three_match=%d" % three_match_seen)

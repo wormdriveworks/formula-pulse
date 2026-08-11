@@ -189,7 +189,7 @@
    "columns": {
     "id": "id",
     "name_key": "string_key",
-    "target": "string",
+    "target": "enum:slipstream_coef,braking_coef,line_coef,chassis_max,duel_judgment,trouble_chassis_wear",
     "effect_per_step": "float",
     "effect_unit": "enum:ratio,flat",
     "cost1": "int",
@@ -206,9 +206,9 @@
     "id": "id",
     "name_key": "string_key",
     "kind": "enum:trait,sidegrade,part",
-    "effect": "string",
+    "effect": "enum:stable_sector_charge,hold_twice_per_turn,gp_start_charge,final_lap_gauge_mult,front_gauge_ratio,trouble_chassis_wear,duel_judgment,free_restore_line,slipstream_coef,braking_coef,charge_cap,chassis_max",
     "effect_value": "float",
-    "drawback": "string",
+    "drawback": "enum_optional:chassis_max,front_gauge_ratio,rear_pressure_ratio,pulse_charge_yield",
     "drawback_value": "float"
    }
   },
@@ -281,7 +281,7 @@
     "id": "id",
     "name_key": "string_key",
     "cost_cr": "int",
-    "effect": "string",
+    "effect": "enum:chassis_restore,chassis_restore_and_shield,chassis_wear_ratio",
     "effect_value": "float"
    }
   },

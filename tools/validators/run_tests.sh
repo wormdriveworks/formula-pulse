@@ -26,7 +26,7 @@ TESTS=(
 	"tests/test_tc_p.gd:110"
 	"tests/test_events.gd:6000"
 	"tests/test_season.gd:450"
-	"tests/test_tc_o.gd:230"
+	"tests/test_tc_o.gd:239"
 	"tests/test_narrative.gd:68"
 )
 failures=0
