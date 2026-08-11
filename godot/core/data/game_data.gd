@@ -21,6 +21,12 @@ var strings := StringTable.new()
 var _load_ok := true
 
 
+# 로드 이후에도 유효 — param()·circuit_int() 등이 누락 값을 만나면 false로 내려앉는다.
+# 값 누락은 "중단·보고" 사안(불변규칙 2)이므로 호출부는 실행 후 반드시 이 값을 확인한다.
+func is_ok() -> bool:
+	return _load_ok
+
+
 func load_all() -> bool:
 	_load_ok = true
 	_load_params()
@@ -48,6 +54,37 @@ func param(id: String) -> float:
 
 func param_int(id: String) -> int:
 	return int(param(id))
+
+
+# 구조 JSON 필수 값 조회 — param()과 동일 계약. 침묵하는 기본값(`get(key, 3)`)을 두지 않는다:
+# 대체값을 쓰는 순간 "D13에 없는 값이면 중단·보고"(불변규칙 2)가 조용히 우회된다.
+func circuit_int(key: String) -> int:
+	return _structure_int(circuit, key, "circuit_debug.json")
+
+
+func grid_int(key: String) -> int:
+	return _structure_int(grid, key, "grid_debug.json")
+
+
+func circuit_str(key: String) -> String:
+	return String(_structure_value(circuit, key, "circuit_debug.json", ""))
+
+
+func grid_array(key: String) -> Array:
+	var value: Variant = _structure_value(grid, key, "grid_debug.json", [])
+	return value if typeof(value) == TYPE_ARRAY else []
+
+
+func _structure_int(source: Dictionary, key: String, source_name: String) -> int:
+	return int(_structure_value(source, key, source_name, 0))
+
+
+func _structure_value(source: Dictionary, key: String, source_name: String, fallback: Variant) -> Variant:
+	if not source.has(key):
+		push_error("GameData: missing '%s' in %s (structure value channel)" % [key, source_name])
+		_load_ok = false
+		return fallback
+	return source[key]
 
 
 func _load_params() -> void:

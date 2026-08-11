@@ -84,7 +84,7 @@ func start_gp() -> Array:
 	_build_entrants()
 	_build_start_grid()
 	_retarget(true, true)
-	events.append(_ev("T5", "raceLog.gpStart01", {"circuit": data.circuit.get("name_key", "")}))
+	events.append(_ev("T5", "raceLog.gpStart01", {"circuit": data.circuit_str("name_key")}))
 	_transition(RaceTypes.GpState.LAP_LOOP)
 	return events
 
@@ -100,7 +100,7 @@ func _build_entrants() -> void:
 		"retired": false, "retire_order": -1, "number": 13,
 	}
 	for row in data.rivals:
-		if not data.grid.get("rivals", []).has(String(row["id"])):
+		if not data.grid_array("rivals").has(String(row["id"])):
 			continue
 		var team: Dictionary = data.teams.get(String(row["team_id"]), {})
 		var form_var := CsvTable.to_float(String(row["form_var"]))
@@ -124,7 +124,7 @@ func _build_entrants() -> void:
 		}
 	var filler_var := data.param("param_filler_stat_var")
 	var filler_form := data.param("param_form_var_filler")
-	for i in range(int(data.grid.get("filler_count", 0))):
+	for i in range(data.grid_int("filler_count")):
 		var filler_id := "filler_%02d" % (i + 1)
 		entrants[filler_id] = {
 			"id": filler_id, "name_key": "ui.race.fillerName", "is_player": false, "is_filler": true,
@@ -164,7 +164,7 @@ func _build_start_grid() -> void:
 	positions.clear()
 	for entry in scored:
 		positions.append(entry["id"])
-	var player_pos := int(data.grid.get("player_start_position", 16))
+	var player_pos := data.grid_int("player_start_position")
 	positions.insert(clampi(player_pos - 1, 0, positions.size()), PLAYER_ID)
 
 
@@ -185,8 +185,8 @@ func begin_turn() -> Dictionary:
 		}
 	else:
 		# 랩 경계 분기 (LAP_LOOP)
-		if sector >= int(data.circuit.get("sectors_per_lap", 4)):
-			if lap >= int(data.circuit.get("laps", 3)):
+		if sector >= data.circuit_int("sectors_per_lap"):
+			if lap >= data.circuit_int("laps"):
 				_transition(RaceTypes.GpState.GP_FINISH)
 				_finish_gp()
 				return {"type": "finished"}
@@ -475,7 +475,7 @@ func _duel_threshold(duel_type: int, opponent_id: String) -> float:
 # ── 게이지 보조 ──
 # 최종 랩 계수 ×1.2 전역 (D13 별첨A §1.3) — 게이지 증감 전체에 곱 적용 [가안]
 func _gauge_mult() -> float:
-	return data.param("param_gauge_final_lap_mult") if lap >= int(data.circuit.get("laps", 3)) else 1.0
+	return data.param("param_gauge_final_lap_mult") if lap >= data.circuit_int("laps") else 1.0
 
 
 # 앞차 저항·뒤차 압박 (D13 별첨A §2.1) — 만충 판정 직전 적용 [가안 — 8단계 내 배치]
@@ -497,7 +497,7 @@ func _effective_pace(entrant: Dictionary) -> float:
 	var pace := float(entrant["pace"]) + float(entrant["form"]) + float(entrant["rush_roll"])
 	if lap == 1:
 		pace += float(entrant["rush_lap1"])
-	if lap >= int(data.circuit.get("laps", 3)):
+	if lap >= data.circuit_int("laps"):
 		pace += float(entrant["rush_lap_final"])
 	return pace
 
@@ -533,7 +533,7 @@ func _ai_retire_check() -> Array:
 	var cap := data.param_int("param_ai_retire_gp_cap")
 	if ai_retire_count >= cap:
 		return events
-	var total_turns := int(data.circuit.get("laps", 3)) * int(data.circuit.get("sectors_per_lap", 4))
+	var total_turns := data.circuit_int("laps") * data.circuit_int("sectors_per_lap")
 	var coef := data.param("param_ai_retire_stability_coef")
 	var constant := data.param("param_ai_retire_const")
 	for id in positions.duplicate():
@@ -565,16 +565,16 @@ func _after_settlement(events: Array) -> void:
 		return
 	# 최종 섹터 정산 후 듀얼이 남아 있으면 폐기 — 다음 섹터 부재 (D05 §4.3 [가안])
 	if pending_duel != RaceTypes.DuelType.NONE \
-		and lap >= int(data.circuit.get("laps", 3)) \
-		and sector >= int(data.circuit.get("sectors_per_lap", 4)):
+		and lap >= data.circuit_int("laps") \
+		and sector >= data.circuit_int("sectors_per_lap"):
 		pending_duel = RaceTypes.DuelType.NONE
 		duel_opponent = ""
 	if gp_state == RaceTypes.GpState.SECTOR_TURN \
 		and pending_duel == RaceTypes.DuelType.NONE \
-		and sector >= int(data.circuit.get("sectors_per_lap", 4)):
+		and sector >= data.circuit_int("sectors_per_lap"):
 		_transition(RaceTypes.GpState.LAP_LOOP)
 	elif gp_state == RaceTypes.GpState.DUEL:
-		if sector >= int(data.circuit.get("sectors_per_lap", 4)):
+		if sector >= data.circuit_int("sectors_per_lap"):
 			_transition(RaceTypes.GpState.LAP_LOOP)
 		else:
 			_transition(RaceTypes.GpState.SECTOR_TURN)

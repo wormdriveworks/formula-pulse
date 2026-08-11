@@ -307,8 +307,8 @@ func _set_intervention_enabled(enabled: bool) -> void:
 func _refresh_status(is_duel: bool) -> void:
 	var s := data.strings
 	var parts: Array[String] = []
-	parts.append("%s %d/%d" % [s.text("ui.debug.lap"), engine.lap, int(data.circuit.get("laps", 3))])
-	parts.append("%s %d/%d" % [s.text("ui.debug.sector"), engine.sector, int(data.circuit.get("sectors_per_lap", 4))])
+	parts.append("%s %d/%d" % [s.text("ui.debug.lap"), engine.lap, data.circuit_int("laps")])
+	parts.append("%s %d/%d" % [s.text("ui.debug.sector"), engine.sector, data.circuit_int("sectors_per_lap")])
 	parts.append("%s P%d" % [s.text("ui.debug.position"), engine.player_position()])
 	parts.append("%s %.0f" % [s.text("ui.debug.chassis"), engine.chassis])
 	parts.append("%s %d" % [s.text("ui.debug.charge"), engine.charge])
