@@ -113,6 +113,29 @@
     "chassis_wear_mult": "float",
     "gauge_mult": "float"
    }
+  },
+  "presentation_grades.csv": {
+   "id_prefix": "grade_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "code": "enum:L0,L1,L2,L3",
+    "gp_cap": "int:0,9",
+    "sfx_sting": "int:0,1",
+    "haptic_level": "enum:none,weak,strong",
+    "flash_slow": "int:0,1",
+    "illustration": "int:0,1",
+    "sting_length_sec": "float"
+   }
+  },
+  "presentation_triggers.csv": {
+   "id_prefix": "trigger_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "grade_id": "fk:presentation_grades.csv",
+    "priority": "int:1,9"
+   }
   }
  },
  "structures": {

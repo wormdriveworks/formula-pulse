@@ -24,6 +24,7 @@ func _init() -> void:
 	_tc_c9_chassis_retire()
 	_tc_c11_seal()
 	_tc_c12_scumming()
+	_presentation_grade_caps()
 	_check_global_postconditions()
 	print("")
 	if _failures == 0:
@@ -630,3 +631,70 @@ func _tc_c12_scumming() -> void:
 	var streams: Dictionary = payload["rng"]["streams"]
 	for stream_name in RngService.STREAM_NAMES:
 		_ok("TC-C12 스트림 직렬화 %s" % stream_name, streams.has(stream_name))
+
+
+# ── 연출 등급 L0~L3 + GP당 상한 (D04 §5.5 · D08 §8.5 · D13 별첨A §8.1 · D12 §5.8) ──
+# MS-1 유보분(IMPL-016)의 결선 검증. 상한 초과 = L1 강등 · 우선순위 소진 순서 고정.
+func _presentation_grade_caps() -> void:
+	var data := GameData.new()
+	if not data.load_all():
+		_failures += 1
+		print("  [FAIL] data load")
+		return
+	# D08 §8.5 확정값 대조 (L2 = 2회 · L3 = 1회)
+	_eq_float("D08 §8.5 L2 GP당 상한 2",
+		CsvTable.to_float(String(data.presentation_grade("grade_l2")["gp_cap"])), 2.0)
+	_eq_float("D08 §8.5 L3 GP당 상한 1",
+		CsvTable.to_float(String(data.presentation_grade("grade_l3")["gp_cap"])), 1.0)
+	# D13 별첨A §8.3 등급 스팅 길이
+	_eq_float("D13 §8.3 L1 스팅 0.8초",
+		CsvTable.to_float(String(data.presentation_grade("grade_l1")["sting_length_sec"])), 0.8)
+	_eq_float("D13 §8.3 L2 스팅 1.5초",
+		CsvTable.to_float(String(data.presentation_grade("grade_l2")["sting_length_sec"])), 1.5)
+	_eq_float("D13 §8.3 L3 스팅 2.5초",
+		CsvTable.to_float(String(data.presentation_grade("grade_l3")["sting_length_sec"])), 2.5)
+	# 채널 구성 (D04 §5.5 · D11 §2.5): L0 로그만 → L1 +SFX·약햅틱 → L2 +강햅틱·플래시 → L3 +일러스트
+	var l0 := PresentationGrade.new()
+	l0.setup(data)
+	var c0 := l0.channels("grade_l0")
+	_ok("L0 = 로그만", bool(c0["log"]) and not bool(c0["sfx_sting"])
+		and String(c0["haptic_level"]) == "none" and not bool(c0["flash_slow"]), str(c0))
+	var c1 := l0.channels("grade_l1")
+	_ok("L1 = 로그+SFX+약햅틱", bool(c1["sfx_sting"]) and String(c1["haptic_level"]) == "weak"
+		and not bool(c1["flash_slow"]), str(c1))
+	var c2 := l0.channels("grade_l2")
+	_ok("L2 = +강햅틱·플래시", String(c2["haptic_level"]) == "strong" and bool(c2["flash_slow"])
+		and not bool(c2["illustration"]), str(c2))
+	var c3 := l0.channels("grade_l3")
+	_ok("L3 = L2 + 전용 일러스트", bool(c3["illustration"]) and bool(c3["flash_slow"]), str(c3))
+	# L2 상한 소진 후 3번째 후보는 L1로 강등된다
+	var grade := PresentationGrade.new()
+	grade.setup(data)
+	for attempt in range(2):
+		var granted := grade.resolve(["trigger_duel_decision"])
+		_ok("L2 %d회차 발동" % (attempt + 1), String(granted[0]["grade"]) == "grade_l2", str(granted))
+	var overflow := grade.resolve(["trigger_duel_decision"])
+	_ok("L2 상한 초과 = L1 강등", String(overflow[0]["grade"]) == "grade_l1"
+		and bool(overflow[0]["demoted"]), str(overflow))
+	# L3는 독립 상한 1회 — L2 소진과 무관하게 1회는 성립한다
+	var signature := grade.resolve(["trigger_signature_event"])
+	_ok("L3 독립 상한 1회 성립", String(signature[0]["grade"]) == "grade_l3", str(signature))
+	_ok("L3 상한 초과 = L1 강등",
+		String(grade.resolve(["trigger_signature_event"])[0]["grade"]) == "grade_l1")
+	# GP 경계에서 카운터가 되돌아간다 (상한은 '그랑프리당')
+	grade.reset_gp()
+	_ok("GP 경계 카운터 리셋", String(grade.resolve(["trigger_duel_decision"])[0]["grade"]) == "grade_l2")
+	# 우선순위 소진 (D08 §8.5): 듀얼 결판 > 벽 라이벌 비트 > 찬스 3매치.
+	# 후보 3건이 같은 턴에 서고 슬롯이 2개면, 찬스 3매치가 강등돼야 한다.
+	var priority := PresentationGrade.new()
+	priority.setup(data)
+	var resolved := priority.resolve([
+		"trigger_chance_three_match", "trigger_wall_rival_beat", "trigger_duel_decision",
+	])
+	_ok("우선순위 정렬 = 듀얼 결판 우선", String(resolved[0]["trigger"]) == "trigger_duel_decision",
+		str(resolved))
+	_ok("우선순위 2번째 = 벽 라이벌", String(resolved[1]["trigger"]) == "trigger_wall_rival_beat")
+	_ok("슬롯 2개 소진 후 찬스 3매치 강등",
+		String(resolved[2]["trigger"]) == "trigger_chance_three_match"
+		and String(resolved[2]["grade"]) == "grade_l1" and bool(resolved[2]["demoted"]), str(resolved))
+	_ok("연출 등급 조회 중 데이터 침묵 기본값 0", data.is_ok())

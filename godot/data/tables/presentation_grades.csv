@@ -1,0 +1,5 @@
+id,code,gp_cap,sfx_sting,haptic_level,flash_slow,illustration,sting_length_sec
+grade_l0,L0,0,0,none,0,0,0
+grade_l1,L1,0,1,weak,0,0,0.8
+grade_l2,L2,2,1,strong,1,0,1.5
+grade_l3,L3,1,1,strong,1,1,2.5

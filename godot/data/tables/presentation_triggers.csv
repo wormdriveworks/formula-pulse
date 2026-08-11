@@ -1,0 +1,5 @@
+id,grade_id,priority
+trigger_duel_decision,grade_l2,1
+trigger_wall_rival_beat,grade_l2,2
+trigger_chance_three_match,grade_l2,3
+trigger_signature_event,grade_l3,1

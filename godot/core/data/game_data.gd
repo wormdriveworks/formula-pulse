@@ -15,6 +15,8 @@ var teams: Dictionary = {}             # team_id -> 행
 var rivals: Array[Dictionary] = []     # ai_rivals 행 (등재 순서 유지)
 var points_tier1: Dictionary = {}      # position(int) -> points(int)
 var sector_attrs: Dictionary = {}      # attr_* id -> 행 (속성 6축 — D13 별첨A §1.3)
+var presentation_grades: Dictionary = {}   # grade_* id -> 행 (연출 등급 — D12 §5.8)
+var presentation_triggers: Dictionary = {} # trigger_* id -> 행 (등급 후보·우선순위)
 var circuit: Dictionary = {}           # 활성 서킷 구조 JSON
 var circuits: Dictionary = {}          # circuit_* id -> 구조 JSON
 var stages: Dictionary = {}            # stage_* id -> 구조 JSON
@@ -42,6 +44,7 @@ func load_all() -> bool:
 	_load_rivals()
 	_load_points()
 	_load_sector_attrs()
+	_load_presentation()
 	_load_content()
 	grid = _load_json(STRUCTURES_DIR + "grid_debug.json")
 	if not strings.load_file(STRINGS_PATH):
@@ -208,6 +211,33 @@ func _load_sector_attrs() -> void:
 		sector_attrs[String(row["id"])] = row
 	if sector_attrs.is_empty():
 		_load_ok = false
+
+
+func _load_presentation() -> void:
+	presentation_grades.clear()
+	presentation_triggers.clear()
+	for row in CsvTable.load_rows(TABLES_DIR + "presentation_grades.csv"):
+		presentation_grades[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "presentation_triggers.csv"):
+		presentation_triggers[String(row["id"])] = row
+	if presentation_grades.is_empty() or presentation_triggers.is_empty():
+		_load_ok = false
+
+
+func presentation_grade(grade_id: String) -> Dictionary:
+	if not presentation_grades.has(grade_id):
+		push_error("GameData: unknown presentation grade '%s'" % grade_id)
+		_load_ok = false
+		return {}
+	return presentation_grades[grade_id]
+
+
+func presentation_trigger(trigger_id: String) -> Dictionary:
+	if not presentation_triggers.has(trigger_id):
+		push_error("GameData: unknown presentation trigger '%s'" % trigger_id)
+		_load_ok = false
+		return {}
+	return presentation_triggers[trigger_id]
 
 
 func _load_points() -> void:
