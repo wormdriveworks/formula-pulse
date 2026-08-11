@@ -529,7 +529,12 @@ func _run_v4_hardcoded_text() -> void:
 	var before_warn := _warn_count
 	var checked := 0
 	var marker := String(_config["v4_whitelist_marker"])
+	# 비표시 경로 제외 — 테스트 하네스의 진단 라벨은 플레이어에게 렌더되지 않는다.
+	# 우회가 아니라 '표시 문자열'의 범위 선언이며, 제외 대상은 설정에 명시된 경로뿐이다.
+	var exempt_dirs: Array = _config.get("v4_exempt_dirs", [])
 	for entry in _code_files:
+		if _is_exempt_path(String(entry["path"]), exempt_dirs):
+			continue
 		var lines: Array = String(entry["source"]).split("\n")
 		for line_index in range(lines.size()):
 			var raw_line := String(lines[line_index])
@@ -539,6 +544,13 @@ func _run_v4_hardcoded_text() -> void:
 				if _has_hangul(literal) and not raw_line.contains(marker):
 					_fail("V4", "%s:%d: hangul literal '%s'" % [entry["path"], line_index + 1, literal])
 	_report("V4", "hardcoded text", checked, before_fail, before_warn)
+
+
+func _is_exempt_path(path: String, exempt_dirs: Array) -> bool:
+	for dir_path in exempt_dirs:
+		if path.begins_with(String(dir_path)):
+			return true
+	return false
 
 
 # ── V5 앵커 결속 유형: anchor_type ∈ 허용 / tour_slot ∈ {1,5} (D08 §2.3 기계 이행) ──

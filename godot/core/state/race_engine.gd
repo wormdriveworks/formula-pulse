@@ -36,6 +36,11 @@ var rear_gauge: float = 0.0
 var front_target: String = ""
 var rear_target: String = ""
 
+# 턴 시퀀스·정산 단계 추적 로그 (D14 TC-C2·TC-C10의 판정 근거 = '로그 대조').
+# 결과·심볼을 담지 않는다 — 단계 식별자만 기록하므로 봉인 규칙과 무접촉.
+var phase_log: Array = []
+var settle_log: Array = []
+
 # 턴 내부 상태
 var provisional: Array = []          # 심볼 id 3개 (T3 전개 후보)
 var hold_used: bool = false          # 홀드/리스핀 턴당 1회 (D05 §5.4)
@@ -53,6 +58,9 @@ var resonance_sector_slot: int = 0     # 0 = 이 서킷에 오버레이 없음
 var resonance_announced: bool = false
 var resonance_duel_bonus: float = 0.0  # 차기 듀얼 판정 보정 (D13 별첨A §2.4 '레조넌스 보정')
 
+# 비정의 전이 시도 누계 (D14 TC-C1 판정 '비정의 전이 도달 0'의 기계 판정 근거)
+var transition_errors: int = 0
+
 var finished: bool = false
 var result: Dictionary = {}
 
@@ -66,6 +74,9 @@ func setup(game_data: GameData, rng_service: RngService) -> void:
 func _transition(next_state: int) -> void:
 	var allowed: Array = RaceTypes.TRANSITIONS[gp_state]
 	if not allowed.has(next_state):
+		# 비정의 전이는 카운터로 남긴다 — push_error만으로는 테스트가 통과해버려서
+		# "비정의 전이 도달 0"(D14 TC-C1)이 기계 판정 대상이 되지 않는다.
+		transition_errors += 1
 		push_error("RaceEngine: undefined transition %d -> %d" % [gp_state, next_state])
 		return
 	gp_state = next_state
@@ -218,7 +229,8 @@ func begin_turn() -> Dictionary:
 			resonance_announced = true
 			info["events"].append(_ev("T1", "raceLog.resonanceEnter01", {}))
 	turn_number += 1
-	turn_phase = RaceTypes.TurnPhase.T1_SECTOR_OPEN
+	phase_log = []
+	_enter_phase(RaceTypes.TurnPhase.T1_SECTOR_OPEN)
 	provisional = []
 	hold_used = false
 	negated_troubles = 0
@@ -231,10 +243,19 @@ func spin() -> void:
 	if turn_phase != RaceTypes.TurnPhase.T1_SECTOR_OPEN:
 		push_error("RaceEngine: spin out of phase")
 		return
+	_enter_phase(RaceTypes.TurnPhase.T2_SPIN)
 	provisional = []
 	for reel_index in range(3):
 		provisional.append(_roll_reel(reel_index))
-	turn_phase = RaceTypes.TurnPhase.T4_INTERVENTION
+	# T3 전개 후보 — 내부 확정만 하고 노출은 표시 층의 get_provisional() 시점 (봉인 §6.3)
+	_enter_phase(RaceTypes.TurnPhase.T3_PROVISIONAL)
+	_enter_phase(RaceTypes.TurnPhase.T4_INTERVENTION)
+
+
+# 턴 단계 진입 — 단계 전이를 한 곳으로 모아 로그와 상태가 갈라지지 않게 한다.
+func _enter_phase(phase: int) -> void:
+	turn_phase = phase
+	phase_log.append(phase)
 
 
 func _roll_reel(reel_index: int) -> String:
@@ -337,11 +358,11 @@ func confirm(remaining_ratio: float) -> Array:
 	if turn_phase != RaceTypes.TurnPhase.T4_INTERVENTION:
 		push_error("RaceEngine: confirm out of phase")
 		return []
-	turn_phase = RaceTypes.TurnPhase.T5_TRANSLATE
+	_enter_phase(RaceTypes.TurnPhase.T5_TRANSLATE)
 	var events: Array = []
 	var momentum := (not current_turn_is_duel) \
 		and remaining_ratio >= data.param("param_timer_leeway_ratio")
-	turn_phase = RaceTypes.TurnPhase.T6_SETTLE
+	_enter_phase(RaceTypes.TurnPhase.T6_SETTLE)
 	if current_turn_is_duel:
 		events.append_array(_settle_duel())
 	else:
@@ -364,7 +385,9 @@ func _settle_sector(momentum: bool) -> Array:
 	var trouble_fired := false
 	var gauge_mult := _gauge_mult()
 	var chance_full := false
+	settle_log = []
 	for stage in RaceTypes.SETTLE_ORDER:
+		settle_log.append(stage)
 		match stage:
 			RaceTypes.SettleStage.STAGE_1_HAZARD:
 				# 해저드 속성의 턴당 가산 소모 −1.0 (D13 별첨A §2.3 — ×1.15 계수와 별도).
@@ -483,7 +506,9 @@ func _has_any_three_match() -> bool:
 # 듀얼 턴 정산 — 전용 스핀: 심볼은 판정 환산 전속, 통상 효과 미적용 [가안 — impl_log]
 func _settle_duel() -> Array:
 	var events: Array = []
+	settle_log = []
 	for stage in RaceTypes.SETTLE_ORDER:
+		settle_log.append(stage)
 		match stage:
 			RaceTypes.SettleStage.STAGE_6_DUEL_TRIGGER:
 				events.append_array(_resolve_duel())
@@ -742,7 +767,14 @@ func _finish_gp() -> void:
 	standings.append_array(retired_list)
 	var player_rank := standings.find(PLAYER_ID) + 1
 	var player_retired: bool = entrants[PLAYER_ID]["retired"]
-	var points: int = 0 if player_retired else int(data.points_tier1.get(player_rank, 0))
+	# 포인트는 P1~P16 전 순위가 테이블에 명시돼 있다 (D13 별첨A §6.1 'P9↓ 0' 포함).
+	# .get(rank, 0) 류의 침묵 대체를 두지 않는다 — 표가 비면 조용히 0이 되어 표류를 숨긴다.
+	var points := 0
+	if not player_retired:
+		if data.points_tier1.has(player_rank):
+			points = int(data.points_tier1[player_rank])
+		else:
+			push_error("RaceEngine: points_tier1 has no position %d" % player_rank)
 	result = {
 		"standings": standings,
 		"player_rank": player_rank,
