@@ -33,7 +33,6 @@ param_ai_retire_stability_coef,0.025
 param_ai_retire_const,0.002
 param_ai_retire_gp_cap,2
 param_filler_stat_var,0.5
-param_form_var_named,0.3
 param_form_var_filler,0.3
 param_reel_stop_interval_sec,0.4
 param_grid_start_mod_coef,0.5
@@ -41,3 +40,10 @@ param_chassis_hazard_per_turn,1.0
 param_grid_level_pace_add,0.4
 param_save_profile_count,3
 param_time_pacing_beat_sec,1.0
+param_event_trigger_probability,0.80
+param_event_cooldown_judgments,3
+param_event_rank_adjacency,2
+param_repair_field_cap,30
+param_pacing_beat_max_sec,2.5
+param_pacing_beat_probability,0.40
+param_closerace_gauge_threshold,70

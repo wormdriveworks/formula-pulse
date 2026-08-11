@@ -10,6 +10,7 @@ TESTS=(
 	tests/test_save_reload.gd
 	tests/test_tc_c.gd
 	tests/test_tc_p.gd
+	tests/test_events.gd
 )
 failures=0
 for test_path in "${TESTS[@]}"; do

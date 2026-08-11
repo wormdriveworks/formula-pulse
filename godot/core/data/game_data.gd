@@ -16,6 +16,9 @@ var rivals: Array[Dictionary] = []     # ai_rivals 행 (등재 순서 유지)
 var points_tier1: Dictionary = {}      # position(int) -> points(int)
 var sector_attrs: Dictionary = {}      # attr_* id -> 행 (속성 6축 — D13 별첨A §1.3)
 var presentation_grades: Dictionary = {}   # grade_* id -> 행 (연출 등급 — D12 §5.8)
+var events: Dictionary = {}            # event_* id -> 행 (D08 §7 · D12 §5.4)
+var event_categories: Dictionary = {}  # category_* id -> 행 (배분·보상 범위)
+var event_variants: Dictionary = {}    # event id -> 변형 배열 (조건 DSL 포함)
 var presentation_triggers: Dictionary = {} # trigger_* id -> 행 (등급 후보·우선순위)
 var circuit: Dictionary = {}           # 활성 서킷 구조 JSON
 var circuits: Dictionary = {}          # circuit_* id -> 구조 JSON
@@ -45,6 +48,7 @@ func load_all() -> bool:
 	_load_points()
 	_load_sector_attrs()
 	_load_presentation()
+	_load_events()
 	_load_content()
 	grid = _load_json(STRUCTURES_DIR + "grid_debug.json")
 	if not strings.load_file(STRINGS_PATH):
@@ -238,6 +242,44 @@ func presentation_trigger(trigger_id: String) -> Dictionary:
 		_load_ok = false
 		return {}
 	return presentation_triggers[trigger_id]
+
+
+func _load_events() -> void:
+	events.clear()
+	event_categories.clear()
+	event_variants.clear()
+	for row in CsvTable.load_rows(TABLES_DIR + "event_categories.csv"):
+		event_categories[String(row["id"])] = row
+	for row in CsvTable.load_rows(TABLES_DIR + "events.csv"):
+		events[String(row["id"])] = row
+	var variants_file := _load_json(STRUCTURES_DIR + "event_variants.json")
+	var variants: Variant = _structure_value(variants_file, "variants", "event_variants.json", {})
+	if typeof(variants) == TYPE_DICTIONARY:
+		event_variants = variants
+	if events.is_empty() or event_categories.is_empty():
+		_load_ok = false
+
+
+func event(event_id: String) -> Dictionary:
+	if not events.has(event_id):
+		push_error("GameData: unknown event '%s'" % event_id)
+		_load_ok = false
+		return {}
+	return events[event_id]
+
+
+func event_category(category_id: String) -> Dictionary:
+	if not event_categories.has(category_id):
+		push_error("GameData: unknown event category '%s'" % category_id)
+		_load_ok = false
+		return {}
+	return event_categories[category_id]
+
+
+# 변형이 없는 이벤트는 빈 배열 — 이것은 부재값이 아니라 "변형 없음"이라는 사실이다.
+func event_variants_of(event_id: String) -> Array:
+	var entry: Variant = event_variants.get(event_id, [])
+	return entry if typeof(entry) == TYPE_ARRAY else []
 
 
 func _load_points() -> void:

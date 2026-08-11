@@ -3,8 +3,19 @@
 	"id": "stage_metro_night",
 	"name_key": "ui.stage.metroNight",
 	"season1_tour_slot": 1,
-	"circuits": ["circuit_mn1", "circuit_mn2", "circuit_mn3", "circuit_mn4"],
+	"circuits": [
+		"circuit_mn1",
+		"circuit_mn2",
+		"circuit_mn3",
+		"circuit_mn4"
+	],
 	"wall_rival": "",
 	"resonance_bonus_type": "charge",
-	"resonance_bonus_value": 2
+	"resonance_bonus_value": 2,
+	"event_pool": [
+		"event_mn_night_market",
+		"event_mn_local_broadcast",
+		"event_mn_repair_alley",
+		"event_mn_neon_festival"
+	]
 }

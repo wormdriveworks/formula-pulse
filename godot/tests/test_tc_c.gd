@@ -148,6 +148,21 @@ func _d13_anchor_values() -> void:
 				var actual := CsvTable.to_float(String(data.match_effects[symbol_id][match_count][column]))
 				_eq_float("D13 §1.2 %s %d매치 %s" % [symbol_id, match_count, column],
 					actual, float(expected_effects[symbol_id][match_count][column]))
+	# '해당 없음(0)' 칸은 값이 아니라 **구조적 사실**이다 — 개별 0을 전사하는 대신
+	# "그 심볼은 그 축에 관여하지 않는다"를 단언한다. 0이 다른 값으로 바뀌면 이 단언이 깨진다.
+	var non_involvement := {
+		RaceTypes.SYMBOL_SLIPSTREAM: ["rear_gauge", "charge", "chassis"],
+		RaceTypes.SYMBOL_BRAKING: ["front_gauge", "charge", "chassis"],
+		RaceTypes.SYMBOL_LINE: ["charge", "chassis"],
+		RaceTypes.SYMBOL_PULSE: ["front_gauge", "rear_gauge", "chassis"],
+		RaceTypes.SYMBOL_TROUBLE: ["front_gauge", "charge"],
+		RaceTypes.SYMBOL_CHANCE: ["rear_gauge", "charge", "chassis"],
+	}
+	for symbol_id in non_involvement:
+		for match_count in [1, 2, 3]:
+			for column in non_involvement[symbol_id]:
+				_eq_float("구조: %s는 %s에 관여하지 않음 (%d매치)" % [symbol_id, column, match_count],
+					CsvTable.to_float(String(data.match_effects[symbol_id][match_count][column])), 0.0)
 	_ok("D13 §1.2 찬스 3매치 = 즉시 듀얼",
 		String(data.match_effects[RaceTypes.SYMBOL_CHANCE][3]["special"]).strip_edges() == "duel_trigger")
 	# D13 별첨A §1.1 기본 심볼 분포 (앵커 A4) — 합 1.0
@@ -235,6 +250,14 @@ func _d13_anchor_values() -> void:
 			_eq_float("D13 §6.2 %s.%s" % [rival_id, column],
 				CsvTable.to_float(String(rival_rows[rival_id][column])),
 				float(expected_rivals[rival_id][column]), 0.0001)
+	# 비앙카 압박 훅 (D13 §6.2 "안정성 4.0(압박 시 2.5)" · D08 §6.3 조건 분기 위임분).
+	_eq_float("D13 §6.2 비앙카 압박 시 안정성 2.5",
+		CsvTable.to_float(String(rival_rows["ai_bianca"]["stability_under_pressure"])), 2.5)
+	# 조건 분기가 없는 라이벌은 공란 — 값 0이 아니라 "훅 없음"이다.
+	for rival_id in ["ai_lorentz", "ai_diaz", "ai_sherwood"]:
+		_ok("압박 훅 없음: %s" % rival_id,
+			String(rival_rows[rival_id]["stability_under_pressure"]).strip_edges() == "",
+			String(rival_rows[rival_id]["stability_under_pressure"]))
 	_eq_float("D13 §6.2 로렌츠 폼 분산 0 (무결점 연산)",
 		CsvTable.to_float(String(rival_rows["ai_lorentz"]["form_var"])), 0.0)
 	_eq_float("D13 §2.4 로렌츠 방어 임계 55",
@@ -258,7 +281,14 @@ func _d13_anchor_values() -> void:
 				CsvTable.to_float(String(data.teams[team_id][column]), 0.0),
 				float(expected_teams[team_id][column]), 0.0001)
 	# 변동 요소·AI 거동 (D13 별첨A §6.2)
-	_eq_float("D13 §6.2 네임드 폼 분산 0.3", data.param("param_form_var_named"), 0.3)
+	# 네임드 폼 분산은 개별 열(ai_rivals.form_var)이 소비 경로다. 클래스 단위 파라미터를
+	# 따로 두면 단언이 죽은 쪽에 붙어 실제 값 7칸이 무방비가 된다(독립 감사 누락-1).
+	for rival_id in expected_rivals:
+		if not rival_rows.has(rival_id):
+			continue
+		var expected_form := 0.0 if rival_id == "ai_lorentz" else 0.3
+		_eq_float("D13 §6.2 %s.form_var" % rival_id,
+			CsvTable.to_float(String(rival_rows[rival_id]["form_var"])), expected_form)
 	_eq_float("D13 §6.2 필러 폼 분산 0.3", data.param("param_form_var_filler"), 0.3)
 	_eq_float("D13 §6.2 필러 스탯 편차 0.5", data.param("param_filler_stat_var"), 0.5)
 	_eq_float("D13 §6.2 스왑 하한 0.010", data.param("param_ai_swap_min"), 0.010)
@@ -409,6 +439,16 @@ func _force_duel(engine: RaceEngine, duel_type: int) -> String:
 		engine.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
 		engine.confirm(0.0)
 	var player_index := engine.positions.find(RaceEngine.PLAYER_ID)
+	# 필요한 인접 슬롯이 없으면(선두는 앞차 없음·최하위는 뒤차 없음) 플레이어를 한 칸 안으로 옮긴다.
+	# 시작 그리드는 P16이므로 방어 듀얼은 이 재배치 없이는 성립하지 않는다.
+	if duel_type == RaceTypes.DuelType.OVERTAKE and player_index <= 0:
+		engine.positions.erase(RaceEngine.PLAYER_ID)
+		engine.positions.insert(1, RaceEngine.PLAYER_ID)
+	elif duel_type == RaceTypes.DuelType.DEFENSE and player_index >= engine.positions.size() - 1:
+		engine.positions.erase(RaceEngine.PLAYER_ID)
+		engine.positions.insert(engine.positions.size() - 1, RaceEngine.PLAYER_ID)
+	engine._retarget(true, true)
+	player_index = engine.positions.find(RaceEngine.PLAYER_ID)
 	var opponent_index := player_index - 1 if duel_type == RaceTypes.DuelType.OVERTAKE else player_index + 1
 	var opponent_id := String(engine.positions[opponent_index])
 	engine.pending_duel = duel_type
@@ -566,6 +606,14 @@ func _tc_c6_duel_thresholds() -> void:
 	var defense_base := engine.data.param("param_duel_defense_base")
 	var defense_coef := engine.data.param("param_duel_defense_aggression_coef")
 	_eq_float("TC-C6 필러 방어 임계 45", defense_base + 3.0 * defense_coef, 45.0)
+	# 비앙카 압박 훅이 추월 임계에 실제로 작용하는가 (D13 §6.2 · IMPL-016 유보분 해소).
+	# 훅 없는 동일 안정성 라이벌(홀로웨이 4.0)과 비교하면 차이가 훅에서만 온다.
+	var bianca_threshold := engine._duel_threshold(RaceTypes.DuelType.OVERTAKE, "ai_bianca")
+	var holloway_threshold := engine._duel_threshold(RaceTypes.DuelType.OVERTAKE, "ai_holloway")
+	_eq_float("비앙카 추월 임계 = 35 + 2.5×4.5", bianca_threshold, base + 2.5 * coef)
+	_eq_float("홀로웨이 추월 임계 = 35 + 4.0×4.5", holloway_threshold, base + 4.0 * coef)
+	_ok("압박 훅이 임계를 낮춘다", bianca_threshold < holloway_threshold,
+		"bianca=%f holloway=%f" % [bianca_threshold, holloway_threshold])
 	# 부등식 검증 (D13 별첨A §2.4 V-1): 무개입 1매치 < 필러 임계 < 2매치 + 부스트
 	var conversion: Dictionary = engine.data.duel_conversion[RaceTypes.SYMBOL_SLIPSTREAM]
 	var one_match := CsvTable.to_float(String(conversion["match1"]))
@@ -717,6 +765,7 @@ func _tc_c11_seal() -> void:
 	_ok("TC-C11 스핀 전 전개 후보 공백", engine.get_provisional().is_empty(),
 		"provisional=%s" % str(engine.get_provisional()))
 	var events_before: Array = Array(info.get("events", [])).duplicate(true)
+	_surface_before = _public_surface(engine)
 	engine.spin()
 	var events_after: Array = info.get("events", [])
 	_ok("TC-C11 스핀이 이벤트를 발행하지 않음", events_after.size() == events_before.size(),
@@ -729,6 +778,12 @@ func _tc_c11_seal() -> void:
 	var leaked := _leaking_properties(engine)
 	_ok("TC-C11 결과가 실린 공개 표면 = provisional 단독", leaked.is_empty(),
 		"leaked=%s" % str(leaked))
+	# 스핀이 바꾼 공개 표면을 전수 비교한다. '심볼 id를 담았는가'만 보면 결과 상관 신호를
+	# 다른 표기(연출 트리거 id 등)로 실어 보내는 경로가 통과한다 — 변경 자체를 화이트리스트로 막는다.
+	var allowed_changes := ["provisional", "turn_phase", "phase_log"]
+	var unexpected := _unexpected_surface_changes(engine, _surface_before, allowed_changes)
+	_ok("TC-C11 스핀이 바꾼 공개 표면 = 화이트리스트 한정", unexpected.is_empty(),
+		"changed=%s" % str(unexpected))
 	_ok("TC-C11 확정 전 정산 로그 공백", engine.settle_log.is_empty(),
 		"settle_log=%s" % str(engine.settle_log))
 	var events: Array = engine.confirm(0.0)
@@ -766,6 +821,33 @@ func _leaking_properties(engine: RaceEngine) -> Array:
 		if _contains_symbol_id(engine.get(name)):
 			leaked.append(name)
 	return leaked
+
+
+var _surface_before: Dictionary = {}
+
+
+# 엔진의 공개 스크립트 변수 전체를 문자열 스냅샷으로 뜬다 (비교 목적 — 값 자체는 쓰지 않는다).
+func _public_surface(engine: RaceEngine) -> Dictionary:
+	var surface: Dictionary = {}
+	for property in engine.get_property_list():
+		var name := String(property.get("name", ""))
+		if name.begins_with("_") or name == "script":
+			continue
+		if int(property.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
+			continue
+		surface[name] = str(engine.get(name))
+	return surface
+
+
+func _unexpected_surface_changes(engine: RaceEngine, before: Dictionary, allowed: Array) -> Array:
+	var changed: Array = []
+	var after := _public_surface(engine)
+	for name in after:
+		if allowed.has(name):
+			continue
+		if not before.has(name) or String(before[name]) != String(after[name]):
+			changed.append(name)
+	return changed
 
 
 func _contains_symbol_id(value: Variant) -> bool:
@@ -1250,17 +1332,31 @@ func _result_and_ranking() -> void:
 		+ 10.0 * timing.data.param("param_time_pacing_beat_sec") \
 		+ timing.data.param("param_time_wrapup_sec")
 	_eq_float("GP 소요 모델 = D13 §4.1 산식", timing.estimated_minutes(), expected_seconds / 60.0, 0.01)
-	# D13 §4.1이 인쇄한 총계에 도달하는가 (12턴 10.0분 / 15턴 11.3분 — 듀얼은 턴 수에 비례).
-	# 12턴의 인쇄값 10.0분은 반올림이다: 성분 산술은 252+112.5+12+210 = 586.5초 = 9.775분.
-	# 성분값이 정본이므로(§4.1 산출 열) 총계는 근사로 단언한다 — 성분 4종은 위에서 전사 대조했다.
+	# D13 §4.1 성분 산술을 **정확히** 단언한다. 인쇄 총계(12턴 10.0분)와는 0.225분 차이가
+	# 있는데 이는 반올림이 아니다(9.775 → 9.8). 허용 오차로 흡수하면 그 불일치가
+	# 테스트 뒤에 숨고, 더 중요하게는 **성분 산술이 GP 목표 하한 10분을 밑도는 사실**이
+	# 가려진다 (D05 §2.2 목표 10~15분). impl_log 보고 항목 — 총괄 판정 대기.
 	var turn_sec := timing.data.param("param_time_turn_sec")
 	var duel_sec := timing.data.param("param_time_duel_sec")
 	var beat_sec := timing.data.param("param_time_pacing_beat_sec")
 	var wrapup_sec := timing.data.param("param_time_wrapup_sec")
-	_eq_float("D13 §4.1 12턴 서킷 = 10.0분",
-		(12.0 * turn_sec + 2.5 * duel_sec + 12.0 * beat_sec + wrapup_sec) / 60.0, 10.0, 0.25)
-	_eq_float("D13 §4.1 15턴 서킷 = 11.3분",
+	_eq_float("D13 §4.1 12턴 성분 산술 = 586.5초",
+		12.0 * turn_sec + 2.5 * duel_sec + 12.0 * beat_sec + wrapup_sec, 586.5, 0.01)
+	# 15턴 총계 11.3분은 문면에 성분이 없다 — 듀얼 수는 12턴의 2.5를 턴 비례로 파생한
+	# 3.125다([가안], impl_log 등재). 라벨에 파생임을 명시해 정본 전사와 구분한다.
+	_eq_float("[파생] 15턴 총계 = 11.3분 (듀얼 비례 3.125 가정)",
 		(15.0 * turn_sec + 3.125 * duel_sec + 15.0 * beat_sec + wrapup_sec) / 60.0, 11.3, 0.06)
+	# 완급 비트 평균 1.0초는 성분 2쌍의 곱이다 (2.5초 상한 × 발동 40% — D13 §8.1).
+	# 성분을 두지 않으면 상한·빈도가 바뀌어도 평균만 손으로 맞춰 검사를 통과시킬 수 있다.
+	_eq_float("D13 §8.1 완급 비트 재생 상한 2.5초",
+		timing.data.param("param_pacing_beat_max_sec"), 2.5)
+	_eq_float("D13 §8.1 완급 비트 발동 빈도 40%",
+		timing.data.param("param_pacing_beat_probability"), 0.40)
+	_eq_float("D13 §8.1 완급 비트 평균 = 상한 × 빈도",
+		timing.data.param("param_pacing_beat_max_sec")
+			* timing.data.param("param_pacing_beat_probability"), beat_sec)
+	_eq_float("D13 §8.1 접전 판정 임계 70 G",
+		timing.data.param("param_closerace_gauge_threshold"), 70.0)
 	# 타임아웃에 추가 페널티가 없다 (D05 §7.3 확정)
 	var timeout_probe := _new_engine(707)
 	timeout_probe.start_gp()
@@ -1350,6 +1446,35 @@ func _result_and_ranking() -> void:
 	_ok("듀얼 부스트가 판정치에 작용 (부스트 승 / 무부스트 패)",
 		boosted.player_position() == rank_before - 1 and unboosted.player_position() == rank_before,
 		"boosted=P%d unboosted=P%d before=P%d" % [boosted.player_position(), unboosted.player_position(), rank_before])
+	# 방어 듀얼 패배의 귀결 = 피추월. 순위 절대값이 아니라 **상대와의 순서**로 단언한다 —
+	# 같은 턴의 배경 AI 리타이어가 앞자리를 비우면 절대 순위가 상쇄되어 검사가 무의미해진다.
+	var defense_loss := _new_engine(333)
+	defense_loss.start_gp()
+	_flatten_neighbors(defense_loss)
+	var loss_opponent := _force_duel(defense_loss, RaceTypes.DuelType.DEFENSE)
+	_ok("방어 듀얼 상대가 뒤차", defense_loss.positions.find(loss_opponent) > defense_loss.positions.find(RaceEngine.PLAYER_ID))
+	defense_loss.begin_turn()
+	defense_loss.spin()
+	defense_loss.charge = 0
+	# 방어 primary(브레이킹) 없이 라인 1매치만 → 임계 미달
+	defense_loss.provisional = [RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_PULSE, RaceTypes.SYMBOL_PULSE]
+	defense_loss.confirm(0.0)
+	_ok("방어 듀얼 패배 = 상대가 앞으로 (피추월)",
+		defense_loss.positions.find(loss_opponent) < defense_loss.positions.find(RaceEngine.PLAYER_ID),
+		"opponent_index=%d player_index=%d" % [defense_loss.positions.find(loss_opponent),
+			defense_loss.positions.find(RaceEngine.PLAYER_ID)])
+	var defense_win := _new_engine(333)
+	defense_win.start_gp()
+	_flatten_neighbors(defense_win)
+	var win_opponent := _force_duel(defense_win, RaceTypes.DuelType.DEFENSE)
+	defense_win.begin_turn()
+	defense_win.spin()
+	defense_win.provisional = _combo(RaceTypes.SYMBOL_BRAKING, 3, RaceTypes.SYMBOL_BRAKING)
+	defense_win.confirm(0.0)
+	_ok("방어 듀얼 승리 = 상대가 여전히 뒤",
+		defense_win.positions.find(win_opponent) > defense_win.positions.find(RaceEngine.PLAYER_ID),
+		"opponent_index=%d player_index=%d" % [defense_win.positions.find(win_opponent),
+			defense_win.positions.find(RaceEngine.PLAYER_ID)])
 	# 게이지 계수가 심볼별로 빠지지 않는지 — 방어(브레이킹)·공략(라인) 경로도 확인
 	var battle := _new_engine(222, "circuit_mn1")
 	battle.start_gp()

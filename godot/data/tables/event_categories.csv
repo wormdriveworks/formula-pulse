@@ -1,0 +1,6 @@
+id,code,name_key,weight,reward_type,reward_min,reward_max,rare_probability,rare_dp
+category_c1,C1,ui.eventCategory.c1,0.20,chassis,10,20,0,0
+category_c2,C2,ui.eventCategory.c2,0.25,credit,120,250,0.10,12
+category_c3,C3,ui.eventCategory.c3,0.20,relation,0,0,0,0
+category_c4,C4,ui.eventCategory.c4,0.15,info,0,0,0,0
+category_c5,C5,ui.eventCategory.c5,0.20,none,0,0,0,0

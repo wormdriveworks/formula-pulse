@@ -33,6 +33,7 @@ func _init() -> void:
 	_run_v7_forbidden_vocab()
 	_run_v8_key_grammar()
 	_run_contamination_scan()
+	_run_architecture_scan()
 	print("")
 	if _fail_count == 0:
 		print("VALIDATORS_PASS warnings=%d" % _warn_count)
@@ -647,6 +648,47 @@ func _is_layout_literal(literal: String) -> bool:
 func _is_exempt_path(path: String, exempt_dirs: Array) -> bool:
 	for dir_path in exempt_dirs:
 		if path.begins_with(String(dir_path)):
+			return true
+	return false
+
+
+# ── 아키텍처 규칙 스캔 (혼입 0 스캔과 같은 정적 축) ──
+# 테스트로 닫을 수 없는 종류의 위반을 잡는다:
+#  ①정책 층 우회 — 세이브 I/O를 정책 층(백업 회전·프로필 분리·마이그레이션) 밖에서 직접 호출
+#  ②코어의 표준출력 — 코어는 순수 로직이며 출력 경로를 갖지 않는다. print는 봉인 규칙의
+#    누출 경로이기도 하다(릴 정지 전 결과를 stdout으로 흘리면 어떤 헤드리스 테스트도 못 잡는다).
+func _run_architecture_scan() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	for rule in _config.get("architecture_rules", []):
+		var spec: Dictionary = rule
+		var patterns: Array = spec.get("forbidden", [])
+		var scope: Array = spec.get("scope", [])
+		var allowed: Array = spec.get("allow", [])
+		var label := String(spec.get("name", "rule"))
+		var reason := String(spec.get("reason", ""))
+		for entry in _code_files:
+			var path := String(entry["path"])
+			if not _path_in_scope(path, scope) or _is_exempt_path(path, allowed):
+				continue
+			var lines: Array = String(entry["source"]).split("\n")
+			for line_index in range(lines.size()):
+				var code_line := _strip_comment(String(lines[line_index]))
+				for pattern in patterns:
+					checked += 1
+					if code_line.contains(String(pattern)):
+						_fail("ARCH", "%s:%d: %s — '%s' (%s)"
+							% [path, line_index + 1, label, pattern, reason])
+	_report("ARCH", "architecture rules", checked, before_fail, before_warn)
+
+
+# 빈 scope = 전 코드. 그 외에는 접두 일치.
+func _path_in_scope(path: String, scope: Array) -> bool:
+	if scope.is_empty():
+		return true
+	for prefix in scope:
+		if path.begins_with(String(prefix)):
 			return true
 	return false
 

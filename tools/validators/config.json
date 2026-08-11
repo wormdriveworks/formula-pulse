@@ -85,7 +85,8 @@
     "start_mod": "float",
     "form_var": "float",
     "duel_overtake_add": "float",
-    "duel_defense_override": "float_optional"
+    "duel_defense_override": "float_optional",
+    "stability_under_pressure": "float_optional"
    }
   },
   "points_tier1.csv": {
@@ -136,6 +137,31 @@
     "grade_id": "fk:presentation_grades.csv",
     "priority": "int:1,9"
    }
+  },
+  "event_categories.csv": {
+   "id_prefix": "category_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "code": "enum:C1,C2,C3,C4,C5",
+    "name_key": "string_key",
+    "weight": "float",
+    "reward_type": "enum:chassis,credit,dp,relation,info,none",
+    "reward_min": "int",
+    "reward_max": "int",
+    "rare_probability": "float",
+    "rare_dp": "int"
+   }
+  },
+  "events.csv": {
+   "id_prefix": "event_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "category_id": "fk:event_categories.csv",
+    "name_key": "string_key",
+    "scope": "enum:common,stage"
+   }
   }
  },
  "structures": {
@@ -183,7 +209,8 @@
     "circuits": "structure_ref_array",
     "wall_rival": "fk_optional:ai_rivals.csv",
     "resonance_bonus_type": "enum:charge,front_gauge,duel_judgment,chassis,front_gauge_full",
-    "resonance_bonus_value": "float"
+    "resonance_bonus_value": "float",
+    "event_pool": "fk_array:events.csv"
    }
   },
   "scripted_loss_s1.json": {
@@ -197,6 +224,12 @@
     "rival_id": "fk:ai_rivals.csv",
     "rule": "enum:overtake_duel_never",
     "player_best_rank": "int:1,16"
+   }
+  },
+  "event_variants.json": {
+   "root": true,
+   "required": {
+    "id": "string"
    }
   }
  },
@@ -309,5 +342,38 @@
   ".ogg",
   ".wav",
   ".bak"
+ ],
+ "architecture_rules": [
+  {
+   "name": "세이브 정책 층 우회 금지",
+   "reason": "SaveManager 경유 — 직접 호출은 백업 회전·프로필 분리·마이그레이션을 우회한다",
+   "forbidden": [
+    "SaveService.save_to",
+    "SaveService.load_from",
+    "SaveService.delete_save"
+   ],
+   "scope": [
+    "godot"
+   ],
+   "allow": [
+    "godot/core/save",
+    "godot/tests"
+   ]
+  },
+  {
+   "name": "코어 표준출력 금지",
+   "reason": "코어는 순수 로직이며 출력 경로를 갖지 않는다 — print는 봉인 규칙의 누출 경로다",
+   "forbidden": [
+    "print(",
+    "print_rich(",
+    "printt(",
+    "prints(",
+    "printraw("
+   ],
+   "scope": [
+    "godot/core"
+   ],
+   "allow": []
+  }
  ]
 }

@@ -1,0 +1,66 @@
+{
+	"schema_version": 1,
+	"id": "event_variants",
+	"variants": {
+		"event_rank_friction": [
+			{
+				"tag": "jude_adjacent",
+				"text_key": "ui.eventVariant.rankFrictionJudeAdjacent",
+				"condition": {"all": [{"field": "jude_rank_delta", "op": "<=", "value": 2}]}
+			},
+			{
+				"tag": "default",
+				"text_key": "ui.eventVariant.rankFrictionDefault",
+				"condition": {}
+			}
+		],
+		"event_control_access": [
+			{
+				"tag": "act2_clue_slot",
+				"text_key": "ui.eventVariant.controlAccessAct2",
+				"condition": {"all": [{"field": "act", "op": ">=", "value": 2}]}
+			},
+			{
+				"tag": "default",
+				"text_key": "ui.eventVariant.controlAccessDefault",
+				"condition": {}
+			}
+		],
+		"event_exposure_deal": [
+			{
+				"tag": "front_runner",
+				"text_key": "ui.eventVariant.exposureDealFront",
+				"condition": {"all": [{"field": "player_rank", "op": "<=", "value": 5}]}
+			},
+			{
+				"tag": "default",
+				"text_key": "ui.eventVariant.exposureDealDefault",
+				"condition": {}
+			}
+		],
+		"event_mn_neon_festival": [
+			{
+				"tag": "returning_opener",
+				"text_key": "ui.eventVariant.neonFestivalReturning",
+				"condition": {"all": [{"field": "season", "op": ">=", "value": 2}]}
+			},
+			{
+				"tag": "default",
+				"text_key": "ui.eventVariant.neonFestivalDefault",
+				"condition": {}
+			}
+		],
+		"event_vane_question": [
+			{
+				"tag": "vane_stage2",
+				"text_key": "ui.eventVariant.vaneQuestionStage2",
+				"condition": {"all": [{"field": "vane_stage", "op": ">=", "value": 2}]}
+			},
+			{
+				"tag": "default",
+				"text_key": "ui.eventVariant.vaneQuestionDefault",
+				"condition": {}
+			}
+		]
+	}
+}

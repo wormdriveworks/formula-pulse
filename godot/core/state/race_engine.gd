@@ -134,6 +134,7 @@ func _build_entrants() -> void:
 			"stability": CsvTable.to_float(String(row["stability"])) + CsvTable.to_float(String(team.get("stability_add", "0"))),
 			"seed_aggression": CsvTable.to_float(String(row["aggression"])),
 			"seed_stability": CsvTable.to_float(String(row["stability"])),
+			"stability_under_pressure": CsvTable.to_float(String(row["stability_under_pressure"]), -1.0),
 			"rush_lap1": CsvTable.to_float(String(row["rush_lap1"])),
 			"rush_lap_final": CsvTable.to_float(String(row["rush_lap_final"])) + CsvTable.to_float(String(team.get("rush_lap_final_add", "0"))),
 			"rush_roll": rng.randf_range("ai", -rush_random, rush_random) if rush_random > 0.0 else 0.0,
@@ -154,6 +155,7 @@ func _build_entrants() -> void:
 			"aggression": 3.0 + rng.randf_range("ai", -filler_var, filler_var),
 			"stability": 3.0 + rng.randf_range("ai", -filler_var, filler_var),
 			"seed_aggression": 3.0, "seed_stability": 3.0,
+			"stability_under_pressure": -1.0,
 			"rush_lap1": 0.0, "rush_lap_final": 0.0, "rush_roll": 0.0,
 			"start_mod": 3.0,
 			"form": rng.randf_range("ai", -filler_form, filler_form),
@@ -598,8 +600,16 @@ func _duel_judgment(duel_type: int) -> float:
 func _duel_threshold(duel_type: int, opponent_id: String) -> float:
 	var opponent: Dictionary = entrants[opponent_id]
 	if duel_type == RaceTypes.DuelType.OVERTAKE:
+		# 압박 훅 (D13 별첨A §6.2 비앙카 "안정성 4.0(압박 시 2.5)" · D08 §6.3 조건 분기 위임).
+		# [가안] '압박 시'의 판정 = **추월 듀얼 상황** — 플레이어가 뒤차로서 앞차를 밀어붙이는
+		# 국면이 압박의 정의에 부합한다. 정본이 '압박'을 별도로 정의하지 않아 해석이다.
+		# 훅이 없는 라이벌은 공란(−1)이므로 시드 안정성을 그대로 쓴다 (침묵 대체가 아니다).
+		var stability := float(opponent["seed_stability"])
+		var under_pressure := float(opponent["stability_under_pressure"])
+		if under_pressure >= 0.0:
+			stability = under_pressure
 		return data.param("param_duel_overtake_base") \
-			+ float(opponent["seed_stability"]) * data.param("param_duel_overtake_stability_coef") \
+			+ stability * data.param("param_duel_overtake_stability_coef") \
 			+ float(opponent["duel_overtake_add"])
 	var override_value := float(opponent["duel_defense_override"])
 	if override_value >= 0.0:

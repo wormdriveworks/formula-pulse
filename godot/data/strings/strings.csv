@@ -97,3 +97,50 @@ vane.brief.timeout01,궤도 재계산. 계속합니다.
 vane.brief.duel01,결판 국면. 연산 집중.
 raceLog.resonanceEnter01,미승인 출력이 감지된다.
 raceLog.resonanceProc01,레조넌스 — 출력이 넘친다.
+ui.eventCategory.c1,정비·머신
+ui.eventCategory.c2,크레딧·스폰서
+ui.eventCategory.c3,관계·조우
+ui.eventCategory.c4,무대 환경
+ui.eventCategory.c5,무드·플레이버
+ui.event.tempPitOpen,임시 피트 개방
+ui.event.scrapRecovery,폐부품 수거
+ui.event.theoAllnighter,테오의 밤샘 정비
+ui.event.surfaceData,노면 데이터 보정
+ui.event.usedPartsMarket,중고 소모품 장터
+ui.event.controlAccess,제어계 접근 시도
+ui.event.exposureDeal,소액 노출 계약
+ui.event.fanSigning,팬 사인회
+ui.event.shootSupport,촬영 협조
+ui.event.leagueRaffle,리그 경품 추첨
+ui.event.mediaColumn,미디어 기고
+ui.event.expoSponsor,전시 협찬
+ui.event.paddockEncounter,패독 조우
+ui.event.rankFriction,순위 인접 신경전
+ui.event.duelRecall,정면 승부 회고
+ui.event.veteranAdvice,노장의 조언
+ui.event.successorGaze,후계자의 시선
+ui.event.numberTwoCheck,2번의 견제
+ui.event.crewChatter,크루 잡담
+ui.event.teamDinner,팀 저녁 식사
+ui.event.weatherBrief,기상 브리핑
+ui.event.circuitWalk,서킷 답사
+ui.event.rivalData,라이벌 데이터 열람
+ui.event.gridRumor,그리드 소문
+ui.event.gridNightscape,그리드 야경
+ui.event.fanLetter,팬레터
+ui.event.oldPoster,옛 포스터 발견
+ui.event.vaneQuestion,베인의 질문
+ui.event.mnNightMarket,나이트 마켓
+ui.event.mnLocalBroadcast,로컬 방송 인터뷰
+ui.event.mnRepairAlley,정비 골목
+ui.event.mnNeonFestival,네온 축제
+ui.eventVariant.rankFrictionJudeAdjacent,바로 앞자리의 시선
+ui.eventVariant.rankFrictionDefault,스쳐 지나가는 눈빛
+ui.eventVariant.controlAccessAct2,잠긴 영역의 신호
+ui.eventVariant.controlAccessDefault,점검 목록의 빈칸
+ui.eventVariant.exposureDealFront,선두권을 향한 제안
+ui.eventVariant.exposureDealDefault,작은 지면의 제안
+ui.eventVariant.neonFestivalReturning,돌아온 개막
+ui.eventVariant.neonFestivalDefault,첫 개막의 야경
+ui.eventVariant.vaneQuestionStage2,조금 더 긴 질문
+ui.eventVariant.vaneQuestionDefault,짧은 질문
