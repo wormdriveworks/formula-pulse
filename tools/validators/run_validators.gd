@@ -312,6 +312,17 @@ func _check_structure_array(file_name: String, structure: Dictionary, array_fiel
 				continue
 			_check_value("%s.%s[%d]" % [file_name, array_field, index], String(required[field_name]),
 				_scalar_text(entry[field_name]), String(structure.get("id", "?")), String(field_name))
+		# 상호 배타 필드 (RB-1 판정 이행): 주·부속성이 같으면 규칙 계수가 곱해져
+		# ×1.8 명문 상한을 넘는다(1.5 × 1.25 = 1.875). 데이터 단계에서 차단한다.
+		for pair in array_spec.get("distinct", []):
+			var first := String(Array(pair)[0])
+			var second := String(Array(pair)[1])
+			var first_value := String(entry.get(first, "")).strip_edges()
+			var second_value := String(entry.get(second, "")).strip_edges()
+			checked += 1
+			if first_value != "" and first_value == second_value:
+				_fail("V1", "%s.%s[%d]: %s와 %s가 같다 ('%s') — 규칙 계수 곱으로 ×1.8 상한 위반"
+					% [file_name, array_field, index, first, second, first_value])
 	return checked
 
 

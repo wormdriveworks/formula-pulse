@@ -21,6 +21,7 @@ var teams: Dictionary = {}             # team_id -> 행
 var rivals: Array[Dictionary] = []     # ai_rivals 행 (등재 순서 유지)
 var points_tier1: Dictionary = {}      # position(int) -> points(int)
 var points_tier2: Dictionary = {}      # position(int) -> 챔피언십 포인트 (D05 §9.4 2층)
+var tour_slot_mods: Dictionary = {}    # race_slot(int) -> 행 (슬롯 진행 보정 — D08 §2.4)
 var season_calendar: Dictionary = {}   # 구조 JSON (D08 §2 캘린더 규칙)
 var sector_attrs: Dictionary = {}      # attr_* id -> 행 (속성 6축 — D13 별첨A §1.3)
 var presentation_grades: Dictionary = {}   # grade_* id -> 행 (연출 등급 — D12 §5.8)
@@ -68,6 +69,7 @@ func load_all() -> bool:
 	_load_rivals()
 	_load_points()
 	_load_points_tier2()
+	_load_tour_slot_mods()
 	_load_sector_attrs()
 	_load_presentation()
 	_load_events()
@@ -439,6 +441,24 @@ func _table_path(file_name: String) -> String:
 		if FileAccess.file_exists(candidate):
 			return candidate
 	return TABLES_DIR + file_name
+
+
+# 슬롯 진행 보정 (D08 §2.4 · D13 별첨A §6.2) — 사용자 판정: **투어 내 GP 슬롯**(제1~4전) 축.
+func _load_tour_slot_mods() -> void:
+	tour_slot_mods.clear()
+	for row in CsvTable.load_rows(_table_path("tour_slot_mods.csv")):
+		tour_slot_mods[CsvTable.to_int(String(row["race_slot"]))] = row
+	if tour_slot_mods.is_empty():
+		_load_ok = false
+
+
+# 미등재 슬롯은 조용히 0이 되지 않는다 — 투어 편성이 바뀌면 값이 함께 와야 한다.
+func tour_slot_pace_add(race_slot: int) -> float:
+	if not tour_slot_mods.has(race_slot):
+		push_error("GameData: no tour slot mod for race slot %d" % race_slot)
+		_load_ok = false
+		return 0.0
+	return CsvTable.to_float(String(tour_slot_mods[race_slot]["pace_add"]))
 
 
 func _load_json(path: String) -> Dictionary:

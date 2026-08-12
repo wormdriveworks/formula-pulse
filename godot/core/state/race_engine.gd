@@ -17,6 +17,10 @@ var gp_state: int = RaceTypes.GpState.GP_START
 var turn_phase: int = RaceTypes.TurnPhase.T1_SECTOR_OPEN
 
 # 진행 카운터
+# 투어 내 GP 슬롯 (제1~4전) — 슬롯 진행 보정의 입력. 투어 층이 주입한다.
+# 사용자 판정(2026-08-12): 슬롯 진행 보정의 축 = 투어 내 GP 슬롯 (D08 §2.4 · D13 별첨A §6.2).
+var race_slot: int = 1
+
 var lap: int = 0
 var sector: int = 0
 var turn_number: int = 0
@@ -163,6 +167,14 @@ func _build_entrants() -> void:
 			"duel_overtake_add": 0.0, "duel_defense_override": -1.0,
 			"retired": false, "retire_order": -1, "number": 20 + i + 1,
 		}
+	# 슬롯 진행 보정: 그리드 전체의 기저 강도에 가산 (D08 §2.4 — 무대 다이얼과 독립된 슬롯 다이얼).
+	# 플레이어는 대상이 아니다 — 보정의 목적어가 "필러·경쟁 풀의 기본 파라미터"다.
+	var slot_pace_add := data.tour_slot_pace_add(race_slot)
+	if slot_pace_add != 0.0:
+		for entrant_id in entrants:
+			if entrant_id == PLAYER_ID:
+				continue
+			entrants[entrant_id]["pace"] = float(entrants[entrant_id]["pace"]) + slot_pace_add
 
 
 # 시작 그리드 (D13 별첨A §6.3): 게임 최초 GP = 플레이어 P16 고정.

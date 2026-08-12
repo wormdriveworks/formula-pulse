@@ -158,6 +158,13 @@ func current_stage_id() -> String:
 	return String(calendar[tour_slot - 1])
 
 
+# 엔진에 GP 슬롯을 넘긴다 — 슬롯 진행 보정의 입력 (사용자 판정: 투어 내 GP 슬롯 축).
+func apply_to_engine(engine: RaceEngine) -> void:
+	engine.race_slot = race_slot
+	engine.resonance_circuit_id = resonance_circuit_id
+	engine.resonance_sector_slot = resonance_sector_slot
+
+
 func current_circuit_id() -> String:
 	var stage_id := current_stage_id()
 	if not data.stages.has(stage_id):

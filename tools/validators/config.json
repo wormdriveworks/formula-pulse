@@ -328,6 +328,15 @@
     "priority": "int:1,9",
     "relation_transition": "fk_optional:relation_axes.csv"
    }
+  },
+  "tour_slot_mods.csv": {
+   "id_prefix": "slotmod_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "race_slot": "int:1,4",
+    "pace_add": "float"
+   }
   }
  },
  "structures": {
@@ -428,7 +437,13 @@
       "name_key": "string_key",
       "main_attr": "fk:sector_attributes.csv",
       "sub_attr": "fk_optional:sector_attributes.csv"
-     }
+     },
+     "distinct": [
+      [
+       "main_attr",
+       "sub_attr"
+      ]
+     ]
     }
    }
   }

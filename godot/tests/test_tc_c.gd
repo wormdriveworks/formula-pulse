@@ -26,6 +26,7 @@ func _init() -> void:
 	_tc_c12_scumming()
 	_seal_across_many_spins()
 	_neighbor_passive_runtime()
+	_slot_progression_wired()
 	_negative_guards()
 	_result_and_ranking()
 	_sector_attribute_weights()
@@ -62,7 +63,9 @@ func _eq_float(label: String, actual: float, expected: float, tolerance: float =
 var _engines: Array = []
 
 
-func _new_engine(seed_value: int, circuit_id: String = "") -> RaceEngine:
+# register=false — **의도적으로** is_ok를 내리는 음성 프로브용. 전역 사후 조건에서 제외한다
+# (그 프로브의 목적이 곧 is_ok 하강이므로 전역 검사에 넣으면 항상 실패한다).
+func _new_engine(seed_value: int, circuit_id: String = "", register := true) -> RaceEngine:
 	var data := GameData.new()
 	if not data.load_all():
 		_failures += 1
@@ -74,7 +77,8 @@ func _new_engine(seed_value: int, circuit_id: String = "") -> RaceEngine:
 	rng.setup(seed_value)
 	var engine := RaceEngine.new()
 	engine.setup(data, rng)
-	_engines.append(engine)
+	if register:
+		_engines.append(engine)
 	return engine
 
 
@@ -340,6 +344,15 @@ func _d13_anchor_values() -> void:
 	_eq_float("D13 §6.2 그리드 레벨 페이스 +0.4", data.param("param_grid_level_pace_add"), 0.4)
 	_eq_float("D13 §6.2 그리드 레벨 듀얼 임계 +3", data.param("param_duel_grid_level_coef"), 3.0)
 	_eq_float("D13 §6.3 시작 보정 계수 0.5", data.param("param_grid_start_mod_coef"), 0.5)
+	# D13 별첨A §6.2 슬롯 진행 보정 — 사용자 판정(U-5·2026-08-12): 축 = **투어 내 GP 슬롯**(제1~4전)
+	var expected_slot_mods := {1: 0.00, 2: 0.05, 3: 0.10, 4: 0.15}
+	for race_slot in expected_slot_mods:
+		_eq_float("D13 §6.2 GP 슬롯 %d 보정 +%.2f" % [race_slot, expected_slot_mods[race_slot]],
+			data.tour_slot_pace_add(race_slot), float(expected_slot_mods[race_slot]))
+	_ok("슬롯 보정은 후반 슬롯일수록 크다 (D08 §2.4)",
+		data.tour_slot_pace_add(4) > data.tour_slot_pace_add(1))
+	_ok("슬롯 보정 폭 < 무대 다이얼 (D08 §2.4 한 자릿수 작게)",
+		data.tour_slot_pace_add(4) < 1.0, "slot4=%f" % data.tour_slot_pace_add(4))
 	# D13 별첨A §2.4 방어 primary(브레이킹)·라인 환산 — 추월 축만 전사하면 방어 축이 새 나간다
 	_eq_float("D13 §2.4 브레이킹 1매치 38",
 		CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_BRAKING]["match1"])), 38.0)
@@ -362,7 +375,7 @@ func _d13_anchor_values() -> void:
 	_eq_float("D13 §4.1 턴 21초", data.param("param_time_turn_sec"), 21.0)
 	_eq_float("D13 §4.1 듀얼 45초", data.param("param_time_duel_sec"), 45.0)
 	_eq_float("D13 §4.1 완급 비트 1초/턴", data.param("param_time_pacing_beat_sec"), 1.0)
-	_eq_float("D13 §4.1 결산·이벤트 210초", data.param("param_time_wrapup_sec"), 210.0)
+	_eq_float("D13 §4.1 결산·이벤트 225초 (U-5 판정 반영)", data.param("param_time_wrapup_sec"), 225.0)
 	# D13 별첨A §6.1 P9↓ = 0 (P10~P16 명시 행 — 침묵 대체가 아니라 데이터로)
 	for position in range(9, 17):
 		_ok("D13 §6.1 P%d = 0점" % position, int(data.points_tier1.get(position, -1)) == 0,
@@ -1430,12 +1443,17 @@ func _result_and_ranking() -> void:
 	var duel_sec := timing.data.param("param_time_duel_sec")
 	var beat_sec := timing.data.param("param_time_pacing_beat_sec")
 	var wrapup_sec := timing.data.param("param_time_wrapup_sec")
-	_eq_float("D13 §4.1 12턴 성분 산술 = 586.5초",
-		12.0 * turn_sec + 2.5 * duel_sec + 12.0 * beat_sec + wrapup_sec, 586.5, 0.01)
+	# 사용자 판정(2026-08-12 · U-5): 결산·이벤트 210 → 225초로 상향해 GP 목표 하한 10분을 충족.
+	# 성분 산술 = 252 + 112.5 + 12 + 225 = 601.5초 = 10.025분.
+	_eq_float("D13 §4.1 12턴 성분 산술 = 601.5초",
+		12.0 * turn_sec + 2.5 * duel_sec + 12.0 * beat_sec + wrapup_sec, 601.5, 0.01)
+	_ok("D05 §2.2 GP 목표 하한 10분 충족",
+		(12.0 * turn_sec + 2.5 * duel_sec + 12.0 * beat_sec + wrapup_sec) / 60.0 >= 10.0,
+		"minutes=%f" % ((12.0 * turn_sec + 2.5 * duel_sec + 12.0 * beat_sec + wrapup_sec) / 60.0))
 	# 15턴 총계 11.3분은 문면에 성분이 없다 — 듀얼 수는 12턴의 2.5를 턴 비례로 파생한
 	# 3.125다([가안], impl_log 등재). 라벨에 파생임을 명시해 정본 전사와 구분한다.
-	_eq_float("[파생] 15턴 총계 = 11.3분 (듀얼 비례 3.125 가정)",
-		(15.0 * turn_sec + 3.125 * duel_sec + 15.0 * beat_sec + wrapup_sec) / 60.0, 11.3, 0.06)
+	_eq_float("[파생] 15턴 총계 = 11.6분 (듀얼 비례 3.125 가정 · U-5 반영)",
+		(15.0 * turn_sec + 3.125 * duel_sec + 15.0 * beat_sec + wrapup_sec) / 60.0, 11.59, 0.06)
 	# 완급 비트 평균 1.0초는 성분 2쌍의 곱이다 (2.5초 상한 × 발동 40% — D13 §8.1).
 	# 성분을 두지 않으면 상한·빈도가 바뀌어도 평균만 손으로 맞춰 검사를 통과시킬 수 있다.
 	_eq_float("D13 §8.1 완급 비트 재생 상한 2.5초",
@@ -1585,3 +1603,38 @@ func _result_and_ranking() -> void:
 	plain.confirm(0.0)
 	_ok("배틀 존 계수가 방어(브레이킹) 경로에도 적용", battle.rear_gauge < plain.rear_gauge,
 		"battle=%f plain=%f" % [battle.rear_gauge, plain.rear_gauge])
+
+
+# ── U-4 결선: 슬롯 진행 보정이 AI 기저 강도에 작용하는가 (D08 §2.4 · D13 별첨A §6.2) ──
+# 사용자 판정(2026-08-12): 축 = 투어 내 GP 슬롯(제1~4전).
+func _slot_progression_wired() -> void:
+	var slot1 := _new_engine(4711)
+	var slot4 := _new_engine(4711)
+	if slot1 == null or slot4 == null:
+		return
+	slot1.race_slot = 1
+	slot4.race_slot = 4
+	slot1.start_gp()
+	slot4.start_gp()
+	var expected_delta := slot4.data.tour_slot_pace_add(4) - slot1.data.tour_slot_pace_add(1)
+	var checked_any := false
+	for entrant_id in slot1.entrants:
+		if entrant_id == RaceEngine.PLAYER_ID:
+			continue
+		if not slot4.entrants.has(entrant_id):
+			continue
+		checked_any = true
+		_eq_float("슬롯 4 AI 페이스 = 슬롯 1 + 보정 차 (%s)" % entrant_id,
+			float(slot4.entrants[entrant_id]["pace"]) - float(slot1.entrants[entrant_id]["pace"]),
+			expected_delta, 0.0001)
+	_ok("AI 참가자 대조 표본 확보", checked_any)
+	# 플레이어는 보정 대상이 아니다 (D08 §2.4 — 목적어가 '필러·경쟁 풀의 기본 파라미터')
+	_eq_float("플레이어는 슬롯 보정 미적용",
+		float(slot4.entrants[RaceEngine.PLAYER_ID]["pace"]),
+		float(slot1.entrants[RaceEngine.PLAYER_ID]["pace"]))
+	# 미등재 슬롯은 조용히 0이 되지 않는다
+	var strict := _new_engine(4712, "", false)
+	strict.race_slot = 9
+	strict.start_gp()
+	_ok("미등재 GP 슬롯 조회가 is_ok를 내린다", not strict.data.is_ok())
+	strict.transition_errors = 0

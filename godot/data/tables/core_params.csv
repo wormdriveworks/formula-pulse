@@ -20,7 +20,7 @@ param_timer_leeway_ratio,0.6
 param_timer_warning_ratio,0.3
 param_time_turn_sec,21
 param_time_duel_sec,45
-param_time_wrapup_sec,210
+param_time_wrapup_sec,225
 param_duel_overtake_base,35
 param_duel_overtake_stability_coef,4.5
 param_duel_defense_base,30
