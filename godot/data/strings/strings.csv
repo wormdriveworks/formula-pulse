@@ -49,27 +49,6 @@ ui.rival.sherwood,카이 셔우드
 ui.rival.jude,주드 오카포
 ui.race.fillerName,No.{number} 머신
 ui.race.playerName,플레이어
-ui.debug.title,MS-1 디버그 레이스
-ui.debug.spin,스핀
-ui.debug.confirm,확정
-ui.debug.holdRespin,홀드·리스핀
-ui.debug.negateTrouble,트러블 무효화
-ui.debug.boostPlus,부스트 +1
-ui.debug.lap,랩
-ui.debug.sector,섹터
-ui.debug.position,포지션
-ui.debug.chassis,섀시
-ui.debug.charge,차지
-ui.debug.frontGauge,전방 게이지
-ui.debug.rearGauge,후방 게이지
-ui.debug.timer,잔여 시간
-ui.debug.reelHidden,???
-ui.debug.statusSeparator,"  |  "
-ui.debug.timerFormat,{label} {value}
-ui.debug.newRace,새 GP
-ui.debug.saveSnapshot,스냅샷 저장
-ui.debug.loadSnapshot,스냅샷 로드
-ui.debug.standings,순위표
 raceLog.gpStart01,{circuit} — 그리드 정렬 완료.
 raceLog.sectorStart01,랩 {lap} 섹터 {sector} 진입.
 raceLog.overtakeSuccess01,{target} 추월. 포지션 {rank}.
@@ -212,3 +191,26 @@ ui.milestoneVn.actTransition,막 전이
 ui.milestoneVn.crewJoin,크루 합류
 ui.milestoneVn.originClue,기원 단서
 ui.milestoneVn.generalFeat,성취 회상
+ui.race.positionFormat,P{rank}/{total}
+ui.race.lapSectorFormat,LAP {lap}/{laps} · S{sector}/{sectors}
+ui.race.gaugeFront,전방
+ui.race.gaugeRear,후방
+ui.race.reelHidden,―
+ui.race.hold,홀드
+ui.race.respin,리스핀
+ui.race.chargeIntervene,차지 개입
+ui.race.confirm,확정
+ui.race.spin,스핀
+ui.race.skillSlotFormat,S{index}
+ui.race.costFormat,◆{cost}
+ui.race.chassisLabel,섀시
+ui.race.chassisFormat,{value}
+ui.race.chargeLabel,차지
+ui.race.chargeFormat,{value}/{cap}
+ui.race.consumableEmpty,―
+ui.race.menu,≡
+ui.race.timerFormat,{value}
+ui.race.resonanceBanner,레조넌스
+ui.race.locked,잠금
+ui.race.speakerRelay,중계
+ui.race.actionWithCost,{label} {cost}

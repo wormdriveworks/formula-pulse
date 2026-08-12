@@ -13,6 +13,13 @@ export_credentials.cfg
 # oh-my-claudecode 운영 상태
 .omc/
 
+# 에디터 도구 플러그인 — 제품 코드가 아니다 (IMPL-070).
+# GDAI 등 MCP 플러그인은 autoload를 등록하는데, 이 프로젝트는 autoload 0개가
+# 의도적 선택이다(IMPL-015 — 원격 헤드리스 작업 전체가 autoload 파손에 인질).
+# 커밋하면 ①원격이 addons 없이 pull할 때 등록된 autoload가 깨지고
+# ②네이티브 .so/.dll이 리포에 들어가며 ③MCP 런타임이 제품 빌드에 실린다.
+godot/addons/
+
 # 빌드 산출물
 build/
 *.aab

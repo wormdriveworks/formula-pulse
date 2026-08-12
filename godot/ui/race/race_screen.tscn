@@ -1,0 +1,505 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/race/race_screen.gd" id="1_pfsyr"]
+[ext_resource type="Script" path="res://ui/race/timer_ring.gd" id="2_6xlbq"]
+[ext_resource type="Script" path="res://ui/race/vane_waveform.gd" id="3_5jw0g"]
+[ext_resource type="Script" path="res://ui/race/log_feed.gd" id="4_y37x3"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_n72o0"]
+content_margin_left = 4.0
+content_margin_top = 2.0
+content_margin_right = 4.0
+content_margin_bottom = 2.0
+bg_color = Color(0.11, 0.12, 0.15, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.38, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_snsij"]
+bg_color = Color(0.18, 0.19, 0.22, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_6fywk"]
+bg_color = Color(0.4, 0.8, 1, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jm7ky"]
+bg_color = Color(0.18, 0.19, 0.22, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_u7phv"]
+bg_color = Color(1, 0.55, 0.35, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5rl2v"]
+content_margin_left = 4.0
+content_margin_top = 2.0
+content_margin_right = 4.0
+content_margin_bottom = 2.0
+bg_color = Color(0.11, 0.12, 0.15, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.38, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_oeioa"]
+content_margin_left = 4.0
+content_margin_top = 2.0
+content_margin_right = 4.0
+content_margin_bottom = 2.0
+bg_color = Color(0.07, 0.08, 0.1, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.38, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_livyn"]
+content_margin_left = 4.0
+content_margin_top = 2.0
+content_margin_right = 4.0
+content_margin_bottom = 2.0
+bg_color = Color(0.07, 0.08, 0.1, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.38, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lyb8d"]
+content_margin_left = 4.0
+content_margin_top = 2.0
+content_margin_right = 4.0
+content_margin_bottom = 2.0
+bg_color = Color(0.07, 0.08, 0.1, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.38, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_2h8ew"]
+content_margin_left = 4.0
+content_margin_top = 2.0
+content_margin_right = 4.0
+content_margin_bottom = 2.0
+bg_color = Color(0.11, 0.12, 0.15, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.38, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_th4iy"]
+bg_color = Color(0.18, 0.19, 0.22, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cyoqd"]
+bg_color = Color(0.55, 0.85, 0.55, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_duebq"]
+content_margin_left = 4.0
+content_margin_top = 2.0
+content_margin_right = 4.0
+content_margin_bottom = 2.0
+bg_color = Color(0.07, 0.08, 0.1, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.38, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dkeee"]
+content_margin_left = 4.0
+content_margin_top = 2.0
+content_margin_right = 4.0
+content_margin_bottom = 2.0
+bg_color = Color(0.07, 0.08, 0.1, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.38, 1)
+
+[node name="RaceScreen" type="Control" unique_id=1168589561]
+layout_mode = 3
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_pfsyr")
+
+[node name="Background" type="ColorRect" parent="." unique_id=747306994]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.07, 0.08, 0.1, 1)
+
+[node name="Root" type="VBoxContainer" parent="." unique_id=1597715702]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/separation = 2
+
+[node name="ZoneA" type="PanelContainer" parent="Root" unique_id=501078565]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_n72o0")
+
+[node name="StripRow" type="HBoxContainer" parent="Root/ZoneA" unique_id=192120817]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="E01Position" type="Label" parent="Root/ZoneA/StripRow" unique_id=1357289871]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="E02LapSector" type="Label" parent="Root/ZoneA/StripRow" unique_id=220031237]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="E02Corner" type="Label" parent="Root/ZoneA/StripRow" unique_id=1142352994]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="E02Resonance" type="Label" parent="Root/ZoneA/StripRow" unique_id=704310093]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.85, 0.6, 1, 1)
+
+[node name="Spacer" type="Control" parent="Root/ZoneA/StripRow" unique_id=1005349868]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Gauges" type="VBoxContainer" parent="Root/ZoneA/StripRow" unique_id=321233636]
+layout_mode = 2
+theme_override_constants/separation = 1
+
+[node name="FrontRow" type="HBoxContainer" parent="Root/ZoneA/StripRow/Gauges" unique_id=942812962]
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="FrontLabel" type="Label" parent="Root/ZoneA/StripRow/Gauges/FrontRow" unique_id=91038625]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="E03FrontGauge" type="ProgressBar" parent="Root/ZoneA/StripRow/Gauges/FrontRow" unique_id=1484760999]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 6)
+layout_mode = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_snsij")
+theme_override_styles/fill = SubResource("StyleBoxFlat_6fywk")
+show_percentage = false
+
+[node name="RearRow" type="HBoxContainer" parent="Root/ZoneA/StripRow/Gauges" unique_id=1375464034]
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="RearLabel" type="Label" parent="Root/ZoneA/StripRow/Gauges/RearRow" unique_id=1828667278]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="E03RearGauge" type="ProgressBar" parent="Root/ZoneA/StripRow/Gauges/RearRow" unique_id=1997649329]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(90, 6)
+layout_mode = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_jm7ky")
+theme_override_styles/fill = SubResource("StyleBoxFlat_u7phv")
+show_percentage = false
+
+[node name="Middle" type="HBoxContainer" parent="Root" unique_id=1547827246]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="LeftColumn" type="VBoxContainer" parent="Root/Middle" unique_id=623258063]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 6.0
+theme_override_constants/separation = 3
+
+[node name="E15ScenePanel" type="PanelContainer" parent="Root/Middle/LeftColumn" unique_id=1475488836]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_5rl2v")
+
+[node name="E04TimerRing" type="Control" parent="Root/Middle/LeftColumn" unique_id=1817969824]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+script = ExtResource("2_6xlbq")
+
+[node name="ReelZone" type="MarginContainer" parent="Root/Middle/LeftColumn/E04TimerRing" unique_id=514889362]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="ReelColumn" type="VBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone" unique_id=936112267]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="E05Reels" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=1007225848]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="Reel0" type="VBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels" unique_id=678720386]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Frame" type="PanelContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel0" unique_id=1075515362]
+custom_minimum_size = Vector2(64, 62)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_oeioa")
+
+[node name="Symbol" type="Label" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel0/Frame" unique_id=2013452434]
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="Hold" type="CheckBox" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel0" unique_id=990133372]
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+
+[node name="Reel1" type="VBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels" unique_id=627001499]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Frame" type="PanelContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel1" unique_id=1265011517]
+custom_minimum_size = Vector2(64, 62)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_livyn")
+
+[node name="Symbol" type="Label" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel1/Frame" unique_id=180750630]
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="Hold" type="CheckBox" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel1" unique_id=1460088210]
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+
+[node name="Reel2" type="VBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels" unique_id=876165731]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Frame" type="PanelContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel2" unique_id=1785730031]
+custom_minimum_size = Vector2(64, 62)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_lyb8d")
+
+[node name="Symbol" type="Label" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel2/Frame" unique_id=1408108796]
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="Hold" type="CheckBox" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel2" unique_id=84979640]
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+
+[node name="ReelSpacer" type="Control" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=676282793]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DividerVane" type="ColorRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=347381688]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(0.28, 0.32, 0.38, 1)
+
+[node name="E07Vane" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=1015256079]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="E07VaneWave" type="Control" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E07Vane" unique_id=605535394]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(72, 20)
+layout_mode = 2
+script = ExtResource("3_5jw0g")
+
+[node name="E07VaneText" type="Label" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E07Vane" unique_id=156425726]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+autowrap_mode = 3
+max_lines_visible = 2
+
+[node name="E04TimerValue" type="Label" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=2031934036]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="DividerActions" type="ColorRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=835426066]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(0.28, 0.32, 0.38, 1)
+
+[node name="E08Actions" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=819287891]
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="E08Respin" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions" unique_id=1754009100]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+
+[node name="E08Skills" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions" unique_id=1365806185]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Skill1" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=1591686259]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+disabled = true
+
+[node name="Skill2" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=505278127]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+disabled = true
+
+[node name="Skill3" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=844481786]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+disabled = true
+
+[node name="Skill4" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=403272530]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+disabled = true
+
+[node name="Skill5" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=1101004853]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+disabled = true
+
+[node name="E08ChargeIntervene" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions" unique_id=735595201]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+
+[node name="E08Confirm" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions" unique_id=90870617]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 8
+
+[node name="E10LogFeed" type="VBoxContainer" parent="Root/Middle" unique_id=2067317297]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+size_flags_stretch_ratio = 4.0
+theme_override_constants/separation = 3
+alignment = 2
+script = ExtResource("4_y37x3")
+
+[node name="ZoneD" type="PanelContainer" parent="Root" unique_id=1365847370]
+custom_minimum_size = Vector2(0, 26)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_2h8ew")
+
+[node name="ResourceRow" type="HBoxContainer" parent="Root/ZoneD" unique_id=765339395]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ChassisLabel" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=1474093746]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="E11ChassisBar" type="ProgressBar" parent="Root/ZoneD/ResourceRow" unique_id=727282090]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(70, 8)
+layout_mode = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_th4iy")
+theme_override_styles/fill = SubResource("StyleBoxFlat_cyoqd")
+show_percentage = false
+
+[node name="E11ChassisValue" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=548912633]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="ChargeLabel" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=1718570279]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="E12Charge" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=1612752779]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="E13Consumables" type="HBoxContainer" parent="Root/ZoneD/ResourceRow" unique_id=1762094857]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="Slot1" type="PanelContainer" parent="Root/ZoneD/ResourceRow/E13Consumables" unique_id=2032662023]
+custom_minimum_size = Vector2(16, 12)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_duebq")
+
+[node name="Label" type="Label" parent="Root/ZoneD/ResourceRow/E13Consumables/Slot1" unique_id=264897779]
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+horizontal_alignment = 1
+
+[node name="Slot2" type="PanelContainer" parent="Root/ZoneD/ResourceRow/E13Consumables" unique_id=740245565]
+custom_minimum_size = Vector2(16, 12)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_dkeee")
+
+[node name="Label" type="Label" parent="Root/ZoneD/ResourceRow/E13Consumables/Slot2" unique_id=1895924138]
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+horizontal_alignment = 1
+
+[node name="Spacer" type="Control" parent="Root/ZoneD/ResourceRow" unique_id=1375114024]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="E14Menu" type="Button" parent="Root/ZoneD/ResourceRow" unique_id=974804253]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 8

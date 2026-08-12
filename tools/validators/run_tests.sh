@@ -35,6 +35,9 @@ TESTS=(
 	"tests/test_tc_o.gd:239"
 	"tests/test_narrative.gd:68"
 	"tests/test_data_driven.gd:40"
+	# SEAL-E — 실화면을 인스턴스화해 릴 정지 연출 전 UI 노출을 잡는다.
+	# 라운드 수가 GP 길이(12~15턴 + 듀얼 삽입)에 따라 달라지므로 하한은 최소 GP 기준이다.
+	"tests/test_seal_ui.gd:84"
 )
 failures=0
 for entry in "${TESTS[@]}"; do
