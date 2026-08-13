@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# 커밋 차단 훅 — 에디터 도구 플러그인이 project.godot 에 남긴 등록을 잡는다 (IMPL-070).
+#
+# 설치 (양 머신 각각 1회):
+#   git config core.hooksPath tools/hooks
+#
+# 왜 필요한가: GDAI 등 MCP 플러그인은 **엔진을 실행할 때마다** autoload 등록을 되살린다.
+# 이 프로젝트는 autoload 0개가 의도적 선택이며(IMPL-015), 등록된 채로 커밋되면
+# 반대편 머신이 `addons/` 없이 pull 했을 때 전 헤드리스 작업이 파손된다.
+# 자동으로 지우지 않고 **차단**한다 — 커밋 내용을 훅이 몰래 바꾸면 그게 더 위험하다.
+set -uo pipefail
+
+staged=$(git diff --cached --name-only)
+case "$staged" in
+	*godot/project.godot*) ;;
+	*) exit 0 ;;
+esac
+
+content=$(git show :godot/project.godot 2>/dev/null) || exit 0
+
+fail=0
+if printf '%s' "$content" | grep -q '^\[autoload\]'; then
+	printf '커밋 차단: godot/project.godot 에 [autoload] 등록이 있다 (autoload 0개 원칙 — IMPL-015).\n' >&2
+	printf '  %s\n' "$(printf '%s' "$content" | grep -A3 '^\[autoload\]' | tail -n +2 | grep -v '^$')" >&2
+	fail=1
+fi
+if printf '%s' "$content" | grep -q '^\[editor_plugins\]'; then
+	printf '커밋 차단: godot/project.godot 에 [editor_plugins] 등록이 있다 (에디터 도구는 커밋 대상이 아니다).\n' >&2
+	fail=1
+fi
+
+if [ "$fail" -ne 0 ]; then
+	printf '\n해당 섹션을 지우고 다시 스테이징하라. 플러그인은 로컬에서 계속 쓸 수 있다 —\n' >&2
+	printf '엔진 실행 시 등록이 되살아나므로 커밋 직전에만 지우면 된다.\n' >&2
+	exit 1
+fi
+exit 0
