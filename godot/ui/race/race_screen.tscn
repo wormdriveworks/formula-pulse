@@ -119,86 +119,86 @@ border_width_right = 1
 border_width_bottom = 1
 border_color = Color(0.28, 0.32, 0.38, 1)
 
-[node name="RaceScreen" type="Control" unique_id=1199890709]
+[node name="RaceScreen" type="Control" unique_id=528677350]
 layout_mode = 3
 anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_pfsyr")
 
-[node name="Background" type="ColorRect" parent="." unique_id=763076148]
+[node name="Background" type="ColorRect" parent="." unique_id=461498552]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(0.07, 0.08, 0.1, 1)
 
-[node name="Root" type="VBoxContainer" parent="." unique_id=941270913]
+[node name="Root" type="VBoxContainer" parent="." unique_id=1646467180]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_constants/separation = 2
 
-[node name="ZoneA" type="PanelContainer" parent="Root" unique_id=270540418]
+[node name="ZoneA" type="PanelContainer" parent="Root" unique_id=1505634926]
 custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_n72o0")
 
-[node name="StripRow" type="HBoxContainer" parent="Root/ZoneA" unique_id=86147920]
+[node name="StripRow" type="HBoxContainer" parent="Root/ZoneA" unique_id=540287222]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="E01Position" type="Label" parent="Root/ZoneA/StripRow" unique_id=1705390467]
+[node name="E01Position" type="Label" parent="Root/ZoneA/StripRow" unique_id=605171166]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 22
 theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
 
-[node name="E02LapSector" type="Label" parent="Root/ZoneA/StripRow" unique_id=1084653119]
+[node name="E02LapSector" type="Label" parent="Root/ZoneA/StripRow" unique_id=1209555237]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
 
-[node name="E02SectorAttr" type="TextureRect" parent="Root/ZoneA/StripRow" unique_id=1370489145]
+[node name="E02SectorAttr" type="TextureRect" parent="Root/ZoneA/StripRow" unique_id=227971070]
 unique_name_in_owner = true
 texture_filter = 1
 custom_minimum_size = Vector2(16, 16)
 layout_mode = 2
 stretch_mode = 5
 
-[node name="E02Corner" type="Label" parent="Root/ZoneA/StripRow" unique_id=1308969653]
+[node name="E02Corner" type="Label" parent="Root/ZoneA/StripRow" unique_id=1568259797]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
 
-[node name="E02Resonance" type="Label" parent="Root/ZoneA/StripRow" unique_id=603052460]
+[node name="E02Resonance" type="Label" parent="Root/ZoneA/StripRow" unique_id=1197348590]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.85, 0.6, 1, 1)
 
-[node name="Spacer" type="Control" parent="Root/ZoneA/StripRow" unique_id=364040757]
+[node name="Spacer" type="Control" parent="Root/ZoneA/StripRow" unique_id=49450885]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="Gauges" type="VBoxContainer" parent="Root/ZoneA/StripRow" unique_id=1596858317]
+[node name="Gauges" type="VBoxContainer" parent="Root/ZoneA/StripRow" unique_id=851759618]
 layout_mode = 2
 theme_override_constants/separation = 1
 
-[node name="FrontRow" type="HBoxContainer" parent="Root/ZoneA/StripRow/Gauges" unique_id=2066277417]
+[node name="FrontRow" type="HBoxContainer" parent="Root/ZoneA/StripRow/Gauges" unique_id=570208467]
 layout_mode = 2
 theme_override_constants/separation = 3
 
-[node name="FrontLabel" type="Label" parent="Root/ZoneA/StripRow/Gauges/FrontRow" unique_id=783482715]
+[node name="FrontLabel" type="Label" parent="Root/ZoneA/StripRow/Gauges/FrontRow" unique_id=212801887]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
 
-[node name="E03FrontGauge" type="ProgressBar" parent="Root/ZoneA/StripRow/Gauges/FrontRow" unique_id=821336787]
+[node name="E03FrontGauge" type="ProgressBar" parent="Root/ZoneA/StripRow/Gauges/FrontRow" unique_id=936518897]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(90, 6)
 layout_mode = 2
@@ -206,17 +206,17 @@ theme_override_styles/background = SubResource("StyleBoxFlat_snsij")
 theme_override_styles/fill = SubResource("StyleBoxFlat_6fywk")
 show_percentage = false
 
-[node name="RearRow" type="HBoxContainer" parent="Root/ZoneA/StripRow/Gauges" unique_id=661795491]
+[node name="RearRow" type="HBoxContainer" parent="Root/ZoneA/StripRow/Gauges" unique_id=1242639382]
 layout_mode = 2
 theme_override_constants/separation = 3
 
-[node name="RearLabel" type="Label" parent="Root/ZoneA/StripRow/Gauges/RearRow" unique_id=629490200]
+[node name="RearLabel" type="Label" parent="Root/ZoneA/StripRow/Gauges/RearRow" unique_id=95340419]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
 
-[node name="E03RearGauge" type="ProgressBar" parent="Root/ZoneA/StripRow/Gauges/RearRow" unique_id=321980794]
+[node name="E03RearGauge" type="ProgressBar" parent="Root/ZoneA/StripRow/Gauges/RearRow" unique_id=803061358]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(90, 6)
 layout_mode = 2
@@ -224,30 +224,30 @@ theme_override_styles/background = SubResource("StyleBoxFlat_jm7ky")
 theme_override_styles/fill = SubResource("StyleBoxFlat_u7phv")
 show_percentage = false
 
-[node name="Middle" type="HBoxContainer" parent="Root" unique_id=968708176]
+[node name="Middle" type="HBoxContainer" parent="Root" unique_id=2088937337]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 4
 
-[node name="LeftColumn" type="VBoxContainer" parent="Root/Middle" unique_id=1091612566]
+[node name="LeftColumn" type="VBoxContainer" parent="Root/Middle" unique_id=2087621282]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 6.0
 theme_override_constants/separation = 3
 
-[node name="E15ScenePanel" type="PanelContainer" parent="Root/Middle/LeftColumn" unique_id=1167877767]
+[node name="E15ScenePanel" type="PanelContainer" parent="Root/Middle/LeftColumn" unique_id=1143062235]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_5rl2v")
 
-[node name="E04TimerRing" type="Control" parent="Root/Middle/LeftColumn" unique_id=1542167612]
+[node name="E04TimerRing" type="Control" parent="Root/Middle/LeftColumn" unique_id=2023431249]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 script = ExtResource("2_6xlbq")
 
-[node name="ReelZone" type="MarginContainer" parent="Root/Middle/LeftColumn/E04TimerRing" unique_id=129273703]
+[node name="ReelZone" type="MarginContainer" parent="Root/Middle/LeftColumn/E04TimerRing" unique_id=1944549356]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -256,169 +256,169 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="ReelColumn" type="VBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone" unique_id=2091037972]
+[node name="ReelColumn" type="VBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone" unique_id=63601448]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="E05Reels" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=2067815413]
+[node name="E05Reels" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=1067232686]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 8
 alignment = 1
 
-[node name="Reel0" type="VBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels" unique_id=726810103]
+[node name="Reel0" type="VBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels" unique_id=1059440980]
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Frame" type="PanelContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel0" unique_id=985116728]
+[node name="Frame" type="PanelContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel0" unique_id=768998825]
 custom_minimum_size = Vector2(64, 62)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_oeioa")
 
-[node name="Symbol" type="TextureRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel0/Frame" unique_id=147171083]
+[node name="Symbol" type="TextureRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel0/Frame" unique_id=1066510965]
 texture_filter = 1
 custom_minimum_size = Vector2(32, 32)
 layout_mode = 2
 stretch_mode = 3
 
-[node name="Hold" type="CheckBox" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel0" unique_id=1428033031]
+[node name="Hold" type="CheckBox" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel0" unique_id=1779957011]
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 
-[node name="Reel1" type="VBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels" unique_id=511804898]
+[node name="Reel1" type="VBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels" unique_id=45025201]
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Frame" type="PanelContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel1" unique_id=899978814]
+[node name="Frame" type="PanelContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel1" unique_id=104860773]
 custom_minimum_size = Vector2(64, 62)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_livyn")
 
-[node name="Symbol" type="TextureRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel1/Frame" unique_id=2125375609]
+[node name="Symbol" type="TextureRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel1/Frame" unique_id=1903728268]
 texture_filter = 1
 custom_minimum_size = Vector2(32, 32)
 layout_mode = 2
 stretch_mode = 3
 
-[node name="Hold" type="CheckBox" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel1" unique_id=515838397]
+[node name="Hold" type="CheckBox" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel1" unique_id=947559462]
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 
-[node name="Reel2" type="VBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels" unique_id=1881911429]
+[node name="Reel2" type="VBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels" unique_id=692230077]
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Frame" type="PanelContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel2" unique_id=848027666]
+[node name="Frame" type="PanelContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel2" unique_id=101673898]
 custom_minimum_size = Vector2(64, 62)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_lyb8d")
 
-[node name="Symbol" type="TextureRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel2/Frame" unique_id=1374370992]
+[node name="Symbol" type="TextureRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel2/Frame" unique_id=1062809646]
 texture_filter = 1
 custom_minimum_size = Vector2(32, 32)
 layout_mode = 2
 stretch_mode = 3
 
-[node name="Hold" type="CheckBox" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel2" unique_id=300095897]
+[node name="Hold" type="CheckBox" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel2" unique_id=213498437]
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 
-[node name="ReelSpacer" type="Control" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=725711835]
+[node name="ReelSpacer" type="Control" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=131452239]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="DividerVane" type="ColorRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=1643643022]
+[node name="DividerVane" type="ColorRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=796499427]
 custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
 color = Color(0.28, 0.32, 0.38, 1)
 
-[node name="E07Vane" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=368265349]
+[node name="E07Vane" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=1625596529]
 layout_mode = 2
 theme_override_constants/separation = 5
 
-[node name="E07VaneWave" type="Control" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E07Vane" unique_id=1412473416]
+[node name="E07VaneWave" type="Control" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E07Vane" unique_id=1062564964]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(72, 20)
 layout_mode = 2
 script = ExtResource("3_5jw0g")
 
-[node name="E07VaneText" type="Label" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E07Vane" unique_id=1329190619]
+[node name="E07VaneText" type="Label" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E07Vane" unique_id=47322497]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
 autowrap_mode = 3
 max_lines_visible = 2
 
-[node name="E04TimerValue" type="Label" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=2133359152]
+[node name="E04TimerValue" type="Label" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=1896294554]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
 
-[node name="DividerActions" type="ColorRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=12000983]
+[node name="DividerActions" type="ColorRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=1532937208]
 custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
 color = Color(0.28, 0.32, 0.38, 1)
 
-[node name="E08Actions" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=2029474704]
+[node name="E08Actions" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=327355408]
 layout_mode = 2
 theme_override_constants/separation = 3
 
-[node name="E08Respin" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions" unique_id=291702290]
+[node name="E08Respin" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions" unique_id=493283157]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 
-[node name="E08Skills" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions" unique_id=1595037508]
+[node name="E08Skills" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions" unique_id=395433534]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Skill1" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=2049590255]
+[node name="Skill1" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=918176171]
 custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 disabled = true
 
-[node name="Skill2" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=494480429]
+[node name="Skill2" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=689180652]
 custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 disabled = true
 
-[node name="Skill3" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=1687178631]
+[node name="Skill3" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=1238921196]
 custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 disabled = true
 
-[node name="Skill4" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=651561132]
+[node name="Skill4" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=130530040]
 custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 disabled = true
 
-[node name="Skill5" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=1150422749]
+[node name="Skill5" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions/E08Skills" unique_id=921471579]
 custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 disabled = true
 
-[node name="E08ChargeIntervene" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions" unique_id=2021982247]
+[node name="E08ChargeIntervene" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions" unique_id=1409776284]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 
-[node name="E08Confirm" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions" unique_id=2076651033]
+[node name="E08Confirm" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E08Actions" unique_id=156478362]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 
-[node name="E10LogFeed" type="VBoxContainer" parent="Root/Middle" unique_id=524934958]
+[node name="E10LogFeed" type="VBoxContainer" parent="Root/Middle" unique_id=1512824876]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -428,22 +428,22 @@ theme_override_constants/separation = 3
 alignment = 2
 script = ExtResource("4_y37x3")
 
-[node name="ZoneD" type="PanelContainer" parent="Root" unique_id=1012512902]
+[node name="ZoneD" type="PanelContainer" parent="Root" unique_id=732142256]
 custom_minimum_size = Vector2(0, 26)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_2h8ew")
 
-[node name="ResourceRow" type="HBoxContainer" parent="Root/ZoneD" unique_id=2027038488]
+[node name="ResourceRow" type="HBoxContainer" parent="Root/ZoneD" unique_id=1392135527]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="ChassisLabel" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=221609903]
+[node name="ChassisLabel" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=217002631]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
 
-[node name="E11ChassisBar" type="ProgressBar" parent="Root/ZoneD/ResourceRow" unique_id=899818860]
+[node name="E11ChassisBar" type="ProgressBar" parent="Root/ZoneD/ResourceRow" unique_id=115181159]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(70, 8)
 layout_mode = 2
@@ -451,56 +451,56 @@ theme_override_styles/background = SubResource("StyleBoxFlat_th4iy")
 theme_override_styles/fill = SubResource("StyleBoxFlat_cyoqd")
 show_percentage = false
 
-[node name="E11ChassisValue" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=493859783]
+[node name="E11ChassisValue" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=1154971068]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
 
-[node name="ChargeLabel" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=39689782]
+[node name="ChargeLabel" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=1336713873]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
 
-[node name="E12Charge" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=384843880]
+[node name="E12Charge" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=294318576]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
 
-[node name="E13Consumables" type="HBoxContainer" parent="Root/ZoneD/ResourceRow" unique_id=58943755]
+[node name="E13Consumables" type="HBoxContainer" parent="Root/ZoneD/ResourceRow" unique_id=2026425395]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 3
 
-[node name="Slot1" type="PanelContainer" parent="Root/ZoneD/ResourceRow/E13Consumables" unique_id=101688706]
+[node name="Slot1" type="PanelContainer" parent="Root/ZoneD/ResourceRow/E13Consumables" unique_id=1954411631]
 custom_minimum_size = Vector2(16, 12)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_duebq")
 
-[node name="Label" type="Label" parent="Root/ZoneD/ResourceRow/E13Consumables/Slot1" unique_id=1095924739]
+[node name="Label" type="Label" parent="Root/ZoneD/ResourceRow/E13Consumables/Slot1" unique_id=1692190627]
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
 horizontal_alignment = 1
 
-[node name="Slot2" type="PanelContainer" parent="Root/ZoneD/ResourceRow/E13Consumables" unique_id=1288251399]
+[node name="Slot2" type="PanelContainer" parent="Root/ZoneD/ResourceRow/E13Consumables" unique_id=936702363]
 custom_minimum_size = Vector2(16, 12)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_dkeee")
 
-[node name="Label" type="Label" parent="Root/ZoneD/ResourceRow/E13Consumables/Slot2" unique_id=53954082]
+[node name="Label" type="Label" parent="Root/ZoneD/ResourceRow/E13Consumables/Slot2" unique_id=836962735]
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11
 theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
 horizontal_alignment = 1
 
-[node name="Spacer" type="Control" parent="Root/ZoneD/ResourceRow" unique_id=1372792725]
+[node name="Spacer" type="Control" parent="Root/ZoneD/ResourceRow" unique_id=29280912]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="E14Menu" type="Button" parent="Root/ZoneD/ResourceRow" unique_id=1822857332]
+[node name="E14Menu" type="Button" parent="Root/ZoneD/ResourceRow" unique_id=913804710]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 11

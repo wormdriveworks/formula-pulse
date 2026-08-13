@@ -1,0 +1,72 @@
+# SET-01 투어 결산 리포트 (D09 §5.1 · 별첨A §A-21).
+#
+# D06 §4.2 시퀀스 ①~⑧을 **표시 블록으로 1:1 번역**한다 (D09 §5.1 확정):
+#   1 투어 종합 순위 / 2 챔피언십 포인트 / 3 수입(Cr) / 4 펄스 차지 환전 / 5 차지 소멸 고지
+#   6 획득 주행 데이터 / 7 마일스톤(해당 시) / 8 [개러지로]
+#
+# **탈락 분기 (확정):** 블록 1 = 탈락 시점 성적 마감 · 블록 3 = S4 축소·S3 미지급 명시 ·
+# **블록 4 = 비표출** · 블록 5~8 동일. 톤은 소프트 실패 원칙(D05 §9.5) — "실패/GAME OVER" 계열 금지.
+#
+# 블록 5(소멸 고지)를 블록 4(환전)와 분리하는 이유는 D09 §5.1 명문이다 —
+# 환전 후 잔여 0이라는 문맥으로 제시해야 소멸이 손실로 오독되지 않는다.
+extends FlowScreen
+
+@onready var _block4: Control = %Block4
+@onready var _next_button: Button = %NextButton
+
+
+func _on_bound(_payload: Dictionary) -> void:
+	var s := session.data.strings
+	var report := session.last_tour_report
+	var dropped := bool(report.get("dropped_out", false))
+	var position := int(report.get("player_position", 0))
+
+	(%HeaderLabel as Label).text = s.text("ui.tourReport.header")
+	(%Block1Label as Label).text = s.text("ui.tourReport.block1")
+	(%Block2Label as Label).text = s.text("ui.tourReport.block2")
+	(%Block3Label as Label).text = s.text("ui.tourReport.block3")
+	(%Block4Label as Label).text = s.text("ui.tourReport.block4")
+	(%Block5Label as Label).text = s.text("ui.tourReport.block5")
+	(%Block6Label as Label).text = s.text("ui.tourReport.block6")
+
+	var rank_text := s.text("ui.tourReport.rankFormat", {"rank": position})
+	(%Block1Value as Label).text = rank_text
+	var championship := int(session.season.championship_points.get(SeasonState.PLAYER_ID, 0))
+	var championship_text := s.text("ui.tourReport.pointsFormat", {"points": championship})
+	(%Block2Value as Label).text = championship_text
+
+	# 블록 3 — 탈락 시 S3 미지급·S4 축소를 문면으로 명시한다 (D06 §4.2)
+	var reward := session.outgame.settlement_reward("tour", maxi(position, 1))
+	var s4_ratio := float(report.get("s4_ratio", 1.0))
+	var credits := int(round(float(int(reward.get("credits", 0))) * s4_ratio))
+	var dp := int(reward.get("dp", 0))
+	if bool(report.get("s3_paid", true)):
+		credits += session.data.param_int("param_tour_finish_bonus_cr")
+		dp += session.data.param_int("param_tour_finish_bonus_dp")
+	session.outgame.gain_credits(credits)
+	session.outgame.gain_drive_data(dp)
+	var credit_text := s.text("ui.tourReport.creditFormat", {"amount": credits})
+	var data_text := s.text("ui.tourReport.dataFormat", {"amount": dp})
+	(%Block3Value as Label).text = credit_text
+	(%Block6Value as Label).text = data_text
+	(%Block3Note as Label).visible = dropped
+	(%Block3Note as Label).text = s.text("ui.tourReport.dropoutNote")
+
+	# 블록 4 — 완주 시에만 표출 (탈락 시 환전 자체가 성립하지 않는다)
+	_block4.visible = not dropped
+	if not dropped:
+		var exchanged := session.outgame.exchange_charge(session.engine.charge, true)
+		var exchanged_text := s.text("ui.tourReport.creditFormat", {"amount": exchanged})
+		(%Block4Value as Label).text = exchanged_text
+	(%Block5Value as Label).text = s.text("ui.tourReport.chargeExpired")
+
+	_next_button.text = s.text("ui.tourReport.toGarage")
+	_next_button.pressed.connect(_on_next)
+	_next_button.grab_focus()
+	session.save_progress()  # 투어 경계 저장 지점 (D09 §2.4)
+
+
+func _on_next() -> void:
+	# [가안] HUB-01 개러지가 아직 서지 않아 타이틀로 돌린다. D09 §2.3 플로우맵은
+	# SET-01 ⑧ → HUB-01 을 지정하므로 개러지 구현 시 이 전이를 교체한다. — IMPL-077
+	go("SYS-01", {})

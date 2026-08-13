@@ -1,0 +1,98 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/run/run_recap_screen.gd" id="1_dtwi0"]
+
+[node name="RunRecapScreen" type="Control" unique_id=897241525]
+layout_mode = 3
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_dtwi0")
+
+[node name="Background" type="ColorRect" parent="." unique_id=797872320]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.07, 0.08, 0.1, 1)
+
+[node name="Pad" type="MarginContainer" parent="." unique_id=1117506919]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="Column" type="VBoxContainer" parent="Pad" unique_id=978901695]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=457190699]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="Body" type="HBoxContainer" parent="Pad/Column" unique_id=711880233]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="Summary" type="VBoxContainer" parent="Pad/Column/Body" unique_id=506135296]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="SummaryRank" type="Label" parent="Pad/Column/Body/Summary" unique_id=282200251]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="CreditsValue" type="Label" parent="Pad/Column/Body/Summary" unique_id=1364839444]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.95, 0.85, 0.45, 1)
+
+[node name="Cards" type="VBoxContainer" parent="Pad/Column/Body" unique_id=2036049644]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="RepairButton" type="Button" parent="Pad/Column/Body/Cards" unique_id=528226986]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+
+[node name="RepairCostValue" type="Label" parent="Pad/Column/Body/Cards" unique_id=1678732709]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="ConsumableButton" type="Button" parent="Pad/Column/Body/Cards" unique_id=1652482785]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+
+[node name="DeckButton" type="Button" parent="Pad/Column/Body/Cards" unique_id=290619130]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+
+[node name="Footer" type="HBoxContainer" parent="Pad/Column" unique_id=641279395]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="FooterSpacer" type="Control" parent="Pad/Column/Footer" unique_id=765475073]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="NextButton" type="Button" parent="Pad/Column/Footer" unique_id=1587980750]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11

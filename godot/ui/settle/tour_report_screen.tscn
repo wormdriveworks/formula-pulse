@@ -1,0 +1,169 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/settle/tour_report_screen.gd" id="1_mfm4w"]
+
+[node name="TourReportScreen" type="Control" unique_id=1958677693]
+layout_mode = 3
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_mfm4w")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1794812947]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.07, 0.08, 0.1, 1)
+
+[node name="Pad" type="MarginContainer" parent="." unique_id=1475450029]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="Column" type="VBoxContainer" parent="Pad" unique_id=842097533]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=25526864]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="Block1LabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=1618452817]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Block1Label" type="Label" parent="Pad/Column/Block1LabelRow" unique_id=1853658138]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="Block1Value" type="Label" parent="Pad/Column/Block1LabelRow" unique_id=1067716280]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="Block2LabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=1498477617]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Block2Label" type="Label" parent="Pad/Column/Block2LabelRow" unique_id=933946206]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="Block2Value" type="Label" parent="Pad/Column/Block2LabelRow" unique_id=28612857]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="Block3LabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=355428450]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Block3Label" type="Label" parent="Pad/Column/Block3LabelRow" unique_id=134314812]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="Block3Value" type="Label" parent="Pad/Column/Block3LabelRow" unique_id=350891725]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="Block3Note" type="Label" parent="Pad/Column" unique_id=1705480958]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="Block4" type="VBoxContainer" parent="Pad/Column" unique_id=442188609]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Block4LabelRow" type="HBoxContainer" parent="Pad/Column/Block4" unique_id=1185990830]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Block4Label" type="Label" parent="Pad/Column/Block4/Block4LabelRow" unique_id=798913923]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="Block4Value" type="Label" parent="Pad/Column/Block4/Block4LabelRow" unique_id=711232958]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="Block5LabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=798727670]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Block5Label" type="Label" parent="Pad/Column/Block5LabelRow" unique_id=522305268]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="Block5Value" type="Label" parent="Pad/Column/Block5LabelRow" unique_id=1981810942]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="Block6LabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=734084634]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Block6Label" type="Label" parent="Pad/Column/Block6LabelRow" unique_id=523534935]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="Block6Value" type="Label" parent="Pad/Column/Block6LabelRow" unique_id=1284981981]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="BottomSpacer" type="Control" parent="Pad/Column" unique_id=230296856]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Footer" type="HBoxContainer" parent="Pad/Column" unique_id=1968469943]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="FooterSpacer" type="Control" parent="Pad/Column/Footer" unique_id=1195916016]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="NextButton" type="Button" parent="Pad/Column/Footer" unique_id=1539595234]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11

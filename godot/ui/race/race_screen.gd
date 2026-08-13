@@ -12,7 +12,7 @@
 #
 # **세이브는 SaveManager 경유** (IMPL-037 · ARCH 정적 규칙). SaveService 직접 호출은 빌드가 막는다.
 # **표시 문자열은 전량 스트링 키** (V4 — 서식 문자열 포함).
-extends Control
+extends FlowScreen
 
 const REEL_COUNT := 3
 const HOLD_KEYS := [KEY_1, KEY_2, KEY_3]
@@ -58,10 +58,27 @@ var _skill_buttons: Array[Button] = []
 @onready var _e12_charge: Label = %E12Charge
 
 
+# 세션 주입 없이 단독 인스턴스화되는 경로(검사 하네스)를 위해 자체 세션을 연다.
+# 폴백이 아니라 **동등한 개시 경로**다 — 라우터가 하는 일을 그대로 한다.
+func _on_bound(_payload: Dictionary) -> void:
+	_boot()
+
+
 func _ready() -> void:
-	data = GameData.new()
-	data.load_all()
-	SaveManager.configure(data)
+	if session == null:
+		_boot()
+
+
+func _boot() -> void:
+	if engine != null:
+		return
+	if session == null:
+		var standalone := GameData.new()
+		standalone.load_all()
+		session = RunSession.new()
+		session.setup(standalone)
+		session.begin_career(1)
+	data = session.data
 	_timer_base = data.param("param_timer_base_sec")
 	_lockout_base = data.param("param_confirm_lockout_sec")
 	_collect_reels()
@@ -162,13 +179,13 @@ func _collect_reels() -> void:
 
 
 # ── GP 수명 주기 ──
+# 서킷 선택·슬롯 보정 주입은 시즌 층이 한다 (D08 §2.4 — 화면은 규칙을 갖지 않는다).
 func _start_gp() -> void:
-	rng = RngService.new()
-	var seeder := RandomNumberGenerator.new()
-	seeder.randomize()  # 마스터 시드 (D12 §6.1)
-	rng.setup(seeder.randi())
-	engine = RaceEngine.new()
-	engine.setup(data, rng)
+	if not session.begin_gp():
+		push_error("RaceScreen: season layer produced no circuit for this slot")
+		return
+	rng = session.rng
+	engine = session.engine
 	_e10_log.clear_feed()
 	_push_events(engine.start_gp())
 	_next_turn()
@@ -198,6 +215,10 @@ func _on_gp_finished() -> void:
 	_refresh_strip()
 	_refresh_resources()
 	_refresh_action_enabled()
+	# 결산 화면이 저장 지점이다 (D09 §2.4 RESULT) — 전이는 라우터가 수행한다.
+	# 단독 실행(검사 하네스)에서는 라우터가 없으므로 요청만 남는다.
+	session.close_gp()
+	go("RACE-03", {})
 
 
 # ── 개입 창 (T2~T4) ──

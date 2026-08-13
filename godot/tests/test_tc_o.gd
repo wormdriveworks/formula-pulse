@@ -344,7 +344,10 @@ func _tc_o6_exchange_guards() -> void:
 	# 함께 고치지 않는 한 통과하지 못하게 한다 (검사 수 하한과 같은 "의도적 변경만 통과" 구조).
 	var expected_methods := [
 		"setup", "gain_credits", "gain_drive_data", "exchange_charge",
-		"field_repair_cost", "field_repair", "begin_tour", "full_repair", "free_restore_line",
+		# `field_repair_cost_next` 는 D07 §3.3·D09 §4.3이 **사전 표시를 필수**로 요구하는
+		# 다음 회차 비용의 조회 경로다 (표시 전용 · 체증 카운터 무변경 — IMPL-079).
+		"field_repair_cost", "field_repair_cost_next", "field_repair", "begin_tour",
+		"full_repair", "free_restore_line",
 		"tuning_step", "tuning_cost", "buy_tuning", "tuning_refund_ratio", "redistribute_tuning",
 		"overhaul_slots", "install_overhaul", "parts_stat_bonus",
 		"skill_tier_open", "unlock_cost", "unlock_skill", "expand_deck", "set_deck",

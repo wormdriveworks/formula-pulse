@@ -1,0 +1,163 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/race/gp_result_screen.gd" id="1_gglkt"]
+
+[node name="GpResultScreen" type="Control" unique_id=453402813]
+layout_mode = 3
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_gglkt")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1588346717]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.07, 0.08, 0.1, 1)
+
+[node name="Pad" type="MarginContainer" parent="." unique_id=167756856]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="Column" type="VBoxContainer" parent="Pad" unique_id=394547615]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="HeaderRow" type="HBoxContainer" parent="Pad/Column" unique_id=1806136343]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HeaderLabel" type="Label" parent="Pad/Column/HeaderRow" unique_id=1751616448]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="RetireBadge" type="Label" parent="Pad/Column/HeaderRow" unique_id=770140822]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.95, 0.3, 0.3, 1)
+
+[node name="HeaderSpacer" type="Control" parent="Pad/Column/HeaderRow" unique_id=1892088298]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="SaveBadge" type="Label" parent="Pad/Column/HeaderRow" unique_id=1737317001]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="RankLabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=91311128]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="RankLabel" type="Label" parent="Pad/Column/RankLabelRow" unique_id=1666857724]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="RankValue" type="Label" parent="Pad/Column/RankLabelRow" unique_id=1454783150]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="PointsLabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=1077833307]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PointsLabel" type="Label" parent="Pad/Column/PointsLabelRow" unique_id=140554339]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="PointsValue" type="Label" parent="Pad/Column/PointsLabelRow" unique_id=1024759302]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="PrizeLabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=286004679]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PrizeLabel" type="Label" parent="Pad/Column/PrizeLabelRow" unique_id=96241956]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="PrizeValue" type="Label" parent="Pad/Column/PrizeLabelRow" unique_id=324168169]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="BonusLabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=394504688]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BonusLabel" type="Label" parent="Pad/Column/BonusLabelRow" unique_id=309710933]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="BonusValue" type="Label" parent="Pad/Column/BonusLabelRow" unique_id=830324863]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="CarryLabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=1282992630]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CarryLabel" type="Label" parent="Pad/Column/CarryLabelRow" unique_id=2016879719]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="CarryValue" type="Label" parent="Pad/Column/CarryLabelRow" unique_id=1497613978]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="BottomSpacer" type="Control" parent="Pad/Column" unique_id=1651122516]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Footer" type="HBoxContainer" parent="Pad/Column" unique_id=1183168474]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="FooterSpacer" type="Control" parent="Pad/Column/Footer" unique_id=110166949]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="NextButton" type="Button" parent="Pad/Column/Footer" unique_id=27966939]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11

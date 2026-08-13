@@ -85,9 +85,19 @@ func exchange_charge(remaining_charge: int, tour_finished: bool) -> int:
 # ── 정비 (D06 §3.3 · D13 별첨A §3.4) ──
 # 필드 정비: 회당 상한 30 CH · 회차 체증 1.5^(n−1) · 체증 카운터는 투어 개시에 리셋.
 func field_repair_cost(season_rank_mod: int = 0) -> int:
+	return _field_repair_cost_at(field_repair_count, season_rank_mod)
+
+
+# 다음 회차 비용 — D07 §3.3·D09 §4.3이 **사전 표시를 필수**로 요구하는 값이다
+# ("지금 정비할 것인가"라는 의사결정의 성립 조건). 표시 전용이며 체증 카운터를 건드리지 않는다.
+func field_repair_cost_next(season_rank_mod: int = 0) -> int:
+	return _field_repair_cost_at(field_repair_count + 1, season_rank_mod)
+
+
+func _field_repair_cost_at(count: int, season_rank_mod: int) -> int:
 	var base := data.param("param_repair_base_cr") \
 		* (1.0 + data.param("param_repair_season_rank_coef") * float(season_rank_mod))
-	var escalated := base * pow(data.param("param_repair_escalation"), float(field_repair_count))
+	var escalated := base * pow(data.param("param_repair_escalation"), float(count))
 	return int(round(escalated * _repair_cost_ratio()))
 
 

@@ -213,3 +213,56 @@ ui.race.resonanceBanner,레조넌스
 ui.race.locked,잠금
 ui.race.speakerRelay,중계
 ui.race.actionWithCost,{label} {cost}
+ui.title.gameTitle,FORMULA PULSE
+ui.title.subtitle,SPIN THE GRID
+ui.title.continueRun,계속하기
+ui.title.newCareer,새 커리어
+ui.title.archive,기록실
+ui.title.options,옵션
+ui.title.quit,종료
+ui.title.versionFormat,v{version}
+ui.save.header,커리어 선택
+ui.save.back,뒤로
+ui.save.slotFormat,슬롯 {index}
+ui.save.empty,빈 슬롯
+ui.save.progressFormat,시즌 {season} · 투어 {tour} · 제{race}전
+ui.save.hintNew,새 커리어를 시작할 슬롯을 고르세요.
+ui.save.hintContinue,이어할 커리어를 고르세요.
+ui.gpResult.header,그랑프리 결산
+ui.gpResult.finalRank,최종 순위
+ui.gpResult.tourPoints,투어 포인트
+ui.gpResult.prize,상금
+ui.gpResult.finishBonus,완주 보너스
+ui.gpResult.carryOver,이월
+ui.gpResult.rankFormat,P{rank}
+ui.gpResult.retired,리타이어 — 투어 탈락
+ui.gpResult.pointsFormat,+{points}
+ui.gpResult.creditFormat,{amount} Cr
+ui.gpResult.carryFormat,섀시 {chassis} · 차지 {charge}
+ui.gpResult.next,다음으로
+ui.gpResult.toTourReport,투어 결산으로
+ui.gpResult.saved,저장됨
+ui.recap.header,간이 정산
+ui.recap.summaryFormat,직전 P{rank} · 투어 포인트 +{points}
+ui.recap.creditsFormat,{amount} Cr
+ui.recap.fieldRepair,필드 정비
+ui.recap.consumable,소모품 보충
+ui.recap.deck,덱 교체
+ui.recap.next,다음 대회로
+ui.recap.repairCostFormat,이번 {now} Cr → 다음 {next} Cr
+ui.tourReport.header,투어 결산
+ui.tourReport.block1,투어 종합 순위
+ui.tourReport.block2,챔피언십 포인트
+ui.tourReport.block3,수입
+ui.tourReport.block4,펄스 차지 환전
+ui.tourReport.block5,차지 소멸
+ui.tourReport.block6,주행 데이터
+ui.tourReport.rankFormat,P{rank}
+ui.tourReport.pointsFormat,{points}
+ui.tourReport.creditFormat,{amount} Cr
+ui.tourReport.dataFormat,{amount} DP
+ui.tourReport.dropoutNote,탈락 — 완주 보너스 미지급 · 순위 보상 축소
+ui.tourReport.chargeExpired,잔여 차지는 투어 경계에서 소멸합니다.
+ui.tourReport.toGarage,개러지로
+ui.save.cardFormat,"{label}
+{body}"
