@@ -9,12 +9,18 @@ extends HubScreen
 
 var _selected := ""
 var _rank := 8
+var _season_chain := false
 
 
 func _on_hub_ready(payload: Dictionary) -> void:
 	var s := session.data.strings
 	(%HeaderLabel as Label).text = s.text("ui.overhaulScreen.title")
 	_rank = int(payload.get("championship_rank", 8))
+	_season_chain = bool(payload.get("season_chain", false))
+	# 1회 전용 진입 (G-M2) — 확정 전에 개러지로 새면 재진입이 불가하므로 뒤로를 막는다.
+	# 취소·재검토의 자유는 화면 안(후보 재선택·COM-01 취소)에서 보장된다 (D07 실장 규칙).
+	if _season_chain:
+		(%BackButton as Button).visible = false
 	var slots := session.outgame.overhaul_slots(_rank)
 	var grade_text := s.text("ui.overhaulScreen.gradeFormat", {
 		"rank": _rank,
@@ -76,4 +82,9 @@ func _on_confirm() -> void:
 		if not accepted:
 			return
 		if session.outgame.install_overhaul(_selected, _rank):
+			# 시즌 체인 경유(SET-02 → HUB-08)면 다음 시즌을 개막하고 개러지로.
+			# (시즌 엔딩 VN은 NAR-01 결선 시 이 사이에 삽입된다 — D09 §2.3)
+			if _season_chain:
+				session.begin_next_season()
+				session.save_progress()  # 시즌 경계 저장 지점 (D09 §2.4)
 			go("HUB-01", {}))

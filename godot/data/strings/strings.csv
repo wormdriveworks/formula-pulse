@@ -324,3 +324,14 @@ ui.overhaulScreen.confirm,오버홀 확정
 ui.overhaulScreen.installConfirm,{overhaul} 오버홀을 확정합니다.
 ui.hub.stationLockedFormat,{station} — {crew} 합류 시
 ui.records.relationFormat,{axis} {stage}단계
+ui.duel.playerFormat,No.{number}
+ui.duel.overtake,추월 듀얼
+ui.duel.defense,방어 듀얼
+ui.duel.boost,부스트 투입
+ui.seasonResult.headerFormat,시즌 {season} 결산
+ui.seasonResult.rowFormat,P{rank} {name} — {points}
+ui.seasonResult.summaryFormat,챔피언십 P{rank} · {points}점
+ui.seasonResult.champion,시즌 챔피언
+ui.seasonResult.epilogue,2연속 챔피언 — 에필로그 개방
+ui.seasonResult.carryOn,시즌 마감 — 다음 시즌으로 이어집니다.
+ui.seasonResult.toOverhaul,시즌 오버홀로

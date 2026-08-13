@@ -67,6 +67,9 @@ func _on_bound(_payload: Dictionary) -> void:
 
 
 func _on_next() -> void:
-	# SET-01 ⑧ → HUB-01 (D09 §2.3 플로우맵 — IMPL-077 [가안] 해소).
-	# 시즌 최종 투어의 SET-02 체인은 SET-02 구현 시 분기한다.
+	# D09 §2.3: [시즌 내 잔여 투어 有] → HUB-01 / [시즌 최종 투어] → SET-02 체인
+	if session.season.season_finished():
+		session.close_season()
+		go("SET-02", {})
+		return
 	go("HUB-01", {})

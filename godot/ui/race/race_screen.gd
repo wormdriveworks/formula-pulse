@@ -56,6 +56,10 @@ var _skill_buttons: Array[Button] = []
 @onready var _e11_chassis_bar: ProgressBar = %E11ChassisBar
 @onready var _e11_chassis_value: Label = %E11ChassisValue
 @onready var _e12_charge: Label = %E12Charge
+@onready var _duel_overlay: Control = %DuelOverlay
+
+# 통상 턴의 릴 표시 배열 — 듀얼 중에는 오버레이의 릴로 스왑된다 (아래 _enter_duel 참조)
+var _base_reel_icons: Array[TextureRect] = []
 
 
 # 세션 주입 없이 단독 인스턴스화되는 경로(검사 하네스)를 위해 자체 세션을 연다.
@@ -88,6 +92,7 @@ func _boot() -> void:
 	# 성장 단계 진폭 계수 — D13 별첨A §8.2. 1단계 고정(성장 상태는 아웃게임 층 소관).
 	_e07_wave.configure(data.param("param_vane_amp_stage1"))
 	_e10_log.configure(int(data.param("param_log_slot_cap")), int(data.param("param_font_size_body")))
+	_duel_overlay.boost_pressed_signal().connect(_on_boost)
 	_apply_static_strings()
 	_start_gp()
 
@@ -170,10 +175,11 @@ func _collect_reels() -> void:
 	for i in range(REEL_COUNT):
 		var column := _e05_reels.get_child(i)
 		_reel_panels.append(column.get_node("Frame"))
-		_reel_icons.append(column.get_node("Frame/Symbol"))
+		_base_reel_icons.append(column.get_node("Frame/Symbol"))
 		var box: CheckBox = column.get_node("Hold")
 		box.toggled.connect(_on_hold_toggled)
 		_hold_boxes.append(box)
+	_reel_icons = _base_reel_icons
 	for child in _e08_skills.get_children():
 		_skill_buttons.append(child)
 
@@ -195,16 +201,58 @@ func _next_turn() -> void:
 	_timer_active = false
 	_revealing = false
 	_e04_timer_ring.set_active(false)
-	_hide_reels()
 	var info := engine.begin_turn()
 	if String(info.get("type", "")) == "finished":
 		_on_gp_finished()
 		return
+	# 듀얼 삽입·복귀 (D05 §3 DUEL) — 오버레이 표시는 화면 전환이 아니다 (D09 §3.5).
+	# 릴 은닉은 **배열 스왑이 끝난 뒤**여야 한다 — 스왑 전에 지우면 복귀 쪽 릴에
+	# 직전 턴 심볼이 남는다 (SEAL-E가 실제로 잡았다: T1 대기 중 비공개 실패 15건).
+	if String(info.get("type", "")) == "duel":
+		_enter_duel(info)
+	else:
+		_exit_duel()
+	_hide_reels()
 	_push_events(info.get("events", []))
 	_refresh_strip()
 	_refresh_resources()
 	_refresh_action_enabled()
 	_update_timer_value()
+
+
+# 릴 표시 배열을 오버레이로 스왑한다 — 공개·은닉·봉인 검사(SEAL-E)가 전부 같은 경로로
+# 오버레이 릴을 보게 하는 장치다. 이중 구현이 없으므로 봉인 규칙이 갈라지지 않는다.
+func _enter_duel(info: Dictionary) -> void:
+	var opponent_id := String(info.get("opponent", ""))
+	var opponent: Dictionary = engine.entrants.get(opponent_id, {})
+	if opponent.is_empty():
+		push_error("RaceScreen: duel opponent missing - %s" % opponent_id)
+		return
+	_duel_overlay.show_duel(data.strings, opponent, int(info.get("duel_type", 0)))
+	_reel_icons = _duel_overlay.reel_icons()
+	_hide_reels()
+	_refresh_boost()
+
+
+func _exit_duel() -> void:
+	if not _duel_overlay.visible:
+		return
+	_duel_overlay.dismiss()
+	_reel_icons = _base_reel_icons
+
+
+func _refresh_boost() -> void:
+	var cap := int(data.param("param_charge_boost_max"))
+	var can_add := _timer_active and not _revealing and engine.charge >= 1 and engine.duel_boost < cap
+	_duel_overlay.set_boost(engine.duel_boost, cap, can_add)
+
+
+func _on_boost() -> void:
+	if not _timer_active or _revealing or not engine.current_turn_is_duel:
+		return
+	engine.add_duel_boost()
+	_refresh_boost()
+	_refresh_resources()
 
 
 func _on_gp_finished() -> void:
@@ -244,8 +292,31 @@ func _on_confirm() -> void:
 	_timer_active = false
 	_e04_timer_ring.set_active(false)
 	var ratio := _timer_remaining / _timer_base
-	_push_events(engine.confirm(ratio))
+	var events := engine.confirm(ratio)
+	_push_events(events)
+	# 듀얼 결과는 프레임 내 표기 후 해제한다 (D09 §3.5). [가안] 표기 유지 0.6초 —
+	# 연출 시간 규격이 D13에 없어 임시값이며 실기 조정 대상이다.
+	if _duel_overlay.visible:
+		var result_key := _duel_result_key(events)
+		if not result_key.is_empty():
+			_duel_overlay.show_result(data.strings.text(result_key))
+			await get_tree().create_timer(0.6).timeout
 	_next_turn()
+
+
+# 듀얼 결판 로그 키 대장 — 엔진이 발행하는 결과 키 전량 (접두 비교 대신 열거:
+# 새 결과 키가 생기면 여기 등재해야 프레임 표기가 붙는다 — 의도적 변경만 통과)
+const DUEL_RESULT_KEYS := [
+	"raceLog.duelWin01", "raceLog.duelLoseOvertake01", "raceLog.duelLoseDefense01",
+]
+
+
+func _duel_result_key(events: Array) -> String:
+	for event in events:
+		var key := String(event.get("key", ""))
+		if DUEL_RESULT_KEYS.has(key):
+			return key
+	return ""
 
 
 func _on_respin() -> void:
@@ -314,6 +385,8 @@ func _reveal_reels(indices: Array, start_window: bool) -> void:
 	if _timer_active:
 		_e04_timer_ring.set_active(true)
 		_e04_timer_ring.set_ratio(_timer_remaining / _timer_base)
+	if engine.current_turn_is_duel:
+		_refresh_boost()
 	_refresh_strip()
 	_refresh_action_enabled()
 	_update_timer_value()
@@ -430,7 +503,8 @@ func _push_events(events: Array) -> void:
 		for param_name in params:
 			var value: Variant = params[param_name]
 			if typeof(value) == TYPE_STRING and data.strings.has_key(String(value)):
-				params[param_name] = data.strings.text(String(value))
+				# 참조 키의 문면에 매개(필러의 {number} 등)가 있으면 같은 params 로 치환한다
+				params[param_name] = data.strings.text(String(value), params)
 		var body := data.strings.text(key, params)
 		if key.begins_with("vane."):
 			_e07_text.text = body  # 릴 존 콜아웃 전속 — 로그 피드로 흘리지 않는다

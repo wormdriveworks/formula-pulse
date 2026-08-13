@@ -472,7 +472,12 @@ func _settle_sector(momentum: bool) -> Array:
 					pending_duel = _armed_duel
 					duel_opponent = front_target if _armed_duel == RaceTypes.DuelType.OVERTAKE else rear_target
 					var log_key := "raceLog.duelStartOvertake01" if _armed_duel == RaceTypes.DuelType.OVERTAKE else "raceLog.duelStartDefense01"
-					events.append(_ev("T5", log_key, {"target": entrants[duel_opponent]["name_key"]}))
+					# number 는 필러 name_key(`No.{number} 머신`)의 표기 매개다 — 표기 층이
+					# name_key 를 번역할 때 함께 치환한다 (네임드 문면에는 자리 자체가 없어 무해)
+					events.append(_ev("T5", log_key, {
+						"target": entrants[duel_opponent]["name_key"],
+						"number": entrants[duel_opponent]["number"],
+					}))
 			RaceTypes.SettleStage.STAGE_7_RANK_UPDATE:
 				pass  # 섹터 턴의 플레이어 순위 변동은 듀얼 전속 (D05 §4)
 			RaceTypes.SettleStage.STAGE_8_BACKGROUND_AI:

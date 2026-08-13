@@ -14,6 +14,7 @@ const ROUTES := {
 	"RACE-03": "res://ui/race/gp_result_screen.tscn",
 	"RUN-01": "res://ui/run/run_recap_screen.tscn",
 	"SET-01": "res://ui/settle/tour_report_screen.tscn",
+	"SET-02": "res://ui/settle/season_result_screen.tscn",
 	"HUB-01": "res://ui/hub/garage_screen.tscn",
 	"HUB-02": "res://ui/hub/repair_bay_screen.tscn",
 	"HUB-03": "res://ui/hub/tuning_bench_screen.tscn",

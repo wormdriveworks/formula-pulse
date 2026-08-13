@@ -19,6 +19,7 @@ var profile_index := 1
 var engine: RaceEngine
 var last_gp_result: Dictionary = {}
 var last_tour_report: Dictionary = {}
+var last_season_report: Dictionary = {}
 
 
 func setup(game_data: GameData) -> void:
@@ -67,6 +68,18 @@ func tour_has_remaining_gp() -> bool:
 func close_tour() -> Dictionary:
 	last_tour_report = season.close_tour()
 	return last_tour_report
+
+
+# 시즌 결산 — 타이틀 판정·그리드 레벨은 코어가 한다 (D05 §9.4~§10)
+func close_season() -> Dictionary:
+	last_season_report = season.close_season()
+	return last_season_report
+
+
+# 다음 시즌 개막 — 캘린더 셔플·챔피언십 리셋은 코어 소관 (D08 §2.1~2.2)
+func begin_next_season() -> void:
+	var next := season.season + 1
+	season.begin_season(next)
 
 
 # 자동 저장 — 저장 지점은 D09 §2.4가 확정한다(RACE-03 진입·투어 경계·시즌 경계).
