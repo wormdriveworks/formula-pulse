@@ -86,3 +86,9 @@ param_scene_panel_height_px,100
 param_vane_amp_stage1,1.0
 param_vane_amp_stage2,0.7
 param_vane_amp_stage3,0.4
+param_opt_volume_default,80
+param_opt_volume_step,10
+param_opt_timer_mult_1,1.5
+param_opt_timer_mult_2,2.0
+param_opt_reel_fast_mult,0.5
+param_pause_countin_sec,3

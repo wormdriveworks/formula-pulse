@@ -27,6 +27,8 @@ var engine: RaceEngine
 var _timer_active := false
 var _timer_remaining := 0.0
 var _timer_base := 10.0
+var _timer_effective_base := 10.0
+var _timer_disabled := false
 var _revealing := false
 var _confirm_lockout := 0.0
 var _lockout_base := 0.3
@@ -57,6 +59,9 @@ var _skill_buttons: Array[Button] = []
 @onready var _e11_chassis_value: Label = %E11ChassisValue
 @onready var _e12_charge: Label = %E12Charge
 @onready var _duel_overlay: Control = %DuelOverlay
+@onready var _pause_overlay: Control = %PauseOverlay
+
+var _paused := false
 
 # 통상 턴의 릴 표시 배열 — 듀얼 중에는 오버레이의 릴로 스왑된다 (아래 _enter_duel 참조)
 var _base_reel_icons: Array[TextureRect] = []
@@ -93,8 +98,20 @@ func _boot() -> void:
 	_e07_wave.configure(data.param("param_vane_amp_stage1"))
 	_e10_log.configure(int(data.param("param_log_slot_cap")), int(data.param("param_font_size_body")))
 	_duel_overlay.boost_pressed_signal().connect(_on_boost)
+	_pause_overlay.setup(session)
+	_pause_overlay.resumed.connect(func(): _paused = false)
+	_pause_overlay.quit_to_title.connect(func(): go("SYS-01", {}))
+	(%E14Menu as Button).pressed.connect(_open_pause)
 	_apply_static_strings()
 	_start_gp()
+
+
+func _open_pause() -> void:
+	if _paused:
+		return
+	_paused = true
+	# 개입 창 중이면 가림막 — 정지 중 보드 숙고 차단 (D09 §3.7 · F2 보호)
+	_pause_overlay.open(_timer_active)
 
 
 # 씬에는 표시 문자열을 굳히지 않는다 — 전량 런타임 키 참조 (D09 §6.6 · D12 §8.1).
@@ -131,13 +148,15 @@ func _with_cost(label_key: String, cost_param: String) -> String:
 
 
 func _process(delta: float) -> void:
+	if _paused:
+		return  # 타이머 정지 (D09 §3.7) — 잔량·링·확정 잠금 전부 동결
 	if _confirm_lockout > 0.0:
 		_confirm_lockout = maxf(0.0, _confirm_lockout - delta)
 		_refresh_action_enabled()
-	if not _timer_active:
-		return
+	if not _timer_active or _timer_disabled:
+		return  # 비활성 = 잔량이 흐르지 않는다 — 타임아웃도 자연 부재 (D09 §6.2)
 	_timer_remaining = maxf(0.0, _timer_remaining - delta)
-	_e04_timer_ring.set_ratio(_timer_remaining / _timer_base)
+	_e04_timer_ring.set_ratio(_timer_remaining / _timer_effective_base)
 	_update_timer_value()
 	if _timer_remaining <= 0.0:
 		_timer_active = false
@@ -152,6 +171,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:
 		return
+	if key.keycode == KEY_ESCAPE:
+		_open_pause()
+		get_viewport().set_input_as_handled()
+		return
+	if _paused:
+		return  # 정지 중 레이스 입력 차단 — 오버레이가 자체 포커스를 갖는다
 	if key.keycode == KEY_SPACE or key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER:
 		_on_primary_action()
 		get_viewport().set_input_as_handled()
@@ -291,7 +316,8 @@ func _on_confirm() -> void:
 		return
 	_timer_active = false
 	_e04_timer_ring.set_active(false)
-	var ratio := _timer_remaining / _timer_base
+	# 비활성 시 모멘텀 = 조건 불성립 (여유 구간 자체가 없다 — D09 §6.2 채택 구조)
+	var ratio := 0.0 if _timer_disabled else _timer_remaining / _timer_effective_base
 	var events := engine.confirm(ratio)
 	_push_events(events)
 	# 듀얼 결과는 프레임 내 표기 후 해제한다 (D09 §3.5). [가안] 표기 유지 0.6초 —
@@ -369,22 +395,41 @@ func _reveal_reels(indices: Array, start_window: bool) -> void:
 	var was_running := _timer_active
 	_timer_active = false
 	_refresh_action_enabled()
+	# O4 릴 정지 속도 — 표준 / 고속(배율 D13 창구) / 일괄 정지 (D09 §6.1 · D05 §5.1 예약 이행).
+	# 일괄 정지도 정지 이벤트 자체는 유지한다 — 연출 압축이지 결과 선표시가 아니다 (간격 0).
 	var interval := data.param("param_reel_stop_interval_sec")
+	match session.options.index_of("o4"):
+		1:
+			interval *= data.param("param_opt_reel_fast_mult")
+		2:
+			interval = 0.0
 	var provisional := engine.get_provisional()
 	for i in indices:
-		await get_tree().create_timer(interval).timeout
+		if interval > 0.0:
+			await get_tree().create_timer(interval).timeout
 		if engine == null:
 			return
 		_reel_icons[i].texture = _icon_texture(String(provisional[i]))
 	_revealing = false
+	# O5 개입 창 타이머 — 기본 / ×1.5 / ×2 / 비활성 (D09 §6.1·§6.2 — 배율은 D13 창구 전사값).
+	# 비활성 = 타이머·구간 자체가 부재. 개입 창은 열리되(가드 재사용) 잔량이 흐르지 않고
+	# 링은 소등, 모멘텀은 조건 불성립으로 자연 미발생(_on_confirm 이 ratio 0 을 넘긴다).
+	_timer_disabled = session.options.index_of("o5") == 3
+	var effective_base := _timer_base
+	match session.options.index_of("o5"):
+		1:
+			effective_base *= data.param("param_opt_timer_mult_1")
+		2:
+			effective_base *= data.param("param_opt_timer_mult_2")
 	if start_window:
 		_push_events([{"phase": "T3", "key": "vane.brief.provisional01", "params": {}}])
-		_timer_remaining = _timer_base
+		_timer_effective_base = effective_base
+		_timer_remaining = effective_base
 		_confirm_lockout = _lockout_base  # T3 진입 후 확정 오입력 방어 (D09 §1.3)
 	_timer_active = true if start_window else was_running
-	if _timer_active:
+	if _timer_active and not _timer_disabled:
 		_e04_timer_ring.set_active(true)
-		_e04_timer_ring.set_ratio(_timer_remaining / _timer_base)
+		_e04_timer_ring.set_ratio(_timer_remaining / _timer_effective_base)
 	if engine.current_turn_is_duel:
 		_refresh_boost()
 	_refresh_strip()
@@ -488,8 +533,9 @@ func _refresh_action_enabled() -> void:
 
 
 func _update_timer_value() -> void:
-	# 수치는 기본 비표시 — 압박의 아날로그화(D04 §8.2). O6 옵션으로만 켠다.
+	# 수치는 기본 비표시 — 압박의 아날로그화(D04 §8.2). O6 옵션으로만 켠다 (즉시 반영).
 	# 소수 자리도 문면이므로 서식은 스트링 키가 갖는다 (IMPL-027 전례).
+	_e04_timer_value.visible = session.options.index_of("o6") == 1 and not _timer_disabled
 	var seconds := snappedf(_timer_remaining, 0.1)
 	var timer_text := data.strings.text("ui.race.timerFormat", {"value": seconds})
 	_e04_timer_value.text = timer_text

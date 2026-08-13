@@ -34,11 +34,10 @@ func _on_bound(_payload: Dictionary) -> void:
 	_continue_button.pressed.connect(_on_continue)
 	_new_button.pressed.connect(_on_new_career)
 	_quit_button.pressed.connect(_on_quit)
-	# 미구현 화면으로는 보내지 않는다 — 라우터가 거부할 전이를 버튼으로 노출하지 않는다.
+	_options_button.pressed.connect(func(): go("SYS-03", {"return": "SYS-01"}))
+	# 기록실 열람 모드(커리어 세이브 문맥)는 세이브 선택 경유가 규격(§A-1 E02) — 미결선 잠금
 	_archive_button.disabled = true
 	_archive_button.focus_mode = Control.FOCUS_NONE
-	_options_button.disabled = true
-	_options_button.focus_mode = Control.FOCUS_NONE
 
 	var has_save := _any_profile_has_save()
 	_continue_button.visible = has_save

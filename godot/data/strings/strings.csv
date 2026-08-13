@@ -346,3 +346,61 @@ ui.vn.calendarTitle,리그 공식 발표 — 시즌 캘린더
 ui.vn.calendarRowFormat,투어 {tour} — {stage}
 ui.vn.calendarAnchorFormat,투어 {tour} — {stage} ★
 ui.records.replay,재생
+ui.options.header,옵션
+ui.options.tabGameplay,게임플레이
+ui.options.tabAccessibility,연출·접근성
+ui.options.tabAudioVideo,화면·사운드
+ui.options.tabControls,조작
+ui.options.tabLanguage,언어
+ui.options.o1,화면 셰이크
+ui.options.o2,플래시
+ui.options.o3,패드 진동
+ui.options.o4,릴 정지 속도
+ui.options.o5,개입 창 타이머
+ui.options.o5Notice,시간 제한이 없어지며 빠른 결정 보너스는 발생하지 않게 됩니다.
+ui.options.o6,타이머 수치 표시
+ui.options.o7,텍스트 크기
+ui.options.o8,UI 스케일
+ui.options.o9,색각 대응
+ui.options.o10,VN 자동 진행 속도
+ui.options.o11,언어
+ui.options.o12,씬 패널 모션
+ui.options.o13,마스터 볼륨
+ui.options.o14,BGM 볼륨
+ui.options.o15,SFX 볼륨
+ui.options.stepStandard,표준
+ui.options.stepReduced,감소
+ui.options.stepOff,끔
+ui.options.stepOn,켬
+ui.options.stepFast,고속
+ui.options.stepInstant,일괄 정지
+ui.options.stepTimerBase,기본
+ui.options.stepTimer15,×1.5
+ui.options.stepTimer20,×2
+ui.options.stepTimerOff,비활성
+ui.options.stepScale100,100%
+ui.options.stepScale110,110%
+ui.options.stepScale115,115%
+ui.options.stepScale125,125%
+ui.options.stepScale130,130%
+ui.options.stepPaletteBase,기본
+ui.options.stepPaletteAlt,대체 팔레트
+ui.options.stepSlow,느림
+ui.options.stepNormal,보통
+ui.options.stepFastText,빠름
+ui.options.stepKorean,한국어
+ui.options.volumeFormat,{value}
+ui.options.stepPrev,◀
+ui.options.stepNext,▶
+ui.options.resetDefaults,기본값 복원
+ui.options.close,닫기
+ui.options.controlsNote,조작 리매핑은 주요 키 한정으로 제공 예정입니다. 현재 매핑 — 스핀·확정 Space / 홀드 1·2·3 / 리스핀 R / 차지 개입 C / 일시정지 Esc
+ui.pause.resume,재개
+ui.pause.options,옵션
+ui.pause.toTitle,타이틀로
+ui.pause.saveNotice,진행은 최근 저장 지점 기준입니다.
+ui.pause.countFormat,{count}
+ui.tip.currencyTitle,재화 안내
+ui.tip.currencyBody,크레딧은 정비·소모품에 쓰는 회전 재화입니다. 주행 데이터는 스킬·시설에 쓰는 축적 재화입니다.
+ui.tip.dismiss,확인
+ui.options.stepStillCut,정지 컷

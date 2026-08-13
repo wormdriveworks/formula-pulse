@@ -56,6 +56,45 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 	depart.text = s.text("ui.hub.depart")
 	depart.pressed.connect(_on_depart)
 	depart.grab_focus()  # 초기 포커스 = E09 (재방문 시 — §A-11)
+	_show_currency_onboarding()
+
+
+# COM-02 1회성 온보딩 툴팁 — 재화 2종 최초 노출 시 기능 명시 (D09 §5.2 · 별첨A §A-24).
+# 자동 표출 + 확인으로 소멸 + 옵션에서 초기화 가능. 기록은 기기별 옵션 파일에 남는다.
+func _show_currency_onboarding() -> void:
+	if session.options.onboarding_seen.has("currency"):
+		return
+	var s := session.data.strings
+	var panel := PanelContainer.new()
+	panel.name = "OnboardingTip"
+	panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	panel.position.y = 40
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	var style := StyleBoxFlat.new()
+	style.bg_color = UiPalette.BG_PANEL
+	style.border_color = UiPalette.TIMER_LEEWAY
+	style.set_border_width_all(1)
+	style.set_content_margin_all(8)
+	panel.add_theme_stylebox_override("panel", style)
+	add_child(panel)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 4)
+	panel.add_child(column)
+	var title := Label.new()
+	title.text = s.text("ui.tip.currencyTitle")
+	column.add_child(title)
+	var body := Label.new()
+	body.text = s.text("ui.tip.currencyBody")
+	body.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size = Vector2(260, 0)
+	column.add_child(body)
+	var confirm := Button.new()
+	confirm.text = s.text("ui.tip.dismiss")
+	confirm.pressed.connect(func():
+		session.options.mark_onboarding("currency")
+		panel.queue_free())
+	column.add_child(confirm)
 
 
 func _on_depart() -> void:

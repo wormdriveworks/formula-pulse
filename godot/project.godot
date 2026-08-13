@@ -26,6 +26,9 @@ window/stretch/scale_mode="integer"
 
 [gui]
 
+; COM-02 툴팁 호출 지연 = 마우스 오버 0.3초 (D09 별첨A §A-24 확정 기준값)
+timers/tooltip_delay_sec=0.3
+
 theme/custom_font="res://assets/fonts/Galmuri9.ttf"
 theme/default_font_size=9
 

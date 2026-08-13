@@ -15,6 +15,7 @@ var season: SeasonState
 var outgame: OutgameState
 var events: EventService
 var narrative: NarrativeService
+var options: OptionsStore
 var profile_index := 1
 
 # 현재 GP
@@ -27,6 +28,8 @@ var last_season_report: Dictionary = {}
 func setup(game_data: GameData) -> void:
 	data = game_data
 	SaveManager.configure(data)
+	options = OptionsStore.new()
+	options.setup(data)  # 기기별 구성 — 프로필·커리어와 무관하게 세션 개시 시 적재
 
 
 # 새 커리어 — 마스터 시드를 뽑아 시즌·아웃게임 층을 연다 (D12 §6.1)

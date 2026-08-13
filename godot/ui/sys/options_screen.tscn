@@ -1,0 +1,65 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/sys/options_screen.gd" id="1_boaau"]
+[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="2_wqp8f"]
+
+[node name="OptionsScreen" type="Control" unique_id=771684500]
+layout_mode = 3
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_boaau")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1870564854]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.07, 0.08, 0.1, 1)
+
+[node name="Pad" type="MarginContainer" parent="." unique_id=1315983242]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="Column" type="VBoxContainer" parent="Pad" unique_id=1290502238]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=1943949244]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_wqp8f")
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="TabRow" type="HBoxContainer" parent="Pad/Column" unique_id=681739232]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="TabBody" type="Control" parent="Pad/Column" unique_id=696430577]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Footer" type="HBoxContainer" parent="Pad/Column" unique_id=325822682]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ResetButton" type="Button" parent="Pad/Column/Footer" unique_id=18250726]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+
+[node name="Spacer" type="Control" parent="Pad/Column/Footer" unique_id=1518378435]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CloseButton" type="Button" parent="Pad/Column/Footer" unique_id=75045]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
