@@ -67,6 +67,6 @@ func _on_bound(_payload: Dictionary) -> void:
 
 
 func _on_next() -> void:
-	# [가안] HUB-01 개러지가 아직 서지 않아 타이틀로 돌린다. D09 §2.3 플로우맵은
-	# SET-01 ⑧ → HUB-01 을 지정하므로 개러지 구현 시 이 전이를 교체한다. — IMPL-077
-	go("SYS-01", {})
+	# SET-01 ⑧ → HUB-01 (D09 §2.3 플로우맵 — IMPL-077 [가안] 해소).
+	# 시즌 최종 투어의 SET-02 체인은 SET-02 구현 시 분기한다.
+	go("HUB-01", {})

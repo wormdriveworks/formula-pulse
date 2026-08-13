@@ -1,0 +1,124 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/hub/records_screen.gd" id="1_8j0db"]
+[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="2_wxsq5"]
+
+[node name="RecordsScreen" type="Control" unique_id=2137265813]
+layout_mode = 3
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_8j0db")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1797153761]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.07, 0.08, 0.1, 1)
+
+[node name="Pad" type="MarginContainer" parent="." unique_id=1553597056]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="Column" type="VBoxContainer" parent="Pad" unique_id=2088117951]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CommonBar" type="HBoxContainer" parent="Pad/Column" unique_id=955824109]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="CreditIcon" type="TextureRect" parent="Pad/Column/CommonBar" unique_id=1609132478]
+unique_name_in_owner = true
+texture_filter = 1
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 2
+stretch_mode = 5
+
+[node name="CreditValue" type="Label" parent="Pad/Column/CommonBar" unique_id=1543420462]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="DataIcon" type="TextureRect" parent="Pad/Column/CommonBar" unique_id=1317328950]
+unique_name_in_owner = true
+texture_filter = 1
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 2
+stretch_mode = 5
+
+[node name="DataValue" type="Label" parent="Pad/Column/CommonBar" unique_id=1418568801]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="ProgressLabel" type="Label" parent="Pad/Column/CommonBar" unique_id=1196963589]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="BarSpacer" type="Control" parent="Pad/Column/CommonBar" unique_id=2145323504]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BackButton" type="Button" parent="Pad/Column/CommonBar" unique_id=1066829970]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+
+[node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=1345306668]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_wxsq5")
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="Tabs" type="HBoxContainer" parent="Pad/Column" unique_id=422528325]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="TabRivals" type="Button" parent="Pad/Column/Tabs" unique_id=1354405483]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+
+[node name="TabCareer" type="Button" parent="Pad/Column/Tabs" unique_id=95665399]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+
+[node name="TabArchive" type="Button" parent="Pad/Column/Tabs" unique_id=772979980]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+
+[node name="PanelRivals" type="VBoxContainer" parent="Pad/Column" unique_id=343382738]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="PanelCareer" type="VBoxContainer" parent="Pad/Column" unique_id=1490184125]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="PanelArchive" type="VBoxContainer" parent="Pad/Column" unique_id=1646232226]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 4

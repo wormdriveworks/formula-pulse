@@ -26,8 +26,11 @@ window/stretch/scale_mode="integer"
 
 [gui]
 
-theme/custom_font="res://assets/fonts/GalmuriMono11.ttf"
-theme/default_font_size=11
+; 본문·로그 계열 = Galmuri9 원도 9px (D10 §5.7 — 8/9/10 계열의 100% 단).
+; 실측: 전각 22자 = 198px ⊂ 로그 슬롯 226px (한 줄 성립 — D10 검증 ①).
+; 대형·VN 계열(12/14/16)은 화면별 Galmuri14 오버라이드.
+theme/custom_font="res://assets/fonts/Galmuri9.ttf"
+theme/default_font_size=9
 
 [rendering]
 

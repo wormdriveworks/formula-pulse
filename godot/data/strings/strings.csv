@@ -266,3 +266,61 @@ ui.tourReport.chargeExpired,잔여 차지는 투어 경계에서 소멸합니다
 ui.tourReport.toGarage,개러지로
 ui.save.cardFormat,"{label}
 {body}"
+ui.confirm.irreversible,이 행동은 되돌릴 수 없습니다.
+ui.confirm.ok,확인
+ui.confirm.cancel,취소
+ui.hub.garageTitle,개러지
+ui.hub.amountFormat,{amount}
+ui.hub.progressFormat,시즌 {season} · 투어 {tour} · 제{race}전
+ui.hub.back,개러지로
+ui.hub.depart,다음 투어 출발
+ui.hub.lockedByCrew," — {crew} 합류 시"
+ui.hub.stRepair,정비 베이
+ui.hub.stTuning,튜닝 벤치
+ui.hub.stStrategy,전략실
+ui.hub.stRecords,기록실
+ui.hub.stSponsor,스폰서 데스크
+ui.hub.stFacility,시설 확장
+ui.hub.stOverhaul,시즌 오버홀
+ui.hub.stRecruit,크루 영입
+ui.repairBay.title,정비 베이
+ui.repairBay.fullRepair,전면 정비
+ui.repairBay.perChFormat,섀시 1당 {amount} Cr
+ui.repairBay.freeLineNote,투어 개시 시 {line}까지 무상 복원됩니다.
+ui.repairBay.run,실행
+ui.tuningBench.title,튜닝 벤치
+ui.tuningBench.buy,강화
+ui.tuningBench.maxed,최대 단계
+ui.tuningBench.costFormat,{amount} DP
+ui.tuningBench.redistribute,재배분
+ui.strategy.title,전략실
+ui.strategy.tierFormat,스킬 티어 {tier}
+ui.strategy.tierLockedFormat,스킬 티어 {tier} — 미개방
+ui.strategy.equip,장착
+ui.strategy.unequip,해제
+ui.strategy.unlockFormat,해금 {amount} DP
+ui.strategy.unlockConfirm,{skill} 스킬을 해금합니다.
+ui.strategy.deckHeaderFormat,덱 {used}/{slots}
+ui.strategy.expandFormat,슬롯 확장 {amount} DP
+ui.records.title,기록실
+ui.records.tabRivals,라이벌 파일
+ui.records.tabCareer,통산 기록
+ui.records.tabArchive,아카이브
+ui.records.dpTotalFormat,생애 누적 {amount} DP
+ui.records.archiveEmpty,기록된 이벤트가 아직 없습니다.
+ui.sponsorDesk.title,스폰서 데스크
+ui.sponsorDesk.slotFormat,계약 {used}/{slots}
+ui.sponsorDesk.incomeFormat,정기 {regular} Cr · 보너스 {bonus} Cr
+ui.sponsorDesk.sign,체결
+ui.sponsorDesk.signed,계약 중
+ui.sponsorDesk.signConfirm,{sponsor} 계약을 체결합니다.
+ui.facilityPanel.title,시설 확장
+ui.facilityPanel.buy,구매
+ui.facilityPanel.owned,보유
+ui.facilityPanel.buyConfirm,{facility} 시설을 확장합니다.
+ui.overhaulScreen.title,시즌 오버홀
+ui.overhaulScreen.gradeFormat,시즌 P{rank} — 슬롯 {slots} · 후보 {candidates}
+ui.overhaulScreen.confirm,오버홀 확정
+ui.overhaulScreen.installConfirm,{overhaul} 오버홀을 확정합니다.
+ui.hub.stationLockedFormat,{station} — {crew} 합류 시
+ui.records.relationFormat,{axis} {stage}단계

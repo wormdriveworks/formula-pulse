@@ -80,8 +80,8 @@ param_vn_season_cap,15
 param_vn_milestone_cap,8
 param_confirm_lockout_sec,0.3
 param_log_slot_cap,4
-param_font_size_body,11
-param_font_size_head,22
+param_font_size_body,9
+param_font_size_head,14
 param_scene_panel_height_px,100
 param_vane_amp_stage1,1.0
 param_vane_amp_stage2,0.7

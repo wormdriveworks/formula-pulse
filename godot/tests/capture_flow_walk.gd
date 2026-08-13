@@ -94,7 +94,9 @@ func _drive(screen: Control) -> void:
 		"RunRecapScreen":
 			(screen.get_node("%NextButton") as Button).pressed.emit()
 		"TourReportScreen":
-			print("WALK_OK shots=%d — 투어 결산 도달" % _shots)
+			(screen.get_node("%NextButton") as Button).pressed.emit()
+		"GarageScreen":
+			print("WALK_OK shots=%d — 개러지 도달 (SET-01 ⑧ 이행)" % _shots)
 			_finish(0)
 
 

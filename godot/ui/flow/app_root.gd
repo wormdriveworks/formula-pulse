@@ -14,6 +14,14 @@ const ROUTES := {
 	"RACE-03": "res://ui/race/gp_result_screen.tscn",
 	"RUN-01": "res://ui/run/run_recap_screen.tscn",
 	"SET-01": "res://ui/settle/tour_report_screen.tscn",
+	"HUB-01": "res://ui/hub/garage_screen.tscn",
+	"HUB-02": "res://ui/hub/repair_bay_screen.tscn",
+	"HUB-03": "res://ui/hub/tuning_bench_screen.tscn",
+	"HUB-04": "res://ui/hub/strategy_screen.tscn",
+	"HUB-05": "res://ui/hub/records_screen.tscn",
+	"HUB-06": "res://ui/hub/sponsor_desk_screen.tscn",
+	"HUB-07": "res://ui/hub/facility_screen.tscn",
+	"HUB-08": "res://ui/hub/overhaul_screen.tscn",
 }
 
 const ENTRY_SCREEN := "SYS-01"
