@@ -195,7 +195,6 @@ ui.race.positionFormat,P{rank}/{total}
 ui.race.lapSectorFormat,LAP {lap}/{laps} · S{sector}/{sectors}
 ui.race.gaugeFront,전방
 ui.race.gaugeRear,후방
-ui.race.reelHidden,―
 ui.race.hold,홀드
 ui.race.respin,리스핀
 ui.race.chargeIntervene,차지 개입

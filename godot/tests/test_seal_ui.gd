@@ -19,7 +19,6 @@ const TIME_SCALE := 5.0
 
 var _screen: Control
 var _data: GameData
-var _placeholder := ""
 var _checks := 0
 var _failures := 0
 var _round := 0
@@ -36,7 +35,6 @@ func _initialize() -> void:
 	Engine.time_scale = TIME_SCALE
 	_data = GameData.new()
 	_data.load_all()
-	_placeholder = _data.strings.text("ui.race.reelHidden")
 	var packed := load(SCENE_PATH) as PackedScene
 	if packed == null:
 		_fail("씬 로드 실패: %s" % SCENE_PATH)
@@ -94,21 +92,17 @@ func _process(delta: float) -> bool:
 
 
 # ── 관찰 ──
+# 심볼은 도상이다 — 비공개 = 텍스처 부재. 텍스트가 아니라 **실제 표시물**을 판정한다.
 func _hidden_count() -> int:
 	var hidden := 0
-	for label in _screen._reel_labels:
-		if label.text == _placeholder:
+	for icon in _screen._reel_icons:
+		if icon.texture == null:
 			hidden += 1
 	return hidden
 
 
-# 미공개 릴에 자리표시 외의 값이 들어가면(빈 문자열 등) 공개 수와 어긋나 드러난다.
 func _non_placeholder_count() -> int:
-	var count := 0
-	for label in _screen._reel_labels:
-		if label.text != _placeholder:
-			count += 1
-	return count
+	return _screen._reel_icons.size() - _hidden_count()
 
 
 # 화면의 전 라벨 텍스트를 뜬다 — 개별 필드를 열거하지 않으므로 새 표시 요소가
@@ -121,8 +115,6 @@ func _surface_snapshot() -> Dictionary:
 
 func _collect_text(node: Node, out: Dictionary) -> void:
 	if node is Label:
-		if _screen._reel_labels.has(node as Label):
-			return  # 릴은 별도 축(①②)이 본다
 		out[node.get_path()] = (node as Label).text
 	elif node is Button:
 		out[node.get_path()] = (node as Button).text

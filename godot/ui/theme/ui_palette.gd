@@ -31,6 +31,20 @@ const VANE_ALERT := Color(0.95, 0.35, 0.35)     # [가안]
 const VANE_ELATED := Color(0.85, 0.60, 1.00)    # [가안]
 const VANE_DAMAGED := Color(0.60, 0.60, 0.62)   # [가안]
 
+# ── 심볼 6분류 전용 색 (D10 §5.1 — 색 + 도상 이중 부호화의 색 축) ──
+# [가안] 색상환에서 서로 떨어뜨리고 명도도 갈라, 색을 지워도 도상만으로 분류가 서게 했다.
+# 판별 실측은 G-2(혼동 행렬 6×6)가 한다.
+const SYMBOL_SLIPSTREAM := Color(0.40, 0.82, 1.00)  # [가안] 후류 — 냉색 고명도
+const SYMBOL_BRAKING := Color(0.98, 0.62, 0.25)     # [가안] 제동 — 난색
+const SYMBOL_LINE := Color(0.55, 0.90, 0.55)        # [가안] 주행선 — 녹
+const SYMBOL_TROUBLE := Color(0.95, 0.30, 0.30)     # [가안] 위험 — 적
+const SYMBOL_CHANCE := Color(1.00, 0.90, 0.40)      # [가안] 기회 — 황 고명도
+const SYMBOL_PULSE := Color(0.80, 0.55, 1.00)       # [가안] 펄스 — 자
+
+# ── 재화 2종 (D10 §5.2 — 실루엣이 1차 구분, 색은 보조) ──
+const CURRENCY_CREDIT := Color(0.95, 0.85, 0.45)    # [가안]
+const CURRENCY_DATA := Color(0.55, 0.85, 0.95)      # [가안]
+
 # ── 배경·프레임 (텔레메트리 계기 의장 — D10 §5.4) ──
 const BG_DEEP := Color(0.07, 0.08, 0.10)
 const BG_PANEL := Color(0.11, 0.12, 0.15)

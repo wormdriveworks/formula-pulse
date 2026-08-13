@@ -28,6 +28,18 @@ if printf '%s' "$content" | grep -q '^\[editor_plugins\]'; then
 	printf '커밋 차단: godot/project.godot 에 [editor_plugins] 등록이 있다 (에디터 도구는 커밋 대상이 아니다).\n' >&2
 	fail=1
 fi
+# 섹션 헤더만 보면 놓친다 — 헤더를 지우고 등록 줄만 남기면 그 줄이 다른 섹션으로 흘러들어
+# **더 나쁜 상태**가 되는데 헤더 검사는 통과한다(실측: [application] 안으로 섞였다).
+# 등록 줄 자체를 섹션과 무관하게 잡는다.
+if printf '%s' "$content" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*="\*(uid://|res://)'; then
+	printf '커밋 차단: godot/project.godot 에 autoload 등록 줄이 남아 있다 (섹션 위치 무관).\n' >&2
+	printf '  %s\n' "$(printf '%s' "$content" | grep -E '^[A-Za-z_][A-Za-z0-9_]*="\*(uid://|res://)')" >&2
+	fail=1
+fi
+if printf '%s' "$content" | grep -q 'addons/'; then
+	printf '커밋 차단: godot/project.godot 이 addons/ 를 참조한다 (에디터 도구 플러그인).\n' >&2
+	fail=1
+fi
 
 if [ "$fail" -ne 0 ]; then
 	printf '\n해당 섹션을 지우고 다시 스테이징하라. 플러그인은 로컬에서 계속 쓸 수 있다 —\n' >&2

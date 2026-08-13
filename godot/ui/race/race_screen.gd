@@ -16,6 +16,9 @@ extends Control
 
 const REEL_COUNT := 3
 const HOLD_KEYS := [KEY_1, KEY_2, KEY_3]
+const ICON_DIR := "res://assets/ui/icons/"
+
+var _icon_cache: Dictionary = {}
 
 var data: GameData
 var rng: RngService
@@ -28,7 +31,7 @@ var _revealing := false
 var _confirm_lockout := 0.0
 var _lockout_base := 0.3
 
-var _reel_labels: Array[Label] = []
+var _reel_icons: Array[TextureRect] = []
 var _reel_panels: Array[PanelContainer] = []
 var _hold_boxes: Array[CheckBox] = []
 var _skill_buttons: Array[Button] = []
@@ -36,6 +39,7 @@ var _skill_buttons: Array[Button] = []
 @onready var _e01_position: Label = %E01Position
 @onready var _e02_lap_sector: Label = %E02LapSector
 @onready var _e02_corner: Label = %E02Corner
+@onready var _e02_attr: TextureRect = %E02SectorAttr
 @onready var _e02_resonance: Label = %E02Resonance
 @onready var _e03_front: ProgressBar = %E03FrontGauge
 @onready var _e03_rear: ProgressBar = %E03RearGauge
@@ -149,7 +153,7 @@ func _collect_reels() -> void:
 	for i in range(REEL_COUNT):
 		var column := _e05_reels.get_child(i)
 		_reel_panels.append(column.get_node("Frame"))
-		_reel_labels.append(column.get_node("Frame/Symbol"))
+		_reel_icons.append(column.get_node("Frame/Symbol"))
 		var box: CheckBox = column.get_node("Hold")
 		box.toggled.connect(_on_hold_toggled)
 		_hold_boxes.append(box)
@@ -279,9 +283,7 @@ func _reveal_reels(indices: Array, start_window: bool) -> void:
 		await get_tree().create_timer(interval).timeout
 		if engine == null:
 			return
-		_reel_labels[i].text = data.strings.text(
-			String(data.symbols[_symbol_index(String(provisional[i]))]["name_key"])
-		)
+		_reel_icons[i].texture = _icon_texture(String(provisional[i]))
 	_revealing = false
 	if start_window:
 		_push_events([{"phase": "T3", "key": "vane.brief.provisional01", "params": {}}])
@@ -296,17 +298,31 @@ func _reveal_reels(indices: Array, start_window: bool) -> void:
 	_update_timer_value()
 
 
-func _symbol_index(symbol_id: String) -> int:
-	for i in range(data.symbols.size()):
-		if String(data.symbols[i]["id"]) == symbol_id:
-			return i
-	return 0
+# 도상 경로 규약: 셀 파일명 = 테이블 id (심볼 `symbol_*` · 속성 `attr_*`).
+# D10 §8.1 에셋 대장의 요소 매핑 열이 아직 없어 파일명 규약으로 잇는다 —
+# [가안]이며 대장 도입 시 교체한다. 없는 도상은 침묵하지 않고 보고한다(IMPL-019 계열).
+func _icon_texture(asset_id: String) -> Texture2D:
+	if asset_id.is_empty():
+		return null
+	if _icon_cache.has(asset_id):
+		return _icon_cache[asset_id]
+	var path := "%s%s.png" % [ICON_DIR, asset_id]
+	var texture: Texture2D = load(path) if ResourceLoader.exists(path) else null
+	if texture == null:
+		# 진단 문자열은 영문 — 표시 문자열이 아니지만 V4는 한글 리터럴을 경로 불문 차단한다
+		# (코어의 push_error 관행과 동일하게 맞춘다)
+		push_error("RaceScreen: icon asset missing - %s" % path)
+	_icon_cache[asset_id] = texture
+	return texture
 
 
 # ── 표시 갱신 ──
+# 비공개 상태 = 도상 부재. 회전 중 심볼을 흘리는 연출은 두지 않는다 —
+# 표시되는 것이 결과와 상관되면 그 자체가 봉인 누출 경로이고, 상관 없는 심볼을 흘리려면
+# 난수가 필요한데 RNG 6스트림은 게임 로직 전속이다(D12 §6). 연출 결선은 아트 유입 시.
 func _hide_reels() -> void:
-	for label in _reel_labels:
-		label.text = data.strings.text("ui.race.reelHidden")
+	for icon in _reel_icons:
+		icon.texture = null
 	for box in _hold_boxes:
 		box.button_pressed = false
 	_refresh_reel_frames()
@@ -331,10 +347,13 @@ func _refresh_strip() -> void:
 	# GP_START~첫 begin_turn 사이에는 섹터가 아직 0이다 — 조회하면 침묵 기본값 가드가
 	# 정당하게 push_error를 낸다(IMPL-019). 진입 전에는 코너명을 비운다.
 	if engine.sector > 0:
-		var corner_key := String(data.sector_entry(engine.sector).get("name_key", ""))
+		var sector_entry := data.sector_entry(engine.sector)
+		var corner_key := String(sector_entry.get("name_key", ""))
 		_e02_corner.text = s.text(corner_key)
+		_e02_attr.texture = _icon_texture(String(sector_entry.get("main_attr", "")))
 	else:
 		_e02_corner.text = ""
+		_e02_attr.texture = null
 	# 레조넌스는 **진입 시점에만** 공표한다 — 위치 사전 표시·예고는 어떤 채널로도 하지 않는다
 	# (D08 §3.7 R6 · D09 §3.6). 엔진의 announced 플래그를 그대로 따른다.
 	_e02_resonance.visible = engine.resonance_announced
