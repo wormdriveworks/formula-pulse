@@ -335,3 +335,14 @@ ui.seasonResult.champion,시즌 챔피언
 ui.seasonResult.epilogue,2연속 챔피언 — 에필로그 개방
 ui.seasonResult.carryOn,시즌 마감 — 다음 시즌으로 이어집니다.
 ui.seasonResult.toOverhaul,시즌 오버홀로
+ui.eventNode.proceed,계속
+ui.eventNode.rewardFormat,+{amount}
+ui.eventNode.rewardChassisFormat,섀시 +{amount}
+ui.eventNode.rare,희귀
+ui.vn.skip,스킵 ▶▶
+ui.vn.speakerVane,베인
+ui.vn.placeholderLine01,…통신 채널 연결. 브리핑을 시작한다.
+ui.vn.calendarTitle,리그 공식 발표 — 시즌 캘린더
+ui.vn.calendarRowFormat,투어 {tour} — {stage}
+ui.vn.calendarAnchorFormat,투어 {tour} — {stage} ★
+ui.records.replay,재생

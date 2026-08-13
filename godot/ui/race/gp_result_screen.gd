@@ -74,4 +74,10 @@ func _on_next(to_tour_report: bool) -> void:
 		session.close_tour()
 		go("SET-01", {})
 		return
+	# 이벤트 노드 삽입 지점 (D09 §2.3 — RACE-03 → RUN-01 사이, 발생 시에만).
+	# 무발생이면 RUN-02 는 화면 자체가 비표출이다 (D09 §5.4).
+	var occurrence := session.judge_event()
+	if not occurrence.is_empty():
+		go("RUN-02", {"occurrence": occurrence})
+		return
 	go("RUN-01", {})

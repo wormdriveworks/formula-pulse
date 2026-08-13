@@ -13,6 +13,8 @@ var data: GameData
 var rng: RngService
 var season: SeasonState
 var outgame: OutgameState
+var events: EventService
+var narrative: NarrativeService
 var profile_index := 1
 
 # 현재 GP
@@ -40,6 +42,37 @@ func begin_career(profile: int) -> void:
 	season.begin_tour()
 	outgame = OutgameState.new()
 	outgame.setup(data)
+	events = EventService.new()
+	events.setup(data, rng)
+	narrative = NarrativeService.new()
+	narrative.setup(data)
+	narrative.begin_season()
+
+
+# 이벤트 노드 판정 (D08 §7 — RACE-03 → RUN-01 사이 삽입 지점의 발생 판정)
+func judge_event() -> Dictionary:
+	var stage_id := season.current_stage_id()
+	# 변형 조건 DSL 의 입력 문맥 — 성적·막 축 (D08 §7.3)
+	var context := {
+		"player_rank": int(last_gp_result.get("player_rank", 16)),
+		"act": 1,
+		"season": season.season,
+		"tour_slot": season.tour_slot,
+	}
+	return events.judge(stage_id, context)
+
+
+# 이벤트 보상 적용 — 화면은 표시만 하고 적용은 세션이 코어에 위임한다
+func apply_event_reward(reward: Dictionary) -> void:
+	match String(reward.get("type", "none")):
+		"credit":
+			outgame.gain_credits(int(reward.get("amount", 0)))
+		"dp":
+			outgame.gain_drive_data(int(reward.get("amount", 0)))
+		"chassis":
+			pass  # 섀시 회복 — GP 간 이월 결선(IMPL-078) 후 적용 지점
+		"relation", "info", "none":
+			pass  # 관계 축·정보성은 별도 경로 (관계 카운터는 대회 경계 스냅)
 
 
 # 다음 그랑프리 개시 — 서킷 선택과 슬롯 보정 주입은 시즌 층 소관이다
@@ -92,6 +125,8 @@ func serialize() -> Dictionary:
 	return {
 		"season": season.serialize() if season != null else {},
 		"rng": rng.serialize() if rng != null else {},
+		"events": events.serialize() if events != null else {},
+		"narrative": narrative.serialize() if narrative != null else {},
 	}
 
 
@@ -105,4 +140,12 @@ func restore(payload: Dictionary) -> bool:
 		return false
 	outgame = OutgameState.new()
 	outgame.setup(data)
+	events = EventService.new()
+	events.setup(data, rng)
+	if payload.has("events"):
+		events.restore(payload["events"])
+	narrative = NarrativeService.new()
+	narrative.setup(data)
+	if payload.has("narrative"):
+		narrative.restore(payload["narrative"])
 	return true

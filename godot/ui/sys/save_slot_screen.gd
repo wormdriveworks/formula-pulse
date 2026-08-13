@@ -77,4 +77,13 @@ func _on_slot_pressed(profile: int, has_save: bool) -> void:
 		# 신규 — 기존 세이브가 있어도 여기서 지우지 않는다. 덮어쓰기는 첫 저장 지점에서
 		# 일어나며, 그 경로에는 백업 회전이 걸려 있다(IMPL-028).
 		session.begin_career(profile)
+		# 시즌 오프닝 VN + 캘린더 공개 비트 (D09 §2.3 — 신규 진입 경로).
+		# [가안] vn 인스턴스 id 는 시즌 단위 발급 — 실문안 트랙 유입 시 대장으로 교체
+		go("NAR-01", {
+			"vn_id": "vn_season_open_s%d" % session.season.season,
+			"slot_id": "vnslot_season_open",
+			"calendar": true,
+			"next": "RACE-01",
+		})
+		return
 	go("RACE-01", {})

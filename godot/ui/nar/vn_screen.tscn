@@ -1,0 +1,136 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/nar/vn_screen.gd" id="1_fdm5n"]
+[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="2_xp8kc"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_512q8"]
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
+bg_color = Color(0.11, 0.12, 0.15, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.38, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5r4y3"]
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
+bg_color = Color(0.11, 0.12, 0.15, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.38, 1)
+
+[node name="VnScreen" type="Control" unique_id=544504972]
+layout_mode = 3
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_fdm5n")
+
+[node name="Background" type="ColorRect" parent="." unique_id=414345010]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.07, 0.08, 0.1, 1)
+
+[node name="StandingRow" type="HBoxContainer" parent="." unique_id=1289425215]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/separation = 120
+alignment = 1
+
+[node name="StandingLeft" type="Control" parent="StandingRow" unique_id=2121975341]
+custom_minimum_size = Vector2(120, 160)
+layout_mode = 2
+
+[node name="StandingRight" type="Control" parent="StandingRow" unique_id=1214027478]
+custom_minimum_size = Vector2(120, 160)
+layout_mode = 2
+
+[node name="SkipButton" type="Button" parent="." unique_id=216977260]
+unique_name_in_owner = true
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = 8.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 9
+
+[node name="DialoguePanel" type="PanelContainer" parent="." unique_id=1871334634]
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_512q8")
+
+[node name="DialogueColumn" type="VBoxContainer" parent="DialoguePanel" unique_id=1414328077]
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="SpeakerLabel" type="Label" parent="DialoguePanel/DialogueColumn" unique_id=2091997148]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.35, 0.85, 0.9, 1)
+
+[node name="BodyLabel" type="Label" parent="DialoguePanel/DialogueColumn" unique_id=124783043]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+autowrap_mode = 3
+
+[node name="DialogueFooter" type="HBoxContainer" parent="DialoguePanel/DialogueColumn" unique_id=956260666]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Spacer" type="Control" parent="DialoguePanel/DialogueColumn/DialogueFooter" unique_id=1233832356]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="AdvanceButton" type="Button" parent="DialoguePanel/DialogueColumn/DialogueFooter" unique_id=1108677850]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+
+[node name="CalendarPanel" type="PanelContainer" parent="." unique_id=463634223]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+theme_override_styles/panel = SubResource("StyleBoxFlat_5r4y3")
+
+[node name="CalendarColumn" type="VBoxContainer" parent="CalendarPanel" unique_id=1156740820]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="CalendarTitle" type="Label" parent="CalendarPanel/CalendarColumn" unique_id=1191702317]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_xp8kc")
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="CalendarList" type="VBoxContainer" parent="CalendarPanel/CalendarColumn" unique_id=736271537]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 2

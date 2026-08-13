@@ -1,0 +1,96 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/run/event_node_screen.gd" id="1_355rn"]
+[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="2_i3lhm"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_be4vl"]
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
+bg_color = Color(0.11, 0.12, 0.15, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.38, 1)
+
+[node name="EventNodeScreen" type="Control" unique_id=776179280]
+layout_mode = 3
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_355rn")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1662376114]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.07, 0.08, 0.1, 1)
+
+[node name="Center" type="CenterContainer" parent="." unique_id=456596264]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="PanelContainer" parent="Center" unique_id=254314309]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_be4vl")
+
+[node name="Column" type="VBoxContainer" parent="Center/Panel" unique_id=11678074]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TitleLabel" type="Label" parent="Center/Panel/Column" unique_id=1854257137]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_i3lhm")
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="BodyLabel" type="Label" parent="Center/Panel/Column" unique_id=603617870]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+autowrap_mode = 3
+
+[node name="RewardRow" type="HBoxContainer" parent="Center/Panel/Column" unique_id=656442315]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="RewardIcon" type="TextureRect" parent="Center/Panel/Column/RewardRow" unique_id=1927919028]
+unique_name_in_owner = true
+texture_filter = 1
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 2
+stretch_mode = 5
+
+[node name="RewardValue" type="Label" parent="Center/Panel/Column/RewardRow" unique_id=1814150748]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.95, 0.85, 0.45, 1)
+
+[node name="RareBadge" type="Label" parent="Center/Panel/Column/RewardRow" unique_id=250092366]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(1, 0.9, 0.4, 1)
+
+[node name="Footer" type="HBoxContainer" parent="Center/Panel/Column" unique_id=1331875308]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Spacer" type="Control" parent="Center/Panel/Column/Footer" unique_id=1268285071]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ProceedButton" type="Button" parent="Center/Panel/Column/Footer" unique_id=849203083]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9

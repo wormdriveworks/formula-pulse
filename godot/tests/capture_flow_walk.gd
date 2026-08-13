@@ -83,6 +83,11 @@ func _drive(screen: Control) -> void:
 			screen._on_new_career()
 		"SaveSlotScreen":
 			screen._on_slot_pressed(1, false)
+		"VnScreen":
+			# 라인 진행 → 캘린더 공개 → 종료까지 진행 입력 반복 (§A-19/§A-20)
+			screen._advance()
+		"EventNodeScreen":
+			(screen.get_node("%ProceedButton") as Button).pressed.emit()
 		"RaceScreen":
 			# 스핀 → (정지 연출) → 확정. 잠금 창은 규격대로 두고 지나가길 기다린다.
 			if screen._timer_active and screen._confirm_lockout <= 0.0:

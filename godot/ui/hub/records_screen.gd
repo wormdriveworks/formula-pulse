@@ -92,9 +92,39 @@ func _fill_career() -> void:
 func _fill_archive() -> void:
 	var s := session.data.strings
 	var panel := %PanelArchive as VBoxContainer
-	# 게이트 표시 요소 전무 — 발생 VN이 아직 없으므로 빈 목록 문면만 (스포일러 방지:
-	# 미발생 이벤트는 목록 비표시가 규격이다)
-	var empty := Label.new()
-	empty.text = s.text("ui.records.archiveEmpty")
-	empty.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
-	panel.add_child(empty)
+	# 게이트 표시 요소 전무 (무상·상시 — D01 G2 조건 2). 발생분 전량 등재 — 스킵분 동일 취급.
+	# 미발생 이벤트는 목록 비표시 (스포일러 방지).
+	var entries := session.narrative.archive_entries()
+	if entries.is_empty():
+		var empty := Label.new()
+		empty.text = s.text("ui.records.archiveEmpty")
+		empty.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+		panel.add_child(empty)
+		return
+	for vn_id in entries:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var name_label := Label.new()
+		name_label.text = _vn_title(String(vn_id))
+		name_label.custom_minimum_size = Vector2(140, 0)
+		row.add_child(name_label)
+		var replay := Button.new()
+		replay.text = s.text("ui.records.replay")
+		# 재생 모드 — 동일 화면 + 종료 시 아카이브 복귀 (§A-19). 전이 재발화 없음(멱등).
+		replay.pressed.connect(func(): go("NAR-01", {
+			"vn_id": String(vn_id), "replay": true, "next": "HUB-05",
+		}))
+		row.add_child(replay)
+		panel.add_child(row)
+
+
+# [가안] VN 인스턴스 id → 표제: 실문안 대장(D04 트랙) 유입 전까지 슬롯 유형으로 표기
+func _vn_title(vn_id: String) -> String:
+	var s := session.data.strings
+	if vn_id.begins_with("vn_season_open"):
+		return s.text("ui.vnSlot.seasonOpen")
+	if vn_id.begins_with("vn_season_close"):
+		return s.text("ui.vnSlot.seasonClose")
+	if vn_id.begins_with("vn_tour_brief"):
+		return s.text("ui.vnSlot.tourBrief")
+	return vn_id
