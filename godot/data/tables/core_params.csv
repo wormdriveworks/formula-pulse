@@ -92,3 +92,10 @@ param_opt_timer_mult_1,1.5
 param_opt_timer_mult_2,2.0
 param_opt_reel_fast_mult,0.5
 param_pause_countin_sec,3
+param_fx_reduced_mult,0.5
+param_fx_shake_weak_px,2
+param_fx_shake_strong_px,4
+param_fx_shake_sec,0.25
+param_fx_flash_alpha,0.35
+param_fx_flash_sec,0.25
+param_fx_gauge_pulse_sec,0.4

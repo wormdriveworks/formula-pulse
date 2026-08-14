@@ -16,6 +16,7 @@ var outgame: OutgameState
 var events: EventService
 var narrative: NarrativeService
 var options: OptionsStore
+var presentation: PresentationGrade
 var profile_index := 1
 
 # 현재 GP
@@ -50,6 +51,8 @@ func begin_career(profile: int) -> void:
 	narrative = NarrativeService.new()
 	narrative.setup(data)
 	narrative.begin_season()
+	presentation = PresentationGrade.new()
+	presentation.setup(data)
 
 
 # 이벤트 노드 판정 (D08 §7 — RACE-03 → RUN-01 사이 삽입 지점의 발생 판정)
@@ -86,6 +89,7 @@ func begin_gp() -> bool:
 	engine = RaceEngine.new()
 	engine.setup(data, rng)
 	season.apply_to_engine(engine)
+	presentation.reset_gp()  # L2/L3 상한 카운터 = GP 단위 (D08 §8.5)
 	return true
 
 
@@ -151,4 +155,6 @@ func restore(payload: Dictionary) -> bool:
 	narrative.setup(data)
 	if payload.has("narrative"):
 		narrative.restore(payload["narrative"])
+	presentation = PresentationGrade.new()
+	presentation.setup(data)
 	return true

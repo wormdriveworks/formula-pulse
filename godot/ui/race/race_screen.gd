@@ -150,6 +150,7 @@ func _with_cost(label_key: String, cost_param: String) -> String:
 func _process(delta: float) -> void:
 	if _paused:
 		return  # 타이머 정지 (D09 §3.7) — 잔량·링·확정 잠금 전부 동결
+	_process_shake(delta)
 	if _confirm_lockout > 0.0:
 		_confirm_lockout = maxf(0.0, _confirm_lockout - delta)
 		_refresh_action_enabled()
@@ -161,7 +162,9 @@ func _process(delta: float) -> void:
 	if _timer_remaining <= 0.0:
 		_timer_active = false
 		_e04_timer_ring.set_active(false)
-		_push_events(engine.timeout())
+		var timeout_events := engine.timeout()
+		_push_events(timeout_events)
+		_run_presentation(timeout_events)  # 타임아웃 자동 확정도 확정이다 — 채널 동일
 		_next_turn()
 
 
@@ -320,12 +323,17 @@ func _on_confirm() -> void:
 	var ratio := 0.0 if _timer_disabled else _timer_remaining / _timer_effective_base
 	var events := engine.confirm(ratio)
 	_push_events(events)
+	_run_presentation(events)  # 확정 후 이벤트에서만 — 봉인 (불변규칙 5)
 	# 듀얼 결과는 프레임 내 표기 후 해제한다 (D09 §3.5). [가안] 표기 유지 0.6초 —
 	# 연출 시간 규격이 D13에 없어 임시값이며 실기 조정 대상이다.
 	if _duel_overlay.visible:
-		var result_key := _duel_result_key(events)
-		if not result_key.is_empty():
-			_duel_overlay.show_result(data.strings.text(result_key))
+		var result_event := _duel_result_event(events)
+		if not result_event.is_empty():
+			# 결과 문면의 매개({amount} 등)는 이벤트 params 로 치환한다 — 로그 번역과 동일 경로
+			var result_text := data.strings.text(
+				String(result_event["key"]), result_event.get("params", {})
+			)
+			_duel_overlay.show_result(result_text)
 			await get_tree().create_timer(0.6).timeout
 	_next_turn()
 
@@ -337,12 +345,11 @@ const DUEL_RESULT_KEYS := [
 ]
 
 
-func _duel_result_key(events: Array) -> String:
+func _duel_result_event(events: Array) -> Dictionary:
 	for event in events:
-		var key := String(event.get("key", ""))
-		if DUEL_RESULT_KEYS.has(key):
-			return key
-	return ""
+		if DUEL_RESULT_KEYS.has(String(event.get("key", ""))):
+			return event
+	return {}
 
 
 func _on_respin() -> void:
@@ -539,6 +546,117 @@ func _update_timer_value() -> void:
 	var seconds := snappedf(_timer_remaining, 0.1)
 	var timer_text := data.strings.text("ui.race.timerFormat", {"value": seconds})
 	_e04_timer_value.text = timer_text
+
+
+# ── 연출 등급 채널 실행 (§3.4 몫 — D09 §3.6 · D12 §5.8) ──
+# 등급 판정·상한·우선순위는 코어(PresentationGrade)가 갖고, 여기서는 **확정된 등급의
+# 표현 채널만** 실행한다. 접근성 옵션(O1~O3)은 출력 단계 마스킹이며 판정에 관여하지 않는다.
+#
+# 트리거 후보는 확정 후(T5) 이벤트에서만 뽑는다 — 릴 정지 연출 전에 발화하면
+# 그 자체가 결과 상관 신호다 (봉인 — 불변규칙 5).
+const TRIGGER_BY_KEY := {
+	"raceLog.duelWin01": "trigger_duel_decision",
+	"raceLog.duelLoseOvertake01": "trigger_duel_decision",
+	"raceLog.duelLoseDefense01": "trigger_duel_decision",
+	"raceLog.chanceDuel01": "trigger_chance_three_match",
+}
+
+var _shake_left := 0.0
+var _shake_strength := 0.0
+
+
+func _collect_triggers(events: Array) -> Array:
+	var triggers: Array = []
+	for event in events:
+		var key := String(event.get("key", ""))
+		if TRIGGER_BY_KEY.has(key):
+			var trigger := String(TRIGGER_BY_KEY[key])
+			if not triggers.has(trigger):
+				triggers.append(trigger)
+			# 벽 라이벌 격파 = 듀얼 승리 + 상대가 무대 벽 라이벌 (D08 §8.5 — 무대 1은 부재라
+			# 자연 미발동. 매핑만 결선해 두면 무대 2+ 데이터 유입 시 그대로 붙는다)
+			if key == "raceLog.duelWin01":
+				var wall := String(data.stage_of_active_circuit().get("wall_rival", ""))
+				if not wall.is_empty() and engine.duel_opponent == wall:
+					triggers.append("trigger_wall_rival_beat")
+	return triggers
+
+
+func _run_presentation(events: Array) -> void:
+	var triggers := _collect_triggers(events)
+	if triggers.is_empty():
+		return
+	# 한 턴의 후보를 배치로 넘긴다 — 개별 호출은 우선순위 역전을 만든다 (IMPL-034)
+	for resolved in session.presentation.resolve(triggers):
+		var channels: Dictionary = session.presentation.channels(String(resolved["grade"]))
+		_fire_channels(channels)
+
+
+func _fire_channels(channels: Dictionary) -> void:
+	if channels.is_empty():
+		return
+	var code := String(channels.get("code", "L0"))
+	# 로그 채널은 이벤트 자체가 이미 발화했다 (전 등급 공통).
+	# SFX 스팅·햅틱: 음원·지속 시간 실물 부재 — sting_length_sec 소비 지점만 확보(IMPL-035).
+	if code == "L1":
+		_pulse_gauge()
+		_start_shake(data.param("param_fx_shake_weak_px"))
+	elif code == "L2" or code == "L3":
+		_start_shake(data.param("param_fx_shake_strong_px"))
+		if bool(channels.get("flash_slow", false)):
+			_fire_flash()
+	# L3 전용 일러스트 컷인: 도트 CG 미유입 + 발동 조건(찬스 3매치 + 히든)이 무대 1 골격
+	# 밖이라 소비부를 두지 않는다 — CG 유입 시 결선. 정보 채널(로그)은 이미 보존된다.
+
+
+# 게이지 섬광 (L1 — D09 §3.6). 플래시(O2)와 별개 채널이라 감쇠 대상이 아니다 —
+# 게이지 자체가 정보 표시이므로 정보 보존 축에 속한다.
+func _pulse_gauge() -> void:
+	var duration := data.param("param_fx_gauge_pulse_sec")
+	var tween := create_tween()
+	tween.tween_property(_e03_front, "modulate", Color(1.6, 1.6, 1.6), duration * 0.3)
+	tween.tween_property(_e03_front, "modulate", Color.WHITE, duration * 0.7)
+
+
+# 셰이크 — O1 감쇠 (표준 1.0 / 감소 0.5 / 끔 0 — 출력 마스킹, D09 §6.3)
+func _start_shake(base_px: float) -> void:
+	var mask := _fx_mask("o1")
+	if mask <= 0.0:
+		return
+	_shake_strength = base_px * mask
+	_shake_left = data.param("param_fx_shake_sec")
+
+
+# 플래시 — O2 감쇠 (광과민 대응). 끔이어도 로그·게이지의 정보 채널은 남는다 (정보 보존 의무)
+func _fire_flash() -> void:
+	var mask := _fx_mask("o2")
+	if mask <= 0.0:
+		return
+	var flash := %FxFlash as ColorRect
+	flash.color.a = data.param("param_fx_flash_alpha") * mask
+	var tween := create_tween()
+	tween.tween_property(flash, "color:a", 0.0, data.param("param_fx_flash_sec"))
+
+
+func _fx_mask(option_id: String) -> float:
+	match session.options.index_of(option_id):
+		1:
+			return data.param("param_fx_reduced_mult")
+		2:
+			return 0.0
+	return 1.0
+
+
+func _process_shake(delta: float) -> void:
+	var root_box := get_node("Root") as Control
+	if _shake_left <= 0.0:
+		if root_box.position != Vector2.ZERO:
+			root_box.position = Vector2.ZERO
+		return
+	_shake_left -= delta
+	# 결정적 흔들림 — 난수를 쓰지 않는다 (RNG 스트림은 게임 로직 전속 — D12 §6)
+	var phase := _shake_left * 60.0
+	root_box.position = Vector2(sin(phase * 1.7), cos(phase * 2.3)) * _shake_strength
 
 
 # ── 이벤트 → 표시 경로 분기 (D09 §3.1 국면 분리) ──
