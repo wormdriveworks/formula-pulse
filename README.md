@@ -5,7 +5,7 @@
 | 경로 | 내용 |
 |---|---|
 | `CLAUDE.md` | AI 에이전트 상시 지침 (불변 규칙 + 문서 라우팅) — **모든 작업의 출발점** |
-| `docs/master_plan_v2_28.md` | 단일 진실 원천 (문서 판번·운영 규칙) |
+| `docs/master_plan_v2_30.md` | 단일 진실 원천 (문서 판번·운영 규칙) |
 | `docs/design/` | 설계 정본 D01~D16 (21파일) — 읽기 전용 |
 | `docs/reverse_design/` | 역기획 1~4단계 (참고 자료) |
 | `docs/decisions/impl_log.md` | 구현 단계 결정 로그 |

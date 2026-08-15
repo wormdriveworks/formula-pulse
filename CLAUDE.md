@@ -110,10 +110,10 @@ C:\SDKs\godot\Godot_v4.7.1-stable_win64_console.exe  ← CLI 전용 (실측 검�
 내러티브 턴제 레이싱 로그라이트. 슬롯 릴로 섹터를 주파하고, 자원으로 무작위성을 통제한다.
 설계 문서 **D01~D16 전량 확정** 상태이며, 본 리포지토리는 **구현 단계** 전용이다.
 
-- **단일 진실 원천:** `docs/master_plan_v2_28.md`
+- **단일 진실 원천:** `docs/master_plan_v2_30.md`
 - **설계 정본:** `docs/design/` (21개 파일 — **읽기 전용. 수정 금지**)
 - **구현 결정 로그:** `docs/decisions/impl_log.md`
-- **현재 마일스톤:** MS-1 프로토타입 (D15 §1.1) — 착수 프롬프트 = `prompts/MS1_kickoff.md`
+- **현재 마일스톤:** MS-2 버티컬 슬라이스 (D15 §1.1) — 착수 프롬프트 = `prompts/MS2_kickoff.md` · 레인 인계 = `docs/handoff/` (주력 레인 마감 2026-08-15 · 잔여 = 원격 레인 + 게이트 외 완료 조건 충족 상태)
 
 ## 기술 스택 (D12 v1.1 §1 확정 — 변경 금지)
 - **Godot 4.7 계열 핀** (v1.1 결정 #11 — v1.0 핀 4.4에서 갱신) · **GDScript 주 언어** (성능 임계 지점 한정 C#/GDExtension 보조 — 남용 금지) · **Compatibility 렌더러 단일**
