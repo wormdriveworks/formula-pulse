@@ -11,7 +11,7 @@
 extends SceneTree
 
 const FIXTURE_DIR := "res://tests/fixtures/tables/"
-const MIN_CHECKS := 40
+const MIN_CHECKS := 55
 
 var _failures := 0
 var _checked := 0
@@ -23,6 +23,7 @@ func _init() -> void:
 	_outgame_reads_data()
 	_reel_columns_are_distinct()
 	_save_layer_reads_data()
+	_new_consumers_read_data()
 	print("")
 	if _checked < MIN_CHECKS:
 		print("DATA_DRIVEN_TEST_FAIL checks=%d < 하한 %d (스위트 축소·로드 실패 의심)" % [_checked, MIN_CHECKS])
@@ -298,3 +299,74 @@ func _save_layer_reads_data() -> void:
 	_ok("범위 밖 프로필 파일 미생성",
 		not FileAccess.file_exists(SaveManager.progress_path(count + 1)))
 	SaveService.delete_save(SaveManager.progress_path(count + 1))
+
+
+# ── 신규 소비부 (인계 §3-5 — IMPL-087·090 계열) — 값을 갈아 끼우면 거동이 따라오는가 ──
+# fx 파라미터(param_fx_*)·릴 고속·타이머 배율은 소비부가 화면 실행 층(race_screen)이라
+# 본 로직 스위트의 사정권 밖이다 — 실행 층 검증(SEAL-E·캡처) 소관으로 기록만 남긴다.
+func _new_consumers_read_data() -> void:
+	var data := _fixture_data()
+	if data == null:
+		return
+	# 다음 회차 비용 조회 (IMPL-079): 현재 × 데이터 체증 (픽스처 2.0 · 기본 1.5)
+	var state := OutgameState.new()
+	state.setup(data)
+	var now := state.field_repair_cost()
+	var next := state.field_repair_cost_next()
+	_eq_float("다음 회차 비용 = 현재 × 데이터 체증", float(next) / float(now),
+		data.param("param_repair_escalation"), 0.05)
+	_ok("다음 회차 비용이 리터럴 1.5 체증이 아니다", next != int(round(float(now) * 1.5)),
+		"next=%d now=%d" % [next, now])
+	_ok("다음 회차 조회는 카운터 무변경", state.field_repair_cost() == now)
+	# 무상 복원선 (픽스처 40 · 기본 70) — begin_tour 하한과 필드 정비 절단이 데이터 값
+	state.chassis = 0.0
+	state.begin_tour()
+	_eq_float("무상 복원선 = 데이터 값", state.chassis, data.param("param_repair_free_restore_line"))
+	_ok("복원선이 리터럴 70이 아니다", absf(state.chassis - 70.0) > 0.0001,
+		"chassis=%f" % state.chassis)
+	state.gain_credits(100000)
+	_ok("복원선 도달 후 필드 정비 무동작 = 데이터 기준", state.field_repair(999) == 0,
+		"chassis=%f" % state.chassis)
+	# 이벤트 회복 상한 = 데이터 필드 정비 상한 (픽스처 7 · 기본 30)
+	var ev := OutgameState.new()
+	ev.setup(data)
+	ev.chassis = 0.0
+	var recovered := ev.event_chassis_recover(50)
+	_ok("이벤트 회복 상한 = 데이터 값", recovered == data.param_int("param_repair_field_cap"),
+		"recovered=%d" % recovered)
+	_ok("이벤트 회복 상한이 리터럴 30이 아니다", recovered != 30, "recovered=%d" % recovered)
+	# 이월 절단 = 데이터 최대치 (픽스처 80 · 기본 100)
+	var engine := RaceEngine.new()
+	engine.setup(data, _rng(4001))
+	engine.chassis_carry_in = 999.0
+	engine.start_gp()
+	_eq_float("이월 절단 = 데이터 최대치", engine.chassis, data.param("param_chassis_max"))
+	_ok("이월 절단이 리터럴 100이 아니다", absf(engine.chassis - 100.0) > 0.0001,
+		"chassis=%f" % engine.chassis)
+	# 옵션 파라미터 (픽스처 60·25 · 기본 80·10) — 기기 옵션 파일은 백업 후 원복한다
+	# (주력 머신에서 이 스위트를 돌려도 기기 설정이 지워지지 않아야 한다)
+	var options_path := SaveManager.OPTIONS_PATH
+	var backup_text := ""
+	var had_options := FileAccess.file_exists(options_path)
+	if had_options:
+		var backup_file := FileAccess.open(options_path, FileAccess.READ)
+		backup_text = backup_file.get_as_text()
+		backup_file.close()
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(options_path))
+	var options := OptionsStore.new()
+	options.setup(data)
+	_ok("볼륨 기본값 = 데이터 값", options.index_of("o13") == data.param_int("param_opt_volume_default"),
+		"value=%d" % options.index_of("o13"))
+	_ok("볼륨 기본값이 리터럴 80이 아니다", options.index_of("o13") != 80,
+		"value=%d" % options.index_of("o13"))
+	_ok("볼륨 스텝 = 데이터 값", options.volume_step() == data.param_int("param_opt_volume_step"),
+		"step=%d" % options.volume_step())
+	_ok("볼륨 스텝이 리터럴 10이 아니다", options.volume_step() != 10,
+		"step=%d" % options.volume_step())
+	if had_options:
+		var restore_file := FileAccess.open(options_path, FileAccess.WRITE)
+		restore_file.store_string(backup_text)
+		restore_file.close()
+	else:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(options_path))
+	_ok("신규 소비부 경로에서 침묵 기본값 0", data.is_ok())

@@ -58,7 +58,7 @@ param_repair_base_cr,100
 param_repair_escalation,2.0
 param_repair_season_rank_coef,0.0
 param_repair_full_cr_per_ch,5
-param_repair_free_restore_line,70
+param_repair_free_restore_line,40
 param_tuning_refund_ratio,0.8
 param_tuning_max_step,2
 param_consumable_carry_cap,1
@@ -78,3 +78,5 @@ param_parts_cap_per_line,0.1
 param_parts_cap_total,0.2
 param_vn_season_cap,15
 param_vn_milestone_cap,8
+param_opt_volume_default,60
+param_opt_volume_step,25
