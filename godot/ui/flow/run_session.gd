@@ -160,12 +160,14 @@ func restore(payload: Dictionary) -> bool:
 		return false
 	events = EventService.new()
 	events.setup(data, rng)
-	if payload.has("events"):
-		events.restore(payload["events"])
+	# 복원 실패는 전파한다 — 무시하면 손상 payload가 조용히 초기 상태로 리셋되어
+	# 백업 복구 경로(TC-P8) 대신 "멀쩡히 로드된 척"이 된다 (season·outgame과 동일 취급)
+	if payload.has("events") and not events.restore(payload["events"]):
+		return false
 	narrative = NarrativeService.new()
 	narrative.setup(data)
-	if payload.has("narrative"):
-		narrative.restore(payload["narrative"])
+	if payload.has("narrative") and not narrative.restore(payload["narrative"]):
+		return false
 	presentation = PresentationGrade.new()
 	presentation.setup(data)
 	return true

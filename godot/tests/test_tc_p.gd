@@ -25,12 +25,13 @@ func _init() -> void:
 	_counter_survives_corruption()
 	_not_configured_is_distinct()
 	_session_outgame_round_trip()
+	_session_service_round_trip()
 	_clean_profiles()
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 125:
-		print("TC_P_TEST_FAIL checks=%d < 하한 125 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 132:
+		print("TC_P_TEST_FAIL checks=%d < 하한 132 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -475,3 +476,49 @@ func _session_outgame_round_trip() -> void:
 	_ok("구세이브(outgame 부재) 복원 성립", legacy.restore(payload))
 	_ok("구세이브 섀시 = 최대치", legacy.outgame.chassis == data.param("param_chassis_max"),
 		"chassis=%f" % legacy.outgame.chassis)
+
+
+# ── 세션 왕복 — 이벤트·서사 층 (IMPL-086 편입분의 왕복 검증 — 인계 §3-6) ──
+# 인메모리 왕복이 아니라 **디스크(SaveManager) 경유**로 돈다 — JSON 직렬화가 만드는
+# 타입 변형(int→float 등)까지 검사 대상에 들어온다.
+func _session_service_round_trip() -> void:
+	var data := GameData.new()
+	if not data.load_all():
+		_failures += 1
+		print("  [FAIL] data load")
+		return
+	var session := RunSession.new()
+	session.setup(data)
+	session.begin_career(2)
+	session.events._cooldowns = {"event_fan_letter": 3}
+	session.events.judgment_count = 7
+	session.events.occurrence_count = 2
+	session.narrative.vn_seen = {"vn_season_open_s1": true}
+	session.narrative.vn_skipped = {"vn_season_open_s1": true}
+	session.narrative._transitions_fired = {"milestone_first_podium": true}
+	session.narrative.season_vn_count = 1
+	session.narrative.milestone_vn_count = 2
+	var saved := SaveManager.save_progress(2, session.serialize())
+	_ok("서비스 층 저장", bool(saved["ok"]), str(saved.get("error")))
+	var loaded := SaveManager.load_progress(2)
+	_ok("서비스 층 로드", bool(loaded["ok"]), str(loaded.get("error")))
+	var restored := RunSession.new()
+	restored.setup(data)
+	_ok("세션 복원 (서비스 층)", restored.restore(loaded["payload"]))
+	_ok("이벤트 쿨다운 보존", int(restored.events._cooldowns.get("event_fan_letter", 0)) == 3,
+		str(restored.events._cooldowns))
+	_ok("이벤트 카운터 보존", restored.events.judgment_count == 7
+		and restored.events.occurrence_count == 2,
+		"judged=%d occurred=%d" % [restored.events.judgment_count, restored.events.occurrence_count])
+	_ok("VN 열람·스킵 기록 보존", restored.narrative.vn_seen.has("vn_season_open_s1")
+		and restored.narrative.vn_skipped.has("vn_season_open_s1"))
+	# 전이 재발화 방지 기록 — 유실되면 재로드가 마일스톤 VN을 재발화한다 (아카이브 멱등 훼손)
+	_ok("전이 발화 기록 보존", restored.narrative._transitions_fired.has("milestone_first_podium"))
+	_ok("VN 카운터 보존", restored.narrative.season_vn_count == 1
+		and restored.narrative.milestone_vn_count == 2)
+	# 손상 서비스 payload = 복원 실패 전파 (조용한 초기화 금지 — 백업 복구 경로가 살아야 한다)
+	var corrupt: Dictionary = session.serialize()
+	corrupt["narrative"] = {}
+	var strict := RunSession.new()
+	strict.setup(data)
+	_ok("손상 서사 payload = 복원 실패", not strict.restore(corrupt))
