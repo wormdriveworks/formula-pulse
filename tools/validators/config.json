@@ -86,7 +86,8 @@
     "form_var": "float",
     "duel_overtake_add": "float",
     "duel_defense_override": "float_optional",
-    "stability_under_pressure": "float_optional"
+    "stability_under_pressure": "float_optional",
+    "number": "int"
    }
   },
   "points_tier1.csv": {

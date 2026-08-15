@@ -28,7 +28,7 @@ fi
 TESTS=(
 	"tests/test_core_loop.gd:0"
 	"tests/test_save_reload.gd:0"
-	"tests/test_tc_c.gd:933"
+	"tests/test_tc_c.gd:942"
 	"tests/test_tc_p.gd:127"
 	"tests/test_events.gd:6000"
 	"tests/test_season.gd:450"
