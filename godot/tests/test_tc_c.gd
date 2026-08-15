@@ -36,8 +36,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 850:
-		print("TC_C_TEST_FAIL checks=%d < 하한 850 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 925:
+		print("TC_C_TEST_FAIL checks=%d < 하한 925 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -802,6 +802,36 @@ func _tc_c9_chassis_retire() -> void:
 	hazard.confirm(0.0)
 	_ok("TC-C9 해저드 섹터 섀시 소모 가중", hazard.chassis < flat.chassis,
 		"hazard=%f flat=%f" % [hazard.chassis, flat.chassis])
+	# GP 간 이월 주입 (D05 §8 "자동 완전 회복 없다" — IMPL-078 해소).
+	# 엔진은 주입 값을 소비만 한다 — 미주입(음수) = 최대치 개시로 기존 계약 불변.
+	var carried := _new_engine(77)
+	carried.chassis_carry_in = 55.0
+	carried.start_gp()
+	_eq_float("이월 주입 = 개시 섀시", carried.chassis, 55.0)
+	var over := _new_engine(77)
+	over.chassis_carry_in = 250.0
+	over.start_gp()
+	_eq_float("이월 상한 절단 (250→최대치)", over.chassis, over.data.param("param_chassis_max"))
+	var fresh := _new_engine(77)
+	fresh.start_gp()
+	_eq_float("미주입 = 최대치 개시 (기존 계약)", fresh.chassis, fresh.data.param("param_chassis_max"))
+	# 카 넘버 — D03 결정 로그 #13-③ 확정 8인분의 전사 대조 (총괄 회신 E-2)
+	var expected_numbers := {"ai_lorentz": 1, "ai_maro": 2, "ai_diaz": 18, "ai_volkova": 81,
+		"ai_holloway": 5, "ai_bianca": 51, "ai_sherwood": 24, "ai_jude": 77}
+	for row in fresh.data.rivals:
+		var rival_id := String(row["id"])
+		_ok("D03 카 넘버 전사: %s" % rival_id,
+			CsvTable.to_int(String(row["number"])) == int(expected_numbers.get(rival_id, -1)),
+			"number=%s" % String(row["number"]))
+	# 그리드 카 넘버 유일성 — 필러가 네임드 실넘버(24 등)와 겹치면 표기 층이 오식별한다
+	var seen_numbers := {}
+	var duplicate_numbers := 0
+	for entrant_id in fresh.entrants:
+		var entrant_number := int(fresh.entrants[entrant_id]["number"])
+		if seen_numbers.has(entrant_number):
+			duplicate_numbers += 1
+		seen_numbers[entrant_number] = true
+	_ok("그리드 카 넘버 유일", duplicate_numbers == 0, "dupes=%d" % duplicate_numbers)
 
 
 # ── TC-C11 봉인 규칙 — 릴 정지 연출 완료 전 결과·결과 상관 신호 노출 0 (D02 §4 · D12 §6.3) ──

@@ -75,10 +75,13 @@ func _refresh_row(tuning_id: String) -> void:
 	var row: HBoxContainer = _rows[tuning_id]
 	var step := session.outgame.tuning_step(tuning_id)
 	var max_step := int(session.data.param("param_tuning_max_step"))
-	# 단계 게이지 ●●●○○ (§A-13) — 텍스트 표기, 게이지 에셋 유입 시 교체
+	# 단계 게이지 ●●●○○ (§A-13) — 텍스트 표기, 게이지 에셋 유입 시 교체.
+	# ●/○ 도 스트링 키 경유다 (V4 — 전 표시 문자열 키 참조)
+	var step_filled := s.text("ui.tuningBench.stepFilled")
+	var step_empty := s.text("ui.tuningBench.stepEmpty")
 	var filled := ""
 	for i in range(max_step):
-		filled += "●" if i < step else "○"
+		filled += step_filled if i < step else step_empty
 	(row.get_node("Gauge") as Label).text = filled
 	var cost_label := row.get_node("Cost") as Label
 	var buy := row.get_node("Buy") as Button

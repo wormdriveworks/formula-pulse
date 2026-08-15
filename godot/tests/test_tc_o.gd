@@ -22,8 +22,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 230:
-		print("TC_O_TEST_FAIL checks=%d < 하한 230 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 245:
+		print("TC_O_TEST_FAIL checks=%d < 하한 245 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -347,7 +347,9 @@ func _tc_o6_exchange_guards() -> void:
 		# `field_repair_cost_next` 는 D07 §3.3·D09 §4.3이 **사전 표시를 필수**로 요구하는
 		# 다음 회차 비용의 조회 경로다 (표시 전용 · 체증 카운터 무변경 — IMPL-079).
 		"field_repair_cost", "field_repair_cost_next", "field_repair", "begin_tour",
-		"full_repair", "free_restore_line",
+		# `full_repair_cost` 는 D09 §4.3 비용 표시의 조회 경로 (IMPL-079와 같은 구조 — 표시 전용).
+		# `event_chassis_recover` 는 D06 §3.4 이벤트 회복의 유일 진입로 (회당 상한 가드 내장).
+		"full_repair", "full_repair_cost", "free_restore_line", "event_chassis_recover",
 		"tuning_step", "tuning_cost", "buy_tuning", "tuning_refund_ratio", "redistribute_tuning",
 		"overhaul_slots", "install_overhaul", "parts_stat_bonus",
 		"skill_tier_open", "unlock_cost", "unlock_skill", "expand_deck", "set_deck",
@@ -508,26 +510,75 @@ func _repair_and_consumables() -> void:
 	var state := _new_state()
 	if state == null:
 		return
+	# 섀시 이월분의 아웃게임 정본 (D05 §8 이월 결선 — IMPL-078 해소)
+	var maximum := state.data.param("param_chassis_max")
+	_ok("새 커리어 섀시 = 최대치 [가안]", state.chassis == maximum, "chassis=%f" % state.chassis)
 	# 회차 체증: 200 → 300 → 450 (기준액 × 1.5^(n−1)) · 테오 −10% 반영
 	var expected_first := int(round(200.0 * 0.9))
 	_ok("1회차 정비비 = 200 × (테오 −10%)", state.field_repair_cost() == expected_first,
 		"actual=%d expected=%d" % [state.field_repair_cost(), expected_first])
 	state.gain_credits(10000)
-	state.field_repair(30)
+	# 회복 여지 없음 = 무동작 — 지불·체증 카운터 무변경 (헛돈이 나가지 않는다)
+	var credits_before := state.credits
+	_ok("만충 시 필드 정비 무동작", state.field_repair(30) == 0
+		and state.credits == credits_before and state.field_repair_cost() == expected_first)
+	# 회복 적용 + 회당 상한 30 CH 절단 (D06 §3.4 경제 가드)
+	state.chassis = 10.0
+	_ok("회당 상한 절단·적용 (10→40)", state.field_repair(100) == 30 and state.chassis == 40.0,
+		"chassis=%f" % state.chassis)
 	var expected_second := int(round(200.0 * 1.5 * 0.9))
 	_ok("2회차 정비비 = ×1.5", state.field_repair_cost() == expected_second,
 		"actual=%d expected=%d" % [state.field_repair_cost(), expected_second])
-	# 회당 상한 30 CH 절단 (D06 §3.4 경제 가드)
-	_ok("회당 상한 절단", state.field_repair(100) == 30, "restored=%d" % state.field_repair(0))
+	# 복원선 절단 — 초과 구간(70~100)의 유일 수단은 전면 정비 (D07 §3.3 명문)
+	_ok("복원선 절단 (40→70)", state.field_repair(100) == 30 and state.chassis == 70.0,
+		"chassis=%f" % state.chassis)
+	_ok("복원선 도달 후 필드 정비 무동작", state.field_repair(100) == 0 and state.chassis == 70.0)
 	# 체증 카운터는 투어 개시에 리셋
 	state.begin_tour()
 	_ok("투어 개시 시 체증 리셋", state.field_repair_cost() == expected_first,
 		"actual=%d" % state.field_repair_cost())
-	# 전면 정비 = 20 Cr/CH · 상한 없음
+	# 투어 개시 무상 복원선 = 하한 (D06 §3.3 결정 #12 — 위면 유지·아래면 끌어올림)
+	state.chassis = 10.0
+	state.begin_tour()
+	_ok("투어 개시 무상 복원선 (10→70)", state.chassis == 70.0, "chassis=%f" % state.chassis)
+	state.chassis = 85.0
+	state.begin_tour()
+	_ok("복원선 위는 유지 (85)", state.chassis == 85.0, "chassis=%f" % state.chassis)
+	# 전면 정비 = 20 Cr/CH · 상한 없음 · 완전 회복 (테오 −10%)
 	var full := _new_state()
 	full.gain_credits(10000)
-	var restored := full.full_repair(50)
-	_ok("전면 정비 상한 없음 (50 CH)", restored == 50, "restored=%d" % restored)
+	full.chassis = 50.0
+	var expected_full_cost := int(round(50.0 * 20.0 * 0.9))
+	_ok("전면 정비 비용 조회 (표시 전용)", full.full_repair_cost() == expected_full_cost,
+		"actual=%d expected=%d" % [full.full_repair_cost(), expected_full_cost])
+	var full_credits := full.credits
+	var restored := full.full_repair()
+	_ok("전면 정비 상한 없음·완전 회복 (50 CH)", restored == 50 and full.chassis == maximum,
+		"restored=%d chassis=%f" % [restored, full.chassis])
+	_ok("전면 정비 지불", full.credits == full_credits - expected_full_cost,
+		"credits=%d" % full.credits)
+	_ok("만충 시 전면 정비 무동작", full.full_repair() == 0
+		and full.credits == full_credits - expected_full_cost)
+	# 이벤트 회복 — 회당 상한 가드 (D06 §3.4 "필드 정비의 회당 상한을 초과할 수 없다")
+	var ev := _new_state()
+	ev.chassis = 20.0
+	_ok("이벤트 회복 상한 가드 (50 요청→30 적용)",
+		ev.event_chassis_recover(50) == 30 and ev.chassis == 50.0, "chassis=%f" % ev.chassis)
+	ev.chassis = 95.0
+	_ok("이벤트 회복 최대치 절단 (95→100)",
+		ev.event_chassis_recover(10) == 5 and ev.chassis == maximum, "chassis=%f" % ev.chassis)
+	# 직렬화 왕복 — 섀시 이월분 보존 (세이브를 건너면 이월이 사라지는 회귀 방지)
+	var trip := _new_state()
+	trip.chassis = 33.0
+	var back := _new_state()
+	_ok("직렬화 왕복 섀시 보존", back.restore(trip.serialize()) and back.chassis == 33.0,
+		"chassis=%f" % back.chassis)
+	# 이월 도입 전 세이브(chassis 키 부재) = 최대치 복원 (그 세계의 충실한 기본값)
+	var legacy := trip.serialize()
+	legacy.erase("chassis")
+	var legacy_state := _new_state()
+	_ok("구세이브 복원 = 최대치", legacy_state.restore(legacy) and legacy_state.chassis == maximum,
+		"chassis=%f" % legacy_state.chassis)
 	# 소모품 휴대 상한 2
 	var shop := _new_state()
 	shop.gain_credits(10000)

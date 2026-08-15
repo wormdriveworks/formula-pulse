@@ -11,6 +11,7 @@
 extends Control
 
 var _icons: Array[TextureRect] = []
+var _strings: StringTable
 
 @onready var _opponent_label: Label = %OpponentLabel
 @onready var _player_label: Label = %PlayerLabel
@@ -28,15 +29,23 @@ func reel_icons() -> Array[TextureRect]:
 	return _icons
 
 
-# 대치 표기 — No.13(플레이어 — D03 §1.1 데칼) ↔ 상대.
-# [가안] 네임드 카 넘버: ai_rivals 데이터에 넘버 열이 없어(엔진 실측 0) 이름만 표기한다.
-# 카 넘버 대장은 D03 소관 설정값이라 임의 기입하지 않는다 — IMPL-084. 필러는 넘버 보유.
+# 대치 표기 — No.13(플레이어 — D03 §1.1 데칼) ↔ 상대 "No.{넘버} {이름}" (§A-7 E01 "No.1 로렌츠").
+# 네임드 카 넘버는 D03 결정 로그 #13-③ 확정값의 데이터 전사(IMPL-092)로 결선됐다.
+# 네임드 초상 미니(E01 잔여)는 아트 실물 유입 대상 — 주력 레인 몫.
 func show_duel(strings: StringTable, opponent: Dictionary, duel_type: int) -> void:
+	_strings = strings
 	var player_text := strings.text("ui.duel.playerFormat", {"number": 13})
 	_player_label.text = player_text
-	var opponent_name := strings.text(String(opponent["name_key"]), {
-		"number": int(opponent["number"]),
-	}) if bool(opponent["is_filler"]) else strings.text(String(opponent["name_key"]))
+	var opponent_name := ""
+	if bool(opponent["is_filler"]):
+		opponent_name = strings.text(String(opponent["name_key"]), {
+			"number": int(opponent["number"]),
+		})
+	else:
+		opponent_name = strings.text("ui.duel.namedFormat", {
+			"number": int(opponent["number"]),
+			"name": strings.text(String(opponent["name_key"])),
+		})
 	_opponent_label.text = opponent_name
 	var kind_key := "ui.duel.overtake" if duel_type == RaceTypes.DuelType.OVERTAKE else "ui.duel.defense"
 	(%KindLabel as Label).text = strings.text(kind_key)
@@ -46,10 +55,13 @@ func show_duel(strings: StringTable, opponent: Dictionary, duel_type: int) -> vo
 	visible = true
 
 
+# ◆/◇ 도 스트링 키 경유다 (V4 — 전 표시 문자열 키 참조 · ui.race.costFormat "◆{cost}" 전례)
 func set_boost(count: int, cap: int, can_add: bool) -> void:
+	var filled := _strings.text("ui.duel.boostFilled")
+	var empty := _strings.text("ui.duel.boostEmpty")
 	var stack := ""
 	for i in range(cap):
-		stack += "◆" if i < count else "◇"
+		stack += filled if i < count else empty
 	_boost_stack.text = stack
 	_boost_button.disabled = not can_add
 

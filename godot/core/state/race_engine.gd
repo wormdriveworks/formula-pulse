@@ -34,6 +34,9 @@ var positions: Array = []
 
 # 플레이어 자원 (D05 §6.2·§8 — 인게임 자원은 차지·섀시 이원이 전부)
 var chassis: float = 0.0
+# GP 간 이월 주입분 (D05 §8 — "그랑프리 간 자동 완전 회복은 없다"). 음수 = 미주입(최대치 개시).
+# 이월 값의 소유는 아웃게임 층이고 엔진은 주입된 값을 소비만 한다 — 세션이 start_gp 전에 넣는다.
+var chassis_carry_in: float = -1.0
 var charge: int = 0
 var front_gauge: float = 0.0
 var rear_gauge: float = 0.0
@@ -98,7 +101,11 @@ func start_gp() -> Array:
 	duel_count = 0
 	ai_retire_count = 0
 	_retire_order = 0
-	chassis = data.param("param_chassis_max")
+	if chassis_carry_in >= 0.0:
+		# 이월 개시 (D05 §8) — 주입 값은 [0, 최대치]로 절단한다 (세이브 조작·상한 초과 방어)
+		chassis = clampf(chassis_carry_in, 0.0, data.param("param_chassis_max"))
+	else:
+		chassis = data.param("param_chassis_max")
 	charge = 0
 	front_gauge = 0.0
 	rear_gauge = 0.0
@@ -147,11 +154,21 @@ func _build_entrants() -> void:
 			"pressure_mult": CsvTable.to_float(String(team.get("pressure_mult", "1")), 1.0),
 			"duel_overtake_add": CsvTable.to_float(String(row["duel_overtake_add"])),
 			"duel_defense_override": CsvTable.to_float(String(row["duel_defense_override"]), -1.0),
-			"retired": false, "retire_order": -1, "number": 0,
+			# 카 넘버 = D03 결정 로그 #13-③ 확정 8인분의 데이터 전사 (임의 기입 아님)
+			"retired": false, "retire_order": -1, "number": CsvTable.to_int(String(row["number"])),
 		}
 	var filler_var := data.param("param_filler_stat_var")
 	var filler_form := data.param("param_form_var_filler")
+	# 필러 넘버는 21부터 순차 [가안 — 정본 미규정]. 네임드·플레이어 실넘버(D03 확정)와
+	# 겹치면 건너뛴다 — 그리드에 같은 카 넘버가 둘 나오면 표기 층이 오식별한다.
+	var used_numbers: Dictionary = {}
+	for entrant_id in entrants:
+		used_numbers[int(entrants[entrant_id]["number"])] = true
+	var next_number := 21
 	for i in range(data.grid_int("filler_count")):
+		while used_numbers.has(next_number):
+			next_number += 1
+		used_numbers[next_number] = true
 		var filler_id := "filler_%02d" % (i + 1)
 		entrants[filler_id] = {
 			"id": filler_id, "name_key": "ui.race.fillerName", "is_player": false, "is_filler": true,
@@ -165,7 +182,7 @@ func _build_entrants() -> void:
 			"form": rng.randf_range("ai", -filler_form, filler_form),
 			"pressure_mult": 1.0,
 			"duel_overtake_add": 0.0, "duel_defense_override": -1.0,
-			"retired": false, "retire_order": -1, "number": 20 + i + 1,
+			"retired": false, "retire_order": -1, "number": next_number,
 		}
 	# 슬롯 진행 보정: 그리드 전체의 기저 강도에 가산 (D08 §2.4 — 무대 다이얼과 독립된 슬롯 다이얼).
 	# 플레이어는 대상이 아니다 — 보정의 목적어가 "필러·경쟁 풀의 기본 파라미터"다.

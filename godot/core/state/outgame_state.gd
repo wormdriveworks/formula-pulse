@@ -30,6 +30,9 @@ var relation_stages: Dictionary = {}     # relation id -> 공표된 단계 (0~3)
 var _relation_pending: Dictionary = {}   # relation id -> 도달했으나 미공표 단계
 var consumables: Dictionary = {}         # consumable id -> 보유 수
 var field_repair_count: int = 0          # 투어 내 정비 회차 (체증 카운터)
+# 섀시 컨디션 이월분 (D05 §8 — 투어 관통 생존 자원 · GP 간 자동 완전 회복 없음).
+# GP 중에는 엔진이 쥐고, GP 밖에서는 여기가 정본이다 — 세션이 GP 경계에서 양방향 복사한다.
+var chassis: float = 0.0
 var milestones: Dictionary = {}          # milestone id -> true
 var drive_data_earned_total: int = 0     # 베인 단계 판정용 누적 획득 (소비 무차감 — D13 §5.4)
 
@@ -37,6 +40,8 @@ var drive_data_earned_total: int = 0     # 베인 단계 판정용 누적 획득
 func setup(game_data: GameData) -> void:
 	data = game_data
 	deck_slots = data.param_int("param_deck_slots_start")
+	# [가안] 새 커리어 섀시 초기값 = 최대치 (D13에 별도 항목 부재 — 새 머신은 온전하다)
+	chassis = data.param("param_chassis_max")
 	# 크루 2인(마르타·테오)은 시작 합류 — 영입 단가 0 (D07 §5.2 영입 2단 구조의 1단)
 	for crew_id in data.crew:
 		if CsvTable.to_int(String(data.crew[crew_id]["recruit_dp"])) == 0:
@@ -108,26 +113,58 @@ func _repair_cost_ratio() -> float:
 	return 1.0
 
 
-# 반환: 회복량 (0 = 실패). 회당 상한을 넘겨 요청하면 상한으로 절단한다.
+# 반환: 실제 회복량 (0 = 실패 또는 회복 여지 없음 — 이때는 지불·체증 카운터 무변경).
+# 회당 상한(30 CH) 절단 + **무상 복원선 초과 구간 진입 불가** — 그 구간의 유일 수단은
+# 전면 정비다 (D07 §3.3 명문 "투어 개시 무상 복원선 70% 초과 구간의 유일 수단").
 func field_repair(requested_ch: int, season_rank_mod: int = 0) -> int:
+	var capped := minf(float(maxi(requested_ch, 0)), data.param("param_repair_field_cap"))
+	var recoverable := minf(capped, float(free_restore_line()) - chassis)
+	if recoverable <= 0.0:
+		return 0
 	var cost := field_repair_cost(season_rank_mod)
 	if not _spend_credits(cost):
 		return 0
 	field_repair_count += 1
-	return mini(maxi(requested_ch, 0), data.param_int("param_repair_field_cap"))
+	chassis += recoverable
+	return int(round(recoverable))
 
 
 func begin_tour() -> void:
 	field_repair_count = 0    # 체증 카운터 리셋 = 투어 개시 (D13 별첨A §3.4 R2)
+	# 무상 복원선 — 투어 개시 시 복원선까지 무상 복원, 이미 그 위면 그대로 (D06 §3.3 결정 #12)
+	chassis = maxf(chassis, float(free_restore_line()))
 
 
-# 전면 정비: 20 Cr / 1 CH · 상한 없음 (D13 별첨A §3.4)
-func full_repair(missing_ch: int) -> int:
+# 전면 정비 비용 조회 — 표시 전용 (D09 §4.3 비용 표시 · field_repair_cost_next와 같은 구조)
+func full_repair_cost() -> int:
+	var missing := maxf(data.param("param_chassis_max") - chassis, 0.0)
 	var per_ch := data.param("param_repair_full_cr_per_ch") * _repair_cost_ratio()
-	var cost := int(round(per_ch * float(maxi(missing_ch, 0))))
-	if not _spend_credits(cost):
+	return int(round(per_ch * missing))
+
+
+# 전면 정비: 20 Cr / 1 CH · 상한 없음 — 완전 회복 (D13 별첨A §3.4).
+# 반환: 실제 회복량 (0 = 실패 또는 이미 만충).
+func full_repair() -> int:
+	var maximum := data.param("param_chassis_max")
+	var missing := maxf(maximum - chassis, 0.0)
+	if missing <= 0.0:
 		return 0
-	return maxi(missing_ch, 0)
+	if not _spend_credits(full_repair_cost()):
+		return 0
+	chassis = maximum
+	return int(round(missing))
+
+
+# 이벤트 회복 (D06 §3.4 — 무상·확률적·페이싱, 인스턴스 D08 풀).
+# 경제 가드: 무상 이벤트 회복은 필드 정비의 회당 상한을 초과할 수 없다 (D06 §3.4 명문).
+# [가안] 복원선 절단은 걸지 않는다 — 가드 조항이 회당 상한만 명시하므로 최대치 절단만 적용.
+func event_chassis_recover(amount: int) -> int:
+	var capped := minf(float(maxi(amount, 0)), data.param("param_repair_field_cap"))
+	var applied := minf(capped, data.param("param_chassis_max") - chassis)
+	if applied <= 0.0:
+		return 0
+	chassis += applied
+	return int(round(applied))
 
 
 func free_restore_line() -> int:
@@ -448,6 +485,7 @@ func serialize() -> Dictionary:
 		"consumables": consumables.duplicate(),
 		"field_repair_count": field_repair_count,
 		"milestones": milestones.duplicate(),
+		"chassis": chassis,
 	}
 
 
@@ -474,4 +512,6 @@ func restore(payload: Dictionary) -> bool:
 	consumables = payload.get("consumables", {})
 	field_repair_count = int(payload.get("field_repair_count", 0))
 	milestones = payload.get("milestones", {})
+	# 이월 도입(IMPL-078 해소) 전 세이브에는 없다 — 그 세계는 매 GP 최대치 개시였으므로 최대치가 충실한 기본값이다
+	chassis = float(payload.get("chassis", data.param("param_chassis_max")))
 	return true

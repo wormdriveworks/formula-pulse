@@ -99,3 +99,4 @@ param_fx_shake_sec,0.25
 param_fx_flash_alpha,0.35
 param_fx_flash_sec,0.25
 param_fx_gauge_pulse_sec,0.4
+param_fx_duel_result_hold_sec,0.6
