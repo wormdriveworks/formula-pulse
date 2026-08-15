@@ -324,8 +324,8 @@ func _on_confirm() -> void:
 	var events := engine.confirm(ratio)
 	_push_events(events)
 	_run_presentation(events)  # 확정 후 이벤트에서만 — 봉인 (불변규칙 5)
-	# 듀얼 결과는 프레임 내 표기 후 해제한다 (D09 §3.5). [가안] 표기 유지 0.6초 —
-	# 연출 시간 규격이 D13에 없어 임시값이며 실기 조정 대상이다.
+	# 듀얼 결과는 프레임 내 표기 후 해제한다 (D09 §3.5). 표기 유지 0.6초 = D13 별첨A
+	# §8.1(v1.4) 확정 기준값(총괄 회신 C항) — 다른 연출 시간(fx_*)과 같은 데이터 창구 경유.
 	if _duel_overlay.visible:
 		var result_event := _duel_result_event(events)
 		if not result_event.is_empty():
@@ -334,7 +334,7 @@ func _on_confirm() -> void:
 				String(result_event["key"]), result_event.get("params", {})
 			)
 			_duel_overlay.show_result(result_text)
-			await get_tree().create_timer(0.6).timeout
+			await get_tree().create_timer(data.param("param_fx_duel_result_hold_sec")).timeout
 	_next_turn()
 
 

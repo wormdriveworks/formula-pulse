@@ -325,6 +325,7 @@ ui.overhaulScreen.installConfirm,{overhaul} 오버홀을 확정합니다.
 ui.hub.stationLockedFormat,{station} — {crew} 합류 시
 ui.records.relationFormat,{axis} {stage}단계
 ui.duel.playerFormat,No.{number}
+ui.duel.namedFormat,No.{number} {name}
 ui.duel.overtake,추월 듀얼
 ui.duel.defense,방어 듀얼
 ui.duel.boost,부스트 투입
