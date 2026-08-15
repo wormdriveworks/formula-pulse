@@ -34,6 +34,9 @@ var positions: Array = []
 
 # 플레이어 자원 (D05 §6.2·§8 — 인게임 자원은 차지·섀시 이원이 전부)
 var chassis: float = 0.0
+# GP 간 이월 주입분 (D05 §8 — "그랑프리 간 자동 완전 회복은 없다"). 음수 = 미주입(최대치 개시).
+# 이월 값의 소유는 아웃게임 층이고 엔진은 주입된 값을 소비만 한다 — 세션이 start_gp 전에 넣는다.
+var chassis_carry_in: float = -1.0
 var charge: int = 0
 var front_gauge: float = 0.0
 var rear_gauge: float = 0.0
@@ -98,7 +101,11 @@ func start_gp() -> Array:
 	duel_count = 0
 	ai_retire_count = 0
 	_retire_order = 0
-	chassis = data.param("param_chassis_max")
+	if chassis_carry_in >= 0.0:
+		# 이월 개시 (D05 §8) — 주입 값은 [0, 최대치]로 절단한다 (세이브 조작·상한 초과 방어)
+		chassis = clampf(chassis_carry_in, 0.0, data.param("param_chassis_max"))
+	else:
+		chassis = data.param("param_chassis_max")
 	charge = 0
 	front_gauge = 0.0
 	rear_gauge = 0.0

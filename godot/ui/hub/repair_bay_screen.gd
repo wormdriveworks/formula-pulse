@@ -2,9 +2,7 @@
 #
 # 전면 정비 단일 카드: 비용 · 완전 회복 고스트 게이지 · 실행. 테오 스탠딩 상주(아트 유입 대상).
 # 무상 복원선(투어 개시 70)은 자동 처리 고지행으로만 표기한다 (§A-12 확정).
-#
-# **실행은 잠금** — 섀시가 GP 간 이월되지 않아(IMPL-078) 회복할 손상이 존재하지 않는다.
-# 비용 규격·고지행은 규격대로 세워 두고, 이월이 결선되면 실행만 푼다.
+# 실행은 섀시 이월 결선(IMPL-078 해소)으로 개방 — 비용·회복량 판정은 전부 코어 소관.
 extends HubScreen
 
 
@@ -20,6 +18,22 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 	(%FreeLineNote as Label).text = line_text
 	var run := %RunButton as Button
 	run.text = s.text("ui.repairBay.run")
-	run.disabled = true  # IMPL-078 — 이월 결선 전
-	run.focus_mode = Control.FOCUS_NONE
+	run.pressed.connect(_on_run_pressed)
+	_refresh_run_button()
 	(%BackButton as Button).grab_focus()
+
+
+func _on_run_pressed() -> void:
+	session.outgame.full_repair()
+	refresh_currency()
+	_refresh_run_button()
+
+
+# 손상(최대치 미만)과 지불 능력이 함께 성립할 때만 활성 — 이미 만충이면 소등
+func _refresh_run_button() -> void:
+	var outgame := session.outgame
+	var damaged := outgame.chassis < session.data.param("param_chassis_max")
+	var affordable := outgame.credits >= outgame.full_repair_cost()
+	var run := %RunButton as Button
+	run.disabled = not (damaged and affordable)
+	run.focus_mode = Control.FOCUS_NONE if run.disabled else Control.FOCUS_ALL

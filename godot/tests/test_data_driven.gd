@@ -207,6 +207,7 @@ func _outgame_reads_data() -> void:
 		"actual=%d" % state.field_repair_cost())
 	# 필드 정비 회당 상한 (픽스처 7 · 기본 30)
 	state.gain_credits(100000)
+	state.chassis = 0.0  # 이월 결선(IMPL-090) 후 정비는 실적용이다 — 회복 여지를 만들어야 상한이 보인다
 	_ok("필드 정비 상한 = 데이터 값", state.field_repair(999) == data.param_int("param_repair_field_cap"),
 		"restored=%d" % state.field_repair(0))
 	# 회차 체증 (픽스처 ×2.0 · 기본 ×1.5)

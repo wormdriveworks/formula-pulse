@@ -34,14 +34,34 @@ func _on_bound(_payload: Dictionary) -> void:
 
 	_refresh_repair_cost()
 	_next_button.pressed.connect(func(): go("RACE-01", {}))
-	# 3기능 전부 **실행은 잠금**이다 — 비용·규격 표시는 세우되 실제 적용 대상이 아직 없다.
-	# 필드 정비가 회복할 섀시는 GP 간 이월분인데 `RaceEngine.start_gp()` 가 매 GP
-	# `param_chassis_max` 로 리셋하므로 이월분이 존재하지 않는다(실측). 섀시 이월은 로직 층
-	# 사안이라 여기서 만들지 않고 보고한다 — IMPL-078. 덱·소모품도 소비 경로 결선 전이다.
-	for locked in [_repair_button, _consumable_button, _deck_button]:
+	# 필드 정비 — 섀시 이월 결선(IMPL-078 해소)으로 실행 개방. 회복량·복원선·비용은 코어 소관.
+	_repair_button.pressed.connect(_on_repair_pressed)
+	_refresh_repair_button()
+	# 덱·소모품은 소비 경로 결선 전 잠금 유지 — 선택 UI(씬)가 필요해 주력 레인 몫이다.
+	for locked in [_consumable_button, _deck_button]:
 		locked.disabled = true
 		locked.focus_mode = Control.FOCUS_NONE
 	_next_button.grab_focus()  # 초기 포커스 = 주 버튼 (§A-9 E05)
+
+
+func _on_repair_pressed() -> void:
+	var cap := session.data.param_int("param_repair_field_cap")
+	session.outgame.field_repair(cap)
+	var s := session.data.strings
+	var credits_text := s.text("ui.recap.creditsFormat", {"amount": session.outgame.credits})
+	(%CreditsValue as Label).text = credits_text
+	_refresh_repair_cost()
+	_refresh_repair_button()
+
+
+# 회복 여지(복원선 미만)와 지불 능력이 함께 성립할 때만 활성 — 판정은 코어 값으로만 한다
+func _refresh_repair_button() -> void:
+	var outgame := session.outgame
+	var line := float(outgame.free_restore_line())
+	var recoverable := outgame.chassis < line
+	var affordable := outgame.credits >= outgame.field_repair_cost()
+	_repair_button.disabled = not (recoverable and affordable)
+	_repair_button.focus_mode = Control.FOCUS_NONE if _repair_button.disabled else Control.FOCUS_ALL
 
 
 # 이번 비용 → 다음 회차 비용 병기 (D07 §3.3 필수 규격). 체증 계산은 코어가 한다.

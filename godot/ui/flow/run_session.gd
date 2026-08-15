@@ -76,7 +76,8 @@ func apply_event_reward(reward: Dictionary) -> void:
 		"dp":
 			outgame.gain_drive_data(int(reward.get("amount", 0)))
 		"chassis":
-			pass  # 섀시 회복 — GP 간 이월 결선(IMPL-078) 후 적용 지점
+			# 이벤트 회복 — 회당 상한 가드·최대치 절단은 코어가 한다 (D06 §3.4)
+			outgame.event_chassis_recover(int(reward.get("amount", 0)))
 		"relation", "info", "none":
 			pass  # 관계 축·정보성은 별도 경로 (관계 카운터는 대회 경계 스냅)
 
@@ -89,6 +90,7 @@ func begin_gp() -> bool:
 	engine = RaceEngine.new()
 	engine.setup(data, rng)
 	season.apply_to_engine(engine)
+	engine.chassis_carry_in = outgame.chassis  # GP 간 이월 (D05 §8 — 자동 완전 회복 없음)
 	presentation.reset_gp()  # L2/L3 상한 카운터 = GP 단위 (D08 §8.5)
 	return true
 
@@ -99,6 +101,7 @@ func close_gp() -> void:
 		return
 	last_gp_result = engine.result.duplicate(true)
 	season.record_gp(engine.result)
+	outgame.chassis = engine.chassis  # 잔여 섀시 회수 — GP 밖 정본은 아웃게임 층 (D05 §8)
 
 
 func tour_has_remaining_gp() -> bool:
@@ -107,6 +110,10 @@ func tour_has_remaining_gp() -> bool:
 
 func close_tour() -> Dictionary:
 	last_tour_report = season.close_tour()
+	if not season.season_finished():
+		# 다음 투어 개시 — 체증 카운터 리셋 + 무상 복원선 (D06 §3.3 · D13 별첨A §3.4 R2).
+		# 시즌 마지막 투어면 다음 투어가 없다 — 개시 처리는 begin_next_season()이 한다.
+		outgame.begin_tour()
 	return last_tour_report
 
 
@@ -120,6 +127,7 @@ func close_season() -> Dictionary:
 func begin_next_season() -> void:
 	var next := season.season + 1
 	season.begin_season(next)
+	outgame.begin_tour()  # 시즌 첫 투어 개시 — 체증 리셋 + 무상 복원선 (D06 §3.3 "시즌 간 = 동일")
 
 
 # 자동 저장 — 저장 지점은 D09 §2.4가 확정한다(RACE-03 진입·투어 경계·시즌 경계).
@@ -134,6 +142,7 @@ func serialize() -> Dictionary:
 		"rng": rng.serialize() if rng != null else {},
 		"events": events.serialize() if events != null else {},
 		"narrative": narrative.serialize() if narrative != null else {},
+		"outgame": outgame.serialize() if outgame != null else {},
 	}
 
 
@@ -147,6 +156,8 @@ func restore(payload: Dictionary) -> bool:
 		return false
 	outgame = OutgameState.new()
 	outgame.setup(data)
+	if payload.has("outgame") and not outgame.restore(payload["outgame"]):
+		return false
 	events = EventService.new()
 	events.setup(data, rng)
 	if payload.has("events"):

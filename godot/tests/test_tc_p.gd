@@ -24,12 +24,13 @@ func _init() -> void:
 	_paths_are_distinct()
 	_counter_survives_corruption()
 	_not_configured_is_distinct()
+	_session_outgame_round_trip()
 	_clean_profiles()
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 110:
-		print("TC_P_TEST_FAIL checks=%d < 하한 110 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 125:
+		print("TC_P_TEST_FAIL checks=%d < 하한 125 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -434,3 +435,43 @@ func _not_configured_is_distinct() -> void:
 	_ok("설정 후 범위 밖 = profile_out_of_range",
 		String(real_out_of_range["error"]) == "profile_out_of_range", String(real_out_of_range["error"]))
 	_clean_profiles()
+
+
+# ── 세션 왕복 — 섀시 이월분(아웃게임 층)이 GP 경계와 저장을 건너 보존된다 (IMPL-078 결선) ──
+# 이월 값의 정본은 아웃게임 층이고, 세션이 GP 경계에서 엔진과 양방향 복사한다.
+# 저장 payload에 outgame 층이 빠지면 이월·재화가 재로드마다 증발하므로 왕복을 못박는다.
+func _session_outgame_round_trip() -> void:
+	var data := GameData.new()
+	if not data.load_all():
+		_failures += 1
+		print("  [FAIL] data load")
+		return
+	var session := RunSession.new()
+	session.setup(data)
+	session.begin_career(1)
+	# GP 경계 결선: 이월 주입 → 개시 → 회수
+	session.outgame.chassis = 64.0
+	_ok("세션 GP 개시", session.begin_gp())
+	_ok("이월 주입 (세션→엔진)", session.engine.chassis_carry_in == 64.0,
+		"carry=%f" % session.engine.chassis_carry_in)
+	session.engine.start_gp()
+	_ok("이월 개시 섀시", session.engine.chassis == 64.0, "chassis=%f" % session.engine.chassis)
+	session.engine.chassis = 42.0
+	session.engine.result = {"standings": ["player"], "player_rank": 1, "tour_points": 10}
+	session.close_gp()
+	_ok("잔여 섀시 회수 (엔진→아웃게임)", session.outgame.chassis == 42.0,
+		"chassis=%f" % session.outgame.chassis)
+	# 직렬화 왕복 — 아웃게임 층 포함
+	var payload := session.serialize()
+	var restored := RunSession.new()
+	restored.setup(data)
+	_ok("세션 복원", restored.restore(payload))
+	_ok("아웃게임 섀시 보존", restored.outgame.chassis == 42.0,
+		"chassis=%f" % restored.outgame.chassis)
+	# 구세이브(outgame 키 부재) — 복원은 성립하고 섀시는 최대치 (그 세계는 매 GP 최대치 개시였다)
+	payload.erase("outgame")
+	var legacy := RunSession.new()
+	legacy.setup(data)
+	_ok("구세이브(outgame 부재) 복원 성립", legacy.restore(payload))
+	_ok("구세이브 섀시 = 최대치", legacy.outgame.chassis == data.param("param_chassis_max"),
+		"chassis=%f" % legacy.outgame.chassis)
