@@ -11,6 +11,8 @@ const SHOTS := [
 	# [파일명, 라우트, 크루·재화 지급 여부]
 	["hub01_garage_start", "res://ui/hub/garage_screen.tscn", false],
 	["hub02_repair", "res://ui/hub/repair_bay_screen.tscn", false],
+	# 손상 상태 — §A-12 완전 회복 고스트 게이지·총비용은 손상이 있어야 보인다
+	["hub02_repair_damaged", "res://ui/hub/repair_bay_screen.tscn", true],
 	["hub03_tuning_locked", "res://ui/hub/tuning_bench_screen.tscn", false],
 	["hub04_strategy", "res://ui/hub/strategy_screen.tscn", true],
 	["hub05_records", "res://ui/hub/records_screen.tscn", false],
@@ -49,6 +51,7 @@ func _initialize() -> void:
 		_rich_session.outgame.crew[crew_id] = true
 	_rich_session.outgame.gain_credits(2000)
 	_rich_session.outgame.gain_drive_data(500)
+	_rich_session.outgame.chassis = 46.0    # 손상 상태 — 정비 카드 활성·게이지 확인용
 	_next()
 
 

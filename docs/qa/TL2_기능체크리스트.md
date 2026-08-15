@@ -65,9 +65,9 @@
 ## RUN-01 간이 정산 화면 (§A-9)
 - 구현: res://ui/run/run_recap_screen.gd
 - [ ] ①진입/이탈 — 진입: RACE-03·RUN-02 / 이탈: RACE-01 (실측 — 별첨A 플로우와 대조)
-- [ ] ②표시 요소 전수 (8개 실측): HeaderLabel(Label)·SummaryRank(Label)·CreditsValue(Label)·RepairButton(Button)·RepairCostValue(Label)·ConsumableButton(Button)·DeckButton(Button)·NextButton(Button)
+- [ ] ②표시 요소 전수 (9개 실측): HeaderLabel(Label)·SummaryRank(Label)·CreditsValue(Label)·RepairButton(Button)·RepairCostValue(Label)·ChassisValue(Label)·ConsumableButton(Button)·DeckButton(Button)·NextButton(Button)
 - [ ] ③옵션 반영 — 소비 실측: (직접 소비 없음 — 공통 채널 경유 여부 확인)
-- [ ] ④T-1 완칭 — 사용 키 8종 · '티어' 단독 표기 기계 검사 통과 (문면 눈 대조는 실행 시)
+- [ ] ④T-1 완칭 — 사용 키 10종 · '티어' 단독 표기 기계 검사 통과 (문면 눈 대조는 실행 시)
 - [x] ⑤금지 구역 진입점 0 — 광고 계층 어휘 0건 (기계 판정 통과)
 
 ## RUN-02 이벤트 노드 화면 (§A-10)
@@ -89,9 +89,9 @@
 ## HUB-02 정비 베이 (§A-12)
 - 구현: res://ui/hub/repair_bay_screen.gd
 - [ ] ①진입/이탈 — 진입: (역참조 없음 — 세션 전이 확인) / 이탈: HUB-01 (실측 — 별첨A 플로우와 대조)
-- [ ] ②표시 요소 전수 (11개 실측): CreditIcon(TextureRect)·CreditValue(Label)·DataIcon(TextureRect)·DataValue(Label)·ProgressLabel(Label)·BackButton(Button)·HeaderLabel(Label)·CardLabel(Label)·CostLabel(Label)·FreeLineNote(Label)·RunButton(Button)
+- [ ] ②표시 요소 전수 (13개 실측): CreditIcon(TextureRect)·CreditValue(Label)·DataIcon(TextureRect)·DataValue(Label)·ProgressLabel(Label)·BackButton(Button)·HeaderLabel(Label)·CardLabel(Label)·CostLabel(Label)·TotalCostValue(Label)·ChassisValue(Label)·FreeLineNote(Label)·RunButton(Button)
 - [ ] ③옵션 반영 — 소비 실측: (직접 소비 없음 — 공통 채널 경유 여부 확인)
-- [ ] ④T-1 완칭 — 사용 키 5종 · '티어' 단독 표기 기계 검사 통과 (문면 눈 대조는 실행 시)
+- [ ] ④T-1 완칭 — 사용 키 8종 · '티어' 단독 표기 기계 검사 통과 (문면 눈 대조는 실행 시)
 - [x] ⑤금지 구역 진입점 0 — 광고 계층 어휘 0건 (기계 판정 통과)
 
 ## HUB-03 튜닝 벤치 (§A-13)
@@ -107,7 +107,7 @@
 - [ ] ①진입/이탈 — 진입: (역참조 없음 — 세션 전이 확인) / 이탈: HUB-01 (실측 — 별첨A 플로우와 대조)
 - [ ] ②표시 요소 전수 (9개 실측): CreditIcon(TextureRect)·CreditValue(Label)·DataIcon(TextureRect)·DataValue(Label)·ProgressLabel(Label)·BackButton(Button)·HeaderLabel(Label)·DeckHeader(Label)·ExpandButton(Button)
 - [ ] ③옵션 반영 — 소비 실측: (직접 소비 없음 — 공통 채널 경유 여부 확인)
-- [ ] ④T-1 완칭 — 사용 키 11종 · '티어' 단독 표기 기계 검사 통과 (문면 눈 대조는 실행 시)
+- [ ] ④T-1 완칭 — 사용 키 13종 · '티어' 단독 표기 기계 검사 통과 (문면 눈 대조는 실행 시)
 - [x] ⑤금지 구역 진입점 0 — 광고 계층 어휘 0건 (기계 판정 통과)
 
 ## HUB-05 기록실 (§A-15)

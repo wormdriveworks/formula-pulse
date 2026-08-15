@@ -117,8 +117,7 @@ func _repair_cost_ratio() -> float:
 # 회당 상한(30 CH) 절단 + **무상 복원선 초과 구간 진입 불가** — 그 구간의 유일 수단은
 # 전면 정비다 (D07 §3.3 명문 "투어 개시 무상 복원선 70% 초과 구간의 유일 수단").
 func field_repair(requested_ch: int, season_rank_mod: int = 0) -> int:
-	var capped := minf(float(maxi(requested_ch, 0)), data.param("param_repair_field_cap"))
-	var recoverable := minf(capped, float(free_restore_line()) - chassis)
+	var recoverable := _field_repair_recoverable(requested_ch)
 	if recoverable <= 0.0:
 		return 0
 	var cost := field_repair_cost(season_rank_mod)
@@ -127,6 +126,18 @@ func field_repair(requested_ch: int, season_rank_mod: int = 0) -> int:
 	field_repair_count += 1
 	chassis += recoverable
 	return int(round(recoverable))
+
+
+# 필드 정비 프리뷰 — 실행 시 도달할 섀시 값 (표시 전용 · §A-9 E02 회복 고스트 게이지의 성립 조건).
+# field_repair()와 절단 계산을 공유하므로 표시와 실행이 갈라질 수 없다. 지불 판정은 비대상 —
+# 지불 가능 여부는 버튼 활성이 별도로 본다 (고스트는 "하면 어디까지 가는가"만 답한다).
+func field_repair_preview(requested_ch: int) -> float:
+	return chassis + _field_repair_recoverable(requested_ch)
+
+
+func _field_repair_recoverable(requested_ch: int) -> float:
+	var capped := minf(float(maxi(requested_ch, 0)), data.param("param_repair_field_cap"))
+	return maxf(minf(capped, float(free_restore_line()) - chassis), 0.0)
 
 
 func begin_tour() -> void:

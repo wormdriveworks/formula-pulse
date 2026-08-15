@@ -250,6 +250,8 @@ ui.recap.consumable,소모품 보충
 ui.recap.deck,덱 교체
 ui.recap.next,다음 대회로
 ui.recap.repairCostFormat,이번 {now} Cr → 다음 {next} Cr
+ui.recap.chassisFormat,섀시 {now}% → {after}%
+ui.recap.chassisNowFormat,섀시 {now}%
 ui.tourReport.header,투어 결산
 ui.tourReport.block1,투어 종합 순위
 ui.tourReport.block2,챔피언십 포인트
@@ -288,6 +290,9 @@ ui.repairBay.fullRepair,전면 정비
 ui.repairBay.perChFormat,섀시 1당 {amount} Cr
 ui.repairBay.freeLineNote,투어 개시 시 {line}까지 무상 복원됩니다.
 ui.repairBay.run,실행
+ui.repairBay.totalCostFormat,총비용 {amount} Cr
+ui.repairBay.chassisFormat,섀시 {now}% → {after}%
+ui.repairBay.chassisNowFormat,섀시 {now}%
 ui.tuningBench.title,튜닝 벤치
 ui.tuningBench.buy,강화
 ui.tuningBench.maxed,최대 단계
@@ -297,7 +302,9 @@ ui.tuningBench.costFormat,{amount} DP
 ui.tuningBench.redistribute,재배분
 ui.strategy.title,전략실
 ui.strategy.tierFormat,스킬 티어 {tier}
-ui.strategy.tierLockedFormat,스킬 티어 {tier} — 미개방
+ui.strategy.tierLockedFormat,스킬 티어 {tier} — 개방: {condition}
+ui.strategy.openFirstPodium,첫 포디움
+ui.strategy.openFirstGpWin,첫 그랑프리 우승
 ui.strategy.equip,장착
 ui.strategy.unequip,해제
 ui.strategy.unlockFormat,해금 {amount} DP

@@ -28,7 +28,13 @@ func _build_skill_list() -> void:
 		# '스킬 티어' 완칭 (T-1) — 부분 문자열 치환 금지 대상이므로 키 단위로 발행돼 있다
 		var tier_text := s.text("ui.strategy.tierFormat", {"tier": tier})
 		if not session.outgame.skill_tier_open(tier):
-			tier_text = s.text("ui.strategy.tierLockedFormat", {"tier": tier})
+			# 개방 조건 병기 (§A-14) — 조건 문면 정본 = D07 §4.3 (티어 2 '첫 포디움' ·
+			# 티어 3 '첫 그랑프리 우승'). 판정 자체는 코어 skill_tier_open 전속이며 여기는 표기만.
+			var condition_key := "ui.strategy.openFirstPodium" if tier == 2 \
+				else "ui.strategy.openFirstGpWin"
+			var condition_text := s.text(condition_key)
+			tier_text = s.text("ui.strategy.tierLockedFormat", {
+				"tier": tier, "condition": condition_text})
 		header.text = tier_text
 		header.add_theme_color_override("font_color", UiPalette.TIMER_LEEWAY)
 		list.add_child(header)

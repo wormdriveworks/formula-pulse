@@ -346,7 +346,9 @@ func _tc_o6_exchange_guards() -> void:
 		"setup", "gain_credits", "gain_drive_data", "exchange_charge",
 		# `field_repair_cost_next` 는 D07 §3.3·D09 §4.3이 **사전 표시를 필수**로 요구하는
 		# 다음 회차 비용의 조회 경로다 (표시 전용 · 체증 카운터 무변경 — IMPL-079).
-		"field_repair_cost", "field_repair_cost_next", "field_repair", "begin_tour",
+		# `field_repair_preview` 는 §A-9 E02 회복 고스트 게이지의 도달값 조회 (표시 전용 —
+		# field_repair와 절단 계산 공유, 패리티 검사로 담보).
+		"field_repair_cost", "field_repair_cost_next", "field_repair_preview", "field_repair", "begin_tour",
 		# `full_repair_cost` 는 D09 §4.3 비용 표시의 조회 경로 (IMPL-079와 같은 구조 — 표시 전용).
 		# `event_chassis_recover` 는 D06 §3.4 이벤트 회복의 유일 진입로 (회당 상한 가드 내장).
 		"full_repair", "full_repair_cost", "free_restore_line", "event_chassis_recover",
@@ -522,17 +524,33 @@ func _repair_and_consumables() -> void:
 	var credits_before := state.credits
 	_ok("만충 시 필드 정비 무동작", state.field_repair(30) == 0
 		and state.credits == credits_before and state.field_repair_cost() == expected_first)
+	# 프리뷰 = 실행 패리티 (§A-9 E02 고스트 게이지의 정직성 — 절단 계산 공유 검증)
+	_ok("프리뷰: 만충 시 도달값 = 현재", state.field_repair_preview(30) == maximum)
 	# 회복 적용 + 회당 상한 30 CH 절단 (D06 §3.4 경제 가드)
 	state.chassis = 10.0
+	var previewed := state.field_repair_preview(100)
+	_ok("프리뷰는 상태 무변경 (표시 전용)", state.chassis == 10.0
+		and state.field_repair_cost() == expected_first)
 	_ok("회당 상한 절단·적용 (10→40)", state.field_repair(100) == 30 and state.chassis == 40.0,
 		"chassis=%f" % state.chassis)
+	_ok("프리뷰 = 실행 도달값 (10→40)", previewed == state.chassis,
+		"previewed=%f chassis=%f" % [previewed, state.chassis])
 	var expected_second := int(round(200.0 * 1.5 * 0.9))
 	_ok("2회차 정비비 = ×1.5", state.field_repair_cost() == expected_second,
 		"actual=%d expected=%d" % [state.field_repair_cost(), expected_second])
 	# 복원선 절단 — 초과 구간(70~100)의 유일 수단은 전면 정비 (D07 §3.3 명문)
+	previewed = state.field_repair_preview(100)
 	_ok("복원선 절단 (40→70)", state.field_repair(100) == 30 and state.chassis == 70.0,
 		"chassis=%f" % state.chassis)
+	_ok("프리뷰 = 실행 도달값 (40→70 복원선)", previewed == state.chassis,
+		"previewed=%f chassis=%f" % [previewed, state.chassis])
 	_ok("복원선 도달 후 필드 정비 무동작", state.field_repair(100) == 0 and state.chassis == 70.0)
+	# 복원선이 상한보다 먼저 걸리는 지점의 패리티 — 40→70 지점은 두 절단이 동치(40+30=70)라
+	# 프리뷰가 복원선을 무시해도 못 가른다. 여기(55→70)가 실제로 가르는 지점이다.
+	state.chassis = 55.0
+	previewed = state.field_repair_preview(100)
+	_ok("프리뷰 = 실행 도달값 (55→70 복원선 우선)", state.field_repair(100) == 15
+		and previewed == state.chassis, "previewed=%f chassis=%f" % [previewed, state.chassis])
 	# 체증 카운터는 투어 개시에 리셋
 	state.begin_tour()
 	_ok("투어 개시 시 체증 리셋", state.field_repair_cost() == expected_first,

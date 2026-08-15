@@ -19,6 +19,7 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 	var run := %RunButton as Button
 	run.text = s.text("ui.repairBay.run")
 	run.pressed.connect(_on_run_pressed)
+	_refresh_repair_card()
 	_refresh_run_button()
 	(%BackButton as Button).grab_focus()
 
@@ -26,7 +27,25 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 func _on_run_pressed() -> void:
 	session.outgame.full_repair()
 	refresh_currency()
+	_refresh_repair_card()
 	_refresh_run_button()
+
+
+# §A-12 전면 정비 카드 — 총비용 + 완전 회복 고스트 게이지 (현재 → 최대치).
+# 총비용·최대치는 코어 조회 전속 (full_repair_cost — IMPL-079 구조의 표시 전용 경로).
+# [가안] 백분율 분모 = 섀시 최대치 (RUN-01 E02와 동일 판단)
+func _refresh_repair_card() -> void:
+	var s := session.data.strings
+	var outgame := session.outgame
+	var maximum := session.data.param("param_chassis_max")
+	var total_text := s.text("ui.repairBay.totalCostFormat", {"amount": outgame.full_repair_cost()})
+	(%TotalCostValue as Label).text = total_text
+	var now_pct := int(round(outgame.chassis / maximum * 100.0))
+	var chassis_text := s.text("ui.repairBay.chassisNowFormat", {"now": now_pct})
+	if now_pct < 100:
+		chassis_text = s.text("ui.repairBay.chassisFormat", {"now": now_pct, "after": 100})
+	(%ChassisValue as Label).text = chassis_text
+	(%ChassisGauge as GhostGauge).set_values(outgame.chassis, maximum, maximum)
 
 
 # 손상(최대치 미만)과 지불 능력이 함께 성립할 때만 활성 — 이미 만충이면 소등

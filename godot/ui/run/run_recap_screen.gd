@@ -10,6 +10,8 @@ extends FlowScreen
 
 @onready var _repair_button: Button = %RepairButton
 @onready var _repair_cost: Label = %RepairCostValue
+@onready var _chassis_value: Label = %ChassisValue
+@onready var _chassis_gauge: GhostGauge = %ChassisGauge
 @onready var _consumable_button: Button = %ConsumableButton
 @onready var _deck_button: Button = %DeckButton
 @onready var _next_button: Button = %NextButton
@@ -33,6 +35,7 @@ func _on_bound(_payload: Dictionary) -> void:
 	_next_button.text = s.text("ui.recap.next")
 
 	_refresh_repair_cost()
+	_refresh_chassis()
 	_next_button.pressed.connect(func(): go("RACE-01", {}))
 	# 필드 정비 — 섀시 이월 결선(IMPL-078 해소)으로 실행 개방. 회복량·복원선·비용은 코어 소관.
 	_repair_button.pressed.connect(_on_repair_pressed)
@@ -51,6 +54,7 @@ func _on_repair_pressed() -> void:
 	var credits_text := s.text("ui.recap.creditsFormat", {"amount": session.outgame.credits})
 	(%CreditsValue as Label).text = credits_text
 	_refresh_repair_cost()
+	_refresh_chassis()
 	_refresh_repair_button()
 
 
@@ -72,3 +76,21 @@ func _refresh_repair_cost() -> void:
 		"next": session.outgame.field_repair_cost_next(),
 	})
 	_repair_cost.text = cost_text
+
+
+# §A-9 E02 회복 고스트 게이지 — 현재 → 실행 시 도달값. 도달 계산은 코어 프리뷰 전속이며
+# 지불 능력과 무관하게 "하면 어디까지 가는가"를 보인다 (활성 여부는 버튼이 답한다).
+# [가안] 백분율 분모 = 섀시 최대치 — D09 문면("62%")이 분모를 규정하지 않아 게이지 비율과 일치시켰다
+func _refresh_chassis() -> void:
+	var s := session.data.strings
+	var outgame := session.outgame
+	var maximum := session.data.param("param_chassis_max")
+	var cap := session.data.param_int("param_repair_field_cap")
+	var after := outgame.field_repair_preview(cap)
+	var now_pct := int(round(outgame.chassis / maximum * 100.0))
+	var after_pct := int(round(after / maximum * 100.0))
+	var chassis_text := s.text("ui.recap.chassisNowFormat", {"now": now_pct})
+	if after_pct > now_pct:
+		chassis_text = s.text("ui.recap.chassisFormat", {"now": now_pct, "after": after_pct})
+	_chassis_value.text = chassis_text
+	_chassis_gauge.set_values(outgame.chassis, after, maximum)
