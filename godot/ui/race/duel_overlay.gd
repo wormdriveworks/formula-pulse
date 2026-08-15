@@ -11,6 +11,7 @@
 extends Control
 
 var _icons: Array[TextureRect] = []
+var _strings: StringTable
 
 @onready var _opponent_label: Label = %OpponentLabel
 @onready var _player_label: Label = %PlayerLabel
@@ -32,6 +33,7 @@ func reel_icons() -> Array[TextureRect]:
 # 네임드 카 넘버는 D03 결정 로그 #13-③ 확정값의 데이터 전사(IMPL-092)로 결선됐다.
 # 네임드 초상 미니(E01 잔여)는 아트 실물 유입 대상 — 주력 레인 몫.
 func show_duel(strings: StringTable, opponent: Dictionary, duel_type: int) -> void:
+	_strings = strings
 	var player_text := strings.text("ui.duel.playerFormat", {"number": 13})
 	_player_label.text = player_text
 	var opponent_name := ""
@@ -53,10 +55,13 @@ func show_duel(strings: StringTable, opponent: Dictionary, duel_type: int) -> vo
 	visible = true
 
 
+# ◆/◇ 도 스트링 키 경유다 (V4 — 전 표시 문자열 키 참조 · ui.race.costFormat "◆{cost}" 전례)
 func set_boost(count: int, cap: int, can_add: bool) -> void:
+	var filled := _strings.text("ui.duel.boostFilled")
+	var empty := _strings.text("ui.duel.boostEmpty")
 	var stack := ""
 	for i in range(cap):
-		stack += "◆" if i < count else "◇"
+		stack += filled if i < count else empty
 	_boost_stack.text = stack
 	_boost_button.disabled = not can_add
 

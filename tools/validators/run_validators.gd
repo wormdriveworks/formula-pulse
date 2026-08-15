@@ -585,33 +585,86 @@ func _check_display_sinks(path: String, source: String, sinks: Array, marker: St
 	const_regex.compile("^\\s*const\\s+([A-Z][A-Z0-9_]*)\\s*:?=\\s*\"(.*)\"\\s*$")
 	var identifier_regex := RegEx.new()
 	identifier_regex.compile("[A-Z][A-Z0-9_]{2,}")
+	# 지역 변수 추적 (IMPL-074 확대): 함수 스코프 안에서 문자열 리터럴이 대입된 지역 변수가
+	# 표시 싱크에 닿으면 그 리터럴도 검사 대상이다. 대입은 선언(var)·재대입·누적(+=) 전부 본다.
+	# 한계(기록): 싱크 라인 **뒤**의 재대입은 추적하지 않는다 — 선언 전 사용은 파스 에러라
+	# 컴파일 게이트가 먼저 잡고, 뒤 재대입이 싱크에 닿으려면 루프 역류가 필요해 실코드에 드물다.
+	var local_assign_regex := RegEx.new()
+	local_assign_regex.compile("^\\s*(?:var\\s+)?([a-z_][a-z0-9_]*)\\s*(?::\\s*[A-Za-z_]+\\s*)?\\+?[:]?=(?!=)(.*)$")
+	var local_id_regex := RegEx.new()
+	local_id_regex.compile("(?<![.\\w])([a-z_][a-z0-9_]*)\\b(?![\\w(])")
+	var func_regex := RegEx.new()
+	func_regex.compile("^(?:static\\s+)?func\\s")
+	var local_literals: Dictionary = {}   # 이름 -> [{value, line, raw}] (함수 경계에서 리셋)
 	for line_index in range(lines.size()):
 		var raw_line := String(lines[line_index])
 		var const_match := const_regex.search(raw_line)
 		if const_match != null:
 			const_literals[const_match.get_string(1)] = {"value": const_match.get_string(2), "line": line_index + 1}
 			continue
+		if func_regex.search(raw_line) != null:
+			local_literals = {}   # 함수 경계 — 지역 스코프 리셋
+			continue
 		var code_line := _strip_comment(raw_line)
 		var assigned := _sink_assignment_expression(code_line, sinks)
 		if assigned == "":
+			# 싱크 대입이 아니면 지역 변수 리터럴 대입인지 본다
+			var local_match := local_assign_regex.search(code_line)
+			if local_match != null:
+				var rhs := _strip_dict_key_literals(_strip_subscript_literals(local_match.get_string(2)))
+				for literal in _extract_literals(rhs):
+					var entries: Array = local_literals.get(local_match.get_string(1), [])
+					entries.append({"value": literal, "line": line_index + 1, "raw": raw_line})
+					local_literals[local_match.get_string(1)] = entries
 			continue
-		for literal in _extract_literals(_strip_subscript_literals(assigned)):
+		var stripped_rhs := _strip_dict_key_literals(_strip_subscript_literals(assigned))
+		for literal in _extract_literals(stripped_rhs):
 			checked += 1
-			if raw_line.contains(marker) or _is_layout_literal(literal) or _strings.has(literal):
+			if raw_line.contains(marker) or _is_layout_literal(literal) \
+				or _is_table_id_literal(literal) or _strings.has(literal):
 				continue
 			_fail("V4", "%s:%d: display sink literal '%s' is not a string key" % [path, line_index + 1, literal])
 		for identifier in identifier_regex.search_all(assigned):
 			sink_bound_consts[identifier.get_string()] = line_index + 1
+		# 싱크에 닿은 지역 변수 — 이 함수 안에서 그 변수에 대입된 리터럴 전부를 검사한다.
+		# 문자열 내부의 낱말이 식별자로 잡히지 않도록 리터럴을 지운 우변에서 찾는다.
+		var rhs_without_strings := stripped_rhs
+		for literal in _extract_literals(stripped_rhs):
+			rhs_without_strings = rhs_without_strings.replace("\"%s\"" % literal, "\"\"")
+		for id_match in local_id_regex.search_all(rhs_without_strings):
+			var local_name := id_match.get_string(1)
+			if not local_literals.has(local_name):
+				continue
+			for entry in local_literals[local_name]:
+				checked += 1
+				var value := String(entry["value"])
+				if String(entry["raw"]).contains(marker) or raw_line.contains(marker) \
+					or _is_layout_literal(value) or _is_table_id_literal(value) or _strings.has(value):
+					continue
+				_fail("V4", "%s:%d: local '%s' = '%s' reaches a display sink (line %d) but is not a string key"
+					% [path, int(entry["line"]), local_name, value, line_index + 1])
 	for const_name in sink_bound_consts:
 		if not const_literals.has(const_name):
 			continue
 		var literal_value := String(const_literals[const_name]["value"])
 		checked += 1
-		if _is_layout_literal(literal_value) or _strings.has(literal_value):
+		if _is_layout_literal(literal_value) or _is_table_id_literal(literal_value) or _strings.has(literal_value):
 			continue
 		_fail("V4", "%s:%d: const '%s' = '%s' reaches a display sink but is not a string key"
 			% [path, const_literals[const_name]["line"], const_name, literal_value])
 	return checked
+
+
+# 딕셔너리 **키** 리터럴(`{"value": …}`)은 명명 플레이스홀더·매개 이름이지 표시 문자열이
+# 아니다 (IMPL-074가 오탐으로 실측한 축). 값 리터럴은 남는다 — 치환되어 화면에 실리므로.
+# `.get("name_key", …)`의 첫 인자도 같은 축이다 — 첨자 접근(`["name_key"]`)의 함수형.
+func _strip_dict_key_literals(expression: String) -> String:
+	var regex := RegEx.new()
+	regex.compile("\"[A-Za-z0-9_.]*\"\\s*:")
+	var stripped := regex.sub(expression, ":", true)
+	var getter := RegEx.new()
+	getter.compile("\\.get\\(\\s*\"[A-Za-z0-9_.]*\"")
+	return getter.sub(stripped, ".get(\"\"", true)
 
 
 # 딕셔너리·배열 첨자의 문자열(`["name_key"]`)은 데이터 열 이름이므로 표시 문자열이 아니다.
@@ -635,6 +688,16 @@ func _sink_assignment_expression(code_line: String, sinks: Array) -> String:
 				return stripped.substr(2)
 			sink_index = code_line.find(needle, sink_index + 1)
 	return ""
+
+
+# 테이블 ID·데이터 열 이름 문법 (불변규칙 6 — snake_case, 스트링 키와 **별개 체계**).
+# 밑줄을 포함한 순수 snake_case 토큰은 데이터 이름이지 표시 문자열이 아니다
+# (`param_charge_hold_cost` 등 — 데이터 조회 헬퍼의 인자로 싱크 식에 나타난다).
+# 밑줄 없는 단일 낱말("error" 등)은 면제하지 않는다 — 표시 문자열일 수 있다.
+func _is_table_id_literal(literal: String) -> bool:
+	var regex := RegEx.new()
+	regex.compile("^[a-z][a-z0-9]*(_[a-z0-9]+)+$")
+	return regex.search(literal) != null
 
 
 # 표시 문자열이 아닌 레이아웃·구분 리터럴: 공백류 전용 (줄바꿈·구분 공백 등).

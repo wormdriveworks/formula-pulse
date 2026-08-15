@@ -291,6 +291,8 @@ ui.repairBay.run,실행
 ui.tuningBench.title,튜닝 벤치
 ui.tuningBench.buy,강화
 ui.tuningBench.maxed,최대 단계
+ui.tuningBench.stepFilled,●
+ui.tuningBench.stepEmpty,○
 ui.tuningBench.costFormat,{amount} DP
 ui.tuningBench.redistribute,재배분
 ui.strategy.title,전략실
@@ -329,6 +331,8 @@ ui.duel.namedFormat,No.{number} {name}
 ui.duel.overtake,추월 듀얼
 ui.duel.defense,방어 듀얼
 ui.duel.boost,부스트 투입
+ui.duel.boostFilled,◆
+ui.duel.boostEmpty,◇
 ui.seasonResult.headerFormat,시즌 {season} 결산
 ui.seasonResult.rowFormat,P{rank} {name} — {points}
 ui.seasonResult.summaryFormat,챔피언십 P{rank} · {points}점
