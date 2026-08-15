@@ -10,7 +10,33 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
+      # LFS 필수 — 에셋(*.png·*.ttf)이 포인터로 체크아웃되면 `--import`가 `.import`를
+      # 오염시키고 SEAL-E가 텍스처 영구 null로 행(hang)한다 (IMPL-091 실측: 36분 무진행).
       - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      # 포인터 잔존 가드 — lfs:true가 조용히 실패해도(쿼터·네트워크·러너 LFS 부재) 행 대신
+      # 즉시 실패시킨다. 행은 러너 타임아웃까지 원인 없이 타지만 이 검사는 수초 내에 이름을 준다.
+      # 검출은 반드시 `if`로 감싼다 — `grep -q … && echo` 형태는 정상 경로(마지막 파일이
+      # 포인터가 아님)에서 비0을 반환해 errexit 하의 명령 치환을 죽인다(실측: exit 1).
+      - name: LFS pointer guard
+        run: |
+          pointers=$(git lfs ls-files 2>/dev/null | wc -l)
+          if [ "$pointers" -eq 0 ]; then
+            echo "LFS_GUARD_FAIL: LFS 추적 파일이 0건 — .gitattributes 또는 체크아웃 설정 이상"
+            exit 1
+          fi
+          # 실물 대신 포인터가 남아 있으면 파일 선두가 'version https://git-lfs'다.
+          leftover=$(git lfs ls-files -n | while read -r f; do
+            if head -c 40 "$f" 2>/dev/null | grep -q 'version https://git-lfs'; then echo "$f"; fi
+          done)
+          if [ -n "$leftover" ]; then
+            echo "LFS_GUARD_FAIL: 포인터 잔존 — git lfs pull 미완료"
+            echo "$leftover"
+            exit 1
+          fi
+          echo "LFS_GUARD_PASS files=$pointers"
 
       # 엔진 핀 4.7 계열 (D12 §1.1) — godot-builds 공식 배포 [가안: 러너 조달 경로]
       - name: Install Godot 4.7.1-stable

@@ -115,7 +115,7 @@ C:\SDKs\godot\Godot_v4.7.1-stable_win64_console.exe  ← CLI 전용 (실측 검�
 - **설계 정본:** `docs/design/` (21개 파일 — **읽기 전용. 수정 금지**)
 - **구현 결정 로그:** `docs/decisions/impl_log.md`
 - **현재 마일스톤:** MS-3 Steam EA (D15 §1.1) — 착수 프롬프트 = `prompts/MS3_kickoff.md` (양 레인 공용)
-- **MS-2 = 완료 (2026-08-15).** D15 §1.1 실일자 기입 완료 — 총괄 집행 종결 (`docs/handoff/MS2_마감_총괄회신.md`)
+- **MS-1 = 완료 (2026-08-11) · MS-2 = 완료 (2026-08-15).** D15 §1.1 실일자 기입 완료 — 총괄 집행 종결 (`docs/handoff/MS2_마감_총괄회신.md`)
 
 ## 기술 스택 (D12 v1.1 §1 확정 — 변경 금지)
 - **Godot 4.7 계열 핀** (v1.1 결정 #11 — v1.0 핀 4.4에서 갱신) · **GDScript 주 언어** (성능 임계 지점 한정 C#/GDExtension 보조 — 남용 금지) · **Compatibility 렌더러 단일**
