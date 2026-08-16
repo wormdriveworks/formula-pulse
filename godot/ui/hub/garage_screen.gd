@@ -21,6 +21,12 @@ const STATIONS := [
 ]
 
 
+# 허브 BGM(BGM-02) + 개러지 룸톤(AMB-04). 정거장 진입음이 아니라 **차고 자체**에 붙는다 —
+# 하위 스테이션(HUB-02~08)에서 돌아올 때 BGM 은 같은 트랙이라 재시작하지 않는다(디스패처 판정).
+func _audio_enter_events() -> Array:
+	return ["hub_enter"]
+
+
 func _on_hub_ready(_payload: Dictionary) -> void:
 	var s := session.data.strings
 	(%HeaderLabel as Label).text = s.text("ui.hub.garageTitle")

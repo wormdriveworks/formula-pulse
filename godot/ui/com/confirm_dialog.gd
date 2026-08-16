@@ -72,6 +72,7 @@ func _init(strings: StringTable, summary: String, cost_text: String, irreversibl
 	cancel.name = "CancelButton"
 	cancel.text = _strings.text("ui.confirm.cancel")
 	cancel.add_theme_font_size_override("font_size", _body_font_size)
+	cancel.set_meta(FlowScreen.AUDIO_EVENT_META, "ui_cancel")   # SE-U03 취소·닫기
 	cancel.pressed.connect(_finish.bind(false))
 	buttons.add_child(cancel)
 
@@ -94,4 +95,10 @@ func _finish(accepted: bool) -> void:
 static func ask(host: Control, strings: StringTable, summary: String, cost_text: String, irreversible: bool, body_font_size: int) -> ConfirmDialog:
 	var dialog := ConfirmDialog.new(strings, summary, cost_text, irreversible, body_font_size)
 	host.add_child(dialog)
+	# 다이얼로그는 화면 결속(`bind`) 이후에 태어나므로 조작음 자동 결속에 잡히지 않는다 —
+	# 만든 자리에서 결속한다. 화면이 아닌 곳에서 띄운 경우(호스트가 FlowScreen 이 아님)는
+	# 소리 없이 성립한다.
+	var screen := host as FlowScreen
+	if screen != null:
+		screen.audio_bind_controls(dialog)
 	return dialog

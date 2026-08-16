@@ -24,6 +24,41 @@ const TUTORIAL_ACTIONS := ["spin", "hold", "respin", "charge", "confirm"]
 const HOLD_KEYS := [KEY_1, KEY_2, KEY_3]
 const ICON_DIR := "res://assets/ui/icons/"
 
+# 엔진 로그 키 → 사운드 이벤트 id (D11 §1.4 이벤트 결속 · §2.4 SE-E 계열 정의).
+# **화면은 SFX id 를 들지 않는다** — 무엇이 울릴지는 `sound_map` 이 정한다. 여기 있는 것은
+# "엔진이 무슨 일이 일어났다고 말했는가"와 "그것이 D11 의 어느 결과 범주인가"의 대조뿐이다.
+# 결과 6종은 전부 `seal_gated` 라 릴 정지 연출 전에는 디스패처가 막는다(호출 순서 무관).
+#
+# `defendFail01` 은 `duelLoseDefense01` 과 같은 턴에 함께 발행되므로 등재하지 않는다 —
+# 등재하면 한 결판에 두 번 울린다. `aiRetire01` 은 플레이어의 사건이 아니라 제외.
+const SOUND_BY_KEY := {
+	"raceLog.gpStart01": "gp_start",
+	"raceLog.overtakeSuccess01": "result_advance",   # SE-E01 전진 (추월·순위 상승)
+	"raceLog.defendSuccess01": "result_defend",      # SE-E02 방어 (피추월 방어)
+	"raceLog.stableSector01": "result_stable",       # SE-E03 안정 (무사 통과)
+	"raceLog.troubleHit01": "result_trouble",        # SE-E04 트러블 (소)
+	"raceLog.chanceProc01": "result_chance",         # SE-E06 찬스 개화
+	"raceLog.chanceDuel01": "result_chance",
+	"raceLog.momentum01": "momentum_bonus",
+	"raceLog.timeout01": "timeout",
+	"raceLog.duelWin01": "duel_win",
+	"raceLog.duelLoseOvertake01": "duel_lose",
+	"raceLog.duelLoseDefense01": "duel_lose",
+	"raceLog.playerRetire01": "retire",
+	"raceLog.resonanceEnter01": "resonance_announce",
+}
+
+# **SE-E05 중립은 결선하지 않았다.** "무사건·혼합 상쇄"(D11 §2.4)에 해당하는 확정 턴이
+# 현 엔진에 없다 — 정산 ②자원 단계가 트러블이 없으면 반드시 `stableSector01`(안정)을
+# 발행하므로 섹터 턴은 전부 안정 또는 트러블이다(40 GP·섹터 턴 480건 전수 실측: 결과 없음 0건).
+# 결과 계열이 비는 것은 듀얼 패배 턴뿐인데 그것은 무사건이 아니라 듀얼 결판이다 —
+# 그 자리에 중립음을 넣으면 패배에 통과음이 겹친다. 총괄 보고분(D05·D11 정합).
+
+# 섀시 위험 임계 비율 — **[가안]**. D09 §5.2 는 "임계값 D13"으로 위임했으나 D13 §2.3 에
+# 해당 행이 없다(별첨A v1.5 확인). 종전 게이지 경고색이 쓰던 값을 이름만 붙여 한 곳에 모았다.
+# 표시(경고색)와 판정(SE-D06)이 같은 식을 보게 하는 것이 목적이며, 값 자체는 총괄 판정 대기.
+const CHASSIS_WARN_RATIO := 0.25
+
 var _icon_cache: Dictionary = {}
 
 var data: GameData
@@ -38,6 +73,12 @@ var _timer_disabled := false
 var _revealing := false
 var _confirm_lockout := 0.0
 var _lockout_base := 0.3
+
+# 사운드 상태 — 전이 시점을 잡기 위한 직전 상태 기억(상태 자체는 전부 엔진·데이터가 갖는다).
+var _timer_band := 0        # 0 여유 · 1 경고 · 2 임박 (D05 §7.2 구간 = 링과 같은 경계값)
+var _tick_left := 0.0       # 임박 틱 잔여 — 주기는 링의 점멸과 동기 (D11 §2.3 SE-T03)
+var _chassis_warned := false
+var _charge_shown := 0
 
 var _reel_icons: Array[TextureRect] = []
 var _reel_panels: Array[PanelContainer] = []
@@ -119,9 +160,17 @@ func _boot() -> void:
 	# TUT-01 — 첫 그랑프리 실주행 위 오버레이(§6 "별도 튜토리얼 스테이지 불신설").
 	# 1회성 판정은 온보딩 기록이 쥔다(옵션 초기화로 재활성 — §A-25 확정).
 	_tutorial.setup(session, self)
+	# 레이스 HUD 의 버튼은 하나하나가 고유 게임 행동이라 일반 조작음을 붙이지 않는다
+	# (핸들러가 자기 이벤트를 울린다 — 키보드 입력도 같은 핸들러를 타므로 경로가 하나다).
+	# 정지 오버레이만 메뉴 성격이라 조작음을 결속한다.
+	audio_bind_controls(_pause_overlay)
 	_start_gp()
 	if _tutorial.should_run():
 		_tutorial.begin()
+
+
+func _audio_auto_bind() -> bool:
+	return false
 
 
 func _collect_consumable_slots() -> void:
@@ -186,6 +235,7 @@ func _process(delta: float) -> void:
 	_timer_remaining = maxf(0.0, _timer_remaining - delta)
 	_e04_timer_ring.set_ratio(_timer_remaining / _timer_effective_base)
 	_update_timer_value()
+	_process_timer_sound(delta)
 	if _timer_remaining <= 0.0:
 		_timer_active = false
 		_e04_timer_ring.set_active(false)
@@ -248,6 +298,12 @@ func _start_gp() -> void:
 	rng = session.rng
 	engine = session.engine
 	_e10_log.clear_feed()
+	# 무대 BGM(§4.1 5종 1:1) + 관중 베드(AMB-01). **이벤트 id 를 무대 id 에서 파생**하므로
+	# 무대가 늘면 `sound_map` 에 행만 추가하면 붙는다 — 화면에 무대 목록을 적지 않는다.
+	sfx("%s_enter" % String(data.stage_of_active_circuit().get("id", "")))
+	sfx("race_stage_enter")
+	_charge_shown = engine.charge   # 이월 차지를 획득으로 오인하지 않게 기준선을 먼저 잡는다
+	_chassis_warned = _chassis_critical()
 	_push_events(engine.start_gp())
 	_next_turn()
 
@@ -264,6 +320,7 @@ func _next_turn() -> void:
 	# 릴 은닉은 **배열 스왑이 끝난 뒤**여야 한다 — 스왑 전에 지우면 복귀 쪽 릴에
 	# 직전 턴 심볼이 남는다 (SEAL-E가 실제로 잡았다: T1 대기 중 비공개 실패 15건).
 	if String(info.get("type", "")) == "duel":
+		sfx("duel_enter")   # SE-D02 — 감광 + 프레임 인에 동기 (D11 §2.7 · D09 §3.5)
 		_enter_duel(info)
 	else:
 		_exit_duel()
@@ -306,11 +363,13 @@ func _on_boost() -> void:
 	if not _timer_active or _revealing or not engine.current_turn_is_duel:
 		return
 	engine.add_duel_boost()
+	sfx("boost_spend")
 	_refresh_boost()
 	_refresh_resources()
 
 
 func _on_gp_finished() -> void:
+	sfx("gp_finish")   # SE-U19 피니시 + AMB-03 함성 (D11 SC-09)
 	_push_events([{
 		"phase": "T5", "key": "raceLog.gpFinish01",
 		"params": {"rank": engine.result.get("player_rank", 0)},
@@ -336,6 +395,11 @@ func _on_primary_action() -> void:
 
 
 func _on_spin() -> void:
+	# **봉인은 스핀 커밋(T2)에서 연다** (D12 §6.3 — reel 스트림 소비 시점). 여는 것이 먼저다:
+	# 커밋 뒤 여는 순서면 그 사이에 결과 상관 사운드가 지나갈 창이 생긴다.
+	_seal(true)
+	sfx("reel_spin_start")
+	sfx("reel_spin_loop")
 	engine.spin()  # T2 커밋 — reel 스트림 소비. 결과는 아직 어떤 경로에도 없다
 	_refresh_action_enabled()
 	# **튜토리얼 단계 진행은 여기서 알리지 않는다** — 스핀 커밋 직후에 콜아웃이 바뀌면
@@ -352,6 +416,7 @@ func _on_confirm() -> void:
 	_e04_timer_ring.set_active(false)
 	# 비활성 시 모멘텀 = 조건 불성립 (여유 구간 자체가 없다 — D09 §6.2 채택 구조)
 	var ratio := 0.0 if _timer_disabled else _timer_remaining / _timer_effective_base
+	sfx("confirm")
 	var events := engine.confirm(ratio)
 	_tutorial.notify_action("confirm")
 	_push_events(events)
@@ -393,7 +458,10 @@ func _on_respin() -> void:
 			keep.append(i)
 	var outcome := engine.hold_respin(keep)
 	if not outcome.get("ok", false):
+		sfx("input_rejected")   # SE-I14 — 잔량 부족·이미 사용 (D11 §2.2)
 		return
+	_seal(true)   # 재정지도 정지 연출이다 — 그 사이의 결과 상관 사운드를 다시 막는다
+	sfx("respin")
 	_push_events(outcome.get("events", []))
 	var changed: Array = []
 	for i in range(REEL_COUNT):
@@ -414,8 +482,11 @@ func _on_charge_intervene() -> void:
 		return
 	var outcome := engine.negate_trouble()
 	if outcome.get("ok", false):
+		sfx("charge_intervene")
 		_push_events(outcome.get("events", []))
 		_tutorial.notify_action("charge")   # 거부된 개입은 배운 것이 아니다
+	else:
+		sfx("input_rejected")
 	_refresh_resources()
 	_refresh_action_enabled()
 
@@ -426,7 +497,10 @@ func _toggle_hold(index: int) -> void:
 	_hold_boxes[index].button_pressed = not _hold_boxes[index].button_pressed
 
 
-func _on_hold_toggled(_pressed: bool) -> void:
+func _on_hold_toggled(pressed: bool) -> void:
+	# SE-I02/I03 = 토글 쌍 (D11 §2.2 — 온이 상향·오프가 하향 음정). 홀드 '적용'이 아니라
+	# 토글 자체의 피드백이므로 릴을 실제로 돌리는 리스핀(SE-I04)과 별개 지점이다.
+	sfx("hold_on" if pressed else "hold_off")
 	_refresh_reel_frames()
 
 
@@ -454,7 +528,14 @@ func _reveal_reels(indices: Array, start_window: bool) -> void:
 		if engine == null:
 			return
 		_reel_icons[i].texture = _icon_texture(String(provisional[i]))
+		# SE-R03 — **실제 정지하는 릴** 순서 기준 (D11 규칙 R-b: 홀드 릴은 정지음 없음).
+		# 일괄 정지(O4)도 정지 이벤트 자체는 유지된다(규칙 R-c) — 간격만 0 이다.
+		sfx("reel_stop")
 	_revealing = false
+	# **봉인 해제 지점.** 릴 정지 연출이 여기서 끝난다 — 이 줄보다 앞에서 결과 상관 사운드를
+	# 부르면 디스패처가 막고, 뒤로 옮기면 매치 고지음(R-a)이 막힌다. 순서가 규격이다.
+	_seal(false)
+	_announce_matches(provisional)
 	# O5 개입 창 타이머 — 기본 / ×1.5 / ×2 / 비활성 (D09 §6.1·§6.2 — 배율은 D13 창구 전사값).
 	# 비활성 = 타이머·구간 자체가 부재. 개입 창은 열리되(가드 재사용) 잔량이 흐르지 않고
 	# 링은 소등, 모멘텀은 조건 불성립으로 자연 미발생(_on_confirm 이 ratio 0 을 넘긴다).
@@ -477,6 +558,9 @@ func _reveal_reels(indices: Array, start_window: bool) -> void:
 		_timer_effective_base = effective_base
 		_timer_remaining = effective_base
 		_confirm_lockout = _lockout_base  # T3 진입 후 확정 오입력 방어 (D09 §1.3)
+		sfx("intervention_open")   # SE-I01 — T4 진입·타이머 링 점등 동기
+		_timer_band = 0            # 구간 전환음의 기준선 — 창이 열릴 때마다 여유부터 시작한다
+		_tick_left = 0.0
 	_timer_active = true if start_window else was_running
 	if _timer_active and not _timer_disabled:
 		_e04_timer_ring.set_active(true)
@@ -562,12 +646,27 @@ func _refresh_resources() -> void:
 	var chassis_text := s.text("ui.race.chassisFormat", {"value": int(engine.chassis)})
 	_e11_chassis_value.text = chassis_text
 	var fill: StyleBoxFlat = _e11_chassis_bar.get_theme_stylebox("fill").duplicate()
-	fill.bg_color = UiPalette.CHASSIS_WARN if engine.chassis <= chassis_max * 0.25 else UiPalette.CHASSIS_OK
+	# 경고색과 경고음이 **같은 판정**을 본다 (표시값은 판정값에서 파생 — IMPL-100 계열).
+	var critical := _chassis_critical()
+	fill.bg_color = UiPalette.CHASSIS_WARN if critical else UiPalette.CHASSIS_OK
 	_e11_chassis_bar.add_theme_stylebox_override("fill", fill)
+	# SE-D06 = **진입 시 1회** (D11 §2.7 — 반복 경보 아님). 회복해 임계를 벗어나면 재무장한다.
+	if critical and not _chassis_warned:
+		sfx("chassis_warning")
+	_chassis_warned = critical
+	# SE-I13 = ◆ 스택 +1 동기. 획득원(심볼·안정 완주·듀얼 승리 보너스)이 여럿이라
+	# 발생원마다 걸지 않고 **표시 수치의 증가**를 본다 — 소비(감소)는 대상이 아니다.
+	if engine.charge > _charge_shown:
+		sfx("charge_gain")
+	_charge_shown = engine.charge
 	_e12_charge.text = s.text("ui.race.chargeFormat", {
 		"value": engine.charge, "cap": int(data.param("param_charge_cap")),
 	})
 	_refresh_consumables()
+
+
+func _chassis_critical() -> bool:
+	return engine != null and engine.chassis <= data.param("param_chassis_max") * CHASSIS_WARN_RATIO
 
 
 # 재고 → 슬롯. 데이터 정의 순서로 펼치므로 같은 인벤토리는 항상 같은 슬롯에 앉는다
@@ -602,6 +701,7 @@ func _on_consumable(index: int) -> void:
 		return
 	var events := engine.use_consumable(_e13_slot_ids[index])
 	if events.is_empty():
+		sfx("input_rejected")
 		return  # 거부 = 상태 무변경 (엔진 계약) — 화면도 아무것도 하지 않는다
 	_push_events(events)
 	_refresh_resources()
@@ -630,6 +730,38 @@ func _refresh_action_enabled() -> void:
 	)
 	for i in range(_e13_slots.size()):
 		_e13_slots[i].disabled = not (can_use_item and i < _e13_slot_ids.size())
+
+
+# 개입 창 구간음 (D11 §2.3 SE-T01~T03).
+#
+# 구간 경계는 **링이 쓰는 것과 같은 데이터 값**이다 — 색·두께·점멸과 소리가 갈라지면
+# 삼중 부호화(D09 §3.2)에 네 번째 어긋난 축이 생긴다. O5 비활성이면 `_process` 가
+# 여기 오기 전에 돌아가므로 SE-T01~T03 은 자연 미발생이다(D11 구간 문법 정합 · D09 §6.2).
+func _process_timer_sound(delta: float) -> void:
+	var ratio := _timer_remaining / _timer_effective_base
+	var band := 0
+	if ratio <= data.param("param_timer_warning_ratio"):
+		band = 2
+	elif ratio <= data.param("param_timer_leeway_ratio"):
+		band = 1
+	if band > _timer_band:
+		# 되돌아가는 경계(잔량 증가)는 없다 — 전진 전이만 울린다.
+		if band == 1:
+			sfx("timer_enter_warning")
+		else:
+			sfx("timer_enter_imminent")
+		_timer_band = band
+		_tick_left = 0.0
+	if band < 2:
+		return
+	# 임박 틱은 **링의 고속 점멸과 동기**다(D11 SE-T03 정의). 주기를 따로 두지 않고
+	# 링이 실제로 쓰는 점멸 주파수를 받아 쓴다 — 두 축이 어긋날 여지를 없앤다.
+	_tick_left -= delta
+	if _tick_left > 0.0:
+		return
+	var hz: float = _e04_timer_ring.imminent_blink_hz()
+	_tick_left = 1.0 / hz if hz > 0.0 else 1.0
+	sfx("timer_imminent_tick")
 
 
 func _update_timer_value() -> void:
@@ -750,7 +882,10 @@ func _fire_channels(channels: Dictionary) -> void:
 		return
 	var code := String(channels.get("code", "L0"))
 	# 로그 채널은 이벤트 자체가 이미 발화했다 (전 등급 공통).
-	# SFX 스팅·햅틱: 음원·지속 시간 실물 부재 — sting_length_sec 소비 지점만 확보(IMPL-035).
+	# **등급 스팅 (SE-L1~L3)** — 등급 판정은 코어가 끝냈고 여기서는 확정된 등급을 이벤트 id 로
+	# 옮길 뿐이다. L2·L3 의 BGM 덕킹은 디스패처가 표를 보고 건다(호출부가 알 필요 없다).
+	# L0 은 채널 자체가 없다 — 표에도 행이 없으므로 디스패처가 빈 배열을 돌려준다.
+	sfx("grade_%s" % code.to_lower())
 	if code == "L1":
 		_pulse_gauge()
 		_start_shake(data.param("param_fx_shake_weak_px"))
@@ -813,10 +948,47 @@ func _process_shake(delta: float) -> void:
 	root_box.position = Vector2(sin(phase * 1.7), cos(phase * 2.3)) * _shake_strength
 
 
+# ── 사운드 보조 (D11 §1.3 봉인 정합 · §2.1 릴 계열) ──
+func _seal(open: bool) -> void:
+	if session == null or session.audio == null:
+		return
+	if open:
+		session.audio.open_seal()
+	else:
+		session.audio.close_seal()
+
+
+# SE-R04/R05 매치 고지음 — 매치 **사실**의 고지이며 등급 스팅(§2.5)과 별개다.
+# 봉인을 닫은 직후에만 부른다 (규칙 R-a "정지 완료 후 전속").
+func _announce_matches(provisional: Array) -> void:
+	var counts: Dictionary = {}
+	var best := 0
+	for symbol in provisional:
+		var symbol_id := String(symbol)
+		counts[symbol_id] = int(counts.get(symbol_id, 0)) + 1
+		best = maxi(best, int(counts[symbol_id]))
+	if best >= REEL_COUNT:
+		sfx("reel_match_three")
+	elif best >= 2:
+		sfx("reel_match_two")
+
+
 # ── 이벤트 → 표시 경로 분기 (D09 §3.1 국면 분리) ──
 func _push_events(events: Array) -> void:
 	for event in events:
 		var key := String(event.get("key", ""))
+		# **사운드는 표시와 같은 깔때기를 탄다** — 엔진이 말한 사건 하나에 로그 한 줄과
+		# 소리 하나가 같은 지점에서 나온다. 발화 지점을 따로 두면 둘이 어긋난다.
+		if SOUND_BY_KEY.has(key):
+			# 리타이어만 순서가 규칙이다: **BGM 즉시 정지 → JG-03** (D11 §4.3 전이 규칙표).
+			# 정지를 뒤에 두면 징글이 무대 트랙 위에 겹친다.
+			if key == "raceLog.playerRetire01" and session != null and session.audio != null:
+				session.audio.stop_bgm()
+			sfx(String(SOUND_BY_KEY[key]))
+		if key.begins_with("vane."):
+			# SE-V01a/b/c — 음색이 베인 인격 3단계에 연동된다(D11 §2.10). 단계는
+			# 아웃게임 층이 갖는 값이라 여기서 파생만 한다.
+			sfx("vane_cue_stage%d" % session.outgame.vane_stage())
 		var params: Dictionary = event.get("params", {}).duplicate()
 		for param_name in params:
 			var value: Variant = params[param_name]

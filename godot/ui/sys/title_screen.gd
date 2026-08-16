@@ -18,6 +18,11 @@ extends FlowScreen
 @onready var _version: Label = %VersionLabel
 
 
+# 타이틀 BGM (BGM-01) — 앱 진입 최초의 사운드다.
+func _audio_enter_events() -> Array:
+	return ["title_enter"]
+
+
 func _on_bound(_payload: Dictionary) -> void:
 	var s := session.data.strings
 	_title.text = s.text("ui.title.gameTitle")

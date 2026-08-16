@@ -26,6 +26,7 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 
 func _on_run_pressed() -> void:
 	session.outgame.full_repair()
+	sfx("repair_execute")
 	refresh_currency()
 	_refresh_repair_card()
 	_refresh_run_button()

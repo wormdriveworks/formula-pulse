@@ -104,5 +104,6 @@ func _on_buy(tuning_id: String) -> void:
 	# 튜닝 단계 구매는 재배분(환급 80%)이 존재해 가역이다 — COM-01 비대상 (D09 §1.4 모달 최소주의)
 	if not session.outgame.buy_tuning(tuning_id):
 		return
+	sfx("tuning_install")
 	_refresh_row(tuning_id)
 	refresh_currency()

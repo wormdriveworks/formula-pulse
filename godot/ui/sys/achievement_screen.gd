@@ -41,6 +41,7 @@ func _on_bound(payload: Dictionary) -> void:
 	(%HeaderLabel as Label).text = header_text
 	var close := %CloseButton as Button
 	close.text = s.text("ui.achievement.close")
+	close.set_meta(AUDIO_EVENT_META, "ui_cancel")   # SE-U03 취소·닫기
 	close.pressed.connect(_on_close)
 	_refresh_summary()
 	_build_tabs()
@@ -75,6 +76,7 @@ func _build_tabs() -> void:
 		button.name = "Tab%d" % index
 		button.text = s.text(String(tab["key"]))
 		button.add_theme_font_size_override("font_size", _body_font_size)
+		button.set_meta(AUDIO_EVENT_META, "ui_tab")   # SE-U04 — 결정음이 아니라 탭 전환음
 		button.pressed.connect(_select_tab.bind(index))
 		tab_row.add_child(button)
 

@@ -26,9 +26,18 @@ var last_tour_report: Dictionary = {}
 var last_season_report: Dictionary = {}
 # 직전 경계에서 새로 달성된 업적 — 표시 층이 읽어 고지한다 (무보상 명예형이라 지급 없음)
 var newly_achieved: Array = []
+# 직전 경계에서 새로 열린 스킬 티어 — 성장 게이트 개방 고지(SE-U13)의 근거.
+# 개방 자체는 마일스톤 파생이라 상태가 아니고, "방금 열렸다"는 **경계에서만** 알 수 있다.
+# `newly_achieved` 와 같은 성격의 래치이며 세이브 대상이 아니다(경계 1회성 표시 신호).
+var newly_opened_tiers: Array = []
 # 플랫폼 서비스 — **인터페이스 타입으로만 쥔다**(혼입 0). 합성은 `PlatformServices.create()`
 # 단일 지점이며, 미주입(null)도 정상 상태다: 헤드리스 테스트·러너는 플랫폼 없이 돈다.
 var platform: PlatformServices
+
+# 오디오 디스패처 — **사운드의 유일 발화 경로**. 화면은 게임 이벤트 id 만 던지고 무엇이
+# 울릴지는 `sound_map` 이 정한다. 커리어가 아니라 세션에 매다는 이유: 타이틀·옵션 화면도
+# 소리를 내며, 커리어 개시 전에 이미 BGM 이 돈다.
+var audio: AudioDispatcher
 
 
 func setup(game_data: GameData, services: PlatformServices = null) -> void:
@@ -37,6 +46,11 @@ func setup(game_data: GameData, services: PlatformServices = null) -> void:
 	SaveManager.configure(data)
 	options = OptionsStore.new()
 	options.setup(data)  # 기기별 구성 — 프로필·커리어와 무관하게 세션 개시 시 적재
+	# 재생기 주입 = 합성 지점. 실물 유입 시 여기 한 줄만 바뀐다(디스패처·호출부 무접촉).
+	audio = AudioDispatcher.new()
+	var sink := SilentAudioOutput.new()
+	audio.setup(data, sink)
+	sink.bind_dispatcher(audio)
 
 
 # 새 커리어 — 마스터 시드를 뽑아 시즌·아웃게임 층을 연다 (D12 §6.1)
@@ -141,8 +155,10 @@ func close_gp() -> void:
 	# 완주자만 대상이다: 리타이어한 상대를 앞선 것은 '선착'이 아니다 [가안 — impl_log].
 	last_gp_result["beaten_rivals"] = _beaten_rivals(engine)
 	last_gp_result["scripted_loss"] = season.is_scripted_loss_gp()
+	var tiers_before := _tier_open_snapshot()
 	season.record_gp(last_gp_result)
 	outgame.record_gp_result(last_gp_result)
+	_latch_opened_tiers(tiers_before)
 	# CG-03 전제 래치 — 챔피언십에서 주드를 처음 앞선 시점은 **GP 결과 확정 후**에만 알 수 있다
 	# (총괄 판정 IMPL-128 B-2). 한 번 서면 되돌리지 않는다 — 이후 순위가 다시 밀려도 '첫 역전'은 있었다.
 	if not outgame.jude_overtaken and _player_ahead_of_jude():
@@ -153,6 +169,23 @@ func close_gp() -> void:
 	# R5 이월 회수 — 미사용분은 소멸하지 않는다 (D06 §3.5). 상한 가드는 구매 지점(K4) 전속:
 	# 사용은 수량을 늘리지 못하므로 회수분이 상한을 넘을 경로가 없다.
 	outgame.consumables = engine.consumables_held.duplicate()
+
+
+# 스킬 티어 개방 = 마일스톤 연동이라 별도 반환값이 없다 (D07 §4.3). 경계 전후를 대조해
+# **새로 열린 티어**만 뽑는다 — 티어 구성은 데이터가 정하므로 개수를 코드에 적지 않는다.
+func _tier_open_snapshot() -> Dictionary:
+	var open: Dictionary = {}
+	for row in data.skills:
+		var skill_tier := CsvTable.to_int(String(row["skill_tier"]))
+		open[skill_tier] = outgame.skill_tier_open(skill_tier)
+	return open
+
+
+func _latch_opened_tiers(before: Dictionary) -> void:
+	newly_opened_tiers = []
+	for skill_tier in before:
+		if not bool(before[skill_tier]) and outgame.skill_tier_open(int(skill_tier)):
+			newly_opened_tiers.append(int(skill_tier))
 
 
 # 플랫폼 업적 발행 (D12 §2.2 IAchievement · 총괄 판정 IMPL-128 ③).
@@ -240,8 +273,10 @@ func settle_season() -> Dictionary:
 
 
 func close_tour() -> Dictionary:
+	var tiers_before := _tier_open_snapshot()
 	last_tour_report = season.close_tour()
 	outgame.record_tour_result(last_tour_report)
+	_latch_opened_tiers(tiers_before)
 	newly_achieved = outgame.evaluate_achievements(season.season)
 	_publish_achievements()
 	if not season.season_finished():
@@ -253,8 +288,10 @@ func close_tour() -> Dictionary:
 
 # 시즌 결산 — 타이틀 판정·그리드 레벨은 코어가 한다 (D05 §9.4~§10)
 func close_season() -> Dictionary:
+	var tiers_before := _tier_open_snapshot()
 	last_season_report = season.close_season()
 	outgame.record_season_result(last_season_report)
+	_latch_opened_tiers(tiers_before)
 	newly_achieved = outgame.evaluate_achievements(season.season)
 	_publish_achievements()
 	# 시즌 오버홀 후보 추첨 — 결산 직후 1회 (D06 §5.3). 결과는 아웃게임 층에 보존되어

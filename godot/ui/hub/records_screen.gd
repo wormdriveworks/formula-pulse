@@ -23,7 +23,12 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 	(%TabCareer as Button).text = s.text("ui.records.tabCareer")
 	(%TabArchive as Button).text = s.text("ui.records.tabArchive")
 	for tab_name in _tabs:
-		(_tabs[tab_name]["button"] as Button).pressed.connect(_select_tab.bind(String(tab_name)))
+		var tab_button := _tabs[tab_name]["button"] as Button
+		# 탭 전환음(SE-U04)은 결정음(SE-U02)과 다른 축이다 — 조작음 자동 결속이 이 메타를 읽어
+		# 기본 결정음 대신 탭음을 붙인다. `_select_tab()` 은 진입 초기화에서도 불리므로
+		# 거기서 울리면 화면에 들어서기만 해도 탭음이 난다.
+		tab_button.set_meta(AUDIO_EVENT_META, "ui_tab")
+		tab_button.pressed.connect(_select_tab.bind(String(tab_name)))
 	_fill_rivals()
 	_fill_career()
 	_fill_archive()

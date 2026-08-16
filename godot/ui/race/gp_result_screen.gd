@@ -24,6 +24,7 @@ func _on_bound(_payload: Dictionary) -> void:
 	var retired := bool(result.get("player_retired", false))
 	var rank := int(result.get("player_rank", 0))
 	var tour_points := int(result.get("tour_points", 0))
+	_enter_audio(retired, rank)
 
 	(%HeaderLabel as Label).text = s.text("ui.gpResult.header")
 	(%RankLabel as Label).text = s.text("ui.gpResult.finalRank")
@@ -68,6 +69,29 @@ func _on_bound(_payload: Dictionary) -> void:
 	_save_badge.text = s.text("ui.gpResult.saved")
 	if not bool(saved.get("ok", false)):
 		push_error("GpResultScreen: autosave failed - %s" % String(saved.get("reason", "")))
+
+
+# 결산 진입 사운드 — **순서가 규칙이다** (D11 §4.3 전이 규칙표).
+#   GP 종료 : 무대 트랙 아웃 → JG-01/02 → BGM-08
+#   리타이어: BGM 즉시 정지 → JG-03 → 결산 진입
+# 리타이어 징글(JG-03)은 리타이어 확정 시점(RACE-01)이 이미 울렸으므로 여기서 겹치지 않는다.
+#
+# **상위/중하위 경계 = 포디움 [가안].** D11 §4.2 는 JG-01 을 "상위 성적"이라고만 하고 수치를
+# 두지 않는다. 게임이 이미 가진 유일한 상위 성적 경계인 포디움을 쓰되, 그 임계도 코드에
+# 적지 않고 `milestone_first_podium` 행의 값을 읽는다 — 값 창구 밖에서 수치를 만들지 않는다.
+func _enter_audio(retired: bool, rank: int) -> void:
+	if session.audio != null:
+		session.audio.stop_bgm()   # 무대 트랙 아웃 — 징글이 트랙 위에 겹치지 않게 먼저 끈다
+	if not retired:
+		var podium := CsvTable.to_int(String(
+			session.data.milestones["milestone_first_podium"]["threshold"]))
+		sfx("gp_result_high" if rank >= 1 and rank <= podium else "gp_result_low")
+	sfx("gp_result_enter")
+	sfx("rank_stamp")   # SE-U16 순위 확정 스탬프
+	if not session.newly_achieved.is_empty():
+		sfx("achievement_get")
+	if not session.newly_opened_tiers.is_empty():
+		sfx("growth_gate_open")   # SE-U13 — 스킬 티어 개방은 마일스톤 연동(D07 §4.3)
 
 
 func _on_next(to_tour_report: bool) -> void:

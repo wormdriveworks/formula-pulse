@@ -75,6 +75,7 @@ func _refresh_consumables() -> void:
 func _on_buy_consumable(consumable_id: String) -> void:
 	if not session.outgame.buy_consumable(consumable_id):
 		return  # 상한·잔액 거부는 코어 판정 — 화면은 상태를 바꾸지 않는다
+	sfx("purchase")   # SE-U07 구매 성사
 	var s := session.data.strings
 	(%CreditsValue as Label).text = s.text("ui.recap.creditsFormat", {
 		"amount": session.outgame.credits,
@@ -126,6 +127,7 @@ func _on_toggle_deck(skill_id: String) -> void:
 func _on_repair_pressed() -> void:
 	var cap := session.data.param_int("param_repair_field_cap")
 	session.outgame.field_repair(cap)
+	sfx("repair_execute")   # SE-U10 — 필드 정비도 전면 정비와 같은 정비 실행 축이다
 	var s := session.data.strings
 	var credits_text := s.text("ui.recap.creditsFormat", {"amount": session.outgame.credits})
 	(%CreditsValue as Label).text = credits_text

@@ -78,6 +78,8 @@ func _on_sign(sponsor_id: String, sign: Button) -> void:
 	dialog.resolved.connect(func(accepted: bool):
 		if not accepted:
 			return
+		# 스폰서 체결에 대응하는 행이 `sound_map` 에 없다 — 확정 다이얼로그의 일반 결정음이
+		# 전부다. 표에 없는 행동은 울리지 않는 것이 정상이며, 임의로 다른 SFX 를 빌려 쓰지 않는다.
 		if session.outgame.sign_sponsor(sponsor_id):
 			_refresh_sign(sponsor_id, sign)
 			_refresh_slots())

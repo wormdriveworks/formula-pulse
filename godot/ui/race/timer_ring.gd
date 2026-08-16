@@ -39,6 +39,12 @@ func configure(leeway: float, warning: float) -> void:
 	warning_ratio = warning
 
 
+# 임박 구간 점멸 주파수 — SE-T03 임박 틱이 **점멸과 동기**이므로(D11 §2.3) 사운드 층이
+# 자기 주기를 따로 갖지 않고 여기서 받아 간다. 값이 바뀌면 소리와 그림이 함께 움직인다.
+func imminent_blink_hz() -> float:
+	return BLINK_HZ_IMMINENT
+
+
 func set_active(active: bool) -> void:
 	_active = active
 	set_process(active)

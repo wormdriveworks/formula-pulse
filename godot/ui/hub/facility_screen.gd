@@ -85,5 +85,6 @@ func _on_buy(facility_id: String, buy: Button) -> void:
 		if not accepted:
 			return
 		if session.outgame.unlock_facility(facility_id):
+			sfx("purchase")   # 성립한 구매만 울린다 — 거부는 조작음이 아니다
 			_refresh_buy(facility_id, buy)
 			refresh_currency())

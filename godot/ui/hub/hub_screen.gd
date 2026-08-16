@@ -20,6 +20,11 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 	pass
 
 
+# 정거장 진입음 (SE-U06). HUB-01 은 차고 자체라 진입음이 아니라 BGM·룸톤이므로 재정의한다.
+func _audio_enter_events() -> Array:
+	return ["station_enter"]
+
+
 func _fill_common_bar() -> void:
 	var bar := get_node_or_null("%CommonBar")
 	if bar == null:
@@ -46,6 +51,8 @@ func _fill_common_bar() -> void:
 	var back := get_node_or_null("%BackButton")
 	if back != null:
 		(back as Button).text = s.text("ui.hub.back")
+		# 뒤로 가기는 결정음이 아니라 취소음이다 (SE-U03). 조작음 자동 결속이 이 메타를 읽는다.
+		(back as Button).set_meta(AUDIO_EVENT_META, "ui_cancel")
 		(back as Button).pressed.connect(func(): go("HUB-01", {}))
 
 

@@ -15,6 +15,10 @@ const STANDINGS_SHOWN := 10
 func _on_bound(_payload: Dictionary) -> void:
 	var s := session.data.strings
 	var report := session.last_season_report
+	# 트랙 아웃 → 징글 → 결산 트랙 (D11 §4.3 전이 규칙의 GP 전례를 시즌 경계에 그대로 적용).
+	# 징글은 아래 판정 분기가 내고, 여기서는 앞뒤 순서만 잡는다.
+	if session.audio != null:
+		session.audio.stop_bgm()
 	var standings: Array = report.get("standings", [])
 	var player_position := int(report.get("player_position", 0))
 	var champion := String(report.get("champion", ""))
@@ -54,6 +58,9 @@ func _on_bound(_payload: Dictionary) -> void:
 	if champion == SeasonState.PLAYER_ID:
 		verdict.text = s.text("ui.seasonResult.champion")
 		verdict.add_theme_color_override("font_color", UiPalette.SYMBOL_CHANCE)
+		# JG-04 시즌 챔피언 / JG-05 칭호·특별 달성 — 챔피언 칭호는 두 축을 동시에 만족한다.
+		sfx("season_champion")
+		sfx("title_award")
 		if bool(report.get("epilogue", false)):
 			(%EpilogueLabel as Label).text = s.text("ui.seasonResult.epilogue")
 			(%EpilogueLabel as Label).visible = true
@@ -61,6 +68,7 @@ func _on_bound(_payload: Dictionary) -> void:
 		verdict.text = s.text("ui.seasonResult.carryOn")
 		verdict.add_theme_color_override("font_color", UiPalette.TEXT_PRIMARY)
 
+	sfx("season_result_enter")   # BGM-11 — 징글 뒤에 트랙이 든다 (§4.3 순서)
 	_next_button.text = s.text("ui.seasonResult.toOverhaul")
 	_next_button.pressed.connect(_on_next.bind(player_position))
 	_next_button.grab_focus()

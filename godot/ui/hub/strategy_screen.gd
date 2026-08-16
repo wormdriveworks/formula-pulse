@@ -114,6 +114,7 @@ func _on_unlock(skill_id: String, row: Control) -> void:
 		if not accepted:
 			return
 		if session.outgame.unlock_skill(skill_id):
+			sfx("skill_unlock")   # SE-U12 스킬 해금
 			_refresh_skill_row(skill_id, row)
 			refresh_currency())
 

@@ -13,8 +13,12 @@
 # NAR-02 캘린더 공개 비트는 이 화면 **내부 오버레이**다 (신규 슬롯 불신설 — D08 §2.1).
 extends FlowScreen
 
+# 베인 화자 판별용 — 큐음이 갈린다 (SE-V01 베인 3단계 / SE-V02 그 외 공용, D11 §2.10).
+const VANE_SPEAKER_KEY := "ui.vn.speakerVane"
+
 var _lines: Array = []
 var _line_index := 0
+var _speaker_is_vane := true
 var _calendar_pending := false
 var _next_route := ""
 var _next_payload: Dictionary = {}
@@ -40,11 +44,17 @@ func _on_bound(payload: Dictionary) -> void:
 			go(_next_route, _next_payload)
 			return
 
+	# VN 트랙 2종 (BGM-09 일상 / BGM-10 긴장). **D11 §4.1 은 "트랙 선택 = 이벤트 데이터 태그
+	# (스키마 D12)"로 확정했으나 `vn_slots`·`milestone_vn` 어느 표에도 그 열이 없다** —
+	# 태그가 유입될 때까지 페이로드로 받고 미지정은 일상으로 둔다. [가안] · 총괄 보고분.
+	sfx("vn_enter_%s" % String(payload.get("tone", "calm")))
 	(%SkipButton as Button).text = s.text("ui.vn.skip")
+	(%SkipButton as Button).set_meta(AUDIO_EVENT_META, "ui_cancel")   # 스킵 = 닫기 축
 	(%SkipButton as Button).pressed.connect(_on_skip.bind(vn_id, slot_id))
 	var speaker_key := String(payload.get("speaker_key", "ui.vn.speakerVane"))
 	var speaker_text := s.text(speaker_key)
 	(%SpeakerLabel as Label).text = speaker_text
+	_speaker_is_vane = speaker_key == VANE_SPEAKER_KEY
 	_lines = payload.get("line_keys", ["ui.vn.placeholderLine01"])
 	_line_index = 0
 	_show_line()
@@ -65,6 +75,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _show_line() -> void:
 	var s := session.data.strings
 	(%BodyLabel as Label).text = s.text(String(_lines[_line_index]))
+	# 대사창 갱신 1회당 큐음 1발 (D11 §2.10). 베인만 인격 3단계로 음색이 갈리고
+	# 나머지 화자는 공용음이다 — 캐릭터별 개별음은 불채택 확정.
+	if _speaker_is_vane:
+		sfx("vane_cue_stage%d" % session.outgame.vane_stage())
+	else:
+		sfx("speaker_cue")
 
 
 func _advance() -> void:

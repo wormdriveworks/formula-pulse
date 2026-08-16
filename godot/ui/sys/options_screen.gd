@@ -28,6 +28,7 @@ func _on_bound(payload: Dictionary) -> void:
 	reset.pressed.connect(_on_reset)
 	var close := %CloseButton as Button
 	close.text = s.text("ui.options.close")
+	close.set_meta(AUDIO_EVENT_META, "ui_cancel")   # SE-U03 취소·닫기
 	close.pressed.connect(_on_close)
 	_build_tabs()
 	_select_tab(0)
@@ -43,6 +44,7 @@ func _build_tabs() -> void:
 		button.name = "Tab%d" % index
 		button.text = s.text(String(tab["key"]))
 		button.add_theme_font_size_override("font_size", _body_font_size)
+		button.set_meta(AUDIO_EVENT_META, "ui_tab")   # SE-U04 — 결정음이 아니라 탭 전환음
 		button.pressed.connect(_select_tab.bind(index))
 		tab_row.add_child(button)
 
@@ -113,6 +115,9 @@ func _build_row(option_id: String) -> Control:
 		notice.visible = false
 		column.add_child(notice)
 
+	# 단계 이동은 결정이 아니다 — 빈 메타로 일반 결정음을 끄고 `_shift()` 가 토글음을 낸다.
+	prev.set_meta(AUDIO_EVENT_META, "")
+	next.set_meta(AUDIO_EVENT_META, "")
 	prev.pressed.connect(_shift.bind(option_id, -1, value, notice))
 	next.pressed.connect(_shift.bind(option_id, 1, value, notice))
 	_refresh_value(option_id, value, notice)
@@ -129,6 +134,7 @@ func _shift(option_id: String, direction: int, value: Label, notice: Label) -> v
 		var count := store.step_count(option_id)
 		current = wrapi(current + direction, 0, count)
 	store.set_index(option_id, current)  # 즉시 반영 — 소비부가 사용 시점마다 읽는다
+	sfx("ui_toggle")   # SE-U05 토글·슬라이더 — 단계 이동과 볼륨 이동이 같은 축이다
 	_refresh_value(option_id, value, notice)
 
 

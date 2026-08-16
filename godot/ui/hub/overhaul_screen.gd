@@ -103,6 +103,7 @@ func _on_confirm() -> void:
 		if not accepted:
 			return
 		if session.outgame.install_overhaul(_selected, _rank):
+			sfx("overhaul_install")   # SE-U14 시즌 오버홀 적용
 			# 상위권 = 슬롯 2 (D13 §7.1) — 잔여 슬롯과 고를 후보가 남으면 화면에 머문다.
 			# [가안] 잔여 슬롯은 후보 잔존 시 선택 필수 (포기 동선은 씬 개편 사안 — 주력 몫)
 			if _remaining_slots() > 0 and _has_selectable_candidate():

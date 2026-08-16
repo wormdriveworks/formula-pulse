@@ -15,6 +15,12 @@ extends FlowScreen
 @onready var _next_button: Button = %NextButton
 
 
+# SE-U15 결산 포인트 롤업 — 블록별 수치가 채워지는 동안의 루프음이다. 롤업 연출(수치
+# 카운트업)은 아직 없어 진입 1회로 둔다. 연출이 붙으면 시작·종료를 이 지점이 감싼다.
+func _audio_enter_events() -> Array:
+	return ["settle_rollup"]
+
+
 func _on_bound(_payload: Dictionary) -> void:
 	var s := session.data.strings
 	var report := session.last_tour_report
