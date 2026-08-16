@@ -686,6 +686,11 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 9
 
+[node name="AchievementsButton" type="Button" parent="PauseOverlay/Center/Panel/MenuColumn" unique_id=612430893]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+
 [node name="TitleButton" type="Button" parent="PauseOverlay/Center/Panel/MenuColumn" unique_id=941539708]
 unique_name_in_owner = true
 layout_mode = 2

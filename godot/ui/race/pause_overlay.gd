@@ -3,7 +3,8 @@
 # **개입 창 중 호출 시: 릴·게이지 존 가림막 + 타이머 정지 (확정)** — 정지 상태에서 보드를
 # 숙고하는 소프트 타임 리미트 우회를 차단한다 (F2 보호). 재개 시 3-2-1 카운트인.
 #
-# 메뉴: 재개 / 옵션 / 타이틀로(최근 저장 지점 복귀 경고). 업적은 MS-2 범위 외(IMPL-077)라 없다.
+# 메뉴: 재개 / 옵션 / 업적 / 타이틀로(최근 저장 지점 복귀 경고) — §A-5 확정 4항.
+# 업적(SYS-04)은 MS-3 에서 서면서 들어왔다(IMPL-077 범위 제외 해소).
 extends Control
 
 signal resumed
@@ -25,10 +26,12 @@ func setup(run_session: RunSession) -> void:
 	var s := _session.data.strings
 	(%ResumeButton as Button).text = s.text("ui.pause.resume")
 	(%OptionsButton as Button).text = s.text("ui.pause.options")
+	(%AchievementsButton as Button).text = s.text("ui.pause.achievements")
 	(%TitleButton as Button).text = s.text("ui.pause.toTitle")
 	(%TitleWarning as Label).text = s.text("ui.pause.saveNotice")
 	(%ResumeButton as Button).pressed.connect(_begin_countin)
 	(%OptionsButton as Button).pressed.connect(_open_options)
+	(%AchievementsButton as Button).pressed.connect(_open_achievements)
 	(%TitleButton as Button).pressed.connect(func(): quit_to_title.emit())
 
 
@@ -71,3 +74,10 @@ func _open_options() -> void:
 	add_child(options)
 	options.open_as_overlay(_session)
 	# 닫힘은 options 쪽 closed 시그널 — 오버레이 회수는 options 가 스스로 한다 (queue_free)
+
+
+func _open_achievements() -> void:
+	var packed := load("res://ui/sys/achievement_screen.tscn") as PackedScene
+	var achievements: Control = packed.instantiate()
+	add_child(achievements)
+	achievements.open_as_overlay(_session)

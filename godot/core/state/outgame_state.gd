@@ -635,6 +635,24 @@ func pending_achievements() -> Array:
 	return pending
 
 
+# 업적 1건의 진척 조회 (표시 전용) — SYS-04 업적 화면의 '조건' 축 (D09 별첨A §A-4).
+# **판정과 같은 계산을 쓴다** — `_achievement_met()` 이 여기 반환값을 그대로 임계와 비교하므로
+# 표시와 판정이 갈라질 수 없다 (IMPL-100 `field_repair_preview` 와 같은 구조).
+# 상태 변경 없음 — 조회만 한다.
+func achievement_progress(achievement_id: String) -> Dictionary:
+	if not data.achievements.has(achievement_id):
+		push_error("OutgameState: unknown achievement '%s'" % achievement_id)
+		return {"current": 0, "threshold": 0, "met": false, "pending": false}
+	var row: Dictionary = data.achievements[achievement_id]
+	return {
+		# 미지 소스 표식(-1)은 표시에 내보내지 않는다 — 판정 쪽만 그 값을 본다.
+		"current": maxi(_achievement_current(row), 0),
+		"threshold": CsvTable.to_int(String(row["threshold"])),
+		"met": achievements.has(achievement_id),
+		"pending": _achievement_source_missing(row),
+	}
+
+
 func _achievement_source_missing(row: Dictionary) -> bool:
 	if String(row["source"]) == "relation":
 		return not data.relation_axes.has(String(row["source_id"]))
@@ -642,23 +660,28 @@ func _achievement_source_missing(row: Dictionary) -> bool:
 
 
 func _achievement_met(row: Dictionary) -> bool:
+	return _achievement_current(row) >= CsvTable.to_int(String(row["threshold"]))
+
+
+# 업적 조건의 현재값. **미지 소스는 -1** 을 돌려 어떤 임계와 비교해도 미달이 되게 한다
+# (0 을 돌리면 임계 0 인 데이터가 들어왔을 때 미지 소스가 '달성'으로 통과한다).
+func _achievement_current(row: Dictionary) -> int:
 	var source := String(row["source"])
 	var source_id := String(row["source_id"])
-	var threshold := CsvTable.to_int(String(row["threshold"]))
 	match source:
 		"milestone":
-			return milestones.has(source_id)
+			return 1 if milestones.has(source_id) else 0
 		"career_stat":
-			return career_stat(source_id) >= threshold
+			return career_stat(source_id)
 		"relation":
-			return relation_stage(source_id) >= threshold
+			return relation_stage(source_id)
 		"discovery":
-			return discoveries.has(source_id)
+			return 1 if discoveries.has(source_id) else 0
 		"state":
-			return _achievement_state_value(source_id) >= threshold
+			return _achievement_state_value(source_id)
 		_:
 			push_error("OutgameState: unknown achievement source '%s'" % source)
-			return false
+			return -1
 
 
 func _achievement_state_value(key: String) -> int:

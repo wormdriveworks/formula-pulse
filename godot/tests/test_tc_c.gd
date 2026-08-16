@@ -39,8 +39,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 1940:
-		print("TC_C_TEST_FAIL checks=%d < 하한 1940 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 1945:
+		print("TC_C_TEST_FAIL checks=%d < 하한 1945 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -1136,6 +1136,28 @@ func _presentation_grade_caps() -> void:
 		String(resolved[2]["trigger"]) == "trigger_chance_three_match"
 		and String(resolved[2]["grade"]) == "grade_l1" and bool(resolved[2]["demoted"]), str(resolved))
 	_ok("연출 등급 조회 중 데이터 침묵 기본값 0", data.is_ok())
+	# L3 조우 판정 (D10 §7 결정 #6 — CG-01 왕좌/로렌츠). 시즌 최종 무대(펄스 돔)의 벽 라이벌
+	# 듀얼 결판에서만 선다. 무대 5는 실기로 밟기 어려운 경로라 조건식 자체를 못박는다.
+	var race_screen_script: GDScript = load("res://ui/race/race_screen.gd")
+	var final_stage_id := String(data.season_calendar.get("fixed_final_stage", ""))
+	var final_stage: Dictionary = data.stages[final_stage_id]
+	var wall_rival := String(final_stage.get("wall_rival", ""))
+	_ok("시즌 최종 무대 벽 = 로렌츠 (D08 §5.1 이중 고정)", wall_rival == "ai_lorentz", wall_rival)
+	_ok("CG-01 = 최종 무대 벽 듀얼 결판",
+		String(race_screen_script.l3_encounter_for(final_stage, final_stage_id, wall_rival, true))
+		== "cg_01_throne")
+	_ok("듀얼 결판 아니면 미성립",
+		String(race_screen_script.l3_encounter_for(final_stage, final_stage_id, wall_rival, false)).is_empty())
+	_ok("벽 아닌 상대면 미성립",
+		String(race_screen_script.l3_encounter_for(final_stage, final_stage_id, "ai_jude", true)).is_empty())
+	# **비공허성 확보:** 무벽 무대(메트로)로 대조하면 `wall.is_empty()` 가드가 먼저 걸려
+	# 최종 무대 조건이 무검증으로 남는다(돌연변이 실측 — 조건 삭제가 통과했다).
+	# 벽이 **있는** 비최종 무대 + 그 무대의 벽을 상대로 둬야 최종 무대 축만 갈린다.
+	var mid_stage: Dictionary = data.stages["stage_azure_coast"]
+	var mid_wall := String(mid_stage.get("wall_rival", ""))
+	_ok("대조 무대에 벽 존재 (검사 비공허)", not mid_wall.is_empty() and mid_wall != wall_rival, mid_wall)
+	_ok("최종 무대 아니면 미성립 (벽 듀얼이어도)",
+		String(race_screen_script.l3_encounter_for(mid_stage, final_stage_id, mid_wall, true)).is_empty())
 
 
 # ── 섹터 속성 6축 가중 — 릴 분포 대조 (D13 별첨A §1.3 · D08 별첨A §1) ──

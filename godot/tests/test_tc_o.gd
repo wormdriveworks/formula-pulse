@@ -24,8 +24,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 364:
-		print("TC_O_TEST_FAIL checks=%d < 하한 364 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 370:
+		print("TC_O_TEST_FAIL checks=%d < 하한 370 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -517,6 +517,41 @@ func _milestones_and_achievements() -> void:
 	_ok("미결선 = 재회·계승(셀린) 축",
 		pending.has("achievement_relation_reunion") and pending.has("achievement_relation_succession_maro"),
 		str(pending))
+	# ── SYS-04 조건 진척 조회 (표시 전용) ──
+	# 표시가 판정과 다른 계산을 쓰면 화면이 거짓을 그린다 — 같은 소스를 보는지 전수로 못박는다
+	# (IMPL-100 `field_repair_preview` 패리티 검사와 같은 구조).
+	var viewer := _new_state()
+	for i2 in range(4):
+		viewer.record_gp_result({"player_rank": 5, "player_retired": false, "duels": 3, "duel_wins": 2,
+			"trouble_turns": 1, "circuit_id": "circuit_mn1"})
+	viewer.evaluate_achievements()
+	var mid: Dictionary = viewer.achievement_progress("achievement_duel_10_wins")
+	_ok("진척 조회 = 판정 소스 실값 (8/10 미달성)",
+		int(mid["current"]) == 8 and int(mid["threshold"]) == 10 and not bool(mid["met"]), str(mid))
+	_ok("발견형 미통지 진척 0",
+		int(viewer.achievement_progress("achievement_l3_throne")["current"]) == 0)
+	viewer.record_discovery("cg_01_throne")
+	viewer.evaluate_achievements()
+	var found: Dictionary = viewer.achievement_progress("achievement_l3_throne")
+	_ok("발견형 통지 진척 1 · 달성", int(found["current"]) == 1 and bool(found["met"]), str(found))
+	_ok("미결선 축 = pending 표식 (SYS-04 는 히든 슬롯으로 가린다)",
+		bool(viewer.achievement_progress("achievement_relation_reunion")["pending"]))
+	_ok("미지 업적 id = 빈 진척 가드",
+		int(viewer.achievement_progress("achievement_nope")["threshold"]) == 0)
+	beater.evaluate_achievements()
+	var parity_ok := true
+	var parity_detail := ""
+	for progress_id in data.achievements:
+		var view: Dictionary = beater.achievement_progress(String(progress_id))
+		if bool(view["met"]) != beater.achievements.has(progress_id):
+			parity_ok = false
+			parity_detail = String(progress_id)
+		if bool(view["pending"]):
+			continue   # 판정 소스 미결선 — 임계 비교 자체가 성립하지 않는다
+		if (int(view["current"]) >= int(view["threshold"])) != bool(view["met"]):
+			parity_ok = false
+			parity_detail = String(progress_id)
+	_ok("진척 조회-판정 패리티 39종 전수", parity_ok, parity_detail)
 	# 직렬화 왕복 — 통산·업적·제패·발견 4축 보존
 	var payload := beater.serialize()
 	var restored := _new_state()
@@ -598,7 +633,9 @@ func _tc_o6_exchange_guards() -> void:
 		"tuning_step", "tuning_cost", "buy_tuning", "tuning_refund_ratio", "redistribute_tuning",
 		"overhaul_slots", "install_overhaul", "draw_overhaul_candidates", "parts_stat_bonus",
 		"career_stat", "record_gp_result", "record_tour_result", "record_season_result",
-		"record_discovery", "evaluate_achievements", "pending_achievements",
+		# `achievement_progress` 는 SYS-04 업적 화면의 조건 진척 조회 경로다
+		# (표시 전용 · 판정과 계산 공유 — IMPL-079·100과 같은 구조).
+		"record_discovery", "evaluate_achievements", "pending_achievements", "achievement_progress",
 		"skill_tier_open", "unlock_cost", "unlock_skill", "expand_deck", "set_deck",
 		"recruit_crew",
 		"sponsor_slots", "sponsor_candidate_count", "sign_sponsor", "settle_sponsors",

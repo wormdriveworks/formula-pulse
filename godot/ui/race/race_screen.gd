@@ -646,8 +646,47 @@ func _collect_triggers(events: Array) -> Array:
 	return triggers
 
 
+# L3 조우 판정 (D10 §7 결정 #6 — CG-01~03은 D08 §8.11 발견형 히든 업적과 1:1).
+# **CG-01(왕좌 — 로렌츠)만 결선한다.** 조건 = 시즌 최종 무대의 벽 라이벌과의 듀얼 결판 국면.
+# 나머지 2종은 아직 설 수 없다 — CG-02(재회 — 카이)는 '대면' 도달 축이 `relation_axes` 에
+# 부재(T7 서사 유입 의존 — IMPL-113 §5), CG-03(동기 — 주드)은 '첫 순위 역전 인접 듀얼'의
+# 판정 규격이 정본에 없다(총괄 보고 대상). 임의 해석하지 않는다(불변규칙 9).
+# 조건 판정은 화면 상태를 타지 않는 순수 함수로 둔다 — 화면을 세우지 않고 검사할 수 있어야
+# 조건이 조용히 어긋나는 일을 막는다(무대 5 도달 없이는 실기로 못 밟는 경로다).
+static func l3_encounter_for(stage: Dictionary, final_stage_id: String, opponent: String,
+		duel_decided: bool) -> String:
+	if not duel_decided:
+		return ""
+	if final_stage_id.is_empty() or String(stage.get("id", "")) != final_stage_id:
+		return ""
+	var wall := String(stage.get("wall_rival", ""))
+	if wall.is_empty() or opponent != wall:
+		return ""
+	return "cg_01_throne"
+
+
+func _l3_encounter_id(events: Array) -> String:
+	var decided := false
+	for event in events:
+		if String(TRIGGER_BY_KEY.get(String(event.get("key", "")), "")) == "trigger_duel_decision":
+			decided = true
+			break
+	return l3_encounter_for(
+		data.stage_of_active_circuit(),
+		String(data.season_calendar.get("fixed_final_stage", "")),
+		engine.duel_opponent,
+		decided)
+
+
 func _run_presentation(events: Array) -> void:
 	var triggers := _collect_triggers(events)
+	# 조우 기록은 연출(CG)과 별개 채널이다 — 도트 CG 미유입이어도 조우 자체는 성립했으므로
+	# 정보·기록 축은 지금 닫는다. 업적 판정은 GP·투어·시즌 경계의 evaluate_achievements() 몫.
+	var encounter := _l3_encounter_id(events)
+	if not encounter.is_empty():
+		session.outgame.record_discovery(encounter)
+		if not triggers.has("trigger_signature_event"):
+			triggers.append("trigger_signature_event")
 	if triggers.is_empty():
 		return
 	# 한 턴의 후보를 배치로 넘긴다 — 개별 호출은 우선순위 역전을 만든다 (IMPL-034)
@@ -669,8 +708,9 @@ func _fire_channels(channels: Dictionary) -> void:
 		_start_shake(data.param("param_fx_shake_strong_px"))
 		if bool(channels.get("flash_slow", false)):
 			_fire_flash()
-	# L3 전용 일러스트 컷인: 도트 CG 미유입 + 발동 조건(찬스 3매치 + 히든)이 무대 1 골격
-	# 밖이라 소비부를 두지 않는다 — CG 유입 시 결선. 정보 채널(로그)은 이미 보존된다.
+	# L3 전용 일러스트 컷인: 도트 CG(CG-01~03) 미유입이라 컷인 재생 소비부는 아직 없다 —
+	# 실물 유입 시 결선(T6). 조우 **기록**은 `_l3_encounter_id()` 가 이미 닫았고,
+	# 정보 채널(로그)도 보존된다.
 
 
 # 게이지 섬광 (L1 — D09 §3.6). 플래시(O2)와 별개 채널이라 감쇠 대상이 아니다 —

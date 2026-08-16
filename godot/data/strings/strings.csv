@@ -415,6 +415,7 @@ ui.options.close,닫기
 ui.options.controlsNote,조작 리매핑은 주요 키 한정으로 제공 예정입니다. 현재 매핑 — 스핀·확정 Space / 홀드 1·2·3 / 리스핀 R / 차지 개입 C / 일시정지 Esc
 ui.pause.resume,재개
 ui.pause.options,옵션
+ui.pause.achievements,업적
 ui.pause.toTitle,타이틀로
 ui.pause.saveNotice,진행은 최근 저장 지점 기준입니다.
 ui.pause.countFormat,{count}
@@ -585,3 +586,16 @@ ui.achievement.l3Throne,왕좌의 목격
 ui.achievement.l3Reunion,재회의 목격
 ui.achievement.l3Kinship,역전의 목격
 ui.achievement.scriptedP2,왕좌의 코앞
+ui.achievement.header,업적
+ui.achievement.tabCareer,커리어
+ui.achievement.tabRival,라이벌
+ui.achievement.tabDriving,드라이빙
+ui.achievement.tabGarage,개러지
+ui.achievement.tabArchive,아카이브
+ui.achievement.summaryFormat,달성 {done} / {total} ({percent}%)
+ui.achievement.hiddenSlot,???
+ui.achievement.progressFormat,{current} / {threshold}
+ui.achievement.markDone,달성
+ui.achievement.markPending,미달성
+ui.achievement.close,닫기
+ui.title.achievements,업적

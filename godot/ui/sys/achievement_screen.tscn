@@ -1,0 +1,66 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/sys/achievement_screen.gd" id="1_ach01"]
+[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="2_ach02"]
+
+[node name="AchievementScreen" type="Control" unique_id=612430881]
+layout_mode = 3
+anchors_preset = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_ach01")
+
+[node name="Background" type="ColorRect" parent="." unique_id=612430882]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.07, 0.08, 0.1, 1)
+
+[node name="Pad" type="MarginContainer" parent="." unique_id=612430883]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="Column" type="VBoxContainer" parent="Pad" unique_id=612430884]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=612430885]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_ach02")
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="SummaryLabel" type="Label" parent="Pad/Column" unique_id=612430886]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.55, 0.58, 0.64, 1)
+
+[node name="TabRow" type="HBoxContainer" parent="Pad/Column" unique_id=612430887]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="TabBody" type="Control" parent="Pad/Column" unique_id=612430888]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Footer" type="HBoxContainer" parent="Pad/Column" unique_id=612430889]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Spacer" type="Control" parent="Pad/Column/Footer" unique_id=612430890]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CloseButton" type="Button" parent="Pad/Column/Footer" unique_id=612430891]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9

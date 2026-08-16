@@ -11,6 +11,7 @@ const ROUTES := {
 	"SYS-01": "res://ui/sys/title_screen.tscn",
 	"SYS-02": "res://ui/sys/save_slot_screen.tscn",
 	"SYS-03": "res://ui/sys/options_screen.tscn",
+	"SYS-04": "res://ui/sys/achievement_screen.tscn",
 	"RACE-01": "res://ui/race/race_screen.tscn",
 	"RACE-03": "res://ui/race/gp_result_screen.tscn",
 	"RUN-01": "res://ui/run/run_recap_screen.tscn",

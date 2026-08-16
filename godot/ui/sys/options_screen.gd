@@ -12,6 +12,10 @@ signal closed
 var _return_route := "SYS-01"
 var _overlay_mode := false
 var _tab_panels: Array = []
+# 코드로 만든 Control 은 프로젝트 기본 폰트 크기를 상속하지 않고 **엔진 기본 테마의 16** 으로
+# 해석된다(실측 — IMPL-125). 씬에 놓인 노드만 9 가 먹어 탭·행이 16 으로 서 있었다.
+# 본문 계열 9 = D10 §5.7 확정단이므로 데이터 창구에서 읽어 명시 적용한다(불변규칙 2).
+var _body_font_size := 9
 
 
 func open_as_overlay(run_session: RunSession) -> void:
@@ -22,6 +26,7 @@ func open_as_overlay(run_session: RunSession) -> void:
 func _on_bound(payload: Dictionary) -> void:
 	var s := session.data.strings
 	_return_route = String(payload.get("return", "SYS-01"))
+	_body_font_size = int(session.data.param("param_font_size_body"))
 	(%HeaderLabel as Label).text = s.text("ui.options.header")
 	var reset := %ResetButton as Button
 	reset.text = s.text("ui.options.resetDefaults")
@@ -42,6 +47,7 @@ func _build_tabs() -> void:
 		var button := Button.new()
 		button.name = "Tab%d" % index
 		button.text = s.text(String(tab["key"]))
+		button.add_theme_font_size_override("font_size", _body_font_size)
 		button.pressed.connect(_select_tab.bind(index))
 		tab_row.add_child(button)
 
@@ -56,6 +62,7 @@ func _build_tabs() -> void:
 			# 조작 탭 — 리매핑은 주요 키 한정(결정 #6)이며 골격은 매핑 안내만 (§1.3 데스크탑)
 			var note := Label.new()
 			note.text = s.text("ui.options.controlsNote")
+			note.add_theme_font_size_override("font_size", _body_font_size)
 			note.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
 			note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			panel.add_child(note)
@@ -77,22 +84,26 @@ func _build_row(option_id: String) -> Control:
 	var label := Label.new()
 	label.custom_minimum_size = Vector2(150, 0)
 	label.text = s.text(String(option["label"]))
+	label.add_theme_font_size_override("font_size", _body_font_size)
 	row.add_child(label)
 
 	var prev := Button.new()
 	prev.name = "Prev"
 	prev.text = s.text("ui.options.stepPrev")
+	prev.add_theme_font_size_override("font_size", _body_font_size)
 	row.add_child(prev)
 
 	var value := Label.new()
 	value.name = "Value"
 	value.custom_minimum_size = Vector2(90, 0)
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value.add_theme_font_size_override("font_size", _body_font_size)
 	row.add_child(value)
 
 	var next := Button.new()
 	next.name = "Next"
 	next.text = s.text("ui.options.stepNext")
+	next.add_theme_font_size_override("font_size", _body_font_size)
 	row.add_child(next)
 
 	# O5 고지행 — '비활성' 선택 시에만 표출·상시 병기 (D09 §6.2 확정 문면 규격)
@@ -101,6 +112,7 @@ func _build_row(option_id: String) -> Control:
 		notice = Label.new()
 		notice.name = "Notice"
 		notice.text = s.text(String(option["notice"]))
+		notice.add_theme_font_size_override("font_size", _body_font_size)
 		notice.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
 		notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		notice.visible = false

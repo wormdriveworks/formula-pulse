@@ -3,8 +3,8 @@
 # 메뉴 열: 계속하기 / 새 커리어 / 기록실 / 옵션 / 종료.
 # **세이브 부재 시 '계속하기' 비표출 · '새 커리어' 승격** (§A-1 E01).
 #
-# 업적(SYS-04)은 MS-2 범위 밖이라 항목 자체를 두지 않는다 (사용자 확정 23종 — IMPL-077).
-# 기록실(HUB-05)·옵션(SYS-03)은 범위 안이지만 아직 서지 않아 잠금 표기로 자리만 잡는다 —
+# 업적(SYS-04)은 MS-3 에서 서면서 항목이 들어왔다 (§A-1 이탈 대상 = SYS-02·SYS-03·SYS-04).
+# 기록실(HUB-05)은 커리어 세이브 문맥이 필요해 아직 잠금 표기로 자리만 잡는다 —
 # 도달 불가 요소를 남기면 패드 순회 폐쇄 루프(D09 §1.3)가 깨지므로 비활성으로 순회에서 뺀다.
 extends FlowScreen
 
@@ -12,6 +12,7 @@ extends FlowScreen
 @onready var _continue_button: Button = %ContinueButton
 @onready var _new_button: Button = %NewCareerButton
 @onready var _archive_button: Button = %ArchiveButton
+@onready var _achievements_button: Button = %AchievementsButton
 @onready var _options_button: Button = %OptionsButton
 @onready var _quit_button: Button = %QuitButton
 @onready var _version: Label = %VersionLabel
@@ -24,6 +25,7 @@ func _on_bound(_payload: Dictionary) -> void:
 	_continue_button.text = s.text("ui.title.continueRun")
 	_new_button.text = s.text("ui.title.newCareer")
 	_archive_button.text = s.text("ui.title.archive")
+	_achievements_button.text = s.text("ui.title.achievements")
 	_options_button.text = s.text("ui.title.options")
 	_quit_button.text = s.text("ui.title.quit")
 	var version_text := s.text("ui.title.versionFormat", {
@@ -34,6 +36,7 @@ func _on_bound(_payload: Dictionary) -> void:
 	_continue_button.pressed.connect(_on_continue)
 	_new_button.pressed.connect(_on_new_career)
 	_quit_button.pressed.connect(_on_quit)
+	_achievements_button.pressed.connect(func(): go("SYS-04", {"return": "SYS-01"}))
 	_options_button.pressed.connect(func(): go("SYS-03", {"return": "SYS-01"}))
 	# 기록실 열람 모드(커리어 세이브 문맥)는 세이브 선택 경유가 규격(§A-1 E02) — 미결선 잠금
 	_archive_button.disabled = true
