@@ -20,6 +20,9 @@ var turn_phase: int = RaceTypes.TurnPhase.T1_SECTOR_OPEN
 # 투어 내 GP 슬롯 (제1~4전) — 슬롯 진행 보정의 입력. 투어 층이 주입한다.
 # 사용자 판정(2026-08-12): 슬롯 진행 보정의 축 = 투어 내 GP 슬롯 (D08 §2.4 · D13 별첨A §6.2).
 var race_slot: int = 1
+# 플레이어 시작 포지션 (D13 별첨A §6.3) — 투어 층이 산정해 주입한다. 0 = 미주입(고정값 사용).
+# 기준 순위 산정(챔피언십 순위 / 직전 GP 결과)은 시즌 층 소관이며 엔진은 결과만 소비한다.
+var player_start_rank: int = 0
 
 var lap: int = 0
 var sector: int = 0
@@ -243,7 +246,9 @@ func _build_start_grid() -> void:
 	positions.clear()
 	for entry in scored:
 		positions.append(entry["id"])
-	var player_pos := data.grid_int("player_start_position")
+	# 플레이어 시작 포지션 (D13 별첨A §6.3): 기준 순위는 투어 층이 주입한다.
+	# 미주입(단독 GP·디버그 주행) = 그리드 데이터의 고정값 — MS-1 단독 GP 계약을 보존한다.
+	var player_pos := player_start_rank if player_start_rank > 0 else data.grid_int("player_start_position")
 	positions.insert(clampi(player_pos - 1, 0, positions.size()), PLAYER_ID)
 
 

@@ -167,6 +167,27 @@ func apply_to_engine(engine: RaceEngine) -> void:
 	engine.race_slot = race_slot
 	engine.resonance_circuit_id = resonance_circuit_id
 	engine.resonance_sector_slot = resonance_sector_slot
+	engine.player_start_rank = player_start_rank()
+
+
+# 플레이어 시작 포지션 (D13 별첨A §6.3 산정식):
+#   · 시즌 1 투어 1 제1전 = P16 고정
+#   · 투어 첫 그랑프리    = 챔피언십 순위 기반 (동률 = 직전 GP 결과 순 — V-2 등반 서사 보존)
+#   · 투어 내 2~4전       = 직전 그랑프리 결과 기반
+# 개별 시작 보정은 엔진의 AI 정렬 소관이며 여기서는 **플레이어 기준 순위**만 낸다.
+func player_start_rank() -> int:
+	var grid_size := data.grid_int("filler_count") + data.grid_array("rivals").size() + 1
+	if season <= 1 and tour_slot <= 1 and race_slot <= 1:
+		return grid_size   # 개막전 P16 고정 (D08 §3.5)
+	if race_slot > 1:
+		var previous := last_gp_standings.find(PLAYER_ID)
+		if previous >= 0:
+			return clampi(previous + 1, 1, grid_size)
+		return grid_size
+	var standing := championship_standings().find(PLAYER_ID)
+	if standing >= 0:
+		return clampi(standing + 1, 1, grid_size)
+	return grid_size
 
 
 func current_circuit_id() -> String:

@@ -19,8 +19,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 478:
-		print("SEASON_TEST_FAIL checks=%d < 하한 478 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 486:
+		print("SEASON_TEST_FAIL checks=%d < 하한 486 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -296,6 +296,52 @@ func _calendar_rules() -> void:
 	_ok("직전 없으면 6조합 전부 가능", first_seen.size() == 6, "seen=%d" % first_seen.size())
 	# 단일 원소 풀은 셔플 대상이 아니다
 	_ok("단일 풀은 그대로", state.shuffle_middle(["x"], []) == ["x"])
+	_start_grid_rule()
+
+
+# ── 시작 그리드 산정 (D13 별첨A §6.3 — TL-5 러너가 적발한 미구현분) ──
+# 선재 구멍: 엔진이 매 GP 디버그 고정값(P16)을 썼다. 순위 상승 경로가 구조적으로 없어
+# 챔피언십 중앙값이 항상 최하위였고 D13 §4.3 도달률 발주가 성립 불가였다.
+func _start_grid_rule() -> void:
+	var state := _new_state(71)
+	if state == null:
+		return
+	state.begin_season(1)
+	var grid_size := state.data.grid_int("filler_count") + state.data.grid_array("rivals").size() + 1
+	_ok("D08 §3.5 개막전 = P%d 고정" % grid_size, state.player_start_rank() == grid_size,
+		"actual=%d" % state.player_start_rank())
+	# 투어 내 2~4전 = 직전 그랑프리 결과 기반
+	state.record_gp(_gp_result(6))
+	_ok("투어 내 2전 = 직전 GP 결과 (P6)", state.player_start_rank() == 6,
+		"actual=%d" % state.player_start_rank())
+	state.record_gp(_gp_result(2))
+	_ok("투어 내 3전 = 직전 GP 결과 (P2)", state.player_start_rank() == 2,
+		"actual=%d" % state.player_start_rank())
+	# 투어 첫 그랑프리 = 챔피언십 순위 기반
+	state.record_gp(_gp_result(1))
+	state.record_gp(_gp_result(1))
+	state.close_tour()
+	var championship_index := state.championship_standings().find(SeasonState.PLAYER_ID) + 1
+	_ok("투어 2 개막 = 챔피언십 순위 기반", state.player_start_rank() == championship_index,
+		"actual=%d championship=%d" % [state.player_start_rank(), championship_index])
+	# 경로가 실제로 갈렸는지 — 개막전 고정값과 같으면 분기가 죽어 있어도 통과한다
+	_ok("투어 2 개막 ≠ 개막전 고정값", state.player_start_rank() != grid_size,
+		"actual=%d" % state.player_start_rank())
+	# 챔피언십 무득점자는 최하위 기준 — 순위표에 없으면 그리드 최후미
+	var fresh := _new_state(72)
+	fresh.begin_season(2)
+	_ok("시즌 2 개막 무득점 = 최후미", fresh.player_start_rank() == grid_size,
+		"actual=%d" % fresh.player_start_rank())
+	# 엔진 주입 경로 — 산정값이 실제 시작 포지션이 된다 (주입이 끊기면 여기서 깨진다)
+	var engine := RaceEngine.new()
+	engine.setup(state.data, state.rng)
+	state.apply_to_engine(engine)
+	_ok("엔진 주입 = 산정값", engine.player_start_rank == state.player_start_rank(),
+		"engine=%d state=%d" % [engine.player_start_rank, state.player_start_rank()])
+	state.data.select_circuit("circuit_mn1")
+	engine.start_gp()
+	_ok("실제 시작 포지션 = 산정값", engine.player_position() == state.player_start_rank(),
+		"actual=%d expected=%d" % [engine.player_position(), state.player_start_rank()])
 
 
 func _same_multiset(a: Array, b: Array) -> bool:

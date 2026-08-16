@@ -36,15 +36,10 @@ func _on_bound(_payload: Dictionary) -> void:
 	(%Block2Value as Label).text = championship_text
 
 	# 블록 3 — 탈락 시 S3 미지급·S4 축소를 문면으로 명시한다 (D06 §4.2)
-	var reward := session.outgame.settlement_reward("tour", maxi(position, 1))
-	var s4_ratio := float(report.get("s4_ratio", 1.0))
-	var credits := int(round(float(int(reward.get("credits", 0))) * s4_ratio))
-	var dp := int(reward.get("dp", 0))
-	if bool(report.get("s3_paid", true)):
-		credits += session.data.param_int("param_tour_finish_bonus_cr")
-		dp += session.data.param_int("param_tour_finish_bonus_dp")
-	session.outgame.gain_credits(credits)
-	session.outgame.gain_drive_data(dp)
+	# 지급·환전은 세션 경로 전속 (규칙이 화면에 갇히지 않는다) — 화면은 반환값을 표시만 한다
+	var settled := session.settle_tour(session.engine.charge if session.engine != null else 0)
+	var credits := int(settled["credits"])
+	var dp := int(settled["dp"])
 	var credit_text := s.text("ui.tourReport.creditFormat", {"amount": credits})
 	var data_text := s.text("ui.tourReport.dataFormat", {"amount": dp})
 	(%Block3Value as Label).text = credit_text
@@ -55,7 +50,7 @@ func _on_bound(_payload: Dictionary) -> void:
 	# 블록 4 — 완주 시에만 표출 (탈락 시 환전 자체가 성립하지 않는다)
 	_block4.visible = not dropped
 	if not dropped:
-		var exchanged := session.outgame.exchange_charge(session.engine.charge, true)
+		var exchanged := int(settled["exchanged"])
 		var exchanged_text := s.text("ui.tourReport.creditFormat", {"amount": exchanged})
 		(%Block4Value as Label).text = exchanged_text
 	(%Block5Value as Label).text = s.text("ui.tourReport.chargeExpired")

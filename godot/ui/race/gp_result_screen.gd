@@ -39,9 +39,10 @@ func _on_bound(_payload: Dictionary) -> void:
 	var points_text := s.text("ui.gpResult.pointsFormat", {"points": tour_points})
 	_points_label.text = points_text
 
-	var prize := session.outgame.gp_prize(tour_points, not retired)
-	var bonus := session.outgame.finish_bonus(not retired)
-	session.outgame.gain_credits(prize + bonus)
+	# 지급은 세션 경로 전속 (러너·테스트가 같은 경로를 탄다) — 화면은 반환값을 표시만 한다
+	var settled := session.settle_gp()
+	var prize := int(settled["prize"])
+	var bonus := int(settled["bonus"])
 	var prize_text := s.text("ui.gpResult.creditFormat", {"amount": prize})
 	var bonus_text := s.text("ui.gpResult.creditFormat", {"amount": bonus})
 	_prize_label.text = prize_text

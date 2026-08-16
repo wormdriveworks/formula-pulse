@@ -140,6 +140,36 @@ func _beaten_rivals(source: RaceEngine) -> Array:
 	return beaten
 
 
+# GP 정산 지급 (D13 별첨A §3.1 S1 상금 + S2 완주 보너스) — **지급의 유일 경로**.
+# 화면이 직접 gain_credits 를 부르면 그 규칙이 화면 층에 갇혀 러너·테스트가 닿지 못한다
+# (TL-5 자동 러너는 "실코드 경로 주행"이 규격 — D14 §8.2). 표시는 반환값을 읽는다.
+func settle_gp() -> Dictionary:
+	var tour_points := int(last_gp_result.get("tour_points", 0))
+	var finished := not bool(last_gp_result.get("player_retired", false))
+	var prize := outgame.gp_prize(tour_points, finished)
+	var bonus := outgame.finish_bonus(finished)
+	outgame.gain_credits(prize + bonus)
+	return {"prize": prize, "bonus": bonus, "tour_points": tour_points, "finished": finished}
+
+
+# 투어 결산 지급 (D13 별첨A §3.2 S3·S4 + D06 §4.1 잔여 차지 환전) — 동상.
+func settle_tour(remaining_charge: int) -> Dictionary:
+	var position := int(last_tour_report.get("player_position", 16))
+	var dropped := bool(last_tour_report.get("dropped_out", false))
+	var reward := outgame.settlement_reward("tour", maxi(position, 1))
+	var ratio := float(last_tour_report.get("s4_ratio", 1.0))
+	var credits := int(round(float(int(reward.get("credits", 0))) * ratio))
+	var drive_points := int(reward.get("dp", 0))
+	if bool(last_tour_report.get("s3_paid", true)):
+		credits += data.param_int("param_tour_finish_bonus_cr")
+		drive_points += data.param_int("param_tour_finish_bonus_dp")
+	outgame.gain_credits(credits)
+	outgame.gain_drive_data(drive_points)
+	# 탈락 시 환전 미성립 (D06 §4.1 G4) — 코어가 조건을 쥐지만 호출 자체를 걸지 않는다
+	var exchanged := outgame.exchange_charge(remaining_charge, not dropped)
+	return {"credits": credits, "dp": drive_points, "exchanged": exchanged, "dropped": dropped}
+
+
 func close_tour() -> Dictionary:
 	last_tour_report = season.close_tour()
 	outgame.record_tour_result(last_tour_report)
