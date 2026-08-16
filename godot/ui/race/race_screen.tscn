@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://ui/race/duel_overlay.gd" id="5_5jw0g"]
 [ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="6_y37x3"]
 [ext_resource type="Script" path="res://ui/race/pause_overlay.gd" id="7_y37x3"]
+[ext_resource type="Script" path="res://ui/race/tutorial_overlay.gd" id="8_tut01"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_n72o0"]
 content_margin_left = 4.0
@@ -722,3 +723,68 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 color = Color(1, 1, 1, 0)
+
+[node name="TutorialOverlay" type="Control" parent="." unique_id=612430894]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("8_tut01")
+
+[node name="DimTop" type="ColorRect" parent="TutorialOverlay" unique_id=612430895]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+color = Color(0.04, 0.05, 0.06, 0.72)
+
+[node name="DimBottom" type="ColorRect" parent="TutorialOverlay" unique_id=612430896]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+color = Color(0.04, 0.05, 0.06, 0.72)
+
+[node name="DimLeft" type="ColorRect" parent="TutorialOverlay" unique_id=612430897]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+color = Color(0.04, 0.05, 0.06, 0.72)
+
+[node name="DimRight" type="ColorRect" parent="TutorialOverlay" unique_id=612430898]
+unique_name_in_owner = true
+layout_mode = 0
+mouse_filter = 2
+color = Color(0.04, 0.05, 0.06, 0.72)
+
+[node name="CalloutPanel" type="PanelContainer" parent="TutorialOverlay" unique_id=612430899]
+unique_name_in_owner = true
+layout_mode = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_n72o0")
+
+[node name="Column" type="VBoxContainer" parent="TutorialOverlay/CalloutPanel" unique_id=612430900]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="HeadRow" type="HBoxContainer" parent="TutorialOverlay/CalloutPanel/Column" unique_id=612430901]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="StepLabel" type="Label" parent="TutorialOverlay/CalloutPanel/Column/HeadRow" unique_id=612430902]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.85, 0.85, 1)
+
+[node name="Spacer" type="Control" parent="TutorialOverlay/CalloutPanel/Column/HeadRow" unique_id=612430903]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SkipButton" type="Button" parent="TutorialOverlay/CalloutPanel/Column/HeadRow" unique_id=612430904]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="CalloutText" type="Label" parent="TutorialOverlay/CalloutPanel/Column" unique_id=612430905]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)

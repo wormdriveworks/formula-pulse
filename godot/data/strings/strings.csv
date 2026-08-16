@@ -601,3 +601,10 @@ ui.achievement.seasonFormat,시즌 {season}
 ui.achievement.seasonUnknown,—
 ui.achievement.close,닫기
 ui.title.achievements,업적
+ui.tutorial.spin,[문안 미유입]
+ui.tutorial.hold,[문안 미유입]
+ui.tutorial.respin,[문안 미유입]
+ui.tutorial.charge,[문안 미유입]
+ui.tutorial.confirm,[문안 미유입]
+ui.tutorial.skip,건너뛰기
+ui.tutorial.stepFormat,{current}/{total}

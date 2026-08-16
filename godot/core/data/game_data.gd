@@ -31,6 +31,8 @@ var tuning_lines: Dictionary = {}      # tuning_* id -> 행 (D13 별첨A §3.5)
 var overhauls: Dictionary = {}         # overhaul_* id -> 행 (D13 별첨A §7.2)
 var milestones: Dictionary = {}        # milestone_* id -> 행 (D08 §8.2 마스터 표)
 var achievements: Dictionary = {}      # achievement_* id -> 행 (D08 §8.11 · D07 §7.1)
+# 튜토리얼 단계 — **순서가 의미이므로 딕셔너리가 아니라 배열**이다 (D09 별첨A §A-25).
+var tutorial_steps: Array = []         # step_order 오름차순 행 (D04 §8.1 베인 1단계 화자)
 var overhaul_slots: Dictionary = {}    # ovslot_* id -> 행 (D13 별첨A §7.1)
 var skills: Dictionary = {}            # skill_* id -> 행 (D07 §4.2)
 var crew: Dictionary = {}              # crew_* id -> 행 (D07 §5.1 · D13 별첨A §5.1)
@@ -346,7 +348,12 @@ func _load_outgame() -> void:
 		milestones[String(row["id"])] = row
 	for row in CsvTable.load_rows(_table_path("achievements.csv")):
 		achievements[String(row["id"])] = row
-	if facilities.is_empty() or tuning_lines.is_empty() or overhauls.is_empty() or overhaul_slots.is_empty() or skills.is_empty() or crew.is_empty() or sponsors.is_empty() or relation_axes.is_empty() or consumables.is_empty() or settlement_rewards.is_empty() or milestones.is_empty() or achievements.is_empty():
+	# 튜토리얼 단계 — 표시 순서(step_order)대로 정렬해 둔다. 화면이 정렬을 다시 하지 않도록
+	# 데이터 적재 시점에 한 번만 맞춘다 (CSV 행 순서에 의존하지 않는다).
+	tutorial_steps = CsvTable.load_rows(_table_path("tutorial_steps.csv"))
+	tutorial_steps.sort_custom(func(a, b): return CsvTable.to_int(String(a["step_order"])) \
+		< CsvTable.to_int(String(b["step_order"])))
+	if facilities.is_empty() or tuning_lines.is_empty() or overhauls.is_empty() or overhaul_slots.is_empty() or skills.is_empty() or crew.is_empty() or sponsors.is_empty() or relation_axes.is_empty() or consumables.is_empty() or settlement_rewards.is_empty() or milestones.is_empty() or achievements.is_empty() or tutorial_steps.is_empty():
 		_load_ok = false
 
 

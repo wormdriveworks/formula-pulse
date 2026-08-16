@@ -17,6 +17,10 @@ extends FlowScreen
 const REEL_COUNT := 3
 # 라이벌 id — 데이터 행 키 참조이며 표시 문자열이 아니다(불변규칙 6의 테이블 ID 체계).
 const JUDE_ID := "ai_jude"
+# TUT-01 이 기다릴 수 있는 행동 전량 — **이 화면이 실제로 발화하는 것만** 여기 든다.
+# 단계 표(`tutorial_steps.csv`)가 이 집합 밖의 행동을 지목하면 그 단계는 영원히 넘어가지 않고
+# 튜토리얼이 잠긴다. 검사가 두 쪽을 대조하므로 한쪽만 고치면 통과하지 못한다.
+const TUTORIAL_ACTIONS := ["spin", "hold", "respin", "charge", "confirm"]
 const HOLD_KEYS := [KEY_1, KEY_2, KEY_3]
 const ICON_DIR := "res://assets/ui/icons/"
 
@@ -62,6 +66,7 @@ var _skill_buttons: Array[Button] = []
 @onready var _e12_charge: Label = %E12Charge
 @onready var _duel_overlay: Control = %DuelOverlay
 @onready var _pause_overlay: Control = %PauseOverlay
+@onready var _tutorial: Control = %TutorialOverlay
 
 var _paused := false
 
@@ -111,7 +116,12 @@ func _boot() -> void:
 	(%E14Menu as Button).pressed.connect(_open_pause)
 	_collect_consumable_slots()
 	_apply_static_strings()
+	# TUT-01 — 첫 그랑프리 실주행 위 오버레이(§6 "별도 튜토리얼 스테이지 불신설").
+	# 1회성 판정은 온보딩 기록이 쥔다(옵션 초기화로 재활성 — §A-25 확정).
+	_tutorial.setup(session, self)
 	_start_gp()
+	if _tutorial.should_run():
+		_tutorial.begin()
 
 
 func _collect_consumable_slots() -> void:
@@ -328,6 +338,10 @@ func _on_primary_action() -> void:
 func _on_spin() -> void:
 	engine.spin()  # T2 커밋 — reel 스트림 소비. 결과는 아직 어떤 경로에도 없다
 	_refresh_action_enabled()
+	# **튜토리얼 단계 진행은 여기서 알리지 않는다** — 스핀 커밋 직후에 콜아웃이 바뀌면
+	# 릴 정지 연출이 끝나기 전에 릴 외 표면이 움직인다(봉인·불변규칙 5. SEAL-E 실측 검출).
+	# 정지 연출이 끝나는 지점에서 흘린다.
+	_tutorial_pending = "spin"
 	_reveal_reels([0, 1, 2], true)
 
 
@@ -339,6 +353,7 @@ func _on_confirm() -> void:
 	# 비활성 시 모멘텀 = 조건 불성립 (여유 구간 자체가 없다 — D09 §6.2 채택 구조)
 	var ratio := 0.0 if _timer_disabled else _timer_remaining / _timer_effective_base
 	var events := engine.confirm(ratio)
+	_tutorial.notify_action("confirm")
 	_push_events(events)
 	_run_presentation(events)  # 확정 후 이벤트에서만 — 봉인 (불변규칙 5)
 	# 듀얼 결과는 프레임 내 표기 후 해제한다 (D09 §3.5). 표기 유지 0.6초 = D13 별첨A
@@ -386,6 +401,10 @@ func _on_respin() -> void:
 			changed.append(i)
 	# 재정지분도 정지 연출을 다시 재생한다 — 개입 창 내라 정보 누출은 아니지만
 	# 즉시 갱신은 정지 연출 규격이 아니다(IMPL-019 이월 3번 해소).
+	# 홀드와 리스핀은 같은 엔진 호출(hold_respin)의 두 얼굴이다 — 릴을 고정한 채 눌렀으면
+	# '홀드'를 배운 것이고, 고정 없이 눌렀으면 '리스핀'을 배운 것이다.
+	# 스핀과 같은 이유로 통지는 재정지 연출이 끝난 뒤로 미룬다.
+	_tutorial_pending = "hold" if not keep.is_empty() else "respin"
 	_reveal_reels(changed, false)
 	_refresh_resources()
 
@@ -396,6 +415,7 @@ func _on_charge_intervene() -> void:
 	var outcome := engine.negate_trouble()
 	if outcome.get("ok", false):
 		_push_events(outcome.get("events", []))
+		_tutorial.notify_action("charge")   # 거부된 개입은 배운 것이 아니다
 	_refresh_resources()
 	_refresh_action_enabled()
 
@@ -438,13 +458,20 @@ func _reveal_reels(indices: Array, start_window: bool) -> void:
 	# O5 개입 창 타이머 — 기본 / ×1.5 / ×2 / 비활성 (D09 §6.1·§6.2 — 배율은 D13 창구 전사값).
 	# 비활성 = 타이머·구간 자체가 부재. 개입 창은 열리되(가드 재사용) 잔량이 흐르지 않고
 	# 링은 소등, 모멘텀은 조건 불성립으로 자연 미발생(_on_confirm 이 ratio 0 을 넘긴다).
-	_timer_disabled = session.options.index_of("o5") == 3
+	# **튜토리얼 중 타이머 비활성 고정** (D09 §6 · 별첨A §A-25 확정 — D08 튜토리얼 GP 정합).
+	# 배우는 동안 시간 압박을 걸지 않는다. O5 설정과 무관하게 강제된다.
+	_timer_disabled = session.options.index_of("o5") == 3 or _tutorial.visible
 	var effective_base := _timer_base
 	match session.options.index_of("o5"):
 		1:
 			effective_base *= data.param("param_opt_timer_mult_1")
 		2:
 			effective_base *= data.param("param_opt_timer_mult_2")
+	# 릴을 움직인 행동의 튜토리얼 통지는 **정지 연출이 끝난 지금** 흘린다 (봉인 — 불변규칙 5).
+	if _tutorial_pending != "":
+		var pending := _tutorial_pending
+		_tutorial_pending = ""
+		_tutorial.notify_action(pending)
 	if start_window:
 		_push_events([{"phase": "T3", "key": "vane.brief.provisional01", "params": {}}])
 		_timer_effective_base = effective_base
@@ -629,6 +656,8 @@ const TRIGGER_BY_KEY := {
 
 var _shake_left := 0.0
 var _shake_strength := 0.0
+# 릴을 움직인 행동의 튜토리얼 통지 대기분 — 정지 연출이 끝날 때까지 들고 있는다(봉인).
+var _tutorial_pending := ""
 
 
 func _collect_triggers(events: Array) -> Array:

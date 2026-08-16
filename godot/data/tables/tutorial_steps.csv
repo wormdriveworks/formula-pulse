@@ -1,0 +1,6 @@
+id,step_order,anchor_node,advance_on,text_key
+tutorial_spin,1,E05Reels,spin,ui.tutorial.spin
+tutorial_confirm,2,E08Confirm,confirm,ui.tutorial.confirm
+tutorial_hold,3,E05Reels,hold,ui.tutorial.hold
+tutorial_respin,4,E08Respin,respin,ui.tutorial.respin
+tutorial_charge,5,E08ChargeIntervene,charge,ui.tutorial.charge

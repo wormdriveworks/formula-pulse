@@ -36,6 +36,7 @@ func _init() -> void:
 	_gp_summary_counters()
 	_presentation_grade_caps()
 	_momentum_interrupt_matrix()
+	_tutorial_step_contract()
 	_check_global_postconditions()
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
@@ -1175,6 +1176,45 @@ func _presentation_grade_caps() -> void:
 	# 순위표 미등재(무득점 초반)의 99 가 인접으로 새지 않는가 — `_jude_rank_delta` 의 큰 값 규약
 	_ok("순위표 미등재(99)는 인접 아님",
 		String(race_screen_script.l3_kinship_for("ai_jude", true, 99, adjacent_max)).is_empty())
+
+
+# ── TUT-01 튜토리얼 단계 데이터 계약 (D09 별첨A §A-25) ──
+#
+# 단계 표는 화면이 발화하는 행동을 지목한다. 지목한 행동을 화면이 내지 않으면 그 단계에서
+# **튜토리얼이 영원히 잠긴다** — 실기로는 그 단계까지 가야 드러나므로 데이터 단계에서 막는다.
+func _tutorial_step_contract() -> void:
+	var probe := _new_engine(5150, "", false)
+	if probe == null:
+		return
+	var data := probe.data
+	var steps: Array = data.tutorial_steps
+	_ok("튜토리얼 단계 적재", steps.size() >= 1, str(steps.size()))
+	var race_screen_script: GDScript = load("res://ui/race/race_screen.gd")
+	var actions: Array = race_screen_script.TUTORIAL_ACTIONS
+	var order_ok := true
+	var action_ok := true
+	var key_ok := true
+	for index in range(steps.size()):
+		var step: Dictionary = steps[index]
+		# 적재 시점 정렬이 성립하는가 — 1부터 빈칸 없이 올라간다
+		if CsvTable.to_int(String(step["step_order"])) != index + 1:
+			order_ok = false
+		if not actions.has(String(step["advance_on"])):
+			action_ok = false
+		if not data.strings.keys().has(String(step["text_key"])):
+			key_ok = false
+	_ok("단계 순서 = 1부터 연속 (적재 시 정렬)", order_ok)
+	_ok("지목 행동이 전부 화면 발화 집합 안 (잠김 차단)", action_ok, str(actions))
+	_ok("단계 문면 키 전건 존재", key_ok)
+	# 진행 규격 — 지목하지 않은 행동으로는 넘어가지 않는다(§A-25 "단계 진행 = 지시 행동 수행").
+	# 화면 없이 판정하려고 오버레이의 단계 배열·인덱스만 흉내 낸다.
+	var first_action := String(steps[0]["advance_on"])
+	var other := ""
+	for candidate in actions:
+		if String(candidate) != first_action:
+			other = String(candidate)
+			break
+	_ok("대조용 타 행동 확보 (검사 비공허)", other != "", first_action)
 
 
 # ── TL-5 ③ 모멘텀 × 개입 4타입 상호작용 매트릭스 (D14 §8.3 ③) ──

@@ -365,6 +365,17 @@
     "threshold": "int",
     "hidden": "int:0,1"
    }
+  },
+  "tutorial_steps.csv": {
+   "id_prefix": "tutorial_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "step_order": "int",
+    "anchor_node": "string",
+    "advance_on": "enum:spin,hold,respin,charge,confirm",
+    "text_key": "string_key"
+   }
   }
  },
  "structures": {
