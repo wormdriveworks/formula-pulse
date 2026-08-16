@@ -59,6 +59,10 @@ const SOUND_BY_KEY := {
 # 표시(경고색)와 판정(SE-D06)이 같은 식을 보게 하는 것이 목적이며, 값 자체는 총괄 판정 대기.
 const CHASSIS_WARN_RATIO := 0.25
 
+# O9 색각 대체 도상 대상 — 팔레트 정본 §6 교체 4행 중 **심볼 2종**이 도상에 색이 구워진다.
+# 게이지 위험·주의는 런타임 색이라 `UiPalette` 조회 창구가 바로 처리한다.
+const ALT_ICON_IDS := ["symbol_line", "symbol_trouble"]
+
 var _icon_cache: Dictionary = {}
 
 var data: GameData
@@ -575,9 +579,23 @@ func _reveal_reels(indices: Array, start_window: bool) -> void:
 # 도상 경로 규약: 셀 파일명 = 테이블 id (심볼 `symbol_*` · 속성 `attr_*`).
 # D10 §8.1 에셋 대장의 요소 매핑 열이 아직 없어 파일명 규약으로 잇는다 —
 # [가안]이며 대장 도입 시 교체한다. 없는 도상은 침묵하지 않고 보고한다(IMPL-019 계열).
+#
+# **O9 색각 대체는 도상이 아니라 색만 바꾼다**(정본 §6). 심볼 도상은 색이 구워진 PNG 라
+# 런타임 틴트로는 정본 색을 재현할 수 없다 — 같은 도상의 대체색 파일(`<id>_alt.png`)을
+# 우선 찾고, **없으면 조용히 기본 도상으로 돌아간다.** 대체 도상 실물은 에셋 트랙 몫이며
+# (교체 대상 = 라인·트러블 2종) 부재는 결함이 아니라 미유입이므로 여기서 보고하지 않는다.
 func _icon_texture(asset_id: String) -> Texture2D:
 	if asset_id.is_empty():
 		return null
+	var cache_key := asset_id
+	if UiPalette.colorblind and ALT_ICON_IDS.has(asset_id):
+		cache_key = "%s_alt" % asset_id
+	if _icon_cache.has(cache_key):
+		return _icon_cache[cache_key]
+	var alt_path := "%s%s.png" % [ICON_DIR, cache_key]
+	if cache_key != asset_id and ResourceLoader.exists(alt_path):
+		_icon_cache[cache_key] = load(alt_path) as Texture2D
+		return _icon_cache[cache_key]
 	if _icon_cache.has(asset_id):
 		return _icon_cache[asset_id]
 	var path := "%s%s.png" % [ICON_DIR, asset_id]
@@ -648,7 +666,7 @@ func _refresh_resources() -> void:
 	var fill: StyleBoxFlat = _e11_chassis_bar.get_theme_stylebox("fill").duplicate()
 	# 경고색과 경고음이 **같은 판정**을 본다 (표시값은 판정값에서 파생 — IMPL-100 계열).
 	var critical := _chassis_critical()
-	fill.bg_color = UiPalette.CHASSIS_WARN if critical else UiPalette.CHASSIS_OK
+	fill.bg_color = UiPalette.gauge_danger() if critical else UiPalette.CHASSIS_OK
 	_e11_chassis_bar.add_theme_stylebox_override("fill", fill)
 	# SE-D06 = **진입 시 1회** (D11 §2.7 — 반복 경보 아님). 회복해 임계를 벗어나면 재무장한다.
 	if critical and not _chassis_warned:

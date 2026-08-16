@@ -81,8 +81,8 @@ func _band() -> Dictionary:
 	if _ratio > leeway_ratio:
 		return {"color": UiPalette.TIMER_LEEWAY, "width": WIDTH_LEEWAY, "blink_hz": 0.0}
 	if _ratio > warning_ratio:
-		return {"color": UiPalette.TIMER_WARNING, "width": WIDTH_WARNING, "blink_hz": BLINK_HZ_WARNING}
-	return {"color": UiPalette.TIMER_IMMINENT, "width": WIDTH_IMMINENT, "blink_hz": BLINK_HZ_IMMINENT}
+		return {"color": UiPalette.gauge_caution(), "width": WIDTH_WARNING, "blink_hz": BLINK_HZ_WARNING}
+	return {"color": UiPalette.gauge_danger(), "width": WIDTH_IMMINENT, "blink_hz": BLINK_HZ_IMMINENT}
 
 
 func _blink_alpha(hz: float) -> float:

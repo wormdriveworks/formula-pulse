@@ -26,6 +26,10 @@ func bind(run_session: RunSession, payload: Dictionary) -> void:
 	if session != null and session.data != null:
 		_body_font_size = session.data.param_int("param_font_size_body")
 		_head_font_size = session.data.param_int("param_font_size_head")
+	# O9 색각 대체 팔레트 — 폰트 계열과 같은 이유로 `_on_bound()` 보다 먼저다.
+	# 화면 초기화가 이 색으로 컨트롤을 칠하기 때문에 순서가 규격이다.
+	if session != null:
+		UiPalette.apply_options(session.options)
 	_on_bound(payload)
 	# 진입음·조작음은 **`_on_bound()` 뒤**다 — 화면이 계산한 상태(무대 id·VN 정조)를
 	# 진입 이벤트가 근거로 삼고, 초기화가 만든 동적 버튼까지 결속 대상에 들어온다.

@@ -58,3 +58,45 @@ const BG_PANEL := Color("#151B22")              # 마스터 N03 화면 바탕
 const FRAME_LINE := Color("#424A54")            # 마스터 N08
 const TEXT_PRIMARY := Color("#C7D0D8")          # 마스터 N16 본문 텍스트
 const TEXT_DIM := Color("#6A737E")              # 마스터 N11
+
+# ── 색각 대체 팔레트 (A-팔레트-02 · 정본 §6 — O9 소비부, IMPL-155) ──
+#
+# **교체는 정본 §6 표의 4행이 전부다** — "색상만 교체·도상 불변 · 교체는 최소로".
+# 위 상수는 기본 팔레트의 전사로 그대로 남긴다(조달처 대조 성립 — IMPL-144).
+#
+# **hex 가 같다고 함께 바꾸지 않는다.** 교체 단위는 색값이 아니라 **조달 슬롯**이다:
+#   · `VANE_ALERT`(부속 · 베인 경고)는 `#FF4A3D` 로 게이지 위험과 같은 값이지만 §6 표에 없다.
+#   · `SYMBOL_BRAKING`(부속 · 심볼 브레이킹)은 `#FFBF3D` 로 게이지 주의와 같지만 역시 없다.
+# 둘을 함께 바꾸면 정본에 없는 교체를 구현이 만든 것이 된다. **대체 시 두 색군이 갈리는데
+# 그것이 의도인지는 에셋 트랙·총괄 확인 대상**으로 발신했다.
+const ALT_SYMBOL_LINE := Color("#E8EEF5")       # 정본 §6 · 적록 축 충돌 이탈
+const ALT_SYMBOL_TROUBLE := Color("#7A5CFF")    # 정본 §6 · 동상
+const ALT_GAUGE_DANGER := Color("#7A5CFF")      # 정본 §6 · 상태색 일관
+const ALT_GAUGE_CAUTION := Color("#FFD400")     # 정본 §6 · 위험과의 분리 강화
+
+# 옵션 상태는 소비 시점마다 읽는 것이 원칙(D09 §6.1)이나, 팔레트는 세션을 쥘 수 없는
+# 정적 클래스다. 화면 진입과 옵션 변경 두 지점에서 밀어 넣는다 — 그 둘이 O9 가 바뀔 수 있는
+# 전부이며, 둘 다 놓치면 화면이 옛 색으로 남는다(옵션 화면이 즉시 반영을 요구한다).
+static var colorblind := false
+
+
+static func apply_options(options: OptionsStore) -> void:
+	colorblind = options != null and options.index_of("o9") == 1
+
+
+# 대체 대상 4슬롯의 조회 창구. 이 4개만 함수이고 나머지는 상수 그대로다 —
+# 함수가 있다는 것 자체가 "여기는 O9 로 갈린다"는 표시가 된다.
+static func symbol_line() -> Color:
+	return ALT_SYMBOL_LINE if colorblind else SYMBOL_LINE
+
+
+static func symbol_trouble() -> Color:
+	return ALT_SYMBOL_TROUBLE if colorblind else SYMBOL_TROUBLE
+
+
+static func gauge_danger() -> Color:
+	return ALT_GAUGE_DANGER if colorblind else TIMER_IMMINENT
+
+
+static func gauge_caution() -> Color:
+	return ALT_GAUGE_CAUTION if colorblind else TIMER_WARNING

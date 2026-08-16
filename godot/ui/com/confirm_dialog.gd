@@ -60,7 +60,7 @@ func _init(strings: StringTable, summary: String, cost_text: String, irreversibl
 		var warn := Label.new()
 		warn.text = _strings.text("ui.confirm.irreversible")
 		warn.add_theme_font_size_override("font_size", _body_font_size)
-		warn.add_theme_color_override("font_color", UiPalette.TIMER_IMMINENT)
+		warn.add_theme_color_override("font_color", UiPalette.gauge_danger())
 		column.add_child(warn)
 
 	var buttons := HBoxContainer.new()

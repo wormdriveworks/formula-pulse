@@ -134,6 +134,9 @@ func _shift(option_id: String, direction: int, value: Label, notice: Label) -> v
 		var count := store.step_count(option_id)
 		current = wrapi(current + direction, 0, count)
 	store.set_index(option_id, current)  # 즉시 반영 — 소비부가 사용 시점마다 읽는다
+	# 팔레트는 세션을 쥘 수 없는 정적 클래스라 소비 시점에 스스로 읽지 못한다 —
+	# 옵션이 바뀌는 두 지점(화면 진입 · 여기) 중 하나다. 빠뜨리면 O9 가 다음 화면부터 먹는다.
+	UiPalette.apply_options(store)
 	sfx("ui_toggle")   # SE-U05 토글·슬라이더 — 단계 이동과 볼륨 이동이 같은 축이다
 	_refresh_value(option_id, value, notice)
 
