@@ -54,11 +54,6 @@ const SOUND_BY_KEY := {
 # 결과 계열이 비는 것은 듀얼 패배 턴뿐인데 그것은 무사건이 아니라 듀얼 결판이다 —
 # 그 자리에 중립음을 넣으면 패배에 통과음이 겹친다. 총괄 보고분(D05·D11 정합).
 
-# 섀시 위험 임계 비율 — **[가안]**. D09 §5.2 는 "임계값 D13"으로 위임했으나 D13 §2.3 에
-# 해당 행이 없다(별첨A v1.5 확인). 종전 게이지 경고색이 쓰던 값을 이름만 붙여 한 곳에 모았다.
-# 표시(경고색)와 판정(SE-D06)이 같은 식을 보게 하는 것이 목적이며, 값 자체는 총괄 판정 대기.
-const CHASSIS_WARN_RATIO := 0.25
-
 # O9 색각 대체 도상 대상 — 팔레트 정본 §6 교체 4행 중 **심볼 2종**이 도상에 색이 구워진다.
 # 게이지 위험·주의는 런타임 색이라 `UiPalette` 조회 창구가 바로 처리한다.
 const ALT_ICON_IDS := ["symbol_line", "symbol_trouble"]
@@ -683,8 +678,13 @@ func _refresh_resources() -> void:
 	_refresh_consumables()
 
 
+# 섀시 위험 임계 — D13 v1.6 §8.1 원천 확정(최대치의 25% · 결정 #16). 경고색·SE-D06·점멸이
+# **이 한 식만** 본다. 값은 데이터 창구 경유다 — 종전 리터럴은 정본에 값이 없던 시절의
+# 임시 명명이었고, D13 확정과 함께 `core_params` 로 옮겼다(총괄 판정 IMPL-157 §2-②).
 func _chassis_critical() -> bool:
-	return engine != null and engine.chassis <= data.param("param_chassis_max") * CHASSIS_WARN_RATIO
+	if engine == null:
+		return false
+	return engine.chassis <= data.param("param_chassis_max") * data.param("param_chassis_warn_ratio")
 
 
 # 재고 → 슬롯. 데이터 정의 순서로 펼치므로 같은 인벤토리는 항상 같은 슬롯에 앉는다

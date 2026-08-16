@@ -17,6 +17,7 @@ extends SceneTree
 
 const SCENE_PATH := "res://ui/race/race_screen.tscn"
 const MENU_SCENE_PATH := "res://ui/sys/title_screen.tscn"
+const FIXTURE_DIR := "res://tests/fixtures/tables/"
 const UI_DIR := "res://ui/"
 const SPIN_ROUNDS := 6
 const TIME_SCALE := 5.0
@@ -329,6 +330,7 @@ func _process(delta: float) -> bool:
 				return false
 			if _round == 0:
 				_assert_gp_open(audio)
+				_assert_chassis_threshold()
 			audio.fired.clear()
 			_seal_open_seen = false
 			_seal_leaks = 0
@@ -381,6 +383,32 @@ func _assert_gp_open(audio: AudioDispatcher) -> void:
 	_ok("GP 개시에 무대 BGM 이 든다", has_bgm, "발화: %s" % ", ".join(fired))
 	_ok("GP 개시 시그널(SE-U18)", fired.has("SE-U18"), "발화: %s" % ", ".join(fired))
 	_ok("관중 베드(AMB-01)", fired.has("AMB-01"), "발화: %s" % ", ".join(fired))
+
+
+# SE-D06 섀시 경고는 위험 임계 **진입 시 1회** 울린다. 임계는 D13 v1.6 §8.1 확정값이고
+# **데이터 경유**여야 한다 — 코드에 비율이 남으면 값 창구 밖에서 거동이 정해지고, 기본
+# 데이터로만 보면 그 결함이 보이지 않는다. 픽스처로 갈아 끼워 거동이 따라오는지 본다.
+func _assert_chassis_threshold() -> void:
+	var fixture := GameData.new()
+	fixture.tables_override_dir = FIXTURE_DIR
+	if not fixture.load_all():
+		_fail("픽스처 적재 실패 — 섀시 임계 값 출처 확인 불가")
+		return
+	var default_line := _data.param("param_chassis_max") * _data.param("param_chassis_warn_ratio")
+	var fixture_line := fixture.param("param_chassis_max") * fixture.param("param_chassis_warn_ratio")
+	_ok("픽스처가 더 높은 임계를 담는다", fixture_line > default_line + 1.0,
+		"fixture=%.1f default=%.1f" % [fixture_line, default_line])
+	var saved_data: GameData = _screen.data
+	var saved_chassis: float = _screen.engine.chassis
+	# 두 임계 사이의 섀시 — 어느 데이터를 보는지가 여기서 갈린다.
+	_screen.engine.chassis = (default_line + fixture_line) * 0.5
+	_ok("기본 데이터에서는 임계 밖", not _screen._chassis_critical(),
+		"chassis=%.1f line=%.1f" % [_screen.engine.chassis, default_line])
+	_screen.data = fixture
+	_ok("픽스처 데이터에서는 임계 안 — 임계가 데이터 경유다", _screen._chassis_critical(),
+		"chassis=%.1f line=%.1f" % [_screen.engine.chassis, fixture_line])
+	_screen.data = saved_data
+	_screen.engine.chassis = saved_chassis
 
 
 func _assert_spin_sounds(audio: AudioDispatcher) -> void:
