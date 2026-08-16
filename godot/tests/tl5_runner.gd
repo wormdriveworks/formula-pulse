@@ -21,11 +21,16 @@ var _data: GameData
 var _profile := "standard"
 var _runs := 20
 var _base_seed := 42
+# 주행 시즌 수 — D13 §4.3 지표에 "시즌 챔피언 도달 S2~S3"·"첫 투어 우승 S2 투어3"처럼
+# 시즌 2 이후를 가리키는 항이 있다. 시즌 1만 돌면 그 항들의 표본이 도달분만 남아
+# 중앙값이 앞당겨진다(미도달 제외 편향) — 다시즌 주행이 대조의 성립 조건이다.
+var _seasons := 3
 var _out_path := "user://tl5_result.json"
 var _policy: Dictionary = {}
 # 정책 난수 — 게임 RNG 스트림과 분리한다. 러너의 조작 흔들림이 reel/ai 스트림을 소비하면
 # 시드 재현성이 '플레이어 행동'에 오염된다 (D12 §6.1 스트림 분리 취지).
 var _policy_rng := RandomNumberGenerator.new()
+var _gp_counter := 0
 
 
 func _init() -> void:
@@ -38,6 +43,7 @@ func _init() -> void:
 	_policy = PROFILES.get(_profile, PROFILES["standard"])
 	var samples: Array = []
 	for index in range(_runs):
+		_gp_counter = 0
 		samples.append(_run_season(_base_seed + index))
 	var summary := _summarize(samples)
 	summary["profile"] = _profile
@@ -66,6 +72,8 @@ func _parse_args() -> void:
 				_runs = maxi(int(parts[1]), 1)
 			"seed":
 				_base_seed = int(parts[1])
+			"seasons":
+				_seasons = maxi(int(parts[1]), 1)
 			"out":
 				_out_path = parts[1]
 
@@ -81,50 +89,69 @@ func _run_season(seed_value: int) -> Dictionary:
 	var sample := {
 		"gp_minutes": [], "gp_duels": [], "ai_retires": [],
 		"first_podium": 0, "first_gp_win": 0, "first_tour_win": 0,
-		"lorentz_beat": 0, "tour_retires": 0, "chassis_wear": [],
+		"lorentz_beat": 0, "tour_retires": 0,
+		"season1_rank": 16, "champion_season": 0, "lorentz_beat_season1": false,
 	}
-	var gp_index := 0
-	while not session.season.season_finished():
-		while session.tour_has_remaining_gp():
-			gp_index += 1
-			if not session.begin_gp():
-				break
-			session.engine.start_gp()
-			_drive_gp(session)
-			session.close_gp()
-			session.settle_gp()
-			var result := session.last_gp_result
-			sample["gp_minutes"].append(session.engine.estimated_minutes())
-			sample["gp_duels"].append(int(result.get("duels", 0)))
-			sample["ai_retires"].append(int(session.engine.ai_retire_count))
-			# 마일스톤 도달 시점 = 전역 GP 인덱스 (1~20 → 투어 = (i-1)/4 + 1)
-			_stamp(sample, "first_podium", session.outgame.milestones.has("milestone_first_podium"), gp_index)
-			_stamp(sample, "first_gp_win", session.outgame.milestones.has("milestone_first_gp_win"), gp_index)
-			_stamp(sample, "lorentz_beat", session.outgame.milestones.has("milestone_lorentz_beat"), gp_index)
-			if bool(result.get("player_retired", false)):
-				sample["tour_retires"] = int(sample["tour_retires"]) + 1
-				session.season.mark_dropout()
-				break
-			# 이벤트 노드 (D08 §7 — RACE-03 → RUN-01 사이 삽입 지점). 실플레이가 반드시
-			# 지나는 경로이므로 러너도 지난다 — 빼면 C1 회복·C2 수입이 통째로 누락된다.
-			var event := session.judge_event()
-			if not event.is_empty():
-				session.apply_event_reward(event.get("reward", {}))
-			# GP 사이 간이 정산 (D07 §1.2 — 필드 정비·소모품 보충). 이 경로가 없으면
-			# 4GP 누적 소모가 복원선을 넘어 매 투어 리타이어한다 (실플레이와 다른 경로).
-			_field_service(session)
-		var remaining_charge := session.engine.charge if session.engine != null else 0
-		session.close_tour()
-		session.settle_tour(remaining_charge)
-		_stamp(sample, "first_tour_win", session.outgame.milestones.has("milestone_first_tour_win"), gp_index)
-		_shop(session)
-	var report := session.close_season()
-	sample["championship_rank"] = int(report.get("player_position", 16))
-	sample["champion"] = String(report.get("champion", "")) == SeasonState.PLAYER_ID
+	
+	for season_index in range(1, _seasons + 1):
+		if season_index > 1:
+			session.begin_next_season()
+		while not session.season.season_finished():
+			_run_tour(session, sample)
+		var report := session.close_season()
+		session.settle_season()
+		if season_index == 1:
+			# 시즌 1 기준 지표는 시즌 1 종료 시점에 스냅한다 — 3시즌 누적을 쓰면
+			# E1(시즌 1 축적형 총량)·S1 격파율이 정의와 다른 값이 된다 (실측 오집계 교정).
+			sample["season1_rank"] = int(report.get("player_position", 16))
+			sample["lorentz_beat_season1"] = session.outgame.milestones.has("milestone_lorentz_beat")
+			sample["e1_drive_data"] = session.outgame.drive_data_earned_total
+		if int(sample["champion_season"]) == 0 \
+			and String(report.get("champion", "")) == SeasonState.PLAYER_ID:
+			sample["champion_season"] = season_index
 	sample["credits_end"] = session.outgame.credits
-	sample["drive_data_total"] = session.outgame.drive_data_earned_total
-	sample["gps"] = gp_index
+	sample["drive_data_total"] = int(sample["e1_drive_data"])   # E1 = 시즌 1 기준
+	sample["gps"] = _gp_counter
+	sample["championship_rank"] = int(sample["season1_rank"])
+	sample["champion"] = int(sample["champion_season"]) > 0
 	return sample
+
+
+# 투어 1회분 — GP 주행·이벤트·간이 정산·투어 결산. 시즌 루프에서 호출된다.
+func _run_tour(session: RunSession, sample: Dictionary) -> void:
+	while session.tour_has_remaining_gp():
+		_gp_counter += 1
+		if not session.begin_gp():
+			break
+		session.engine.start_gp()
+		_drive_gp(session)
+		session.close_gp()
+		session.settle_gp()
+		var result := session.last_gp_result
+		sample["gp_minutes"].append(session.engine.estimated_minutes())
+		sample["gp_duels"].append(int(result.get("duels", 0)))
+		sample["ai_retires"].append(int(session.engine.ai_retire_count))
+		# 마일스톤 도달 시점 = 전역 GP 인덱스 (투어 = (i-1)/4 + 1 — 시즌 경계를 넘어 누적)
+		_stamp(sample, "first_podium", session.outgame.milestones.has("milestone_first_podium"), _gp_counter)
+		_stamp(sample, "first_gp_win", session.outgame.milestones.has("milestone_first_gp_win"), _gp_counter)
+		_stamp(sample, "lorentz_beat", session.outgame.milestones.has("milestone_lorentz_beat"), _gp_counter)
+		if bool(result.get("player_retired", false)):
+			sample["tour_retires"] = int(sample["tour_retires"]) + 1
+			session.season.mark_dropout()
+			break
+		# 이벤트 노드 (D08 §7 — RACE-03 → RUN-01 사이 삽입 지점). 실플레이가 반드시
+		# 지나는 경로이므로 러너도 지난다 — 빼면 C1 회복·C2 수입이 통째로 누락된다.
+		var event := session.judge_event()
+		if not event.is_empty():
+			session.apply_event_reward(event.get("reward", {}))
+		# GP 사이 간이 정산 (D07 §1.2 — 필드 정비·소모품 보충). 이 경로가 없으면
+		# 4GP 누적 소모가 복원선을 넘어 매 투어 리타이어한다 (실플레이와 다른 경로).
+		_field_service(session)
+	var remaining_charge := session.engine.charge if session.engine != null else 0
+	session.close_tour()
+	session.settle_tour(remaining_charge)
+	_stamp(sample, "first_tour_win", session.outgame.milestones.has("milestone_first_tour_win"), _gp_counter)
+	_shop(session)
 
 
 func _stamp(sample: Dictionary, key: String, reached: bool, gp_index: int) -> void:
@@ -256,7 +283,8 @@ func _summarize(samples: Array) -> Dictionary:
 		_collect_tour(podium_tours, int(sample["first_podium"]))
 		_collect_tour(gp_win_tours, int(sample["first_gp_win"]))
 		_collect_tour(tour_win_tours, int(sample["first_tour_win"]))
-		_collect_tour(lorentz_tours, int(sample["lorentz_beat"]))
+		if bool(sample["lorentz_beat_season1"]):
+			_collect_tour(lorentz_tours, int(sample["lorentz_beat"]))
 	return {
 		"championship_rank_median": _median(ranks),
 		"championship_rank_p25": _percentile(ranks, 0.25),

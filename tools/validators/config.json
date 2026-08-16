@@ -348,7 +348,8 @@
     "name_key": "string_key",
     "source": "enum:gp_rank,tour_rank,gp_finish,season_champion,beat_rival",
     "source_id": "fk_optional:ai_rivals.csv",
-    "threshold": "int"
+    "threshold": "int",
+    "reward_dp": "int"
    }
   },
   "achievements.csv": {

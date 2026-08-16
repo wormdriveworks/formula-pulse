@@ -24,8 +24,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 348:
-		print("TC_O_TEST_FAIL checks=%d < 하한 348 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 364:
+		print("TC_O_TEST_FAIL checks=%d < 하한 364 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -416,6 +416,37 @@ func _milestones_and_achievements() -> void:
 	# 스킬 티어 개방이 마일스톤으로 살아난다 (선재 구멍 — 기록 경로 부재로 티어 2·3 영구 잠김이었다)
 	_ok("D13 §4.1 스킬 티어 2 개방 (첫 포디움)", podium.skill_tier_open(2))
 	_ok("스킬 티어 3 미개방 (첫 우승 전)", not podium.skill_tier_open(3))
+	# S5 마일스톤 보상 (D06 §2.1 축적형 주 수입 · D13 별첨A §3.3) — 달성 즉시 지급.
+	# 선재 공백: 마일스톤 기록이 없어 S5 자체가 죽어 있었고, E1(시즌 1 축적형 기대 총량 820)의
+	# 620 DP 분이 통째로 누락돼 TL-5 실측이 모델의 54%로 나왔다.
+	var expected_dp := {
+		"milestone_first_finish": 10, "milestone_first_point": 20, "milestone_first_podium": 60,
+		"milestone_first_gp_win": 80, "milestone_first_tour_win": 80, "milestone_lorentz_beat": 100,
+	}
+	for milestone_id in expected_dp:
+		_ok("D13 §3.3 %s = %d DP" % [milestone_id, expected_dp[milestone_id]],
+			CsvTable.to_int(String(data.milestones[milestone_id]["reward_dp"])) == int(expected_dp[milestone_id]),
+			String(data.milestones[milestone_id]["reward_dp"]))
+	for rival_id in ["ai_maro", "ai_diaz", "ai_jude"]:
+		var suffix2 := String(rival_id).trim_prefix("ai_")
+		_ok("D13 §3.3 네임드 첫 선착 = 15 DP (%s)" % rival_id,
+			CsvTable.to_int(String(data.milestones["milestone_beat_%s" % suffix2]["reward_dp"])) == 15)
+	_ok("D13 §3.3 시즌 챔피언 = 0 DP (보상은 S6·오버홀)",
+		CsvTable.to_int(String(data.milestones["milestone_season_champion"]["reward_dp"])) == 0)
+	var rewarded := _new_state()
+	_ok("지급 전 DP 0", rewarded.drive_data == 0)
+	rewarded.record_gp_result({"player_rank": 3, "player_retired": false, "circuit_id": "circuit_mn1"})
+	# 첫 완주 10 + 첫 포인트 20 + 첫 포디움 60 = 90 (동시 달성분 전량 지급)
+	_ok("S5 동시 달성 3종 지급 = 90 DP", rewarded.drive_data == 90, "actual=%d" % rewarded.drive_data)
+	_ok("S5 누적 획득에도 반영", rewarded.drive_data_earned_total == 90,
+		"actual=%d" % rewarded.drive_data_earned_total)
+	rewarded.record_gp_result({"player_rank": 3, "player_retired": false, "circuit_id": "circuit_mn1"})
+	_ok("S5 재지급 없음 (1회성)", rewarded.drive_data == 90, "actual=%d" % rewarded.drive_data)
+	# S6 시즌 결산 보상 — settlement_rewards.csv season 행이 실제로 소비된다
+	var season_reward := rewarded.settlement_reward("season", 4)
+	_ok("D13 §3.2 S6 4~5위 = 1800 Cr / 60 DP",
+		int(season_reward.get("credits", 0)) == 1800 and int(season_reward.get("dp", 0)) == 60,
+		str(season_reward))
 	# 리타이어는 완주가 아니다 — 순위가 좋아도 마일스톤 0
 	var retired := _new_state()
 	retired.record_gp_result({"player_rank": 1, "player_retired": true, "circuit_id": "circuit_mn1"})

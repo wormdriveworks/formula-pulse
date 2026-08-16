@@ -22,6 +22,8 @@ func _on_bound(_payload: Dictionary) -> void:
 	(%HeaderLabel as Label).text = s.text("ui.seasonResult.headerFormat", {
 		"season": int(report.get("season", 1)),
 	})
+	# S6 시즌 결산 지급 (D06 §2.1) — 지급은 세션 경로 전속. 표시 항목은 §A-22 개편 시 배치.
+	session.settle_season()
 
 	# ① 최종 스탠딩 — 상위 N + 플레이어 행 (전 순위 열람은 기록실 층 소관)
 	var list := %StandingsList as VBoxContainer

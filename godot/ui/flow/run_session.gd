@@ -61,13 +61,31 @@ func begin_career(profile: int) -> void:
 func judge_event() -> Dictionary:
 	var stage_id := season.current_stage_id()
 	# 변형 조건 DSL 의 입력 문맥 — 성적·막 축 (D08 §7.3)
+	# 변형 4축의 입력 (D08 §7.3). 필드가 빠지면 DSL 이 오류를 내고 그 변형은 영구 미발동한다
+	# (IMPL-095 "미지 필드 = 오류" 처리 덕에 TL-5 러너가 vane_stage·jude_rank_delta 누락을 적발).
 	var context := {
 		"player_rank": int(last_gp_result.get("player_rank", 16)),
+		# [가안] 막(act) 고정 1 — 막 전이는 마일스톤 래치 층(D08 §8.1 서사 층)이며 미결선.
+		# 서사 트랙(T7) 유입 시 narrative 층에서 받아 채운다.
 		"act": 1,
 		"season": season.season,
 		"tour_slot": season.tour_slot,
+		"vane_stage": outgame.vane_stage(),
+		"jude_rank_delta": _jude_rank_delta(),
 	}
 	return events.judge(stage_id, context)
+
+
+# 주드 인접 판정 (D13 별첨A §6.5): |플레이어 챔피언십 순위 − 주드 순위|.
+# 순위표에 없으면(무득점 초반) 인접이 성립하지 않도록 큰 값을 낸다 — 0 은 '가장 인접'이라
+# 조용히 항상 성립하는 반대 결함이 된다.
+func _jude_rank_delta() -> int:
+	var order := season.championship_standings()
+	var player_index := order.find(SeasonState.PLAYER_ID)
+	var jude_index := order.find("ai_jude")
+	if player_index < 0 or jude_index < 0:
+		return 99
+	return absi(player_index - jude_index)
 
 
 # 이벤트 보상 적용 — 화면은 표시만 하고 적용은 세션이 코어에 위임한다
@@ -168,6 +186,18 @@ func settle_tour(remaining_charge: int) -> Dictionary:
 	# 탈락 시 환전 미성립 (D06 §4.1 G4) — 코어가 조건을 쥐지만 호출 자체를 걸지 않는다
 	var exchanged := outgame.exchange_charge(remaining_charge, not dropped)
 	return {"credits": credits, "dp": drive_points, "exchanged": exchanged, "dropped": dropped}
+
+
+# 시즌 결산 지급 (D06 §2.1 S6 — 챔피언십 순위 비례). 선재 공백이었다:
+# settlement_rewards.csv 의 season 행 6개를 부르는 코드가 어디에도 없었다 (TL-5 적발).
+func settle_season() -> Dictionary:
+	var position := int(last_season_report.get("player_position", 16))
+	var reward := outgame.settlement_reward("season", maxi(position, 1))
+	var credits := int(reward.get("credits", 0))
+	var drive_points := int(reward.get("dp", 0))
+	outgame.gain_credits(credits)
+	outgame.gain_drive_data(drive_points)
+	return {"credits": credits, "dp": drive_points, "position": position}
 
 
 func close_tour() -> Dictionary:

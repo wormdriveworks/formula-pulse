@@ -570,6 +570,9 @@ func _record_milestones(context: Dictionary) -> void:
 		if not _milestone_met(row, context):
 			continue
 		milestones[String(milestone_id)] = true
+		# S5 마일스톤 보상 (D06 §2.1 Source 대장 · D13 별첨A §3.3) — 축적형 주 수입.
+		# 달성 즉시 지급 (D08 §8.1 시스템 층 = 마일스톤 달성 즉시).
+		gain_drive_data(CsvTable.to_int(String(row.get("reward_dp", "0"))))
 		# 네임드 첫 선착 누계 — 라이벌 파일 개방 축 (D07 §6.1 "네임드 8인 전속").
 		# 같은 라이벌을 가리키는 마일스톤이 둘 있다(로렌츠 = 첫 선착 + 첫 격파 — D08 §8.2)
 		# 이므로 **라이벌 단위로 1회만** 센다. 파일은 인물당 하나다.

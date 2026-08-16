@@ -19,8 +19,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 7000:
-		print("EVENTS_TEST_FAIL checks=%d < 하한 7000 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 7035:
+		print("EVENTS_TEST_FAIL checks=%d < 하한 7035 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -129,6 +129,33 @@ func _d13_event_values() -> void:
 		_ok("D08 별첨A %s 전용 풀 카테고리 구성" % stage_id, categories == expected_cats, str(categories))
 
 
+# event_variants.json 이 실제로 참조하는 조건 필드를 전부 걷는다 (중첩 all/any/not 포함)
+func _collect_variant_fields(data: GameData) -> Array:
+	var fields: Dictionary = {}
+	for event_id in data.event_variants:
+		var entries: Variant = data.event_variants[event_id]
+		if typeof(entries) != TYPE_ARRAY:
+			continue
+		for entry in Array(entries):
+			if typeof(entry) == TYPE_DICTIONARY:
+				_walk_condition(Dictionary(entry).get("condition", {}), fields)
+	return fields.keys()
+
+
+func _walk_condition(node: Variant, fields: Dictionary) -> void:
+	if typeof(node) != TYPE_DICTIONARY:
+		return
+	var condition: Dictionary = node
+	if condition.has("field"):
+		fields[String(condition["field"])] = true
+	for key in ["all", "any"]:
+		if condition.has(key) and typeof(condition[key]) == TYPE_ARRAY:
+			for child in Array(condition[key]):
+				_walk_condition(child, fields)
+	if condition.has("not"):
+		_walk_condition(condition["not"], fields)
+
+
 # ── 제한 조건 DSL (D12 §5.4: 필드 비교·AND/OR 한정 · 스크립트 임베드 금지) ──
 func _condition_dsl() -> void:
 	var dsl := ConditionDsl.new()
@@ -150,6 +177,13 @@ func _condition_dsl() -> void:
 		{"field": "act", "op": "==", "value": 2}]}, context))
 	_ok("DSL not", dsl.evaluate({"not": {"field": "player_rank", "op": ">", "value": 10}}, context))
 	_ok("DSL 정상 경로에서 오류 없음", dsl.is_ok(), str(dsl.errors))
+	# 세션 판정 컨텍스트가 event_variants.json 이 참조하는 필드를 전부 덮는지 (D08 §7.3 변형 4축).
+	# 한 축이라도 빠지면 DSL 이 오류를 내고 그 변형은 영구 미발동한다 — TL-5 러너 적발분.
+	var variant_fields := _collect_variant_fields(_new_data())
+	var session_fields := ["player_rank", "act", "season", "tour_slot", "vane_stage", "jude_rank_delta"]
+	for field_name in variant_fields:
+		_ok("변형 조건 필드가 세션 컨텍스트에 있다: %s" % field_name,
+			session_fields.has(String(field_name)), str(session_fields))
 	# 미지 필드·미지 연산자는 조용한 false가 아니라 오류다 (오타 하나로 변형이 영구 미발동되는 것을 막는다)
 	var strict := ConditionDsl.new()
 	strict.evaluate({"field": "no_such_field", "op": "==", "value": 1}, context)
