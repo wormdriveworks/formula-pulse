@@ -24,8 +24,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 376:
-		print("TC_O_TEST_FAIL checks=%d < 하한 376 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 378:
+		print("TC_O_TEST_FAIL checks=%d < 하한 378 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -273,6 +273,12 @@ func _tc_o2_tuning_and_overhaul() -> void:
 	var low := state.overhaul_slots(12)
 	_ok("9위 이하 = 1슬롯 2후보 (G-M1 바닥 보장)",
 		int(low["slots"]) == 1 and int(low["candidates"]) == 2, str(low))
+	# **[보고 고정] 등급 표는 순위 1~16 전속** — D13 §7.1이 그 범위만 덮는다.
+	# `player_position`은 플레이어가 순위표에 없으면 0이 되는데(`order.find()+1`),
+	# `close_season()`은 그 0을 그대로 추첨에 넘기고 SET-02는 `maxi(...,1)`로 절상해 화면에 넘긴다
+	# — **두 소비부의 절상이 비대칭**이다. 순위 밖 플레이어에게 어느 등급을 줄지는 D06/D13
+	# 판단 사안이라 임의로 정하지 않고 이 검사로 경계만 못박는다 (IMPL-134 보고).
+	_ok("등급 표 = 순위 1~16 전속 (0은 행 없음)", state.overhaul_slots(0).is_empty())
 	# 슬롯 초과 장착 거부
 	_ok("1슬롯 장착", state.install_overhaul("overhaul_ov_p1", 5))
 	_ok("1슬롯 초과 거부", not state.install_overhaul("overhaul_ov_p2", 5))

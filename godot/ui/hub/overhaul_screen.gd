@@ -4,7 +4,7 @@
 # 개러지 앵커는 상시 소등이고, 이 화면의 유일한 진입은 SET-02 → HUB-08 체인이다.
 # ①등급 판정(시즌 성적 연동) ②후보 일람(전 후보 열람 자유) ③선택 → **비가역 COM-01**.
 #
-# SET-02가 아직 없어 현재 라우터에서 도달 불가다 — 화면·규격을 먼저 세우고 체인은 SET-02 결선 시.
+# 진입 체인 = SET-02 시즌 결산 → HUB-08 (`season_result_screen._on_next()`). 결선 완료.
 extends HubScreen
 
 var _selected := ""
@@ -22,10 +22,15 @@ func _on_hub_ready(payload: Dictionary) -> void:
 	if _season_chain:
 		(%BackButton as Button).visible = false
 	var slots := session.outgame.overhaul_slots(_rank)
+	# **후보 수는 규칙값이 아니라 실제로 그릴 목록에서 센다** (총괄 승인 — IMPL-128 §6).
+	# 규칙값(`overhaul_slots(_rank).candidates`)은 진입 payload 의 rank 에서 나오고 목록은
+	# 결산 층이 추첨한 결과라, 두 rank 가 어긋나면 헤더가 목록과 다른 수를 말한다
+	# (실측 재현: 헤더 '후보 4' · 목록 5행). 같은 배열에서 세면 구조적으로 갈릴 수 없다 —
+	# IMPL-100·124와 같은 "표시값은 판정값에서 파생시킨다" 처리다.
 	var grade_text := s.text("ui.overhaulScreen.gradeFormat", {
 		"rank": _rank,
 		"slots": int(slots.get("slots", 0)),
-		"candidates": int(slots.get("candidates", 0)),
+		"candidates": _shown_candidates().size(),
 	})
 	(%GradeLabel as Label).text = grade_text
 	_rebuild_candidates()
@@ -37,14 +42,19 @@ func _on_hub_ready(payload: Dictionary) -> void:
 
 # 후보 일람 = 추첨 결과 (D06 §5.3 — 추첨은 세션 결산 층, 화면은 난수를 쓰지 않는다).
 # 후보 미추첨 상태(구세이브·개발 진입)는 전 오버홀 폴백 — 코어 가드도 같은 조건으로 관용한다.
+# **헤더의 후보 수도 이 배열을 센다** — 표시 두 곳이 같은 원천을 본다.
+func _shown_candidates() -> Array:
+	var shown: Array = session.outgame.overhaul_candidates
+	if shown.is_empty():
+		return session.data.overhauls.keys()
+	return shown
+
+
 func _rebuild_candidates() -> void:
 	var list := %CandidateList as VBoxContainer
 	for child in list.get_children():
 		child.queue_free()
-	var shown: Array = session.outgame.overhaul_candidates
-	if shown.is_empty():
-		shown = session.data.overhauls.keys()
-	for overhaul_id in shown:
+	for overhaul_id in _shown_candidates():
 		list.add_child(_candidate(String(overhaul_id)))
 
 
