@@ -207,6 +207,7 @@ ui.race.chassisFormat,{value}
 ui.race.chargeLabel,차지
 ui.race.chargeFormat,{value}/{cap}
 ui.race.consumableEmpty,―
+ui.race.consumableFilled,▣
 ui.race.menu,≡
 ui.race.timerFormat,{value}
 ui.race.resonanceBanner,레조넌스

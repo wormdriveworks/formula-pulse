@@ -66,6 +66,11 @@ var _paused := false
 # 통상 턴의 릴 표시 배열 — 듀얼 중에는 오버레이의 릴로 스왑된다 (아래 _enter_duel 참조)
 var _base_reel_icons: Array[TextureRect] = []
 
+# E13 소모품 2슬롯 (별첨A §A-4). 슬롯 수 = 반입 상한(param_consumable_carry_cap = 2)과
+# 1:1이므로 인벤토리가 슬롯을 넘치지 않는다 — 상한이 바뀌면 슬롯 수는 별첨A 개정 사안이다.
+var _e13_slots: Array[Button] = []
+var _e13_slot_ids: Array[String] = []   # 슬롯 index → 소모품 id (빈 슬롯은 목록 밖)
+
 
 # 세션 주입 없이 단독 인스턴스화되는 경로(검사 하네스)를 위해 자체 세션을 연다.
 # 폴백이 아니라 **동등한 개시 경로**다 — 라우터가 하는 일을 그대로 한다.
@@ -102,8 +107,20 @@ func _boot() -> void:
 	_pause_overlay.resumed.connect(func(): _paused = false)
 	_pause_overlay.quit_to_title.connect(func(): go("SYS-01", {}))
 	(%E14Menu as Button).pressed.connect(_open_pause)
+	_collect_consumable_slots()
 	_apply_static_strings()
 	_start_gp()
+
+
+func _collect_consumable_slots() -> void:
+	_e13_slots.clear()
+	for child in (%E13Consumables as Node).get_children():
+		var slot := child as Button
+		if slot == null:
+			continue
+		var index := _e13_slots.size()
+		slot.pressed.connect(func(): _on_consumable(index))
+		_e13_slots.append(slot)
 
 
 func _open_pause() -> void:
@@ -136,9 +153,7 @@ func _apply_static_strings() -> void:
 	var negate_label := _with_cost("ui.race.chargeIntervene", "param_charge_negate_cost")
 	_e08_respin.text = respin_label
 	_e08_charge.text = negate_label
-	var empty_slot := s.text("ui.race.consumableEmpty")
-	for slot in (%E13Consumables as Node).get_children():
-		(slot.get_node("Label") as Label).text = empty_slot
+	_refresh_consumables()
 
 
 func _with_cost(label_key: String, cost_param: String) -> String:
@@ -523,6 +538,45 @@ func _refresh_resources() -> void:
 	_e12_charge.text = s.text("ui.race.chargeFormat", {
 		"value": engine.charge, "cap": int(data.param("param_charge_cap")),
 	})
+	_refresh_consumables()
+
+
+# 재고 → 슬롯. 데이터 정의 순서로 펼치므로 같은 인벤토리는 항상 같은 슬롯에 앉는다
+# (엔진이 딕셔너리를 돌려주므로 표시 순서를 화면이 고정해야 한다).
+# 슬롯 문면은 도상 없이 채움/빔 2상태 — 소모품 아이콘은 D10 리소스 목록에 없다.
+# 품목명은 툴팁으로 준다 (COM-02 — 슬롯 16×12 에 이름이 들어가지 않는다).
+func _refresh_consumables() -> void:
+	if _e13_slots.is_empty():
+		return
+	var s := data.strings
+	_e13_slot_ids.clear()
+	if engine != null:
+		for id in data.consumables:
+			for _n in range(int(engine.consumables_held.get(id, 0))):
+				_e13_slot_ids.append(String(id))
+	var empty_text := s.text("ui.race.consumableEmpty")
+	var filled_text := s.text("ui.race.consumableFilled")
+	for i in range(_e13_slots.size()):
+		var slot := _e13_slots[i]
+		if i < _e13_slot_ids.size():
+			slot.text = filled_text
+			slot.tooltip_text = s.text(String(data.consumables[_e13_slot_ids[i]]["name_key"]))
+		else:
+			slot.text = empty_text
+			slot.tooltip_text = ""
+
+
+# T1 섹터 개시 전속 (별첨A §A-4 E13 "T1에만 활성" · D06 §3.5 R-B).
+# 엔진이 같은 가드를 다시 걸므로 여기서 새는 경로는 없다 — 화면은 활성 표시를 맞출 뿐이다.
+func _on_consumable(index: int) -> void:
+	if engine == null or index >= _e13_slot_ids.size():
+		return
+	var events := engine.use_consumable(_e13_slot_ids[index])
+	if events.is_empty():
+		return  # 거부 = 상태 무변경 (엔진 계약) — 화면도 아무것도 하지 않는다
+	_push_events(events)
+	_refresh_resources()
+	_refresh_action_enabled()
 
 
 func _refresh_action_enabled() -> void:
@@ -537,6 +591,16 @@ func _refresh_action_enabled() -> void:
 	)
 	_e08_confirm.disabled = not (can_spin or (open and _confirm_lockout <= 0.0))
 	_e08_confirm.text = data.strings.text("ui.race.confirm" if _timer_active else "ui.race.spin")
+	# E13 — 개입 창(T4)이 아니라 **섹터 개시(T1)** 에서 열린다. 듀얼 턴의 T1 은 제외
+	# (듀얼 = 전용 스핀이라 '섹터 개시'가 아니다 — R-B 문면, IMPL-111).
+	var can_use_item := (
+		engine != null and not engine.finished and not _revealing and not _timer_active
+		and engine.turn_phase == RaceTypes.TurnPhase.T1_SECTOR_OPEN
+		and engine.gp_state == RaceTypes.GpState.SECTOR_TURN
+		and not engine.current_turn_is_duel
+	)
+	for i in range(_e13_slots.size()):
+		_e13_slots[i].disabled = not (can_use_item and i < _e13_slot_ids.size())
 
 
 func _update_timer_value() -> void:

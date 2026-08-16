@@ -15,10 +15,13 @@ var _elapsed := 0.0
 var _step := 0
 var _shots := 0
 var _done := false
+var _seeded := false
 
 # [단계, 그 단계에 도달한 뒤 기다릴 초, 파일 접미사]
 var _plan: Array = [
 	[0.35, "01_t1_idle"],
+	# E13 은 T1 전속이므로 스핀 전에 사용 결과를 남긴다 (재고 감소·로그 1줄·섀시 회복).
+	[0.20, "01b_item_used"],
 	[0.05, "02_spin_sealed"],
 	[0.45, "03_reel1_stopped"],
 	[0.95, "04_intervention_open"],
@@ -49,9 +52,29 @@ func _initialize() -> void:
 	root.add_child(_screen)
 
 
+# E13 재고 주입 — 새 커리어는 소모품 0이라 두 슬롯이 전부 빈다.
+# capture_hub_shots 의 '크루 합류·재화 지급 상태로 찍는다'와 같은 성격의 하네스 조작이다.
+# **첫 프레임 이후에 넣는다** — `_initialize()` 시점에는 화면의 `_ready()` 가 아직
+# 돌지 않아 engine·data 가 null 이다 (주입이 조용히 무시된다 — 실측으로 확인).
+func _seed_consumables() -> void:
+	if _screen.engine == null:
+		return
+	var ids: Array = []
+	for id in _screen.data.consumables:
+		ids.append(String(id))
+	if ids.size() < 2:
+		return
+	_screen.engine.consumables_held = {ids[0]: 1, ids[1]: 1}
+	_screen._refresh_resources()
+	_screen._refresh_action_enabled()
+
+
 func _process(delta: float) -> bool:
 	if _done:
 		return true
+	if not _seeded and _screen.engine != null:
+		_seed_consumables()
+		_seeded = true
 	_elapsed += delta
 	if _step >= _plan.size():
 		print("CAPTURE_FLOW_OK shots=%d" % _shots)
@@ -71,8 +94,10 @@ func _process(delta: float) -> bool:
 func _advance(step: int) -> void:
 	match step:
 		0:
+			_screen._on_consumable(0)     # E13 슬롯 1 사용 (T1 전속)
+		1:
 			_screen._on_primary_action()  # 스핀 (T2 커밋)
-		6:
+		7:
 			_screen._on_primary_action()  # 확정 (T4 → T5)
 
 
