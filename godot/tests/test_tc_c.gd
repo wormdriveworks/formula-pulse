@@ -35,12 +35,13 @@ func _init() -> void:
 	_consumable_paths()
 	_gp_summary_counters()
 	_presentation_grade_caps()
+	_momentum_interrupt_matrix()
 	_check_global_postconditions()
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 1950:
-		print("TC_C_TEST_FAIL checks=%d < 하한 1950 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 1990:
+		print("TC_C_TEST_FAIL checks=%d < 하한 1990 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -1174,6 +1175,117 @@ func _presentation_grade_caps() -> void:
 	# 순위표 미등재(무득점 초반)의 99 가 인접으로 새지 않는가 — `_jude_rank_delta` 의 큰 값 규약
 	_ok("순위표 미등재(99)는 인접 아님",
 		String(race_screen_script.l3_kinship_for("ai_jude", true, 99, adjacent_max)).is_empty())
+
+
+# ── TL-5 ③ 모멘텀 × 개입 4타입 상호작용 매트릭스 (D14 §8.3 ③) ──
+#
+# 판정 = **정의 외 상호작용(의도치 않은 중첩·소거) 0.** 개입을 썼다는 이유로 모멘텀 보너스가
+# 사라지거나 두 번 붙으면 안 된다. 개입 4타입 = D05 §6.1 확정(홀드·변환·증폭·보험).
+#
+# 방법: 같은 시드·같은 행동열로 엔진 두 대를 몰고 **`confirm()`의 잔여 비율만** 다르게 준다.
+# 개입이 소비하는 난수도 양쪽이 동일하므로, 두 결과의 차이는 모멘텀 항 하나뿐이어야 한다.
+func _momentum_interrupt_matrix() -> void:
+	var bonus := 0.0
+	# ① 무개입 기준선 — 이후 전 타입이 이 델타와 같아야 한다
+	var base_delta := _momentum_delta("none")
+	var probe := _new_engine(4242)
+	if probe == null:
+		return
+	bonus = probe.data.param("param_gauge_momentum_bonus")
+	_eq_float("무개입 모멘텀 델타 = D13 §2.1 기준값", base_delta, bonus)
+	# ② 홀드 (Hold — 릴 고정 + 재회전. 기본 개입·상시 가용)
+	_eq_float("홀드 개입 후에도 모멘텀 델타 불변", _momentum_delta("hold"), bonus)
+	# ③ 보험 (Insure — 차지 개입 트러블 무효화)
+	_eq_float("보험 개입 후에도 모멘텀 델타 불변", _momentum_delta("negate"), bonus)
+	# ④ 홀드+보험 동시 — 개입을 겹쳐도 보너스는 한 번이다 (중첩 0)
+	_eq_float("홀드+보험 중첩에도 모멘텀 1회분", _momentum_delta("hold_negate"), bonus)
+	# ⑤ 발화 계수 — 모멘텀 로그는 성립 턴에 정확히 1회, 미성립 턴에 0회
+	_ok("모멘텀 로그 성립 시 1회", _momentum_event_count("hold", 1.0) == 1)
+	_ok("모멘텀 로그 미성립 시 0회", _momentum_event_count("hold", 0.0) == 0)
+	# ⑥ 증폭 (Amplify — 듀얼 부스트): **모멘텀과 구조적으로 배타**다.
+	# 모멘텀은 `not current_turn_is_duel` 전속이고 부스트는 듀얼 턴 전속이라 같은 턴에 설 수 없다.
+	# 배타는 '정의 외 상호작용'이 아니라 정의된 비상호작용이므로, 그 사실 자체를 못박는다.
+	var duel := _new_engine(4343)
+	if duel == null:
+		return
+	duel.start_gp()
+	_flatten_neighbors(duel)
+	duel.begin_turn()
+	duel.current_turn_is_duel = true
+	duel.spin()
+	duel.charge = 4
+	var boost_result: Dictionary = duel.add_duel_boost()
+	_ok("듀얼 턴에서 증폭 개입 성립", bool(boost_result.get("ok", false)), str(boost_result))
+	var duel_events: Array = duel.confirm(1.0)
+	var duel_momentum := 0
+	for event in duel_events:
+		if String(event.get("key", "")) == "raceLog.momentum01":
+			duel_momentum += 1
+	_ok("듀얼 턴은 여유 확정이어도 모멘텀 0 (구조적 배타)", duel_momentum == 0, str(duel_momentum))
+	var sector_probe := _new_engine(4343)
+	if sector_probe != null:
+		sector_probe.start_gp()
+		sector_probe.begin_turn()
+		sector_probe.spin()
+		sector_probe.charge = 4
+		# 비듀얼 턴에서는 증폭 개입 자체가 거부된다 — 배타의 반대 방향
+		_ok("비듀얼 턴에서 증폭 개입 거부",
+			not bool(sector_probe.add_duel_boost().get("ok", false)))
+	# ⑦ 변환 (Convert — 심볼 교체·승급): **인게임 소비부가 없다.**
+	# D05 §6.1은 변환을 스킬 데이터 인스턴스로 규정하는데 RACE-01 스킬 슬롯이 전 슬롯 잠금이라
+	# (IMPL-071) 주입할 개입이 존재하지 않는다 — 매트릭스 4행 중 1행은 **미측정**이며 보고 대상이다.
+	_ok("변환 개입 = 엔진 API 부재 (매트릭스 미측정 행)",
+		not probe.has_method("convert_symbol"))
+
+
+# 지정 개입을 넣고 여유 확정 / 즉시 확정의 전방 게이지 차를 낸다.
+func _momentum_delta(interrupt: String) -> float:
+	var on := _momentum_run(interrupt, 1.0)
+	var off := _momentum_run(interrupt, 0.0)
+	return on - off
+
+
+func _momentum_run(interrupt: String, remaining_ratio: float) -> float:
+	var engine := _momentum_engine(interrupt)
+	if engine == null:
+		return 0.0
+	engine.confirm(remaining_ratio)
+	return engine.front_gauge
+
+
+func _momentum_event_count(interrupt: String, remaining_ratio: float) -> int:
+	var engine := _momentum_engine(interrupt)
+	if engine == null:
+		return -1
+	var count := 0
+	for event in engine.confirm(remaining_ratio):
+		if String(event.get("key", "")) == "raceLog.momentum01":
+			count += 1
+	return count
+
+
+# 개입까지 마친 T4 상태의 엔진 — 시드·행동열이 같으므로 난수 소비도 같다.
+func _momentum_engine(interrupt: String) -> RaceEngine:
+	var engine := _new_engine(4242)
+	if engine == null:
+		return null
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	engine.begin_turn()
+	engine.spin()
+	engine.front_gauge = 0.0
+	engine.charge = 9
+	# 보험은 트러블이 있어야 성립한다 — 라인 2 + 트러블 1 조합으로 고정
+	engine.provisional = [RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_TROUBLE]
+	match interrupt:
+		"hold":
+			engine.hold_respin([0, 1])
+		"negate":
+			engine.negate_trouble()
+		"hold_negate":
+			engine.hold_respin([0, 1, 2])   # 전 릴 고정 = 재회전 0 (조합 보존)
+			engine.negate_trouble()
+	return engine
 
 
 # ── 섹터 속성 6축 가중 — 릴 분포 대조 (D13 별첨A §1.3 · D08 별첨A §1) ──
