@@ -44,8 +44,26 @@ func _on_bound(payload: Dictionary) -> void:
 	close.set_meta(AUDIO_EVENT_META, "ui_cancel")   # SE-U03 취소·닫기
 	close.pressed.connect(_on_close)
 	_refresh_summary()
+	_refresh_link_notice()
 	_build_tabs()
 	_select_tab(0)
+
+
+# 플랫폼 도전과제 미연동 고지 (D09 §6.5 필수 항목 — 업적 1:1 매핑).
+#
+# **화면은 어댑터도 플랫폼도 모른다** — 세션의 조회 창구 하나만 읽는다(혼입 0).
+# 연동 상태는 달성 판정에 관여하지 않으므로(판정은 코어가 끝냈다) 고지는 **표기 전용**이고,
+# 연동돼 있으면 아무것도 띄우지 않는다 — 정상 상태에 배지를 다는 것은 소음이다.
+# 문면은 "기록은 유지된다"를 함께 말한다: 미연동을 손실로 오독하면 잘못된 불안을 준다. [가안]
+func _refresh_link_notice() -> void:
+	var notice := %LinkNotice as Label
+	notice.visible = not session.achievement_service_linked()
+	if not notice.visible:
+		return
+	notice.add_theme_font_size_override("font_size", _body_font_size)
+	notice.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+	notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	notice.text = session.data.strings.text("ui.achievement.serviceUnlinked")
 
 
 # 달성률 요약 헤더 (§A-4). 히든 미달성분도 분모에 든다 — 총수 가늠 허용이 §5.5 명문이다.

@@ -175,7 +175,9 @@ func close_gp() -> void:
 # **새로 열린 티어**만 뽑는다 — 티어 구성은 데이터가 정하므로 개수를 코드에 적지 않는다.
 func _tier_open_snapshot() -> Dictionary:
 	var open: Dictionary = {}
-	for row in data.skills:
+	# `data.skills` 는 id → 행 딕셔너리다 — 키를 돌면 문자열을 행으로 착각한다(실주행 적발).
+	for skill_id in data.skills:
+		var row: Dictionary = data.skills[skill_id]
 		var skill_tier := CsvTable.to_int(String(row["skill_tier"]))
 		open[skill_tier] = outgame.skill_tier_open(skill_tier)
 	return open

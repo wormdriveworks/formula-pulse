@@ -241,6 +241,7 @@ func _no_voice_jam() -> void:
 	_ok("세션이 디스패처를 배선한다", session.audio != null)
 	if session.audio == null:
 		return
+	_growth_gate_latch(session)
 	session.audio.emit("timer_enter_warning")   # P1
 	_ok("P1 발화 후에도 P3 가 울린다 (보호가 풀린다)",
 		not session.audio.emit("ui_cursor").is_empty())
@@ -259,7 +260,23 @@ func _no_voice_jam() -> void:
 # 조작음은 버튼마다 손으로 걸지 않고 `bind()` 가 일괄 결속한다 — 그 결속이 꺼지면
 # 커서·결정·취소·토글이 **전 화면에서 동시에** 사라지는데, 소스에는 리터럴이 그대로 남아
 # 커버리지 검사가 통과한다(돌연변이 ⑱ 미검출로 실측). 실제로 신호를 때려 확인한다.
-#
+# 성장 게이트 개방음(SE-U13)은 "방금 열린 스킬 티어"가 있을 때만 난다. 그 판정은 경계
+# 전후 스냅숏 대조인데, 스냅숏이 조용히 비면 **개방음이 영영 안 울리고도 검사가 통과**한다
+# (실주행에서 `data.skills` 딕셔너리를 키로 순회하는 결함이 실제로 났다).
+func _growth_gate_latch(session: RunSession) -> void:
+	session.begin_career(1)
+	var snapshot: Dictionary = session._tier_open_snapshot()
+	_ok("스킬 티어 스냅숏이 전 티어를 담는다", snapshot.size() >= 3,
+		"티어 %d종: %s" % [snapshot.size(), str(snapshot.keys())])
+	_ok("티어 1은 시작 개방·2는 미개방으로 잡힌다",
+		bool(snapshot.get(1, false)) and not bool(snapshot.get(2, true)), str(snapshot))
+	# 첫 포디움 마일스톤이 서면 티어 2가 '방금 열린 것'으로 걸려야 한다.
+	session.outgame.milestones["milestone_first_podium"] = true
+	session._latch_opened_tiers(snapshot)
+	_ok("새로 열린 티어가 래치에 잡힌다", session.newly_opened_tiers.has(2),
+		"래치: %s" % str(session.newly_opened_tiers))
+
+
 # **`bind()` 는 첫 `_process` 프레임에서 부른다** — `_initialize()` 안의 add_child 직후에
 # 부르면 `@onready` 가 아직 비어 있어 화면이 자기 노드를 못 찾는다(기록된 하네스 함정).
 func _menu_controls_bound() -> void:
