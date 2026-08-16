@@ -34,22 +34,26 @@ func _build_row(tuning_id: String, oscar: bool) -> Control:
 	row.add_theme_constant_override("separation", 8)
 
 	var name_label := Label.new()
+	name_label.add_theme_font_size_override("font_size", _body_font_size)
 	name_label.custom_minimum_size = Vector2(120, 0)
 	name_label.text = s.text(String(session.data.tuning_lines[tuning_id]["name_key"]))
 	row.add_child(name_label)
 
 	var gauge := Label.new()
+	gauge.add_theme_font_size_override("font_size", _body_font_size)
 	gauge.name = "Gauge"
 	gauge.add_theme_color_override("font_color", UiPalette.TIMER_LEEWAY)
 	row.add_child(gauge)
 
 	var cost_label := Label.new()
+	cost_label.add_theme_font_size_override("font_size", _body_font_size)
 	cost_label.name = "Cost"
 	cost_label.custom_minimum_size = Vector2(90, 0)
 	cost_label.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
 	row.add_child(cost_label)
 
 	var buy := Button.new()
+	buy.add_theme_font_size_override("font_size", _body_font_size)
 	buy.name = "Buy"
 	buy.text = s.text("ui.tuningBench.buy")
 	row.add_child(buy)

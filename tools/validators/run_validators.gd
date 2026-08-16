@@ -34,6 +34,7 @@ func _init() -> void:
 	_run_v8_key_grammar()
 	_run_contamination_scan()
 	_run_architecture_scan()
+	_run_font_scan()
 	print("")
 	if _fail_count == 0:
 		print("VALIDATORS_PASS warnings=%d" % _warn_count)
@@ -755,6 +756,118 @@ func _run_architecture_scan() -> void:
 						_fail("ARCH", "%s:%d: %s — '%s' (%s)"
 							% [path, line_index + 1, label, pattern, reason])
 	_report("ARCH", "architecture rules", checked, before_fail, before_warn)
+
+
+# ── FONT 코드 생성 Control 폰트 정적 검사 (마스터플랜 v2.35 ⑧ 지시 · 신설 IMPL-147) ──
+#
+# **왜 기계인가.** 코드로 만든 Control 은 프로젝트 기본 폰트 크기를 상속하지 않고
+# 엔진 기본 테마의 16 으로 해석된다(실측). 640×360 캔버스에서 16 은 레이아웃을 깨뜨리는데,
+# `.tscn` 노드는 멀쩡하고 코드 생성분만 새기 때문에 화면을 훑어서는 잡히지 않는다 —
+# 실제로 12개 화면 34지점이 이 방식으로 샜다(본 검사 신설 시점 실측).
+#
+# 축 2종:
+#   FONT-A 코드 생성 텍스트 Control 에 `add_theme_font_size_override` 부재
+#   FONT-B 폰트 크기를 리터럴로 기입 (불변규칙 2 — 값 창구는 D13·core_params)
+#
+# **성격(차단형/경고형) 판정은 총괄 소관이다** — V7 전례대로 스스로 정하지 않는다.
+# 판정 전까지는 **경고형**으로 둔다: 차단형으로 먼저 켜면 판정 전에 게이트를 점유하게 되고,
+# 그것은 "검증기 성격을 구현이 정했다"는 사실을 되돌리기 어렵게 만든다.
+const FONT_TEXT_CONTROLS := ["Label", "Button", "RichTextLabel", "LineEdit", "CheckBox",
+	"CheckButton", "OptionButton", "TextEdit", "LinkButton", "MenuButton", "ItemList",
+	"Tree", "TabBar", "SpinBox"]
+const FONT_OVERRIDE_CALL := ".add_theme_font_size_override("
+
+
+func _run_font_scan() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	for entry in _code_files:
+		var path := String(entry["path"])
+		if not path.begins_with("godot/ui"):
+			continue
+		var lines: Array = String(entry["source"]).split("\n")
+		var overridden := _font_overridden_names(lines)
+		for line_index in range(lines.size()):
+			var code_line := _strip_comment(String(lines[line_index]))
+			# FONT-B — 리터럴 기입
+			var literal_size := _font_literal_size(code_line)
+			if literal_size != "":
+				checked += 1
+				_warn("FONT", "%s:%d: 폰트 크기 리터럴 '%s' — 값 창구는 D13(core_params) 전속"
+					% [path, line_index + 1, literal_size])
+			# FONT-A — 오버라이드 부재
+			var created := _font_control_declaration(code_line)
+			if created.is_empty():
+				continue
+			checked += 1
+			if not overridden.has(String(created["name"])):
+				_warn("FONT", "%s:%d: 코드 생성 %s '%s' 폰트 크기 미지정 — 엔진 기본 16 으로 해석된다"
+					% [path, line_index + 1, String(created["type"]), String(created["name"])])
+	_report("FONT", "code-created control fonts", checked, before_fail, before_warn)
+
+
+# 파일 안에서 폰트 크기 오버라이드를 받은 변수 이름 집합.
+# 함수 단위가 아니라 파일 단위로 본다 — 생성과 적용이 헬퍼로 갈리는 형태가 흔하고,
+# 함수 경계로 좁히면 그 형태가 전부 오검출된다 (경고형 검사의 신뢰를 먼저 잃는다).
+func _font_overridden_names(lines: Array) -> Dictionary:
+	var names: Dictionary = {}
+	for line in lines:
+		var code_line := _strip_comment(String(line))
+		var call_at := code_line.find(FONT_OVERRIDE_CALL)
+		if call_at < 0:
+			continue
+		var head := code_line.substr(0, call_at)
+		var start := head.length() - 1
+		while start >= 0 and (head[start] == "_" or head[start].is_valid_identifier()):
+			start -= 1
+		var name := head.substr(start + 1)
+		if name != "":
+			names[name] = true
+	return names
+
+
+# `var x := Label.new()` / `var x: Label = Label.new()` → {name, type}
+func _font_control_declaration(code_line: String) -> Dictionary:
+	var trimmed := code_line.strip_edges()
+	if not trimmed.begins_with("var "):
+		return {}
+	var assign_at := trimmed.find("=")
+	if assign_at < 0:
+		return {}
+	var rhs := trimmed.substr(assign_at + 1).strip_edges()
+	var control_type := ""
+	for type_name in FONT_TEXT_CONTROLS:
+		if rhs.begins_with(String(type_name) + ".new("):
+			control_type = String(type_name)
+			break
+	if control_type == "":
+		return {}
+	# 좌변에서 변수명만 떼어낸다 (`var x :` / `var x :=` 양 형태)
+	var lhs := trimmed.substr(4, assign_at - 4).strip_edges()
+	var colon_at := lhs.find(":")
+	if colon_at >= 0:
+		lhs = lhs.substr(0, colon_at).strip_edges()
+	if lhs == "":
+		return {}
+	return {"name": lhs, "type": control_type}
+
+
+# `add_theme_font_size_override("font_size", 9)` 의 리터럴 인자 — 변수·호출이면 빈 문자열.
+func _font_literal_size(code_line: String) -> String:
+	var call_at := code_line.find(FONT_OVERRIDE_CALL)
+	if call_at < 0:
+		return ""
+	var args := code_line.substr(call_at + FONT_OVERRIDE_CALL.length())
+	var comma_at := args.find(",")
+	if comma_at < 0:
+		return ""
+	var value := args.substr(comma_at + 1)
+	var close_at := value.find(")")
+	if close_at >= 0:
+		value = value.substr(0, close_at)
+	value = value.strip_edges()
+	return value if value.is_valid_int() or value.is_valid_float() else ""
 
 
 # 빈 scope = 전 코드. 그 외에는 접두 일치.

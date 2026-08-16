@@ -26,6 +26,7 @@ func _init() -> void:
 	_not_configured_is_distinct()
 	_session_outgame_round_trip()
 	_session_service_round_trip()
+	_platform_adapter_wiring()
 	_clean_profiles()
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
@@ -542,3 +543,50 @@ func _session_service_round_trip() -> void:
 	var strict := RunSession.new()
 	strict.setup(data)
 	_ok("손상 서사 payload = 복원 실패", not strict.restore(corrupt))
+
+
+# ── 플랫폼 어댑터 배선 (D12 §2.2 · 총괄 판정 IMPL-128 ③ — Steam 널 배선) ──
+# 축 3종: ①합성 지점이 대장 7종을 전부 채우는가 ②업적 발행이 어댑터에 도달하는가
+#        ③미연동 상태가 게임 내 판정을 바꾸지 않는가 (연동은 표기 축일 뿐이다)
+func _platform_adapter_wiring() -> void:
+	var data := GameData.new()
+	if not data.load_all():
+		_failures += 1
+		print("  [FAIL] data load")
+		return
+	var services := PlatformServices.create()
+	# 대장 7종 (D12 §2.2) — 하나라도 비면 그 어댑터를 무는 소비부가 런타임에 죽는다
+	_ok("어댑터 대장 7종 — 광고", services.ad_service != null)
+	_ok("어댑터 대장 7종 — 클라우드 세이브", services.cloud_save != null)
+	_ok("어댑터 대장 7종 — 업적", services.achievement != null)
+	_ok("어댑터 대장 7종 — 프레즌스", services.presence != null)
+	_ok("어댑터 대장 7종 — 수명주기", services.lifecycle != null)
+	_ok("어댑터 대장 7종 — 햅틱", services.haptics != null)
+	_ok("어댑터 대장 7종 — 디스플레이", services.display != null)
+	# 미연동이 현 단계의 정상 상태다 — 스텁이 true 를 반환하면 화면이 거짓 표기를 한다
+	_ok("Steam 업적 = 미연동 (실 SDK 결선 전 구속)", not services.achievement.is_linked())
+
+	var session := RunSession.new()
+	session.setup(data, services)
+	session.begin_career(2)
+	_ok("세션이 미연동을 그대로 전달", not session.achievement_service_linked())
+	# 발행 경로 — 판정은 코어가 하고 세션은 넘기기만 한다
+	session.newly_achieved = ["achievement_first_gp_win"]
+	session._publish_achievements()
+	_ok("업적이 어댑터에 도달", services.achievement.is_unlocked("achievement_first_gp_win"))
+	# 재발행은 이력을 부풀리지 않는다 (소급 발행 근거가 중복으로 오염되면 안 된다)
+	session._publish_achievements()
+	var desktop_achievement := services.achievement as DesktopAchievement
+	_ok("중복 발행 억제", desktop_achievement.published.size() == 1,
+		str(desktop_achievement.published))
+	# 플랫폼 미주입도 정상 상태 — 헤드리스 테스트·TL-5 러너는 어댑터 없이 돈다
+	var headless := RunSession.new()
+	headless.setup(data)
+	headless.begin_career(2)
+	headless.newly_achieved = ["achievement_first_gp_win"]
+	headless._publish_achievements()
+	_ok("플랫폼 미주입 = 무발행·무오류", not headless.achievement_service_linked())
+	# **연동 상태가 게임 내 달성을 바꾸지 않는다** — 어댑터가 판정에 관여할 경로가 없음의 확인
+	headless.outgame.achievements["achievement_first_gp_win"] = 1
+	_ok("미연동에서도 게임 내 달성은 성립",
+		headless.outgame.achievements.has("achievement_first_gp_win"))

@@ -103,3 +103,16 @@ param_fx_duel_result_hold_sec,0.6
 param_duel_wall_threshold_add,6
 param_consumable_shield_mult,0.5
 param_jude_adjacent_max,2
+param_audio_default_volume,80
+param_audio_duck_db,-6
+param_audio_duck_return_sec,0.3
+param_audio_crossfade_sec,0.8
+param_sting_l1_sec,0.8
+param_sting_l2_sec,1.5
+param_sting_l3_sec,2.5
+param_haptic_damp_ratio,0.5
+param_haptic_l1_sec,0.1
+param_haptic_l2_sec,0.25
+param_cheer_retrigger_sec,4
+param_audio_virtual_channels,12
+param_audio_retrigger_gate_sec,0.05

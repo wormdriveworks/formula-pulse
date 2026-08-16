@@ -97,6 +97,7 @@ func _show_calendar() -> void:
 		var stage_id := String(calendar[index])
 		var stage: Dictionary = session.data.stages.get(stage_id, {})
 		var row := Label.new()
+		row.add_theme_font_size_override("font_size", _body_font_size)
 		var anchor := index == 0 or index == calendar.size() - 1
 		var row_key := "ui.vn.calendarAnchorFormat" if anchor else "ui.vn.calendarRowFormat"
 		var row_text := s.text(row_key, {

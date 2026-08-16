@@ -51,6 +51,11 @@ func _process(delta: float) -> bool:
 		print("WALK_TIMEOUT shots=%d last=%s" % [_shots, _seen])
 		_finish(1)
 		return true
+	# `_app == null`은 정상 상태가 아니다 — 초기화 중단이므로 예산 소진을 기다리지 않는다 (IMPL-146).
+	if _app == null:
+		printerr("WALK_FAIL 앱 인스턴스 부재 — 초기화 중단")
+		_finish(1)
+		return true
 
 	var screen := _current_screen()
 	if screen == null:

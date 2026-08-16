@@ -376,6 +376,20 @@
     "advance_on": "enum:spin,hold,respin,charge,confirm",
     "text_key": "string_key"
    }
+  },
+  "sound_map.csv": {
+   "id_prefix": "sound_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "event_id": "string",
+    "sfx_id": "string",
+    "channel": "enum:sfx,bgm,jingle",
+    "priority": "enum:P1,P2,P3",
+    "haptic": "enum:none,micro,weak,mid,strong",
+    "seal_gated": "int:0,1",
+    "retrigger_param": "string"
+   }
   }
  },
  "structures": {

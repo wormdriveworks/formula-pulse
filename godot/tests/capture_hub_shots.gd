@@ -22,6 +22,13 @@ const SHOTS := [
 	["hub01_garage_crewed", "res://ui/hub/garage_screen.tscn", true],
 ]
 
+# 하네스 탈출 예산 (IMPL-146 — 총괄 인계 ⑤).
+# `_initialize()`/`_next()`가 런타임 오류로 중단되면 `_process`는 아무 일도 못 하면서
+# false만 돌려주고, 헤드리스 프로세스가 그대로 상주한다(주력 실측 3.6시간).
+# `Engine.time_scale`에 영향받지 않는 **실시간**으로 재는 것이 요점 — delta는 스케일된다.
+const WATCHDOG_MSEC := 120000
+
+var _started_msec := 0
 var _out_dir := ""
 var _session: RunSession
 var _rich_session: RunSession
@@ -32,6 +39,7 @@ var _done := false
 
 
 func _initialize() -> void:
+	_started_msec = Time.get_ticks_msec()
 	var args := OS.get_cmdline_user_args()
 	if args.is_empty():
 		printerr("HUBSHOT_FAIL 출력 디렉토리 미지정")
@@ -79,8 +87,19 @@ func _next() -> void:
 
 
 func _process(_delta: float) -> bool:
-	if _done or _current == null:
-		return _done
+	if _done:
+		return true
+	if Time.get_ticks_msec() - _started_msec > WATCHDOG_MSEC:
+		printerr("HUBSHOT_FAIL 하네스 예산 초과 %dms (index=%d) — 무한 상주 차단"
+			% [WATCHDOG_MSEC, _index])
+		_finish(1)
+		return true
+	# **`_current == null`은 정상 상태가 아니다.** 여기 도달했다는 것은 `_initialize()` 나
+	# `_next()` 가 런타임 오류로 중단됐다는 뜻이다 — 종료 사유로 다룬다.
+	if _current == null:
+		printerr("HUBSHOT_FAIL 화면 인스턴스 부재 — 초기화/전환 중단 (index=%d)" % _index)
+		_finish(1)
+		return true
 	_settle += 1
 	if _settle < 5:
 		return false

@@ -30,6 +30,7 @@ func _on_bound(_payload: Dictionary) -> void:
 	for index in range(mini(STANDINGS_SHOWN, standings.size())):
 		var entrant_id := String(standings[index])
 		var row := Label.new()
+		row.add_theme_font_size_override("font_size", _body_font_size)
 		var row_text := s.text("ui.seasonResult.rowFormat", {
 			"rank": index + 1,
 			"name": _entrant_name(entrant_id),
@@ -83,4 +84,5 @@ func _entrant_name(entrant_id: String) -> String:
 
 func _on_next(player_position: int) -> void:
 	# 시즌 결산 직후 1회 전용 진입 (G-M2 물리 분리 — HUB-08의 유일한 진입 경로)
-	go("HUB-08", {"championship_rank": maxi(player_position, 1), "season_chain": true})
+	# 절상은 close_season() 원천 전속 (IMPL-142) — 화면은 받은 값을 그대로 전달한다.
+	go("HUB-08", {"championship_rank": player_position, "season_chain": true})

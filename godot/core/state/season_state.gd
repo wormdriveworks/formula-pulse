@@ -176,7 +176,7 @@ func apply_to_engine(engine: RaceEngine) -> void:
 #   · 투어 내 2~4전       = 직전 그랑프리 결과 기반
 # 개별 시작 보정은 엔진의 AI 정렬 소관이며 여기서는 **플레이어 기준 순위**만 낸다.
 func player_start_rank() -> int:
-	var grid_size := data.grid_int("filler_count") + data.grid_array("rivals").size() + 1
+	var grid_size := _grid_size()
 	if season <= 1 and tour_slot <= 1 and race_slot <= 1:
 		return grid_size   # 개막전 P16 고정 (D08 §3.5)
 	if race_slot > 1:
@@ -188,6 +188,12 @@ func player_start_rank() -> int:
 	if standing >= 0:
 		return clampi(standing + 1, 1, grid_size)
 	return grid_size
+
+
+# 그리드 규모 = 필러 + 네임드 라이벌 + 플레이어 (D08 §3.5 16대 그리드의 구조적 산출).
+# 순위 밖 절상값의 유일 출처 — 상수 기입 금지(불변규칙 2).
+func _grid_size() -> int:
+	return data.grid_int("filler_count") + data.grid_array("rivals").size() + 1
 
 
 func current_circuit_id() -> String:
@@ -364,7 +370,13 @@ func close_season() -> Dictionary:
 	var order := championship_standings()
 	var champion := String(order[0]) if not order.is_empty() else ""
 	champion_history.append(champion)
-	var player_position := order.find(PLAYER_ID) + 1
+	# 순위 밖(챔피언십 미등재) = **최하위 순위로 절상** — 총괄 판정 IMPL-141 ①.
+	# 근거 = D06 §5.3 G-M1 구속(성적 무관 최소 1슬롯 보장 · 시즌 완주 시 오버홀 발생 예외 없음):
+	# 0을 그대로 흘리면 등급 표(순위 1~16)에 걸리는 행이 없어 빈 추첨이 되고, 1로 절상하면
+	# 최상위 대우가 된다. 둘 다 정본 위반이므로 원천에서 최하위로 절상한다.
+	# **절상은 이 단일 지점 전속** — 하류(HUB-08 진입·결산 화면·통산 기록)는 받은 값을 그대로 쓴다.
+	var player_index := order.find(PLAYER_ID)
+	var player_position := player_index + 1 if player_index >= 0 else _grid_size()
 	# 그리드 레벨: 챔피언 달성 시즌의 **다음 시즌부터** +1, 실패해도 유지 (D13 별첨A §7.4)
 	if champion == PLAYER_ID:
 		grid_level += data.param_int("param_grid_level_step")

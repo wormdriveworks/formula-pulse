@@ -22,6 +22,7 @@ func _card(facility_id: String) -> Control:
 	row.add_theme_constant_override("separation", 8)
 
 	var name_label := Label.new()
+	name_label.add_theme_font_size_override("font_size", _body_font_size)
 	name_label.custom_minimum_size = Vector2(130, 0)
 	name_label.text = s.text(String(facility_row["name_key"]))
 	row.add_child(name_label)
@@ -34,6 +35,7 @@ func _card(facility_id: String) -> Control:
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	row.add_child(icon)
 	var cost_label := Label.new()
+	cost_label.add_theme_font_size_override("font_size", _body_font_size)
 	var cost_text := s.text("ui.hub.amountFormat", {
 		"amount": CsvTable.to_int(String(facility_row["cost_dp"])),
 	})
@@ -42,6 +44,7 @@ func _card(facility_id: String) -> Control:
 	row.add_child(cost_label)
 
 	var buy := Button.new()
+	buy.add_theme_font_size_override("font_size", _body_font_size)
 	buy.name = "Buy"
 	row.add_child(buy)
 	_refresh_buy(facility_id, buy)
@@ -77,7 +80,7 @@ func _on_buy(facility_id: String, buy: Button) -> void:
 	var cost_text := s.text("ui.hub.amountFormat", {
 		"amount": CsvTable.to_int(String(session.data.facilities[facility_id]["cost_dp"])),
 	})
-	var dialog := ConfirmDialog.ask(self, s, summary, cost_text, true)
+	var dialog := ConfirmDialog.ask(self, s, summary, cost_text, true, _body_font_size)
 	dialog.resolved.connect(func(accepted: bool):
 		if not accepted:
 			return

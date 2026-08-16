@@ -33,11 +33,13 @@ func _card(sponsor_id: String) -> Control:
 	row.add_theme_constant_override("separation", 8)
 
 	var name_label := Label.new()
+	name_label.add_theme_font_size_override("font_size", _body_font_size)
 	name_label.custom_minimum_size = Vector2(110, 0)
 	name_label.text = s.text(String(sponsor_row["name_key"]))
 	row.add_child(name_label)
 
 	var income := Label.new()
+	income.add_theme_font_size_override("font_size", _body_font_size)
 	var income_text := s.text("ui.sponsorDesk.incomeFormat", {
 		"regular": CsvTable.to_int(String(sponsor_row["regular_cr"])),
 		"bonus": CsvTable.to_int(String(sponsor_row["bonus_cr"])),
@@ -47,6 +49,7 @@ func _card(sponsor_id: String) -> Control:
 	row.add_child(income)
 
 	var sign := Button.new()
+	sign.add_theme_font_size_override("font_size", _body_font_size)
 	sign.name = "Sign"
 	row.add_child(sign)
 	_refresh_sign(sponsor_id, sign)
@@ -71,7 +74,7 @@ func _on_sign(sponsor_id: String, sign: Button) -> void:
 	var sponsor_name := s.text(String(session.data.sponsors[sponsor_id]["name_key"]))
 	var summary := s.text("ui.sponsorDesk.signConfirm", {"sponsor": sponsor_name})
 	# 계약 체결 = 기간 구속이 걸리는 비가역 행동 → COM-01 (D09 §4.6 "체결·갱신 = COM-01")
-	var dialog := ConfirmDialog.ask(self, s, summary, "", true)
+	var dialog := ConfirmDialog.ask(self, s, summary, "", true, _body_font_size)
 	dialog.resolved.connect(func(accepted: bool):
 		if not accepted:
 			return

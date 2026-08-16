@@ -16,6 +16,10 @@ extends SceneTree
 const SCENE_PATH := "res://ui/race/race_screen.tscn"
 const SPIN_ROUNDS := 24
 const TIME_SCALE := 5.0
+# 하네스 탈출 예산 (IMPL-146 — 총괄 인계 ⑤). 이 스위트는 CI 게이트 안에서 돌기 때문에
+# 여기서 상주하면 게이트 자체가 멈춘다(LFS 미설치 머신의 에셋 포인터 체크아웃 등 —
+# IMPL-091 실측). `Engine.time_scale` 무관한 **실시간**으로 잰다 — delta는 스케일된다.
+const WATCHDOG_MSEC := 180000
 
 var _screen: Control
 var _data: GameData
@@ -29,9 +33,11 @@ var _pre_spin_surface: Dictionary = {}
 var _phase := "idle"
 var _settle := 0.0
 var _done := false
+var _started_msec := 0
 
 
 func _initialize() -> void:
+	_started_msec = Time.get_ticks_msec()
 	Engine.time_scale = TIME_SCALE
 	_data = GameData.new()
 	_data.load_all()
@@ -46,6 +52,16 @@ func _initialize() -> void:
 
 func _process(delta: float) -> bool:
 	if _done:
+		return true
+	if Time.get_ticks_msec() - _started_msec > WATCHDOG_MSEC:
+		_fail("하네스 예산 초과 %dms — 무한 상주 차단 (round=%d phase=%s)"
+			% [WATCHDOG_MSEC, _round, _phase])
+		_report()
+		return true
+	# **`_screen == null`은 정상 상태가 아니다** — 인스턴스화가 중단됐다는 뜻이므로 종료한다.
+	if _screen == null:
+		_fail("화면 인스턴스 부재 — 초기화 중단")
+		_report()
 		return true
 	match _phase:
 		"idle":

@@ -24,6 +24,7 @@ func _build_skill_list() -> void:
 	# 스킬 티어별 그룹 (1~3) — 티어 개방 상태 표기 (마일스톤 연동)
 	for tier in range(1, 4):
 		var header := Label.new()
+		header.add_theme_font_size_override("font_size", _head_font_size)
 		header.name = "TierHeader%d" % tier
 		# '스킬 티어' 완칭 (T-1) — 부분 문자열 치환 금지 대상이므로 키 단위로 발행돼 있다
 		var tier_text := s.text("ui.strategy.tierFormat", {"tier": tier})
@@ -57,17 +58,20 @@ func _skill_row(skill_id: String) -> Control:
 	var skill_row: Dictionary = session.data.skills[skill_id]
 
 	var name_label := Label.new()
+	name_label.add_theme_font_size_override("font_size", _body_font_size)
 	name_label.custom_minimum_size = Vector2(110, 0)
 	name_label.text = s.text(String(skill_row["name_key"]))
 	row.add_child(name_label)
 
 	var cost := Label.new()
+	cost.add_theme_font_size_override("font_size", _body_font_size)
 	var cost_text := s.text("ui.race.costFormat", {"cost": CsvTable.to_int(String(skill_row["charge_cost"]))})
 	cost.text = cost_text
 	cost.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
 	row.add_child(cost)
 
 	var action := Button.new()
+	action.add_theme_font_size_override("font_size", _body_font_size)
 	action.name = "Action"
 	row.add_child(action)
 	_refresh_skill_row(skill_id, row)
@@ -105,7 +109,7 @@ func _on_unlock(skill_id: String, row: Control) -> void:
 	var summary := s.text("ui.strategy.unlockConfirm", {"skill": skill_name})
 	var cost_text := s.text("ui.strategy.unlockFormat", {"amount": unlock_dp})
 	# 스킬 해금 = 비가역 (D09 §1.4 명시 예) → COM-01
-	var dialog := ConfirmDialog.ask(self, s, summary, cost_text, true)
+	var dialog := ConfirmDialog.ask(self, s, summary, cost_text, true, _body_font_size)
 	dialog.resolved.connect(func(accepted: bool):
 		if not accepted:
 			return
@@ -137,6 +141,7 @@ func _refresh_deck() -> void:
 	})
 	for skill_id in session.outgame.deck:
 		var entry := Label.new()
+		entry.add_theme_font_size_override("font_size", _body_font_size)
 		entry.text = s.text(String(session.data.skills[skill_id]["name_key"]))
 		deck_box.add_child(entry)
 	var expand := %ExpandButton as Button

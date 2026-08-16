@@ -10,10 +10,15 @@ extends Control
 signal resolved(accepted: bool)
 
 var _strings: StringTable
+# 코드로 만든 Control 은 프로젝트 기본 폰트를 상속하지 않고 엔진 기본 16 으로 해석된다(실측).
+# 640×360 캔버스에서 16 은 레이아웃을 깨뜨리므로 본문 계열 값을 데이터 창구에서 받아 명시 적용한다
+# (불변규칙 2 — 코드 기입 금지 · FONT 정적 검사 대상 · IMPL-147).
+var _body_font_size := 9
 
 
-func _init(strings: StringTable, summary: String, cost_text: String, irreversible: bool) -> void:
+func _init(strings: StringTable, summary: String, cost_text: String, irreversible: bool, body_font_size: int) -> void:
 	_strings = strings
+	_body_font_size = body_font_size
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	# 배후 감광 + 입력 차단 (모달)
 	var dim := ColorRect.new()
@@ -40,18 +45,21 @@ func _init(strings: StringTable, summary: String, cost_text: String, irreversibl
 
 	var summary_label := Label.new()
 	summary_label.text = summary
+	summary_label.add_theme_font_size_override("font_size", _body_font_size)
 	summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(summary_label)
 
 	if not cost_text.is_empty():
 		var cost_label := Label.new()
 		cost_label.text = cost_text
+		cost_label.add_theme_font_size_override("font_size", _body_font_size)
 		cost_label.add_theme_color_override("font_color", UiPalette.CURRENCY_CREDIT)
 		column.add_child(cost_label)
 
 	if irreversible:
 		var warn := Label.new()
 		warn.text = _strings.text("ui.confirm.irreversible")
+		warn.add_theme_font_size_override("font_size", _body_font_size)
 		warn.add_theme_color_override("font_color", UiPalette.TIMER_IMMINENT)
 		column.add_child(warn)
 
@@ -63,12 +71,14 @@ func _init(strings: StringTable, summary: String, cost_text: String, irreversibl
 	var cancel := Button.new()
 	cancel.name = "CancelButton"
 	cancel.text = _strings.text("ui.confirm.cancel")
+	cancel.add_theme_font_size_override("font_size", _body_font_size)
 	cancel.pressed.connect(_finish.bind(false))
 	buttons.add_child(cancel)
 
 	var ok := Button.new()
 	ok.name = "OkButton"
 	ok.text = _strings.text("ui.confirm.ok")
+	ok.add_theme_font_size_override("font_size", _body_font_size)
 	ok.pressed.connect(_finish.bind(true))
 	buttons.add_child(ok)
 
@@ -81,7 +91,7 @@ func _finish(accepted: bool) -> void:
 
 
 # 호출 편의 — 부모에 붙이고 결과 시그널을 돌려준다.
-static func ask(host: Control, strings: StringTable, summary: String, cost_text: String, irreversible: bool) -> ConfirmDialog:
-	var dialog := ConfirmDialog.new(strings, summary, cost_text, irreversible)
+static func ask(host: Control, strings: StringTable, summary: String, cost_text: String, irreversible: bool, body_font_size: int) -> ConfirmDialog:
+	var dialog := ConfirmDialog.new(strings, summary, cost_text, irreversible, body_font_size)
 	host.add_child(dialog)
 	return dialog

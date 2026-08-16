@@ -42,7 +42,8 @@ func _ready() -> void:
 		push_error("AppRoot: game data failed to load")
 		return
 	session = RunSession.new()
-	session.setup(data)
+	# 합성 지점 — 라우터도 구현체 이름을 모른다. 플랫폼 선택은 `PlatformServices.create()` 전속.
+	session.setup(data, PlatformServices.create())
 	_show(ENTRY_SCREEN, {})
 
 

@@ -43,6 +43,10 @@ var settlement_rewards: Dictionary = {}  # reward_* id -> 행 (D13 별첨A §3.2
 var vn_slots: Dictionary = {}          # vnslot_* id -> 행 (D08 §8.4)
 var vane_lines: Dictionary = {}        # vane_* id -> 행 (D12 §5.7 — stage 필드)
 var milestone_vn: Dictionary = {}      # mvn_* id -> 행 (형식 A 전이 매핑)
+# 이벤트-사운드 매핑 (D12 §5.10 · D11 §8.1) — **한 이벤트에 여러 사운드가 걸린다**
+# (GP_FINISH = SE-U19 + AMB-03 등). 그래서 값이 행이 아니라 행의 배열이다.
+var sound_map: Dictionary = {}         # event_id -> Array[행] (sound_* 행)
+var sound_rows: Dictionary = {}        # sound_* id -> 행 (전수 대조·역참조용)
 var event_categories: Dictionary = {}  # category_* id -> 행 (배분·보상 범위)
 var event_variants: Dictionary = {}    # event id -> 변형 배열 (조건 DSL 포함)
 var presentation_triggers: Dictionary = {} # trigger_* id -> 행 (등급 후보·우선순위)
@@ -79,6 +83,7 @@ func load_all() -> bool:
 	_load_events()
 	_load_outgame()
 	_load_narrative()
+	_load_sound_map()
 	_load_content()
 	grid = _load_json(STRUCTURES_DIR + "grid_debug.json")
 	season_calendar = _load_json(STRUCTURES_DIR + "season_calendar.json")
@@ -417,6 +422,28 @@ func _load_narrative() -> void:
 		milestone_vn[String(row["id"])] = row
 	if vn_slots.is_empty() or vane_lines.is_empty() or milestone_vn.is_empty():
 		_load_ok = false
+
+
+# 이벤트-사운드 매핑 적재 (D12 §5.10 — DoD #16).
+# **사운드는 이 표 경유로만 발화한다**(D11 §1.4 이벤트 결속 원칙의 구조 보장) — 코드가 SFX id를
+# 직접 들고 재생하는 경로를 두지 않는다. 그래야 씬 컷 전용 SFX가 구조적으로 생겨날 수 없다(C-A2).
+func _load_sound_map() -> void:
+	sound_map.clear()
+	sound_rows.clear()
+	for row in CsvTable.load_rows(_table_path("sound_map.csv")):
+		var event_id := String(row["event_id"])
+		if not sound_map.has(event_id):
+			sound_map[event_id] = []
+		sound_map[event_id].append(row)
+		sound_rows[String(row["id"])] = row
+	if sound_map.is_empty():
+		_load_ok = false
+
+
+# 이벤트에 걸린 사운드 행 — **미등재는 오류가 아니다**(무음이 정상인 이벤트가 있다:
+# 저장 인디케이터 무음 U-a · 상태 컷 무음 원칙 §2.8). 커버리지 판정은 검사기·V2 소관이다.
+func sounds_for(event_id: String) -> Array:
+	return sound_map.get(event_id, [])
 
 
 func vn_slot(slot_id: String) -> Dictionary:

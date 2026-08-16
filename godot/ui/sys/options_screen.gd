@@ -12,10 +12,6 @@ signal closed
 var _return_route := "SYS-01"
 var _overlay_mode := false
 var _tab_panels: Array = []
-# 코드로 만든 Control 은 프로젝트 기본 폰트 크기를 상속하지 않고 **엔진 기본 테마의 16** 으로
-# 해석된다(실측 — IMPL-125). 씬에 놓인 노드만 9 가 먹어 탭·행이 16 으로 서 있었다.
-# 본문 계열 9 = D10 §5.7 확정단이므로 데이터 창구에서 읽어 명시 적용한다(불변규칙 2).
-var _body_font_size := 9
 
 
 func open_as_overlay(run_session: RunSession) -> void:
@@ -26,7 +22,6 @@ func open_as_overlay(run_session: RunSession) -> void:
 func _on_bound(payload: Dictionary) -> void:
 	var s := session.data.strings
 	_return_route = String(payload.get("return", "SYS-01"))
-	_body_font_size = int(session.data.param("param_font_size_body"))
 	(%HeaderLabel as Label).text = s.text("ui.options.header")
 	var reset := %ResetButton as Button
 	reset.text = s.text("ui.options.resetDefaults")

@@ -224,6 +224,24 @@ func _season_close_and_grid_level() -> void:
 		str(result3["grid_level_next"]))
 	_ok("챔피언 실패 = 에필로그 아님", not bool(result3["epilogue"]))
 	_ok("연속 기록 초기화", String(result3["champion"]) != SeasonState.PLAYER_ID)
+	# ── 순위 밖 절상 (총괄 판정 IMPL-141 ① · 집행 IMPL-142) ──
+	# 플레이어가 챔피언십 순위표에 없는 시즌(전 GP 미기록·이상 종료)에도 D06 §5.3 G-M1은
+	# "성적 무관 최소 1슬롯"을 보장한다. 0을 흘리면 등급 표에 걸리는 행이 없어 빈 추첨이 된다.
+	var outsider := _new_state(43)
+	if outsider == null:
+		return
+	outsider.begin_season(1)
+	var out_result := outsider.close_season()
+	var grid_size := outsider.data.grid_int("filler_count") \
+		+ outsider.data.grid_array("rivals").size() + 1
+	_ok("순위 밖 플레이어는 순위표에 없다",
+		not outsider.championship_standings().has(SeasonState.PLAYER_ID))
+	_ok("순위 밖 → 0이 아니다 (0 오염 차단)", int(out_result["player_position"]) != 0,
+		str(out_result["player_position"]))
+	_ok("순위 밖 → 1이 아니다 (최상위 대우 차단)", int(out_result["player_position"]) != 1,
+		str(out_result["player_position"]))
+	_ok("순위 밖 → 최하위 순위로 절상", int(out_result["player_position"]) == grid_size,
+		"actual=%d grid=%d" % [int(out_result["player_position"]), grid_size])
 
 
 # ── 조기 확정 (D08 §5.5): 공표만 하고 시즌은 계속된다 ──

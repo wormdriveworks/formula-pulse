@@ -62,7 +62,7 @@ func _refresh_consumables() -> void:
 		var row: Dictionary = session.data.consumables[id]
 		var cost := CsvTable.to_int(String(row["cost_cr"]))
 		var button := Button.new()
-		button.add_theme_font_size_override("font_size", 9)
+		button.add_theme_font_size_override("font_size", _body_font_size)
 		button.text = s.text("ui.recap.consumableBuyFormat", {
 			"item": s.text(String(row["name_key"])), "amount": cost,
 		})
@@ -97,7 +97,7 @@ func _refresh_deck() -> void:
 		child.queue_free()
 	if outgame.unlocked_skills.is_empty():
 		var empty := Label.new()
-		empty.add_theme_font_size_override("font_size", 9)
+		empty.add_theme_font_size_override("font_size", _body_font_size)
 		empty.text = s.text("ui.recap.deckNoSkill")
 		_deck_list.add_child(empty)
 		return
@@ -105,7 +105,7 @@ func _refresh_deck() -> void:
 		var equipped := outgame.deck.has(skill_id)
 		var mark := s.text("ui.recap.deckEquipped" if equipped else "ui.recap.deckUnequipped")
 		var button := Button.new()
-		button.add_theme_font_size_override("font_size", 9)
+		button.add_theme_font_size_override("font_size", _body_font_size)
 		button.text = s.text("ui.recap.deckEntryFormat", {
 			"mark": mark, "skill": s.text(String(session.data.skills[skill_id]["name_key"])),
 		})

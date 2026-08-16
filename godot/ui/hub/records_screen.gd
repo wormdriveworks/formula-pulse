@@ -43,6 +43,7 @@ func _fill_rivals() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		var name_label := Label.new()
+		name_label.add_theme_font_size_override("font_size", _body_font_size)
 		name_label.custom_minimum_size = Vector2(110, 0)
 		name_label.text = s.text(String(rival_row["name_key"]))
 		row.add_child(name_label)
@@ -51,6 +52,7 @@ func _fill_rivals() -> void:
 		if not axis.is_empty():
 			var stage := session.outgame.relation_stage(axis)
 			var stage_label := Label.new()
+			stage_label.add_theme_font_size_override("font_size", _body_font_size)
 			var relation_text := s.text("ui.records.relationFormat", {
 				"axis": s.text(String(session.data.relation_axes[axis]["name_key"])),
 				"stage": stage,
@@ -81,6 +83,7 @@ func _fill_career() -> void:
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	row.add_child(icon)
 	var total := Label.new()
+	total.add_theme_font_size_override("font_size", _body_font_size)
 	var total_text := s.text("ui.records.dpTotalFormat", {
 		"amount": session.outgame.drive_data_earned_total,
 	})
@@ -97,6 +100,7 @@ func _fill_archive() -> void:
 	var entries := session.narrative.archive_entries()
 	if entries.is_empty():
 		var empty := Label.new()
+		empty.add_theme_font_size_override("font_size", _body_font_size)
 		empty.text = s.text("ui.records.archiveEmpty")
 		empty.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
 		panel.add_child(empty)
@@ -105,10 +109,12 @@ func _fill_archive() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		var name_label := Label.new()
+		name_label.add_theme_font_size_override("font_size", _body_font_size)
 		name_label.text = _vn_title(String(vn_id))
 		name_label.custom_minimum_size = Vector2(140, 0)
 		row.add_child(name_label)
 		var replay := Button.new()
+		replay.add_theme_font_size_override("font_size", _body_font_size)
 		replay.text = s.text("ui.records.replay")
 		# 재생 모드 — 동일 화면 + 종료 시 아카이브 복귀 (§A-19). 전이 재발화 없음(멱등).
 		replay.pressed.connect(func(): go("NAR-01", {

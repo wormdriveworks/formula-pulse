@@ -26,10 +26,14 @@ var last_tour_report: Dictionary = {}
 var last_season_report: Dictionary = {}
 # 직전 경계에서 새로 달성된 업적 — 표시 층이 읽어 고지한다 (무보상 명예형이라 지급 없음)
 var newly_achieved: Array = []
+# 플랫폼 서비스 — **인터페이스 타입으로만 쥔다**(혼입 0). 합성은 `PlatformServices.create()`
+# 단일 지점이며, 미주입(null)도 정상 상태다: 헤드리스 테스트·러너는 플랫폼 없이 돈다.
+var platform: PlatformServices
 
 
-func setup(game_data: GameData) -> void:
+func setup(game_data: GameData, services: PlatformServices = null) -> void:
 	data = game_data
+	platform = services
 	SaveManager.configure(data)
 	options = OptionsStore.new()
 	options.setup(data)  # 기기별 구성 — 프로필·커리어와 무관하게 세션 개시 시 적재
@@ -144,10 +148,29 @@ func close_gp() -> void:
 	if not outgame.jude_overtaken and _player_ahead_of_jude():
 		outgame.jude_overtaken = true
 	newly_achieved = outgame.evaluate_achievements(season.season)
+	_publish_achievements()
 	outgame.chassis = engine.chassis  # 잔여 섀시 회수 — GP 밖 정본은 아웃게임 층 (D05 §8)
 	# R5 이월 회수 — 미사용분은 소멸하지 않는다 (D06 §3.5). 상한 가드는 구매 지점(K4) 전속:
 	# 사용은 수량을 늘리지 못하므로 회수분이 상한을 넘을 경로가 없다.
 	outgame.consumables = engine.consumables_held.duplicate()
+
+
+# 플랫폼 업적 발행 (D12 §2.2 IAchievement · 총괄 판정 IMPL-128 ③).
+# **판정은 코어가 끝냈고 여기서는 발행만 한다** — 어댑터가 판정에 관여할 경로를 두지 않는다
+# (연동 실패·미연동이 게임 내 달성 상태를 바꾸면 안 된다).
+# 미연동 스텁도 같은 호출을 받아 이력을 쌓아 둔다 — 실 SDK 결선 시 소급 발행의 근거가 된다.
+func _publish_achievements() -> void:
+	if platform == null or platform.achievement == null:
+		return
+	for achievement_id in newly_achieved:
+		platform.achievement.unlock(String(achievement_id))
+
+
+# SYS-04 '미연동' 표기의 조회 창구 — 화면은 어댑터도 플랫폼도 모른 채 이 값만 읽는다.
+func achievement_service_linked() -> bool:
+	if platform == null or platform.achievement == null:
+		return false
+	return platform.achievement.is_linked()
 
 
 func tour_has_remaining_gp() -> bool:
@@ -220,6 +243,7 @@ func close_tour() -> Dictionary:
 	last_tour_report = season.close_tour()
 	outgame.record_tour_result(last_tour_report)
 	newly_achieved = outgame.evaluate_achievements(season.season)
+	_publish_achievements()
 	if not season.season_finished():
 		# 다음 투어 개시 — 체증 카운터 리셋 + 무상 복원선 (D06 §3.3 · D13 별첨A §3.4 R2).
 		# 시즌 마지막 투어면 다음 투어가 없다 — 개시 처리는 begin_next_season()이 한다.
@@ -232,6 +256,7 @@ func close_season() -> Dictionary:
 	last_season_report = season.close_season()
 	outgame.record_season_result(last_season_report)
 	newly_achieved = outgame.evaluate_achievements(season.season)
+	_publish_achievements()
 	# 시즌 오버홀 후보 추첨 — 결산 직후 1회 (D06 §5.3). 결과는 아웃게임 층에 보존되어
 	# HUB-08 진입·재로드 어디서도 다시 추첨되지 않는다 (재로드 리롤 무효).
 	outgame.draw_overhaul_candidates(int(last_season_report.get("player_position", 16)), rng)

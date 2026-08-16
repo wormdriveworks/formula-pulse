@@ -29,11 +29,13 @@ TESTS=(
 	"tests/test_core_loop.gd:0"
 	"tests/test_save_reload.gd:0"
 	"tests/test_tc_c.gd:1997"
-	"tests/test_tc_p.gd:140"
+	"tests/test_tc_p.gd:153"
 	"tests/test_events.gd:7039"
-	"tests/test_season.gd:488"
-	"tests/test_tc_o.gd:382"
+	"tests/test_season.gd:492"
+	"tests/test_tc_o.gd:386"
 	"tests/test_narrative.gd:68"
+	# AUDIO — 오디오 디스패처 정책 4종(봉인·게이트·채널 상한·P1 보호) + 표 전수 대조.
+	"tests/test_audio.gd:350"
 	"tests/test_data_driven.gd:55"
 	# SEAL-E — 실화면을 인스턴스화해 릴 정지 연출 전 UI 노출을 잡는다.
 	# 라운드 수가 GP 길이(12~15턴 + 듀얼 삽입)에 따라 달라지므로 하한은 최소 GP 기준이다.

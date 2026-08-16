@@ -64,6 +64,7 @@ func _candidate(overhaul_id: String) -> Control:
 	row.name = overhaul_id.to_pascal_case()
 	row.add_theme_constant_override("separation", 8)
 	var pick := Button.new()
+	pick.add_theme_font_size_override("font_size", _body_font_size)
 	pick.name = "Pick"
 	pick.toggle_mode = true
 	pick.text = s.text(String(session.data.overhauls[overhaul_id]["name_key"]))
@@ -73,6 +74,7 @@ func _candidate(overhaul_id: String) -> Control:
 	if session.outgame.overhauls.has(overhaul_id):
 		pick.disabled = true
 		var owned := Label.new()
+		owned.add_theme_font_size_override("font_size", _body_font_size)
 		owned.text = s.text("ui.facilityPanel.owned")
 		owned.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
 		row.add_child(owned)
@@ -96,7 +98,7 @@ func _on_confirm() -> void:
 	var overhaul_name := s.text(String(session.data.overhauls[_selected]["name_key"]))
 	var summary := s.text("ui.overhaulScreen.installConfirm", {"overhaul": overhaul_name})
 	# 확정 전 취소·재검토 자유, 확정은 비가역 (§A-18 ④)
-	var dialog := ConfirmDialog.ask(self, s, summary, "", true)
+	var dialog := ConfirmDialog.ask(self, s, summary, "", true, _body_font_size)
 	dialog.resolved.connect(func(accepted: bool):
 		if not accepted:
 			return

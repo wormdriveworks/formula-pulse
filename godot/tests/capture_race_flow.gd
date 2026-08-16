@@ -16,6 +16,9 @@ var _step := 0
 var _shots := 0
 var _done := false
 var _seeded := false
+# 하네스 탈출 예산 (IMPL-146) — `Engine.time_scale` 무관한 실시간으로 잰다.
+const WATCHDOG_MSEC := 120000
+var _started_msec := 0
 
 # [단계, 그 단계에 도달한 뒤 기다릴 초, 파일 접미사]
 var _plan: Array = [
@@ -35,6 +38,7 @@ var _plan: Array = [
 
 
 func _initialize() -> void:
+	_started_msec = Time.get_ticks_msec()
 	var args := OS.get_cmdline_user_args()
 	if args.is_empty():
 		printerr("CAPTURE_FAIL 출력 디렉토리 미지정")
@@ -71,6 +75,19 @@ func _seed_consumables() -> void:
 
 func _process(delta: float) -> bool:
 	if _done:
+		return true
+	if Time.get_ticks_msec() - _started_msec > WATCHDOG_MSEC:
+		printerr("CAPTURE_FAIL 하네스 예산 초과 %dms (step=%d) — 무한 상주 차단"
+			% [WATCHDOG_MSEC, _step])
+		_done = true
+		quit(1)
+		return true
+	# `_screen == null`은 정상 상태가 아니다 — 아래 `_screen.engine` 접근이 매 프레임
+	# 런타임 오류로 중단되면서 false만 돌려주는 좀비 상주가 된다 (IMPL-146).
+	if _screen == null:
+		printerr("CAPTURE_FAIL 화면 인스턴스 부재 — 초기화 중단")
+		_done = true
+		quit(1)
 		return true
 	if not _seeded and _screen.engine != null:
 		_seed_consumables()

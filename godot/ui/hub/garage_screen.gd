@@ -81,15 +81,18 @@ func _show_currency_onboarding() -> void:
 	column.add_theme_constant_override("separation", 4)
 	panel.add_child(column)
 	var title := Label.new()
+	title.add_theme_font_size_override("font_size", _head_font_size)
 	title.text = s.text("ui.tip.currencyTitle")
 	column.add_child(title)
 	var body := Label.new()
+	body.add_theme_font_size_override("font_size", _body_font_size)
 	body.text = s.text("ui.tip.currencyBody")
 	body.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.custom_minimum_size = Vector2(260, 0)
 	column.add_child(body)
 	var confirm := Button.new()
+	confirm.add_theme_font_size_override("font_size", _body_font_size)
 	confirm.text = s.text("ui.tip.dismiss")
 	confirm.pressed.connect(func():
 		session.options.mark_onboarding("currency")

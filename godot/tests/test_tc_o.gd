@@ -58,6 +58,11 @@ func _new_state() -> OutgameState:
 	return state
 
 
+# 그리드 규모 = 순위 밖 절상값 (SeasonState._grid_size()와 동일 구조 산출 — 상수 기입 금지)
+func _grid_size_of(state: OutgameState) -> int:
+	return state.data.grid_int("filler_count") + state.data.grid_array("rivals").size() + 1
+
+
 # ── D13 확정값 전사 (§3~§5·§7) ──
 func _d13_outgame_values() -> void:
 	var state := _new_state()
@@ -273,12 +278,14 @@ func _tc_o2_tuning_and_overhaul() -> void:
 	var low := state.overhaul_slots(12)
 	_ok("9위 이하 = 1슬롯 2후보 (G-M1 바닥 보장)",
 		int(low["slots"]) == 1 and int(low["candidates"]) == 2, str(low))
-	# **[보고 고정] 등급 표는 순위 1~16 전속** — D13 §7.1이 그 범위만 덮는다.
-	# `player_position`은 플레이어가 순위표에 없으면 0이 되는데(`order.find()+1`),
-	# `close_season()`은 그 0을 그대로 추첨에 넘기고 SET-02는 `maxi(...,1)`로 절상해 화면에 넘긴다
-	# — **두 소비부의 절상이 비대칭**이다. 순위 밖 플레이어에게 어느 등급을 줄지는 D06/D13
-	# 판단 사안이라 임의로 정하지 않고 이 검사로 경계만 못박는다 (IMPL-134 보고).
-	_ok("등급 표 = 순위 1~16 전속 (0은 행 없음)", state.overhaul_slots(0).is_empty())
+	# **순위 밖 = 최하위 등급** — 총괄 판정 IMPL-141 ① 집행 (IMPL-142).
+	# 절상은 `close_season()` 원천 전속이므로 등급 표 자체는 여전히 순위 1~16 전속이다.
+	# 이 두 검사가 짝을 이뤄 "표에 0 행이 없다 + 절상값이 최하위 등급을 문다"를 못박는다.
+	_ok("등급 표 = 순위 1~16 전속 (0 행 없음 — 절상은 원천 전속)",
+		state.overhaul_slots(0).is_empty())
+	var out_of_order := state.overhaul_slots(_grid_size_of(state))
+	_ok("순위 밖 절상값 → 최하위 등급 1슬롯·2후보 (G-M1 바닥 보장)",
+		int(out_of_order["slots"]) == 1 and int(out_of_order["candidates"]) == 2, str(out_of_order))
 	# 슬롯 초과 장착 거부
 	_ok("1슬롯 장착", state.install_overhaul("overhaul_ov_p1", 5))
 	_ok("1슬롯 초과 거부", not state.install_overhaul("overhaul_ov_p2", 5))
@@ -504,6 +511,19 @@ func _milestones_and_achievements() -> void:
 		"actual=%d" % stats.career_stat("no_intervention_wins"))
 	_ok("최종 랩 역전 우승 3 (진입 P4 → P1)", stats.career_stat("final_lap_comebacks") == 3,
 		"actual=%d" % stats.career_stat("final_lap_comebacks"))
+	# 최고 챔피언십 순위 — 0 오염 회귀 검사 (총괄 판정 IMPL-141 ① 부대 · IMPL-142).
+	# `best == 0 or position < best`는 0이 들어오면 0을 최고 기록으로 굳혀 이후 갱신을 막는다.
+	# 원천 절상(close_season)이 0을 차단하므로 여기서는 정상 입력의 갱신 방향만 못박는다.
+	var ranker := _new_state()
+	ranker.record_season_result({"player_position": 16, "champion": "ai_lorentz", "tour_wins": 0})
+	_ok("최고 순위 초기 기록 = 최하위 절상값", ranker.career_stat("best_championship_rank") == 16,
+		"actual=%d" % ranker.career_stat("best_championship_rank"))
+	ranker.record_season_result({"player_position": 4, "champion": "ai_lorentz", "tour_wins": 0})
+	_ok("더 좋은 순위로 갱신", ranker.career_stat("best_championship_rank") == 4,
+		"actual=%d" % ranker.career_stat("best_championship_rank"))
+	ranker.record_season_result({"player_position": 9, "champion": "ai_lorentz", "tour_wins": 0})
+	_ok("나쁜 순위는 최고 기록을 덮지 않는다", ranker.career_stat("best_championship_rank") == 4,
+		"actual=%d" % ranker.career_stat("best_championship_rank"))
 	# 같은 서킷 재우승은 제패 수를 늘리지 않는다 (전 서킷 제패 20의 성립 조건)
 	stats.record_gp_result({"player_rank": 1, "player_retired": false, "circuit_id": "circuit_mn1"})
 	_ok("동일 서킷 재우승 = 제패 누계 불변", stats.career_stat("circuits_won") == 3,

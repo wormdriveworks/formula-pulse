@@ -44,6 +44,7 @@ func _build_slots() -> void:
 func _card_for(profile: int) -> Button:
 	var s := session.data.strings
 	var button := Button.new()
+	button.add_theme_font_size_override("font_size", _body_font_size)
 	button.name = "Slot%d" % profile
 	button.custom_minimum_size = Vector2(170, 90)
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
