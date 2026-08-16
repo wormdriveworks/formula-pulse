@@ -95,6 +95,10 @@ C:\SDKs\godot\Godot_v4.7.1-stable_win64_console.exe  ← CLI 전용 (실측 검�
 & "C:\SDKs\godot\Godot_v4.7.1-stable_win64_console.exe" --headless --import
 ```
 
+> **⚠ `--headless --import`는 에디터가 켜져 있으면 죽는다 (2026-08-16 실측 — IMPL-137).** 헤드리스 임포트도 GDAI 애드온을 적재하는데, 에디터가 MCP 포트 3571을 이미 점유 중이면 충돌 후 **접근 위반(0xC0000005)으로 종료**되고 `.import`가 생성되지 않는다.
+> **대처 = 에디터를 끄지 말고 에디터에게 시킨다** — GDAI `execute_editor_script`로 `EditorInterface.get_resource_filesystem().scan()`을 1회 호출하면 신규 파일이 임포트된다. 3레인 병렬 상황에서 "에디터를 끄고 임포트"는 타 세션 작업을 끊는 조치라 쓸 수 없다.
+> 부수: **`.gpl` 등 Godot 임포터가 없는 확장자는 `.import`가 안 생기는 것이 정상**(누락으로 오인 말 것) · 니어리스트는 `project.godot`의 `default_texture_filter=0` 전역이라 파일별 오버라이드 불요.
+
 ### 작업 배분
 
 - **씬 구성·노드/UI 레이아웃·리소스 배치**를 여기서 한다(소유권).
