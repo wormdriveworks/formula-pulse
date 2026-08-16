@@ -28,15 +28,24 @@ func _on_hub_ready(payload: Dictionary) -> void:
 		"candidates": int(slots.get("candidates", 0)),
 	})
 	(%GradeLabel as Label).text = grade_text
-	var list := %CandidateList as VBoxContainer
-	# 후보 일람 — 전 후보 효과 열람 자유 (§A-18 ②). 골격: 전 오버홀 나열, 후보 추첨은
-	# 시즌 결산 층 결선 시 (추첨 스트림 소관 — 화면이 난수를 쓰지 않는다).
-	for overhaul_id in session.data.overhauls:
-		list.add_child(_candidate(String(overhaul_id)))
+	_rebuild_candidates()
 	var confirm := %ConfirmButton as Button
 	confirm.text = s.text("ui.overhaulScreen.confirm")
 	confirm.disabled = true
 	confirm.pressed.connect(_on_confirm)
+
+
+# 후보 일람 = 추첨 결과 (D06 §5.3 — 추첨은 세션 결산 층, 화면은 난수를 쓰지 않는다).
+# 후보 미추첨 상태(구세이브·개발 진입)는 전 오버홀 폴백 — 코어 가드도 같은 조건으로 관용한다.
+func _rebuild_candidates() -> void:
+	var list := %CandidateList as VBoxContainer
+	for child in list.get_children():
+		child.queue_free()
+	var shown: Array = session.outgame.overhaul_candidates
+	if shown.is_empty():
+		shown = session.data.overhauls.keys()
+	for overhaul_id in shown:
+		list.add_child(_candidate(String(overhaul_id)))
 
 
 func _candidate(overhaul_id: String) -> Control:
@@ -82,9 +91,28 @@ func _on_confirm() -> void:
 		if not accepted:
 			return
 		if session.outgame.install_overhaul(_selected, _rank):
+			# 상위권 = 슬롯 2 (D13 §7.1) — 잔여 슬롯과 고를 후보가 남으면 화면에 머문다.
+			# [가안] 잔여 슬롯은 후보 잔존 시 선택 필수 (포기 동선은 씬 개편 사안 — 주력 몫)
+			if _remaining_slots() > 0 and _has_selectable_candidate():
+				_selected = ""
+				(%ConfirmButton as Button).disabled = true
+				_rebuild_candidates()
+				return
 			# 시즌 체인 경유(SET-02 → HUB-08)면 다음 시즌을 개막하고 개러지로.
 			# (시즌 엔딩 VN은 NAR-01 결선 시 이 사이에 삽입된다 — D09 §2.3)
 			if _season_chain:
 				session.begin_next_season()
 				session.save_progress()  # 시즌 경계 저장 지점 (D09 §2.4)
 			go("HUB-01", {}))
+
+
+func _remaining_slots() -> int:
+	var slots := session.outgame.overhaul_slots(_rank)
+	return int(slots.get("slots", 0)) - session.outgame.overhaul_installs_this_season
+
+
+func _has_selectable_candidate() -> bool:
+	for overhaul_id in session.outgame.overhaul_candidates:
+		if not session.outgame.overhauls.has(String(overhaul_id)):
+			return true
+	return false

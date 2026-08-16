@@ -124,6 +124,9 @@ func close_tour() -> Dictionary:
 # 시즌 결산 — 타이틀 판정·그리드 레벨은 코어가 한다 (D05 §9.4~§10)
 func close_season() -> Dictionary:
 	last_season_report = season.close_season()
+	# 시즌 오버홀 후보 추첨 — 결산 직후 1회 (D06 §5.3). 결과는 아웃게임 층에 보존되어
+	# HUB-08 진입·재로드 어디서도 다시 추첨되지 않는다 (재로드 리롤 무효).
+	outgame.draw_overhaul_candidates(int(last_season_report.get("player_position", 16)), rng)
 	return last_season_report
 
 

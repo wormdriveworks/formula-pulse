@@ -12,6 +12,7 @@ func _init() -> void:
 	_d13_outgame_values()
 	_tc_o1_facilities()
 	_tc_o2_tuning_and_overhaul()
+	_overhaul_candidate_draw()
 	_tc_o3_sponsors()
 	_tc_o5_archive()
 	_tc_o6_exchange_guards()
@@ -22,8 +23,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 245:
-		print("TC_O_TEST_FAIL checks=%d < 하한 245 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 282:
+		print("TC_O_TEST_FAIL checks=%d < 하한 282 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -290,6 +291,82 @@ func _tc_o2_tuning_and_overhaul() -> void:
 		"actual=%d" % restore_state.free_restore_line())
 
 
+# ── 시즌 오버홀 후보 추첨 (D06 §5.3 · D13 §7.1 — T3 결선) ──
+# 추첨 스트림 = reserve [가안 — D12 §6.1 예비 스트림의 첫 소비처] · 결과는 상태 보존 (재로드 리롤 무효).
+func _overhaul_candidate_draw() -> void:
+	var state := _new_state()
+	if state == null:
+		return
+	var rng := RngService.new()
+	rng.setup(777)
+	# 등급별 후보 수 (D13 §7.1): 1~3위 5종 / 4~8위 4종 / 9위↓ 2종 (G-M1 바닥 보장)
+	for spec in [[1, 5], [3, 5], [4, 4], [8, 4], [9, 2], [16, 2]]:
+		var drawn := state.draw_overhaul_candidates(int(Array(spec)[0]), rng)
+		_ok("D13 §7.1 순위 %d = 후보 %d종" % [Array(spec)[0], Array(spec)[1]],
+			drawn.size() == int(Array(spec)[1]), str(drawn))
+	# 중복 없음·전건 실재
+	var candidates := state.draw_overhaul_candidates(1, rng)
+	var seen: Dictionary = {}
+	for drawn_id in candidates:
+		seen[drawn_id] = true
+		_ok("후보 실재: %s" % drawn_id, not state.data.overhaul(String(drawn_id)).is_empty())
+	_ok("후보 중복 없음", seen.size() == candidates.size(), str(candidates))
+	# 기장착 제외 (풀 = 전 인스턴스 − 기장착 — D06 §5.3 재등장 규칙의 여집합)
+	state.overhauls = ["overhaul_ov_p1", "overhaul_ov_p2"]
+	var filtered := state.draw_overhaul_candidates(1, rng)
+	_ok("기장착 제외", not filtered.has("overhaul_ov_p1") and not filtered.has("overhaul_ov_p2"),
+		str(filtered))
+	# 풀 고갈: 잔여 2종이면 후보 5 요청에도 2종, 전량 장착 = 후보 0 (G-M1은 '슬롯' 보장이지 후보 생성이 아니다)
+	state.overhauls = state.data.overhauls.keys().slice(0, 10)
+	_ok("풀 고갈 시 잔여분만", state.draw_overhaul_candidates(1, rng).size() == 2,
+		str(state.overhaul_candidates))
+	state.overhauls = state.data.overhauls.keys()
+	_ok("전량 장착 = 후보 0", state.draw_overhaul_candidates(1, rng).is_empty())
+	# 스트림 분리 (D12 §6.1) — 추첨은 reserve 전속: reel 무소비·reserve 소비
+	var probe := _new_state()
+	var rng2 := RngService.new()
+	rng2.setup(778)
+	var before: Dictionary = rng2.serialize()
+	probe.draw_overhaul_candidates(1, rng2)
+	var after: Dictionary = rng2.serialize()
+	_ok("추첨은 reel 스트림 무소비", str(before["streams"]["reel"]) == str(after["streams"]["reel"]))
+	_ok("추첨은 reserve 스트림 소비", str(before["streams"]["reserve"]) != str(after["streams"]["reserve"]))
+	# 후보 가드·슬롯 한도 = 결산 단위 (누적 장착으로 슬롯이 영구 소진되면 안 된다 — 회귀 가드)
+	var guarded := _new_state()
+	var rng3 := RngService.new()
+	rng3.setup(779)
+	var top_candidates := guarded.draw_overhaul_candidates(1, rng3)   # 슬롯 2 · 후보 5
+	var outside := ""
+	for overhaul_id in guarded.data.overhauls:
+		if not top_candidates.has(String(overhaul_id)):
+			outside = String(overhaul_id)
+			break
+	_ok("후보 밖 장착 거부", not guarded.install_overhaul(outside, 1), outside)
+	_ok("후보 장착 1/2", guarded.install_overhaul(String(top_candidates[0]), 1))
+	_ok("후보 장착 2/2", guarded.install_overhaul(String(top_candidates[1]), 1))
+	_ok("슬롯 소진 거부", not guarded.install_overhaul(String(top_candidates[2]), 1))
+	var next_candidates := guarded.draw_overhaul_candidates(5, rng3)   # 차기 결산: 슬롯 1 · 후보 4
+	_ok("차기 결산 재장착 가능 (슬롯 축 = 결산 단위)",
+		guarded.install_overhaul(String(next_candidates[0]), 5), str(next_candidates))
+	_ok("차기 결산 슬롯 1 소진", not guarded.install_overhaul(String(next_candidates[1]), 5))
+	_ok("누적 장착 3 성립", guarded.overhauls.size() == 3, str(guarded.overhauls))
+	# 직렬화 왕복 — 후보·결산 장착 수 보존 (보존이 없으면 재로드가 재추첨 창구가 된다)
+	var payload := guarded.serialize()
+	var restored := _new_state()
+	_ok("복원 성립", restored.restore(payload))
+	_ok("후보 보존", str(restored.overhaul_candidates) == str(guarded.overhaul_candidates),
+		str(restored.overhaul_candidates))
+	_ok("결산 장착 수 보존",
+		restored.overhaul_installs_this_season == guarded.overhaul_installs_this_season)
+	# 구세이브(필드 부재) — 복원 성립 + 후보 가드 비활성 (관용 경로)
+	payload.erase("overhaul_candidates")
+	payload.erase("overhaul_installs_this_season")
+	var legacy := _new_state()
+	_ok("구세이브 복원 성립", legacy.restore(payload))
+	_ok("구세이브 = 후보 빈 상태 (가드 비활성)", legacy.overhaul_candidates.is_empty(),
+		str(legacy.overhaul_candidates))
+
+
 # ── TC-O3 스폰서 계약 (D07 §5.4 · D13 별첨A §5.3) ──
 func _tc_o3_sponsors() -> void:
 	var state := _new_state()
@@ -353,7 +430,7 @@ func _tc_o6_exchange_guards() -> void:
 		# `event_chassis_recover` 는 D06 §3.4 이벤트 회복의 유일 진입로 (회당 상한 가드 내장).
 		"full_repair", "full_repair_cost", "free_restore_line", "event_chassis_recover",
 		"tuning_step", "tuning_cost", "buy_tuning", "tuning_refund_ratio", "redistribute_tuning",
-		"overhaul_slots", "install_overhaul", "parts_stat_bonus",
+		"overhaul_slots", "install_overhaul", "draw_overhaul_candidates", "parts_stat_bonus",
 		"skill_tier_open", "unlock_cost", "unlock_skill", "expand_deck", "set_deck",
 		"recruit_crew",
 		"sponsor_slots", "sponsor_candidate_count", "sign_sponsor", "settle_sponsors",

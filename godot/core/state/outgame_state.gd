@@ -20,6 +20,12 @@ var drive_data: int = 0
 var facilities: Dictionary = {}          # facility id -> true
 var tuning_steps: Dictionary = {}        # tuning id -> 단계 (0~5)
 var overhauls: Array = []                # 장착된 overhaul id
+# 시즌 오버홀 후보 추첨 (D06 §5.3 · D13 §7.1) — 결산 직후 1회 추첨 결과를 상태로 보존해
+# 재로드 리롤을 무효화한다 (D12 §6.2 취지 승계 — 스트림 저장만으로는 재추첨 자체를 못 막는다).
+var overhaul_candidates: Array = []
+# 이번 결산에서 장착한 수 — 슬롯 한도의 축은 결산 단위다 (누적 장착 수로 재면
+# 시즌 2+에서 슬롯이 영구 소진되는 오류 — 12종 풀은 여러 시즌에 걸쳐 소화된다)
+var overhaul_installs_this_season: int = 0
 var unlocked_skills: Dictionary = {}     # skill id -> true
 var deck: Array = []                     # 편성된 skill id
 var deck_slots: int = 0
@@ -241,13 +247,38 @@ func overhaul_slots(championship_rank: int) -> Dictionary:
 	return {}
 
 
+# 시즌 오버홀 후보 추첨 (D06 §5.3 · D13 §7.1~7.2) — 시즌 결산 직후 1회, 세션이 부른다.
+# 스트림 = reserve [가안 — D12 §6.1 예비 스트림의 첫 소비처. 릴·셔플·레조넌스와 채널 분리 유지].
+# 풀 = 전 인스턴스 − 기장착 (선택하지 않은 후보는 소멸하되 다음 시즌 풀에 재등장 — D06 §5.3).
+func draw_overhaul_candidates(championship_rank: int, rng: RngService) -> Array:
+	var slots := overhaul_slots(championship_rank)
+	overhaul_installs_this_season = 0
+	overhaul_candidates = []
+	if slots.is_empty():
+		return []
+	var pool: Array = []
+	for overhaul_id in data.overhauls:
+		if not overhauls.has(String(overhaul_id)):
+			pool.append(String(overhaul_id))
+	pool.sort()   # 추첨의 결정성 — 데이터 적재 순서 의존 제거
+	var count := mini(int(slots["candidates"]), pool.size())
+	for i in range(count):
+		overhaul_candidates.append(pool.pop_at(rng.stream("reserve").randi_range(0, pool.size() - 1)))
+	return overhaul_candidates.duplicate()
+
+
 func install_overhaul(overhaul_id: String, championship_rank: int) -> bool:
 	var slots := overhaul_slots(championship_rank)
-	if slots.is_empty() or overhauls.size() >= int(slots["slots"]):
+	if slots.is_empty() or overhaul_installs_this_season >= int(slots["slots"]):
 		return false
 	if data.overhaul(overhaul_id).is_empty() or overhauls.has(overhaul_id):
 		return false
+	# 선택은 제시된 후보에서만 (D06 §5.3). 후보 미추첨 상태(구세이브·개발 진입)는 통과 —
+	# 추첨이 돈 순간부터 가드가 선다.
+	if not overhaul_candidates.is_empty() and not overhaul_candidates.has(overhaul_id):
+		return false
 	overhauls.append(overhaul_id)
+	overhaul_installs_this_season += 1
 	return true
 
 
@@ -488,6 +519,8 @@ func serialize() -> Dictionary:
 		"drive_data_earned_total": drive_data_earned_total,
 		"facilities": facilities.duplicate(), "tuning_steps": tuning_steps.duplicate(),
 		"overhauls": overhauls.duplicate(), "unlocked_skills": unlocked_skills.duplicate(),
+		"overhaul_candidates": overhaul_candidates.duplicate(),
+		"overhaul_installs_this_season": overhaul_installs_this_season,
 		"deck": deck.duplicate(), "deck_slots": deck_slots,
 		"crew": crew.duplicate(), "sponsor_contracts": sponsor_contracts.duplicate(),
 		"relation_counters": relation_counters.duplicate(),
@@ -512,6 +545,9 @@ func restore(payload: Dictionary) -> bool:
 	facilities = payload["facilities"]
 	tuning_steps = payload["tuning_steps"]
 	overhauls = payload["overhauls"]
+	# 후보 추첨 도입(T3) 전 세이브에는 없다 — 빈 후보 = 가드 비활성(구세이브 관용)이 충실값
+	overhaul_candidates = payload.get("overhaul_candidates", [])
+	overhaul_installs_this_season = int(payload.get("overhaul_installs_this_season", 0))
 	unlocked_skills = payload["unlocked_skills"]
 	deck = payload["deck"]
 	deck_slots = int(payload["deck_slots"])

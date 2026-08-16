@@ -30,8 +30,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 137:
-		print("TC_P_TEST_FAIL checks=%d < 하한 137 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 138:
+		print("TC_P_TEST_FAIL checks=%d < 하한 138 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -476,6 +476,12 @@ func _session_outgame_round_trip() -> void:
 		int(session.outgame.consumables.get("consumable_p1", -1)) == 0
 		and int(session.outgame.consumables.get("consumable_p3", -1)) == 1,
 		str(session.outgame.consumables))
+	# 시즌 결산 → 오버홀 후보 추첨 결선 (D06 §5.3 — T3): 결산 직후 후보가 상태로 남아
+	# HUB-08 진입·재로드 어디서도 재추첨되지 않는다
+	session.season.championship_points = {"player": 30, "ai_lorentz": 20}
+	session.close_season()
+	_ok("결산 직후 후보 추첨 (1위 = 5종)", session.outgame.overhaul_candidates.size() == 5,
+		str(session.outgame.overhaul_candidates))
 	# 직렬화 왕복 — 아웃게임 층 포함
 	var payload := session.serialize()
 	var restored := RunSession.new()
