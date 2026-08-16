@@ -27,6 +27,13 @@ func _fill_common_bar() -> void:
 	var s := session.data.strings
 	(%CreditIcon as TextureRect).texture = load(ICON_DIR + "currency_credit.png")
 	(%DataIcon as TextureRect).texture = load(ICON_DIR + "currency_data.png")
+	# 재화 수치 = 대형·VN 계열 (D10 v1.1 §5.7 — 결정 #8). 아이콘 병기 상시 표기라
+	# 아이콘 대비 판독 균형이 요구되는 지점이다. 씬의 리터럴을 런타임에 덮는다 —
+	# 계열 값의 창구는 D13(param_font_size_head)이고 씬에 수치를 굳히지 않는다(불변규칙 2).
+	# **편입 범위 = 재화 2종 수치 한정.** ProgressLabel(시즌·투어·다음 일정)은 본문 계열 유지.
+	var head_size := int(session.data.param("param_font_size_head"))
+	(%CreditValue as Label).add_theme_font_size_override("font_size", head_size)
+	(%DataValue as Label).add_theme_font_size_override("font_size", head_size)
 	var credit_text := s.text("ui.hub.amountFormat", {"amount": session.outgame.credits})
 	var data_text := s.text("ui.hub.amountFormat", {"amount": session.outgame.drive_data})
 	(%CreditValue as Label).text = credit_text
