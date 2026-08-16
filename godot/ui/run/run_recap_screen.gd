@@ -12,8 +12,10 @@ extends FlowScreen
 @onready var _repair_cost: Label = %RepairCostValue
 @onready var _chassis_value: Label = %ChassisValue
 @onready var _chassis_gauge: GhostGauge = %ChassisGauge
-@onready var _consumable_button: Button = %ConsumableButton
-@onready var _deck_button: Button = %DeckButton
+@onready var _consumable_title: Label = %ConsumableTitle
+@onready var _consumable_list: HBoxContainer = %ConsumableList
+@onready var _deck_title: Label = %DeckTitle
+@onready var _deck_list: HBoxContainer = %DeckList
 @onready var _next_button: Button = %NextButton
 
 
@@ -30,8 +32,6 @@ func _on_bound(_payload: Dictionary) -> void:
 	})
 
 	_repair_button.text = s.text("ui.recap.fieldRepair")
-	_consumable_button.text = s.text("ui.recap.consumable")
-	_deck_button.text = s.text("ui.recap.deck")
 	_next_button.text = s.text("ui.recap.next")
 
 	_refresh_repair_cost()
@@ -40,11 +40,87 @@ func _on_bound(_payload: Dictionary) -> void:
 	# 필드 정비 — 섀시 이월 결선(IMPL-078 해소)으로 실행 개방. 회복량·복원선·비용은 코어 소관.
 	_repair_button.pressed.connect(_on_repair_pressed)
 	_refresh_repair_button()
-	# 덱·소모품은 소비 경로 결선 전 잠금 유지 — 선택 UI(씬)가 필요해 주력 레인 몫이다.
-	for locked in [_consumable_button, _deck_button]:
-		locked.disabled = true
-		locked.focus_mode = Control.FOCUS_NONE
+	_refresh_consumables()
+	_refresh_deck()
 	_next_button.grab_focus()  # 초기 포커스 = 주 버튼 (§A-9 E05)
+
+
+# ── E03 소모품 보충 (§A-9 — 인라인 구매·COM-01 불요 확정: 저액·가역) ──
+# 반입 상한·지불 판정은 전부 코어(buy_consumable)가 갖는다. 화면은 활성 표시만 맞춘다.
+func _refresh_consumables() -> void:
+	var s := session.data.strings
+	var outgame := session.outgame
+	var cap := session.data.param_int("param_consumable_carry_cap")
+	var held := 0
+	for id in outgame.consumables:
+		held += int(outgame.consumables[id])
+	_consumable_title.text = s.text("ui.recap.consumableHeaderFormat", {"held": held, "cap": cap})
+	for child in _consumable_list.get_children():
+		_consumable_list.remove_child(child)
+		child.queue_free()
+	for id in session.data.consumables:
+		var row: Dictionary = session.data.consumables[id]
+		var cost := CsvTable.to_int(String(row["cost_cr"]))
+		var button := Button.new()
+		button.add_theme_font_size_override("font_size", 9)
+		button.text = s.text("ui.recap.consumableBuyFormat", {
+			"item": s.text(String(row["name_key"])), "amount": cost,
+		})
+		button.disabled = held >= cap or outgame.credits < cost
+		button.focus_mode = Control.FOCUS_NONE if button.disabled else Control.FOCUS_ALL
+		button.pressed.connect(_on_buy_consumable.bind(String(id)))
+		_consumable_list.add_child(button)
+
+
+func _on_buy_consumable(consumable_id: String) -> void:
+	if not session.outgame.buy_consumable(consumable_id):
+		return  # 상한·잔액 거부는 코어 판정 — 화면은 상태를 바꾸지 않는다
+	var s := session.data.strings
+	(%CreditsValue as Label).text = s.text("ui.recap.creditsFormat", {
+		"amount": session.outgame.credits,
+	})
+	_refresh_consumables()
+	_refresh_repair_button()  # 잔액이 줄면 정비 지불 능력도 바뀐다
+
+
+# ── E04 덱 교체 (§A-9 — 인라인 요약 + 슬롯 교체, HUB-04 비전환) ──
+# 중복·슬롯 초과 거부는 코어(set_deck)가 한다 — HUB-04 전략실과 같은 경로를 쓴다.
+# **프리셋 전환(시설 G3)은 미결선** — 코어에 프리셋 상태·API가 없다 (impl_log 보고).
+func _refresh_deck() -> void:
+	var s := session.data.strings
+	var outgame := session.outgame
+	_deck_title.text = s.text("ui.recap.deckHeaderFormat", {
+		"used": outgame.deck.size(), "slots": outgame.deck_slots,
+	})
+	for child in _deck_list.get_children():
+		_deck_list.remove_child(child)
+		child.queue_free()
+	if outgame.unlocked_skills.is_empty():
+		var empty := Label.new()
+		empty.add_theme_font_size_override("font_size", 9)
+		empty.text = s.text("ui.recap.deckNoSkill")
+		_deck_list.add_child(empty)
+		return
+	for skill_id in outgame.unlocked_skills:
+		var equipped := outgame.deck.has(skill_id)
+		var mark := s.text("ui.recap.deckEquipped" if equipped else "ui.recap.deckUnequipped")
+		var button := Button.new()
+		button.add_theme_font_size_override("font_size", 9)
+		button.text = s.text("ui.recap.deckEntryFormat", {
+			"mark": mark, "skill": s.text(String(session.data.skills[skill_id]["name_key"])),
+		})
+		button.pressed.connect(_on_toggle_deck.bind(String(skill_id)))
+		_deck_list.add_child(button)
+
+
+func _on_toggle_deck(skill_id: String) -> void:
+	var next_deck: Array = session.outgame.deck.duplicate()
+	if next_deck.has(skill_id):
+		next_deck.erase(skill_id)
+	else:
+		next_deck.append(skill_id)
+	if session.outgame.set_deck(next_deck):
+		_refresh_deck()
 
 
 func _on_repair_pressed() -> void:

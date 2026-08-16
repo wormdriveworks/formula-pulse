@@ -88,15 +88,27 @@ custom_minimum_size = Vector2(180, 6)
 layout_mode = 2
 script = ExtResource("3_touc3")
 
-[node name="ConsumableButton" type="Button" parent="Pad/Column/Body/Cards" unique_id=1652482785]
+[node name="ConsumableTitle" type="Label" parent="Pad/Column/Body/Cards" unique_id=1652482785]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
 
-[node name="DeckButton" type="Button" parent="Pad/Column/Body/Cards" unique_id=290619130]
+[node name="ConsumableList" type="HBoxContainer" parent="Pad/Column/Body/Cards" unique_id=1652482786]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="DeckTitle" type="Label" parent="Pad/Column/Body/Cards" unique_id=290619130]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 9
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+
+[node name="DeckList" type="HBoxContainer" parent="Pad/Column/Body/Cards" unique_id=290619131]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 3
 
 [node name="Footer" type="HBoxContainer" parent="Pad/Column" unique_id=641279395]
 layout_mode = 2

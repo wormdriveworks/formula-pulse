@@ -247,8 +247,13 @@ ui.recap.header,간이 정산
 ui.recap.summaryFormat,직전 P{rank} · 투어 포인트 +{points}
 ui.recap.creditsFormat,{amount} Cr
 ui.recap.fieldRepair,필드 정비
-ui.recap.consumable,소모품 보충
-ui.recap.deck,덱 교체
+ui.recap.consumableHeaderFormat,소모품 보충 {held}/{cap}
+ui.recap.consumableBuyFormat,{item} {amount} Cr
+ui.recap.deckHeaderFormat,덱 교체 {used}/{slots}
+ui.recap.deckEntryFormat,{mark} {skill}
+ui.recap.deckEquipped,●
+ui.recap.deckUnequipped,○
+ui.recap.deckNoSkill,해금된 스킬 없음
 ui.recap.next,다음 대회로
 ui.recap.repairCostFormat,이번 {now} Cr → 다음 {next} Cr
 ui.recap.chassisFormat,섀시 {now}% → {after}%
