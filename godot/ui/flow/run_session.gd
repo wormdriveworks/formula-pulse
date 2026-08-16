@@ -91,6 +91,7 @@ func begin_gp() -> bool:
 	engine.setup(data, rng)
 	season.apply_to_engine(engine)
 	engine.chassis_carry_in = outgame.chassis  # GP 간 이월 (D05 §8 — 자동 완전 회복 없음)
+	engine.consumables_carry_in = outgame.consumables.duplicate()  # R5 반입 (D06 §3.5)
 	presentation.reset_gp()  # L2/L3 상한 카운터 = GP 단위 (D08 §8.5)
 	return true
 
@@ -102,6 +103,9 @@ func close_gp() -> void:
 	last_gp_result = engine.result.duplicate(true)
 	season.record_gp(engine.result)
 	outgame.chassis = engine.chassis  # 잔여 섀시 회수 — GP 밖 정본은 아웃게임 층 (D05 §8)
+	# R5 이월 회수 — 미사용분은 소멸하지 않는다 (D06 §3.5). 상한 가드는 구매 지점(K4) 전속:
+	# 사용은 수량을 늘리지 못하므로 회수분이 상한을 넘을 경로가 없다.
+	outgame.consumables = engine.consumables_held.duplicate()
 
 
 func tour_has_remaining_gp() -> bool:

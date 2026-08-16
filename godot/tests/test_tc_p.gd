@@ -30,8 +30,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 132:
-		print("TC_P_TEST_FAIL checks=%d < 하한 132 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 137:
+		print("TC_P_TEST_FAIL checks=%d < 하한 137 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -452,16 +452,30 @@ func _session_outgame_round_trip() -> void:
 	session.begin_career(1)
 	# GP 경계 결선: 이월 주입 → 개시 → 회수
 	session.outgame.chassis = 64.0
+	# 소모품 R5 반입/이월 (D06 §3.5 — T2 결선): 정본 = 아웃게임 층, 엔진은 대회 중 사본 소비
+	session.outgame.consumables = {"consumable_p1": 1, "consumable_p3": 1}
 	_ok("세션 GP 개시", session.begin_gp())
 	_ok("이월 주입 (세션→엔진)", session.engine.chassis_carry_in == 64.0,
 		"carry=%f" % session.engine.chassis_carry_in)
+	_ok("소모품 반입 (세션→엔진)",
+		session.engine.consumables_carry_in == {"consumable_p1": 1, "consumable_p3": 1},
+		str(session.engine.consumables_carry_in))
 	session.engine.start_gp()
 	_ok("이월 개시 섀시", session.engine.chassis == 64.0, "chassis=%f" % session.engine.chassis)
+	# 대회 중 P1 사용 → 미사용분(P3)만 이월된다 (R5 — 사용분 소모·잔여 보존)
+	session.engine.begin_turn()
+	session.engine.chassis = 42.0
+	var use_events: Array = session.engine.use_consumable("consumable_p1")
+	_ok("T1 사용 성립", use_events.size() == 1, str(use_events))
 	session.engine.chassis = 42.0
 	session.engine.result = {"standings": ["player"], "player_rank": 1, "tour_points": 10}
 	session.close_gp()
 	_ok("잔여 섀시 회수 (엔진→아웃게임)", session.outgame.chassis == 42.0,
 		"chassis=%f" % session.outgame.chassis)
+	_ok("소모품 이월 회수 (R5 — 사용분 소모·미사용분 보존)",
+		int(session.outgame.consumables.get("consumable_p1", -1)) == 0
+		and int(session.outgame.consumables.get("consumable_p3", -1)) == 1,
+		str(session.outgame.consumables))
 	# 직렬화 왕복 — 아웃게임 층 포함
 	var payload := session.serialize()
 	var restored := RunSession.new()

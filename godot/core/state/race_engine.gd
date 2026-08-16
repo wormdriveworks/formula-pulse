@@ -37,6 +37,13 @@ var chassis: float = 0.0
 # GP 간 이월 주입분 (D05 §8 — "그랑프리 간 자동 완전 회복은 없다"). 음수 = 미주입(최대치 개시).
 # 이월 값의 소유는 아웃게임 층이고 엔진은 주입된 값을 소비만 한다 — 세션이 start_gp 전에 넣는다.
 var chassis_carry_in: float = -1.0
+# 소모품 (D06 §3.5 · D07 §3.1) — 반입분(R5)은 세션이 start_gp 전에 주입하고 종료 시 회수한다.
+# 인벤토리 정본은 아웃게임 층(OutgameState.consumables)이고 엔진은 대회 중 사본만 소비한다.
+var consumables_carry_in: Dictionary = {}
+var consumables_held: Dictionary = {}
+# P2/P3 지속 효과 — "이번 대회" 한정 (D07 §3.1)이라 start_gp 에서 리셋된다.
+var trouble_shield_charges: int = 0    # P2: 다음 트러블 1회 섀시 소모 반감 — 사용 횟수만큼 적립 [가안]
+var wear_reduction: float = 0.0        # P3: 잔여 구간 섀시 소모 경감 비율 (D13 §3.6 = 0.20)
 var charge: int = 0
 var front_gauge: float = 0.0
 var rear_gauge: float = 0.0
@@ -107,6 +114,9 @@ func start_gp() -> Array:
 	else:
 		chassis = data.param("param_chassis_max")
 	charge = 0
+	consumables_held = consumables_carry_in.duplicate()
+	trouble_shield_charges = 0
+	wear_reduction = 0.0
 	front_gauge = 0.0
 	rear_gauge = 0.0
 	pending_duel = RaceTypes.DuelType.NONE
@@ -275,6 +285,38 @@ func begin_turn() -> Dictionary:
 	return info
 
 
+# ── 소모품 사용 (D06 §3.5 R-B · D07 §3.1 · D13 §3.6) ──
+# 사용 지점 = T1 섹터 개시 전속 — 개입 창(T4)을 침범하지 않아 D05 §5.4 확정 목록 불변.
+# 듀얼 턴의 T1은 "섹터 개시"가 아니므로 제외한다 (R-B 문면 준거 — impl_log).
+# 성공 = 로그 이벤트 반환 · 거부 = 빈 배열 + 상태 무변경 (효과는 회복·완화 전용 — R3).
+func use_consumable(consumable_id: String) -> Array:
+	if finished or current_turn_is_duel \
+		or turn_phase != RaceTypes.TurnPhase.T1_SECTOR_OPEN \
+		or gp_state != RaceTypes.GpState.SECTOR_TURN:
+		return []
+	if int(consumables_held.get(consumable_id, 0)) <= 0:
+		return []
+	if not data.consumables.has(consumable_id):
+		push_error("RaceEngine: unknown consumable '%s'" % consumable_id)
+		return []
+	var row: Dictionary = data.consumables[consumable_id]
+	var value := CsvTable.to_float(String(row["effect_value"]))
+	match String(row["effect"]):
+		"chassis_restore":
+			chassis = minf(chassis + value, data.param("param_chassis_max"))
+		"chassis_restore_and_shield":
+			chassis = minf(chassis + value, data.param("param_chassis_max"))
+			trouble_shield_charges += 1
+		"chassis_wear_ratio":
+			# 고정 계수라 누적하지 않는다 [가안] — 중복 사용은 허용하되 효과 동일 (UI 층이 안내)
+			wear_reduction = absf(value)
+		_:
+			push_error("RaceEngine: unknown consumable effect '%s'" % row["effect"])
+			return []
+	consumables_held[consumable_id] = int(consumables_held[consumable_id]) - 1
+	return [_ev("T1", "raceLog.consumableUse01", {"item": String(row["name_key"])})]
+
+
 # ── T2 스핀: reel 스트림 소비 = 스핀 커밋 시점 (D12 §6.2) ──
 func spin() -> void:
 	if turn_phase != RaceTypes.TurnPhase.T1_SECTOR_OPEN:
@@ -433,11 +475,18 @@ func _settle_sector(momentum: bool) -> Array:
 				# 위험 단계에 둔다: 트러블 유무와 무관한 속성 소모이고 단계 ①이 위험 소관이다.
 				var hazard_wear := _attr_rule_mult("chassis_wear_mult")
 				if hazard_wear > 1.0:
-					chassis -= data.param("param_chassis_hazard_per_turn")
+					# P3 쿨런트 차지: 잔여 구간 섀시 소모 경감 (D07 §3.1 · D13 §3.6 −20%)
+					chassis -= data.param("param_chassis_hazard_per_turn") * (1.0 - wear_reduction)
 				if trouble_count > 0:
 					trouble_fired = true
 					var effect := _match_effect(RaceTypes.SYMBOL_TROUBLE, trouble_count)
 					var chassis_delta := CsvTable.to_float(String(effect["chassis"])) * hazard_wear
+					if chassis_delta < 0.0 and trouble_shield_charges > 0:
+						# P2 이머전시 실런트: 다음 트러블 1회 섀시 소모 반감 (D13 §3.6 −50%)
+						trouble_shield_charges -= 1
+						chassis_delta *= data.param("param_consumable_shield_mult")
+					if chassis_delta < 0.0:
+						chassis_delta *= (1.0 - wear_reduction)
 					chassis += chassis_delta
 					rear_gauge += CsvTable.to_float(String(effect["rear_gauge"])) * gauge_mult
 					events.append(_ev("T5", "raceLog.troubleHit01", {"amount": chassis_delta}))
@@ -607,7 +656,9 @@ func _resolve_duel() -> Array:
 			events.append(_ev("T5", "raceLog.defendSuccess01", {"target": entrants[opponent_id]["name_key"]}))
 	else:
 		if duel_type == RaceTypes.DuelType.OVERTAKE:
-			var penalty := -data.param("param_chassis_duel_fail_penalty")
+			# P3 경감 대상 [가안]: 문면 "잔여 구간 섀시 소모"가 소모원을 한정하지 않아
+			# 인레이스 섀시 감소 전 경로(해저드·트러블·듀얼 실패)에 적용한다 — impl_log
+			var penalty := -data.param("param_chassis_duel_fail_penalty") * (1.0 - wear_reduction)
 			chassis += penalty
 			events.append(_ev("T5", "raceLog.duelLoseOvertake01", {"amount": penalty}))
 		else:
@@ -913,6 +964,9 @@ func serialize() -> Dictionary:
 		"entrants": entrants.duplicate(true),
 		"positions": positions.duplicate(),
 		"chassis": chassis, "charge": charge,
+		"consumables_held": consumables_held.duplicate(),
+		"trouble_shield_charges": trouble_shield_charges,
+		"wear_reduction": wear_reduction,
 		"front_gauge": front_gauge, "rear_gauge": rear_gauge,
 		"front_target": front_target, "rear_target": rear_target,
 		"provisional": provisional.duplicate(),
@@ -945,6 +999,10 @@ func restore(payload: Dictionary) -> bool:
 	positions = payload["positions"]
 	chassis = float(payload["chassis"])
 	charge = int(payload["charge"])
+	# 구스냅샷(키 부재) = 소모품 이전 세계 — 빈 인벤토리·무효과가 충실값 (IMPL-090 전례)
+	consumables_held = payload.get("consumables_held", {})
+	trouble_shield_charges = int(payload.get("trouble_shield_charges", 0))
+	wear_reduction = float(payload.get("wear_reduction", 0.0))
 	front_gauge = float(payload["front_gauge"])
 	rear_gauge = float(payload["rear_gauge"])
 	front_target = String(payload["front_target"])

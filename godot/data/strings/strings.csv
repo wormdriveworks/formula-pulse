@@ -524,3 +524,4 @@ ui.event.pdMediaDay,미디어 데이
 ui.event.pdLeagueGala,리그 갈라
 ui.event.pdCeremonyRehearsal,세리머니 리허설
 ui.event.pdPitWalk,피트 워크
+raceLog.consumableUse01,{item} 사용.

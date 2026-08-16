@@ -32,13 +32,14 @@ func _init() -> void:
 	_sector_attribute_weights()
 	_resonance_runtime()
 	_wall_rival_wired()
+	_consumable_paths()
 	_presentation_grade_caps()
 	_check_global_postconditions()
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 1850:
-		print("TC_C_TEST_FAIL checks=%d < 하한 1850 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 1900:
+		print("TC_C_TEST_FAIL checks=%d < 하한 1900 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -1335,6 +1336,150 @@ func _wall_rival_wired() -> void:
 	_ok("리타이어 표본 확보 (%d회 시행)" % trials, retired_others >= 5, "retired=%d" % retired_others)
 	_ok("D13 §6.2 벽 라이벌 리타이어 면제 (디아스·아주르)",
 		not bool(probe.entrants["ai_diaz"]["retired"]), str(probe.entrants["ai_diaz"]["retired"]))
+
+
+# ── 소모품 사용 경로 (D06 §3.5 · D07 §3.1 · D13 §3.6 — T2 결선) ──
+# 효과 = 회복·완화 전용 (R3) · 사용 지점 = T1 섹터 개시 전속 (R-B) · 반입/이월 = R5.
+func _consumable_paths() -> void:
+	var probe := _new_engine(404, "circuit_mn1")
+	if probe == null:
+		return
+	var data := probe.data
+	# D13 §3.6 전사 대조 — 단가·효과·값 (수치의 유일 창구 = D13)
+	var expected_items := {
+		"consumable_p1": ["chassis_restore", 250.0, 15.0],
+		"consumable_p2": ["chassis_restore_and_shield", 320.0, 8.0],
+		"consumable_p3": ["chassis_wear_ratio", 400.0, -0.20],
+	}
+	for item_id in expected_items:
+		var row: Dictionary = data.consumables.get(item_id, {})
+		var spec: Array = expected_items[item_id]
+		_ok("D13 §3.6 %s 효과 축" % item_id, String(row.get("effect", "")) == String(spec[0]),
+			str(row.get("effect")))
+		_eq_float("D13 §3.6 %s 단가" % item_id, CsvTable.to_float(String(row.get("cost_cr", "-1"))), float(spec[1]))
+		_eq_float("D13 §3.6 %s 효과값" % item_id, CsvTable.to_float(String(row.get("effect_value", "0"))), float(spec[2]))
+	_eq_float("D13 §3.6 P2 트러블 반감 계수 0.5", data.param("param_consumable_shield_mult"), 0.5)
+	# R4 프리미엄 검증 (D13 §3.6 문면: P1 16.7 Cr/CH vs 필드 정비 1회차 6.7 Cr/CH = 2.5배)
+	var p1_rate := 250.0 / 15.0
+	var repair_rate := data.param("param_repair_base_cr") / data.param("param_repair_field_cap")
+	_eq_float("D13 §3.6 R4 프리미엄 2.5배", p1_rate / repair_rate, 2.5, 0.01)
+	_eq_float("D06 §3.5 휴대 상한 2", data.param("param_consumable_carry_cap"), 2.0)
+	# P1: T1 사용 성공 — 회복·재고 감소·반입분 불변 (held 는 사본이다)
+	probe.consumables_carry_in = {"consumable_p1": 2, "consumable_p2": 2, "consumable_p3": 2}
+	probe.start_gp()
+	_flatten_neighbors(probe)
+	probe.begin_turn()
+	probe.chassis = 50.0
+	var used := probe.use_consumable("consumable_p1")
+	_ok("P1 사용 성공 = 로그 이벤트", used.size() == 1, str(used))
+	_eq_float("P1 회복 +15", probe.chassis, 65.0)
+	_ok("P1 재고 감소 2→1", int(probe.consumables_held["consumable_p1"]) == 1,
+		str(probe.consumables_held))
+	_ok("반입분(carry_in)은 소비되지 않는다", int(probe.consumables_carry_in["consumable_p1"]) == 2,
+		str(probe.consumables_carry_in))
+	# 최대치 절단
+	probe.chassis = data.param("param_chassis_max") - 5.0
+	probe.use_consumable("consumable_p1")
+	_eq_float("P1 회복 = 최대치 절단", probe.chassis, data.param("param_chassis_max"))
+	_ok("P1 재고 소진", int(probe.consumables_held["consumable_p1"]) == 0, str(probe.consumables_held))
+	_ok("재고 0 = 거부", probe.use_consumable("consumable_p1").is_empty())
+	# T1 밖 사용 거부 — 스핀 이후에는 상태 무변경으로 거부된다 (R-B)
+	probe.spin()
+	var before_chassis := probe.chassis
+	_ok("T1 밖 사용 거부", probe.use_consumable("consumable_p2").is_empty())
+	_eq_float("거부 시 섀시 무변경", probe.chassis, before_chassis)
+	_ok("거부 시 재고 무변경", int(probe.consumables_held["consumable_p2"]) == 2,
+		str(probe.consumables_held))
+	# P2: 다음 트러블 1회 반감 — 1회째 ×0.5, 2회째 정상 (지속 효과의 소진)
+	var trouble_hit := CsvTable.to_float(String(data.match_effects[RaceTypes.SYMBOL_TROUBLE][1]["chassis"]))
+	probe.provisional = _combo(RaceTypes.SYMBOL_LINE, 3, RaceTypes.SYMBOL_LINE)
+	probe.confirm(0.0)
+	probe.begin_turn()
+	probe.use_consumable("consumable_p2")
+	var after_restore := probe.chassis
+	probe.spin()
+	probe.provisional = _combo(RaceTypes.SYMBOL_TROUBLE, 1, RaceTypes.SYMBOL_LINE)
+	probe.confirm(0.0)
+	_eq_float("P2 트러블 1회째 = 반감 (mn1 s2 계수 1.0)", probe.chassis,
+		after_restore + trouble_hit * 0.5)
+	var after_first := probe.chassis
+	probe.begin_turn()
+	probe.spin()
+	probe.provisional = _combo(RaceTypes.SYMBOL_TROUBLE, 1, RaceTypes.SYMBOL_LINE)
+	probe.confirm(0.0)
+	_eq_float("P2 소진 후 트러블 2회째 = 정상 소모", probe.chassis, after_first + trouble_hit)
+	# P3: 잔여 구간 섀시 소모 −20% — 트러블·해저드 턴당 소모·듀얼 실패 페널티 3경로 [가안]
+	var reduced := _new_engine(405, "circuit_mn3")   # mn3 s2 = 해저드 (주속성)
+	var plain := _new_engine(405, "circuit_mn3")
+	for pair in [[reduced, true], [plain, false]]:
+		var engine2: RaceEngine = pair[0]
+		engine2.consumables_carry_in = {"consumable_p3": 1}
+		engine2.start_gp()
+		_flatten_neighbors(engine2)
+		engine2.begin_turn()   # s1
+		if bool(pair[1]):
+			engine2.use_consumable("consumable_p3")
+		engine2.spin()
+		engine2.provisional = _combo(RaceTypes.SYMBOL_LINE, 3, RaceTypes.SYMBOL_LINE)
+		engine2.confirm(0.0)
+		engine2.begin_turn()   # s2 = 해저드
+		engine2.chassis = 80.0
+		engine2.spin()
+		engine2.provisional = _combo(RaceTypes.SYMBOL_TROUBLE, 1, RaceTypes.SYMBOL_LINE)
+		engine2.confirm(0.0)
+	var hazard_per_turn := data.param("param_chassis_hazard_per_turn")
+	var wear_mult := CsvTable.to_float(String(data.sector_attr("attr_hazard")["chassis_wear_mult"]))
+	var plain_loss := 80.0 - plain.chassis
+	var reduced_loss := 80.0 - reduced.chassis
+	_eq_float("P3 무효과 기준선 (해저드 턴당 + 트러블 ×1.15)", plain_loss,
+		hazard_per_turn - trouble_hit * wear_mult)
+	_eq_float("P3 = 해저드·트러블 소모 −20%", reduced_loss, plain_loss * 0.8)
+	# P3: 듀얼 실패 페널티도 경감 대상 [가안 — 문면 "잔여 구간 섀시 소모" 무한정]
+	var duelist := _new_engine(406, "circuit_mn1")
+	duelist.consumables_carry_in = {"consumable_p3": 1}
+	duelist.start_gp()
+	_flatten_neighbors(duelist)
+	duelist.begin_turn()
+	duelist.use_consumable("consumable_p3")
+	duelist.spin()
+	duelist.provisional = _combo(RaceTypes.SYMBOL_LINE, 3, RaceTypes.SYMBOL_LINE)
+	duelist.confirm(0.0)
+	_force_duel(duelist, RaceTypes.DuelType.OVERTAKE)
+	duelist.begin_turn()
+	# 듀얼 턴의 T1은 "섹터 개시"가 아니다 — 사용 거부 (R-B 문면 준거)
+	_ok("듀얼 턴 T1 사용 거부", duelist.use_consumable("consumable_p1").is_empty())
+	duelist.chassis = 60.0
+	duelist.spin()
+	duelist.provisional = _combo(RaceTypes.SYMBOL_TROUBLE, 3, RaceTypes.SYMBOL_TROUBLE)  # 판정 최저 = 확정 패배
+	duelist.confirm(0.0)
+	_eq_float("P3 = 듀얼 실패 페널티 −20%", duelist.chassis,
+		60.0 - data.param("param_chassis_duel_fail_penalty") * 0.8)
+	# 직렬화 왕복 — 지속 효과·잔여 인벤토리 보존 (재로드로 실런트·쿨런트가 증발하면 안 된다)
+	var carrier := _new_engine(407, "circuit_mn1")
+	carrier.consumables_carry_in = {"consumable_p2": 2, "consumable_p3": 1}
+	carrier.start_gp()
+	_flatten_neighbors(carrier)
+	carrier.begin_turn()
+	carrier.use_consumable("consumable_p2")
+	carrier.use_consumable("consumable_p3")
+	var snapshot := carrier.serialize()
+	var revived := _new_engine(408, "circuit_mn1")
+	_ok("소모품 상태 복원 성립", revived.restore(snapshot))
+	_ok("복원: 잔여 인벤토리", int(revived.consumables_held.get("consumable_p2", -1)) == 1
+		and int(revived.consumables_held.get("consumable_p3", -1)) == 0,
+		str(revived.consumables_held))
+	_ok("복원: P2 실드 적립", revived.trouble_shield_charges == 1,
+		str(revived.trouble_shield_charges))
+	_eq_float("복원: P3 경감 비율", revived.wear_reduction, 0.20)
+	# 구스냅샷(키 부재) = 소모품 이전 세계 — 빈 인벤토리·무효과 (IMPL-090 전례)
+	snapshot.erase("consumables_held")
+	snapshot.erase("trouble_shield_charges")
+	snapshot.erase("wear_reduction")
+	var legacy := _new_engine(409, "circuit_mn1")
+	_ok("구스냅샷 복원 성립", legacy.restore(snapshot))
+	_ok("구스냅샷 = 빈 인벤토리·무효과", legacy.consumables_held.is_empty()
+		and legacy.trouble_shield_charges == 0 and legacy.wear_reduction == 0.0,
+		str(legacy.consumables_held))
 
 
 # ── 레조넌스 오버레이 런타임 (D08 §3.7 R3·R6·R7 · D13 별첨A §6.6) ──
