@@ -339,6 +339,31 @@
     "race_slot": "int:1,4",
     "pace_add": "float"
    }
+  },
+  "milestones.csv": {
+   "id_prefix": "milestone_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "name_key": "string_key",
+    "source": "enum:gp_rank,tour_rank,gp_finish,season_champion,beat_rival",
+    "source_id": "fk_optional:ai_rivals.csv",
+    "threshold": "int"
+   }
+  },
+  "achievements.csv": {
+   "id_prefix": "achievement_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "name_key": "string_key",
+    "category": "enum:career,rival,driving,garage,archive,discovery",
+    "condition_type": "enum:reach,cumulative,discovery",
+    "source": "enum:milestone,career_stat,relation,discovery,state",
+    "source_id": "string",
+    "threshold": "int",
+    "hidden": "int:0,1"
+   }
   }
  },
  "structures": {

@@ -13,6 +13,7 @@ func _init() -> void:
 	_tc_o1_facilities()
 	_tc_o2_tuning_and_overhaul()
 	_overhaul_candidate_draw()
+	_milestones_and_achievements()
 	_tc_o3_sponsors()
 	_tc_o5_archive()
 	_tc_o6_exchange_guards()
@@ -23,8 +24,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 282:
-		print("TC_O_TEST_FAIL checks=%d < 하한 282 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 348:
+		print("TC_O_TEST_FAIL checks=%d < 하한 348 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -367,6 +368,140 @@ func _overhaul_candidate_draw() -> void:
 		str(legacy.overhaul_candidates))
 
 
+# ── 마일스톤·업적 (D08 §8.2·§8.11 · D07 §6.2·§7.1 — T4 결선) ──
+func _milestones_and_achievements() -> void:
+	var state := _new_state()
+	if state == null:
+		return
+	var data := state.data
+	# D08 §8.11 전수 대장 — 카테고리 구성 대조 (열거 실측)
+	var by_category: Dictionary = {}
+	var hidden_count := 0
+	for achievement_id in data.achievements:
+		var row: Dictionary = data.achievements[achievement_id]
+		var key := String(row["category"])
+		by_category[key] = int(by_category.get(key, 0)) + 1
+		if CsvTable.to_int(String(row["hidden"])) == 1:
+			hidden_count += 1
+	var expected_categories := {"career": 10, "rival": 14, "driving": 6, "garage": 4, "archive": 1, "discovery": 4}
+	for category in expected_categories:
+		_ok("D08 §8.11 %s 카테고리 %d종" % [category, expected_categories[category]],
+			int(by_category.get(category, 0)) == int(expected_categories[category]),
+			"actual=%s" % str(by_category.get(category)))
+	# **[보고] 총계 불일치**: 정본 헤딩은 "총 35종"이나 열거 실측은 39종(5카테고리 35 + 발견형 4).
+	# 열거를 정본 실체로 보아 전량 등재했다 — 헤딩 계수는 총괄 판정 대기 (impl_log IMPL-113).
+	_ok("업적 열거 실측 39종", data.achievements.size() == 39, "actual=%d" % data.achievements.size())
+	# 비노출(H) = 관계 최종 상태 5종 + 발견형 4종 (D07 §7.1 비노출 규칙 · D08 §8.11)
+	_ok("히든 업적 9종 (관계 5 + 발견형 4)", hidden_count == 9, "actual=%d" % hidden_count)
+	for achievement_id in data.achievements:
+		var row2: Dictionary = data.achievements[achievement_id]
+		if String(row2["source"]) == "relation" or String(row2["category"]) == "discovery":
+			_ok("D07 §7.1 비노출: %s" % achievement_id,
+				CsvTable.to_int(String(row2["hidden"])) == 1, String(row2["hidden"]))
+	# 무보상 명예형 (D07 §7.1) — 업적 테이블에 보상 열 자체가 없다 (Source 신설 0)
+	var first_row: Dictionary = data.achievements[data.achievements.keys()[0]]
+	for forbidden in ["reward", "credits", "dp", "reward_type"]:
+		_ok("D07 §7.1 무보상: 보상 열 부재 (%s)" % forbidden, not first_row.has(forbidden))
+	# 마일스톤 판정 (D08 §8.2) — GP 결과가 임계 '이내'일 때만 달성
+	var pointless := _new_state()
+	pointless.record_gp_result({"player_rank": 12, "player_retired": false, "circuit_id": "circuit_mn1"})
+	_ok("첫 완주 달성 (P12 완주)", pointless.milestones.has("milestone_first_finish"))
+	_ok("첫 포인트 미달성 (P12 > P8)", not pointless.milestones.has("milestone_first_point"))
+	_ok("첫 포디움 미달성 (P12 > P3)", not pointless.milestones.has("milestone_first_podium"))
+	var podium := _new_state()
+	podium.record_gp_result({"player_rank": 3, "player_retired": false, "circuit_id": "circuit_mn1"})
+	_ok("D08 §8.2 첫 포디움 = P3 이내", podium.milestones.has("milestone_first_podium"))
+	_ok("첫 포인트 동반 달성 (P3 ≤ P8)", podium.milestones.has("milestone_first_point"))
+	_ok("첫 우승 미달성 (P3 > P1)", not podium.milestones.has("milestone_first_gp_win"))
+	# 스킬 티어 개방이 마일스톤으로 살아난다 (선재 구멍 — 기록 경로 부재로 티어 2·3 영구 잠김이었다)
+	_ok("D13 §4.1 스킬 티어 2 개방 (첫 포디움)", podium.skill_tier_open(2))
+	_ok("스킬 티어 3 미개방 (첫 우승 전)", not podium.skill_tier_open(3))
+	# 리타이어는 완주가 아니다 — 순위가 좋아도 마일스톤 0
+	var retired := _new_state()
+	retired.record_gp_result({"player_rank": 1, "player_retired": true, "circuit_id": "circuit_mn1"})
+	_ok("리타이어 = 첫 완주 미달성", not retired.milestones.has("milestone_first_finish"))
+	_ok("리타이어 = 첫 우승 미달성", not retired.milestones.has("milestone_first_gp_win"))
+	# 네임드 첫 선착 8종 + 라이벌 파일 개방 (D07 §6.1 축)
+	var beater := _new_state()
+	var all_named: Array = []
+	for row3 in beater.data.rivals:
+		all_named.append(String(row3["id"]))
+	_ok("네임드 8인", all_named.size() == 8, str(all_named))
+	beater.record_gp_result({"player_rank": 1, "player_retired": false, "circuit_id": "circuit_mn1",
+		"beaten_rivals": all_named})
+	for rival_id in all_named:
+		var suffix := String(rival_id).trim_prefix("ai_")
+		_ok("네임드 첫 선착: %s" % rival_id, beater.milestones.has("milestone_beat_%s" % suffix))
+	_ok("로렌츠 첫 격파 마일스톤", beater.milestones.has("milestone_lorentz_beat"))
+	_ok("네임드 선착 누계 8", beater.career_stat("named_beats") == 8,
+		"actual=%d" % beater.career_stat("named_beats"))
+	var beat_achievements := beater.evaluate_achievements()
+	_ok("라이벌 파일 완성 업적 (8인 선착)", beat_achievements.has("achievement_rival_files"),
+		str(beat_achievements))
+	_ok("첫 우승 업적 동반", beat_achievements.has("achievement_first_gp_win"))
+	# 통산 지표 (D07 §6.2 확정 6종) — 누계가 GP마다 쌓인다
+	var stats := _new_state()
+	for i in range(3):
+		stats.record_gp_result({"player_rank": 1, "player_retired": false, "duels": 2, "duel_wins": 2,
+			"trouble_turns": 0, "hold_uses": 0, "final_lap_entry_rank": 4,
+			"circuit_id": "circuit_mn%d" % (i + 1)})
+	_ok("통산 완주 3", stats.career_stat("finishes") == 3, "actual=%d" % stats.career_stat("finishes"))
+	_ok("통산 우승 3", stats.career_stat("wins") == 3, "actual=%d" % stats.career_stat("wins"))
+	_ok("통산 포디움 3", stats.career_stat("podiums") == 3, "actual=%d" % stats.career_stat("podiums"))
+	_ok("통산 듀얼 승 6", stats.career_stat("duel_wins") == 6, "actual=%d" % stats.career_stat("duel_wins"))
+	_ok("서킷 제패 누계 3 (서킷별 유일)", stats.career_stat("circuits_won") == 3,
+		"actual=%d" % stats.career_stat("circuits_won"))
+	_ok("무트러블 GP 3", stats.career_stat("clean_gps") == 3, "actual=%d" % stats.career_stat("clean_gps"))
+	_ok("무개입 우승 3", stats.career_stat("no_intervention_wins") == 3,
+		"actual=%d" % stats.career_stat("no_intervention_wins"))
+	_ok("최종 랩 역전 우승 3 (진입 P4 → P1)", stats.career_stat("final_lap_comebacks") == 3,
+		"actual=%d" % stats.career_stat("final_lap_comebacks"))
+	# 같은 서킷 재우승은 제패 수를 늘리지 않는다 (전 서킷 제패 20의 성립 조건)
+	stats.record_gp_result({"player_rank": 1, "player_retired": false, "circuit_id": "circuit_mn1"})
+	_ok("동일 서킷 재우승 = 제패 누계 불변", stats.career_stat("circuits_won") == 3,
+		"actual=%d" % stats.career_stat("circuits_won"))
+	# 누적형 업적 임계 (듀얼 통산 10승)
+	var duelist := _new_state()
+	for i in range(4):
+		duelist.record_gp_result({"player_rank": 5, "player_retired": false, "duels": 3, "duel_wins": 2,
+			"trouble_turns": 1, "circuit_id": "circuit_mn1"})
+	duelist.evaluate_achievements()
+	_ok("듀얼 8승 = 10승 업적 미달성", not duelist.achievements.has("achievement_duel_10_wins"),
+		"duel_wins=%d" % duelist.career_stat("duel_wins"))
+	duelist.record_gp_result({"player_rank": 5, "player_retired": false, "duels": 3, "duel_wins": 2,
+		"trouble_turns": 1, "circuit_id": "circuit_mn1"})
+	_ok("듀얼 10승 = 업적 달성", duelist.evaluate_achievements().has("achievement_duel_10_wins"),
+		"duel_wins=%d" % duelist.career_stat("duel_wins"))
+	_ok("업적은 1회만 발화", not duelist.evaluate_achievements().has("achievement_duel_10_wins"))
+	# 발견형 — 표현 층 통지로만 달성 (L3 조우)
+	var finder := _new_state()
+	finder.evaluate_achievements()
+	_ok("발견형 미통지 = 미달성", not finder.achievements.has("achievement_l3_throne"))
+	finder.record_discovery("cg_01_throne")
+	_ok("발견형 통지 = 달성", finder.evaluate_achievements().has("achievement_l3_throne"))
+	# 판정 소스 미결선 계수 — 관계 축 2종(재회·계승 셀린)이 데이터에 없다 (T7 서사 유입 의존).
+	# 조용한 영구 미달성이 아니라 명시적 계수로 드러낸다.
+	var pending := state.pending_achievements()
+	_ok("판정 소스 미결선 = 관계 2종", pending.size() == 2, str(pending))
+	_ok("미결선 = 재회·계승(셀린) 축",
+		pending.has("achievement_relation_reunion") and pending.has("achievement_relation_succession_maro"),
+		str(pending))
+	# 직렬화 왕복 — 통산·업적·제패·발견 4축 보존
+	var payload := beater.serialize()
+	var restored := _new_state()
+	_ok("복원 성립", restored.restore(payload))
+	_ok("마일스톤 보존", restored.milestones.size() == beater.milestones.size(), str(restored.milestones))
+	_ok("통산 지표 보존", restored.career_stat("named_beats") == 8)
+	_ok("업적 보존", restored.achievements.size() == beater.achievements.size())
+	_ok("서킷 제패 보존", restored.circuits_won.size() == beater.circuits_won.size())
+	# 구세이브(필드 부재) — 복원 성립 + 빈 집계 (그 세계는 집계가 없었다)
+	for key in ["career_stats", "achievements", "circuits_won", "discoveries"]:
+		payload.erase(key)
+	var legacy := _new_state()
+	_ok("구세이브 복원 성립", legacy.restore(payload))
+	_ok("구세이브 = 빈 집계", legacy.career_stats.is_empty() and legacy.achievements.is_empty())
+
+
 # ── TC-O3 스폰서 계약 (D07 §5.4 · D13 별첨A §5.3) ──
 func _tc_o3_sponsors() -> void:
 	var state := _new_state()
@@ -431,6 +566,8 @@ func _tc_o6_exchange_guards() -> void:
 		"full_repair", "full_repair_cost", "free_restore_line", "event_chassis_recover",
 		"tuning_step", "tuning_cost", "buy_tuning", "tuning_refund_ratio", "redistribute_tuning",
 		"overhaul_slots", "install_overhaul", "draw_overhaul_candidates", "parts_stat_bonus",
+		"career_stat", "record_gp_result", "record_tour_result", "record_season_result",
+		"record_discovery", "evaluate_achievements", "pending_achievements",
 		"skill_tier_open", "unlock_cost", "unlock_skill", "expand_deck", "set_deck",
 		"recruit_crew",
 		"sponsor_slots", "sponsor_candidate_count", "sign_sponsor", "settle_sponsors",

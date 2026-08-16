@@ -25,6 +25,13 @@ var lap: int = 0
 var sector: int = 0
 var turn_number: int = 0
 var duel_count: int = 0
+# GP 요약 카운터 (D07 §6.2 통산 지표 · D08 §8.11 드라이빙 업적의 판정 소재).
+# 엔진은 세기만 하고 판정·보존은 아웃게임 층이 한다 — 업적 규칙이 엔진에 들어오지 않는다.
+var duel_wins: int = 0
+var trouble_turns: int = 0        # 트러블이 발화한 섹터 턴 수 (0 = 무트러블 GP)
+var hold_uses: int = 0            # 홀드/리스핀 사용 횟수 (0 = 무개입)
+var chance_three_matches: int = 0 # 찬스 3매치 성립 횟수
+var final_lap_entry_rank: int = 0 # 최종 랩 진입 시점 순위 (역전 우승 판정 소재)
 var ai_retire_count: int = 0
 var _retire_order: int = 0
 
@@ -106,6 +113,11 @@ func start_gp() -> Array:
 	sector = 0
 	turn_number = 0
 	duel_count = 0
+	duel_wins = 0
+	trouble_turns = 0
+	hold_uses = 0
+	chance_three_matches = 0
+	final_lap_entry_rank = 0
 	ai_retire_count = 0
 	_retire_order = 0
 	if chassis_carry_in >= 0.0:
@@ -259,6 +271,10 @@ func begin_turn() -> Dictionary:
 				return {"type": "finished"}
 			lap += 1
 			sector = 0
+			# 최종 랩 진입 시점 순위 — '최종 랩 역전 우승'(D08 §8.11)의 판정 소재.
+			# 엔진은 기록만 하고 업적 판정은 아웃게임 층이 한다.
+			if lap >= data.circuit_int("laps"):
+				final_lap_entry_rank = player_position()
 		sector += 1
 		if gp_state == RaceTypes.GpState.LAP_LOOP or gp_state == RaceTypes.GpState.DUEL or gp_state == RaceTypes.GpState.SECTOR_TURN:
 			_transition(RaceTypes.GpState.SECTOR_TURN)
@@ -401,6 +417,7 @@ func hold_respin(keep_indices: Array) -> Dictionary:
 		return {"ok": false, "error": "charge"}
 	charge -= cost
 	hold_used = true
+	hold_uses += 1
 	for reel_index in range(3):
 		if not keep_indices.has(reel_index):
 			provisional[reel_index] = _roll_reel(reel_index)
@@ -479,6 +496,7 @@ func _settle_sector(momentum: bool) -> Array:
 					chassis -= data.param("param_chassis_hazard_per_turn") * (1.0 - wear_reduction)
 				if trouble_count > 0:
 					trouble_fired = true
+					trouble_turns += 1
 					var effect := _match_effect(RaceTypes.SYMBOL_TROUBLE, trouble_count)
 					var chassis_delta := CsvTable.to_float(String(effect["chassis"])) * hazard_wear
 					if chassis_delta < 0.0 and trouble_shield_charges > 0:
@@ -513,6 +531,8 @@ func _settle_sector(momentum: bool) -> Array:
 					front_gauge += CsvTable.to_float(String(line_effect["front_gauge"])) * gauge_mult
 					rear_gauge += CsvTable.to_float(String(line_effect["rear_gauge"])) * gauge_mult
 				var chance_count := _count_symbol(RaceTypes.SYMBOL_CHANCE)
+				if chance_count >= 3:
+					chance_three_matches += 1
 				if chance_count > 0:
 					var chance_effect := _match_effect(RaceTypes.SYMBOL_CHANCE, chance_count)
 					if String(chance_effect["special"]).strip_edges() == "duel_trigger":
@@ -645,6 +665,7 @@ func _resolve_duel() -> Array:
 	var threshold := _duel_threshold(duel_type, opponent_id)
 	var won := judgment >= threshold
 	if won:
+		duel_wins += 1
 		var bonus := data.param_int("param_charge_duel_win")
 		_gain_charge(bonus)
 		events.append(_ev("T5", "raceLog.duelWin01", {"amount": bonus}))
@@ -912,6 +933,13 @@ func _finish_gp() -> void:
 		"tour_points": points,
 		"turns": turn_number,
 		"duels": duel_count,
+		# GP 요약 (D07 §6.2 통산 지표 · D08 §8.11 드라이빙 업적 판정 소재) — 계수만 넘긴다
+		"duel_wins": duel_wins,
+		"trouble_turns": trouble_turns,
+		"hold_uses": hold_uses,
+		"chance_three_matches": chance_three_matches,
+		"final_lap_entry_rank": final_lap_entry_rank,
+		"circuit_id": String(data.circuit.get("id", "")),
 	}
 
 
@@ -960,6 +988,8 @@ func serialize() -> Dictionary:
 		"turn_phase": turn_phase,
 		"lap": lap, "sector": sector,
 		"turn_number": turn_number, "duel_count": duel_count,
+		"duel_wins": duel_wins, "trouble_turns": trouble_turns, "hold_uses": hold_uses,
+		"chance_three_matches": chance_three_matches, "final_lap_entry_rank": final_lap_entry_rank,
 		"ai_retire_count": ai_retire_count, "retire_order_counter": _retire_order,
 		"entrants": entrants.duplicate(true),
 		"positions": positions.duplicate(),
@@ -993,6 +1023,12 @@ func restore(payload: Dictionary) -> bool:
 	sector = int(payload["sector"])
 	turn_number = int(payload["turn_number"])
 	duel_count = int(payload["duel_count"])
+	# GP 요약 도입(T4) 전 스냅샷에는 없다 — 0 = "그 GP에서 아직 세지 않았다"가 충실값
+	duel_wins = int(payload.get("duel_wins", 0))
+	trouble_turns = int(payload.get("trouble_turns", 0))
+	hold_uses = int(payload.get("hold_uses", 0))
+	chance_three_matches = int(payload.get("chance_three_matches", 0))
+	final_lap_entry_rank = int(payload.get("final_lap_entry_rank", 0))
 	ai_retire_count = int(payload["ai_retire_count"])
 	_retire_order = int(payload["retire_order_counter"])
 	entrants = payload["entrants"]

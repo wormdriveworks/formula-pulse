@@ -29,6 +29,8 @@ var events: Dictionary = {}            # event_* id -> 행 (D08 §7 · D12 §5.4
 var facilities: Dictionary = {}        # facility_* id -> 행 (D07 §2.2)
 var tuning_lines: Dictionary = {}      # tuning_* id -> 행 (D13 별첨A §3.5)
 var overhauls: Dictionary = {}         # overhaul_* id -> 행 (D13 별첨A §7.2)
+var milestones: Dictionary = {}        # milestone_* id -> 행 (D08 §8.2 마스터 표)
+var achievements: Dictionary = {}      # achievement_* id -> 행 (D08 §8.11 · D07 §7.1)
 var overhaul_slots: Dictionary = {}    # ovslot_* id -> 행 (D13 별첨A §7.1)
 var skills: Dictionary = {}            # skill_* id -> 행 (D07 §4.2)
 var crew: Dictionary = {}              # crew_* id -> 행 (D07 §5.1 · D13 별첨A §5.1)
@@ -340,7 +342,11 @@ func _load_outgame() -> void:
 		consumables[String(row["id"])] = row
 	for row in CsvTable.load_rows(_table_path("settlement_rewards.csv")):
 		settlement_rewards[String(row["id"])] = row
-	if facilities.is_empty() or tuning_lines.is_empty() or overhauls.is_empty() or overhaul_slots.is_empty() or skills.is_empty() or crew.is_empty() or sponsors.is_empty() or relation_axes.is_empty() or consumables.is_empty() or settlement_rewards.is_empty():
+	for row in CsvTable.load_rows(_table_path("milestones.csv")):
+		milestones[String(row["id"])] = row
+	for row in CsvTable.load_rows(_table_path("achievements.csv")):
+		achievements[String(row["id"])] = row
+	if facilities.is_empty() or tuning_lines.is_empty() or overhauls.is_empty() or overhaul_slots.is_empty() or skills.is_empty() or crew.is_empty() or sponsors.is_empty() or relation_axes.is_empty() or consumables.is_empty() or settlement_rewards.is_empty() or milestones.is_empty() or achievements.is_empty():
 		_load_ok = false
 
 

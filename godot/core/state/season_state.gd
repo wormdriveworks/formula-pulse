@@ -25,6 +25,8 @@ var tour_points: Dictionary = {}       # entrant id -> 현 투어 누계 투어 
 var championship_points: Dictionary = {}  # entrant id -> 시즌 누계 챔피언십 포인트
 var last_gp_standings: Array = []      # 동률 처리용 (직전 그랑프리 결과 순)
 var tour_dropped_out: bool = false     # 현 투어 탈락 여부 (D05 §9.3)
+var tour_gp_wins: int = 0              # 현 투어 내 플레이어 GP 우승 수 (전승 업적 계수 — D08 §8.11)
+var season_tour_wins: int = 0          # 현 시즌 내 투어 종합 우승 수 (동상)
 var champion_history: Array = []       # 시즌별 챔피언 id (에필로그 판정용 — D05 §10)
 
 # 레조넌스 추첨 결과 (D08 §3.7 R6 — 투어 개막 1회 · 서킷 슬롯 × 섹터 슬롯)
@@ -58,6 +60,7 @@ func begin_season(season_number: int) -> void:
 	season = season_number
 	tour_slot = 1
 	race_slot = 1
+	season_tour_wins = 0
 	championship_points.clear()
 	calendar = build_calendar(season_number, calendar)
 	begin_tour()
@@ -126,6 +129,7 @@ func _permutations(items: Array) -> Array:
 func begin_tour() -> void:
 	race_slot = 1
 	tour_points.clear()
+	tour_gp_wins = 0
 	tour_dropped_out = false
 	_draw_resonance()
 
@@ -185,6 +189,10 @@ func record_gp(result: Dictionary) -> void:
 		push_error("SeasonState: gp result has no standings")
 		return
 	last_gp_standings = Array(standings).duplicate()
+	# 전승 업적(그랜드 슬램·퍼펙트 시즌 — D08 §8.11)의 계수. 판정은 아웃게임 층 소관이고
+	# 여기서는 "이 투어에서 몇 번 이겼는가"만 센다.
+	if int(result.get("player_rank", 0)) == 1 and not bool(result.get("player_retired", false)):
+		tour_gp_wins += 1
 	for index in range(last_gp_standings.size()):
 		var entrant_id := String(last_gp_standings[index])
 		var position := index + 1
@@ -250,11 +258,30 @@ func close_tour() -> Dictionary:
 		"s4_ratio": data.param("param_tour_dropout_s4_ratio") if tour_dropped_out else 1.0,
 		"s3_paid": not tour_dropped_out,
 		"s10_paid": not tour_dropped_out,
+		"gp_wins": tour_gp_wins,
 	}
+	if player_position == 1:
+		season_tour_wins += 1
 	tour_slot += 1
 	if tour_slot <= tours_per_season():
 		begin_tour()
 	return summary
+
+
+# 현 그랑프리가 필패 스크립트 지정 대회인가 (D08 §5.2 — 시즌·투어 슬롯·서킷 3축 대조).
+# 필패 파라미터 적용 자체는 별개 트랙이며, 여기서는 '그 대회인가'만 답한다 —
+# 발견형 업적 '왕좌의 코앞'(D08 §8.11)의 판정 소재다.
+func is_scripted_loss_gp() -> bool:
+	var circuit_id := current_circuit_id()
+	for loss_id in data.scripted_losses:
+		var row: Dictionary = data.scripted_losses[loss_id]
+		if int(row.get("season", -1)) != season:
+			continue
+		if int(row.get("tour_slot", -1)) != tour_slot:
+			continue
+		if String(row.get("circuit_id", "")) == circuit_id:
+			return true
+	return false
 
 
 func mark_dropout() -> void:
@@ -326,6 +353,7 @@ func close_season() -> Dictionary:
 		"champion": champion,
 		"player_position": player_position,
 		"grid_level_next": grid_level,
+		"tour_wins": season_tour_wins,
 		# 에필로그 = 2연속 시즌 챔피언 (D05 §10 · D08 §8.9 — 판정 시점 = 시즌 결산)
 		"epilogue": _consecutive_player_titles() >= 2,
 	}
@@ -349,6 +377,7 @@ func serialize() -> Dictionary:
 		"championship_points": championship_points.duplicate(),
 		"last_gp_standings": last_gp_standings.duplicate(),
 		"tour_dropped_out": tour_dropped_out,
+		"tour_gp_wins": tour_gp_wins, "season_tour_wins": season_tour_wins,
 		"champion_history": champion_history.duplicate(),
 		"resonance_circuit_id": resonance_circuit_id,
 		"resonance_sector_slot": resonance_sector_slot,
@@ -370,6 +399,9 @@ func restore(payload: Dictionary) -> bool:
 	championship_points = payload["championship_points"]
 	last_gp_standings = payload.get("last_gp_standings", [])
 	tour_dropped_out = bool(payload.get("tour_dropped_out", false))
+	# 전승 계수 도입(T4) 전 세이브에는 없다 — 0 = "아직 세지 않았다"가 충실값
+	tour_gp_wins = int(payload.get("tour_gp_wins", 0))
+	season_tour_wins = int(payload.get("season_tour_wins", 0))
 	champion_history = payload.get("champion_history", [])
 	resonance_circuit_id = String(payload["resonance_circuit_id"])
 	resonance_sector_slot = int(payload["resonance_sector_slot"])

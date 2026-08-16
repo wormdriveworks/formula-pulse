@@ -1,0 +1,16 @@
+id,name_key,source,source_id,threshold
+milestone_first_finish,ui.milestone.firstFinish,gp_finish,,1
+milestone_first_point,ui.milestone.firstPoint,gp_rank,,8
+milestone_first_podium,ui.milestone.firstPodium,gp_rank,,3
+milestone_first_gp_win,ui.milestone.firstGpWin,gp_rank,,1
+milestone_first_tour_win,ui.milestone.firstTourWin,tour_rank,,1
+milestone_season_champion,ui.milestone.seasonChampion,season_champion,,1
+milestone_lorentz_beat,ui.milestone.lorentzBeat,beat_rival,ai_lorentz,1
+milestone_beat_lorentz,ui.milestone.beatLorentz,beat_rival,ai_lorentz,1
+milestone_beat_maro,ui.milestone.beatMaro,beat_rival,ai_maro,1
+milestone_beat_diaz,ui.milestone.beatDiaz,beat_rival,ai_diaz,1
+milestone_beat_volkova,ui.milestone.beatVolkova,beat_rival,ai_volkova,1
+milestone_beat_holloway,ui.milestone.beatHolloway,beat_rival,ai_holloway,1
+milestone_beat_bianca,ui.milestone.beatBianca,beat_rival,ai_bianca,1
+milestone_beat_sherwood,ui.milestone.beatSherwood,beat_rival,ai_sherwood,1
+milestone_beat_jude,ui.milestone.beatJude,beat_rival,ai_jude,1

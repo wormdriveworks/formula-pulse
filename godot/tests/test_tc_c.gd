@@ -33,13 +33,14 @@ func _init() -> void:
 	_resonance_runtime()
 	_wall_rival_wired()
 	_consumable_paths()
+	_gp_summary_counters()
 	_presentation_grade_caps()
 	_check_global_postconditions()
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 1900:
-		print("TC_C_TEST_FAIL checks=%d < 하한 1900 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 1940:
+		print("TC_C_TEST_FAIL checks=%d < 하한 1940 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -1230,6 +1231,100 @@ func _sector_attribute_weights() -> void:
 				"actual=%d" % int(member.get("sectors_per_lap", -1)))
 			_ok("D08 §2.3 무대 결속: %s.stage_id" % circuit_id2,
 				String(member.get("stage_id", "")) == stage_id, str(member.get("stage_id")))
+
+
+# ── GP 요약 계수 (D07 §6.2 통산 지표 · D08 §8.11 업적 판정 소재 — T4 결선) ──
+# 엔진은 세기만 한다. 업적 규칙은 아웃게임 층 소관이며 여기서는 계수의 정확성만 본다.
+func _gp_summary_counters() -> void:
+	var engine := _new_engine(505, "circuit_mn1")
+	if engine == null:
+		return
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	_ok("GP 개시 = 요약 계수 0", engine.duel_wins == 0 and engine.trouble_turns == 0
+		and engine.hold_uses == 0 and engine.chance_three_matches == 0
+		and engine.final_lap_entry_rank == 0)
+	# 트러블 발화 턴 계수 — 발화한 턴만 센다 (심볼 수가 아니라 턴 수)
+	engine.begin_turn()
+	engine.spin()
+	engine.provisional = _combo(RaceTypes.SYMBOL_TROUBLE, 2, RaceTypes.SYMBOL_LINE)
+	engine.confirm(0.0)
+	_ok("트러블 턴 1 (2심볼 = 1턴)", engine.trouble_turns == 1, "actual=%d" % engine.trouble_turns)
+	engine.begin_turn()
+	engine.spin()
+	engine.provisional = _combo(RaceTypes.SYMBOL_LINE, 3, RaceTypes.SYMBOL_LINE)
+	engine.confirm(0.0)
+	_ok("무트러블 턴은 계수 불변", engine.trouble_turns == 1, "actual=%d" % engine.trouble_turns)
+	# 찬스 3매치 계수
+	var chancer := _new_engine(506, "circuit_mn1")
+	chancer.start_gp()
+	_flatten_neighbors(chancer)
+	chancer.begin_turn()
+	chancer.spin()
+	chancer.provisional = _combo(RaceTypes.SYMBOL_CHANCE, 3, RaceTypes.SYMBOL_CHANCE)
+	chancer.confirm(0.0)
+	_ok("찬스 3매치 계수 1", chancer.chance_three_matches == 1,
+		"actual=%d" % chancer.chance_three_matches)
+	# 홀드 사용 계수 — 개입 창에서만 성립하므로 차지를 채워 실행한다
+	var holder := _new_engine(507, "circuit_mn1")
+	holder.start_gp()
+	_flatten_neighbors(holder)
+	holder.begin_turn()
+	holder.spin()
+	holder.charge = holder.data.param_int("param_charge_cap")
+	var hold_result := holder.hold_respin([0])
+	_ok("홀드 실행 성립", bool(hold_result.get("ok", false)), str(hold_result))
+	_ok("홀드 사용 계수 1", holder.hold_uses == 1, "actual=%d" % holder.hold_uses)
+	# 듀얼 승수 계수 — 확정 승리 조합으로 1회 성립시킨다
+	var duelist := _new_engine(508, "circuit_mn1")
+	duelist.start_gp()
+	_flatten_neighbors(duelist)
+	_force_duel(duelist, RaceTypes.DuelType.OVERTAKE)
+	duelist.begin_turn()
+	duelist.spin()
+	duelist.provisional = _combo(RaceTypes.SYMBOL_CHANCE, 3, RaceTypes.SYMBOL_CHANCE)
+	duelist.confirm(0.0)
+	_ok("듀얼 승수 계수 1", duelist.duel_wins == 1, "actual=%d" % duelist.duel_wins)
+	# 최종 랩 진입 순위 — 랩 경계에서 1회 기록 (역전 우승 판정 소재)
+	var runner := _new_engine(509, "circuit_mn1")
+	runner.start_gp()
+	_flatten_neighbors(runner)
+	var laps := runner.data.circuit_int("laps")
+	var sectors := runner.data.circuit_int("sectors_per_lap")
+	# 듀얼 삽입으로 턴 수가 늘 수 있어 종료 신호까지 돈다 (상한은 무한 루프 방지용)
+	var guard := (laps * sectors) * 3 + 4
+	while not runner.finished and guard > 0:
+		guard -= 1
+		var info := runner.begin_turn()
+		if String(info.get("type", "")) == "finished":
+			break
+		if runner.lap < laps:
+			_ok("최종 랩 이전 = 미기록", runner.final_lap_entry_rank == 0,
+				"lap=%d rank=%d" % [runner.lap, runner.final_lap_entry_rank])
+		runner.spin()
+		runner.provisional = _combo(RaceTypes.SYMBOL_LINE, 3, RaceTypes.SYMBOL_LINE)
+		runner.confirm(0.0)
+	_ok("GP 종료 도달", runner.finished, "guard=%d state=%d" % [guard, runner.gp_state])
+	_ok("최종 랩 진입 순위 기록", runner.final_lap_entry_rank > 0,
+		"actual=%d" % runner.final_lap_entry_rank)
+	# GP 결과에 요약이 실린다 (아웃게임 판정의 입력)
+	_ok("결과에 요약 편입", runner.result.has("duel_wins") and runner.result.has("trouble_turns")
+		and runner.result.has("hold_uses") and runner.result.has("chance_three_matches")
+		and runner.result.has("final_lap_entry_rank") and runner.result.has("circuit_id"),
+		str(runner.result.keys()))
+	_ok("결과 서킷 id = 활성 서킷", String(runner.result.get("circuit_id", "")) == "circuit_mn1",
+		str(runner.result.get("circuit_id")))
+	# 직렬화 왕복 — 요약 계수 보존 (GP 도중 재로드가 업적 판정을 갉아먹으면 안 된다)
+	var snapshot := chancer.serialize()
+	var revived := _new_engine(510, "circuit_mn1")
+	_ok("요약 계수 복원 성립", revived.restore(snapshot))
+	_ok("복원: 찬스 3매치 계수", revived.chance_three_matches == chancer.chance_three_matches,
+		"actual=%d" % revived.chance_three_matches)
+	snapshot.erase("chance_three_matches")
+	snapshot.erase("hold_uses")
+	var legacy := _new_engine(511, "circuit_mn1")
+	_ok("구스냅샷 복원 성립", legacy.restore(snapshot))
+	_ok("구스냅샷 = 계수 0", legacy.chance_three_matches == 0 and legacy.hold_uses == 0)
 
 
 # D08 별첨A §1~§5 섹터 배치표 전사 (서킷 20종 전수) — 검사 기대값의 유일 정본.

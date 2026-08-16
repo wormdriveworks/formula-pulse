@@ -525,3 +525,57 @@ ui.event.pdLeagueGala,리그 갈라
 ui.event.pdCeremonyRehearsal,세리머니 리허설
 ui.event.pdPitWalk,피트 워크
 raceLog.consumableUse01,{item} 사용.
+ui.milestone.firstFinish,첫 완주
+ui.milestone.firstPoint,첫 포인트
+ui.milestone.firstPodium,첫 포디움
+ui.milestone.firstGpWin,첫 그랑프리 우승
+ui.milestone.firstTourWin,첫 투어 우승
+ui.milestone.seasonChampion,시즌 챔피언
+ui.milestone.lorentzBeat,로렌츠 첫 격파
+ui.milestone.beatLorentz,로렌츠 첫 선착
+ui.milestone.beatMaro,마로 첫 선착
+ui.milestone.beatDiaz,디아스 첫 선착
+ui.milestone.beatVolkova,볼코바 첫 선착
+ui.milestone.beatHolloway,홀로웨이 첫 선착
+ui.milestone.beatBianca,비앙카 첫 선착
+ui.milestone.beatSherwood,셔우드 첫 선착
+ui.milestone.beatJude,주드 첫 선착
+ui.achievement.firstFinish,첫 완주
+ui.achievement.firstPoint,첫 포인트
+ui.achievement.firstPodium,첫 포디움
+ui.achievement.firstGpWin,첫 그랑프리 우승
+ui.achievement.firstTourWin,첫 투어 우승
+ui.achievement.seasonChampion,시즌 챔피언
+ui.achievement.doubleChampion,더블 챔피언
+ui.achievement.grandSlam,그랜드 슬램
+ui.achievement.perfectSeason,퍼펙트 시즌
+ui.achievement.allCircuits,전 서킷 제패
+ui.achievement.beatLorentz,로렌츠 첫 선착
+ui.achievement.beatMaro,마로 첫 선착
+ui.achievement.beatDiaz,디아스 첫 선착
+ui.achievement.beatVolkova,볼코바 첫 선착
+ui.achievement.beatHolloway,홀로웨이 첫 선착
+ui.achievement.beatBianca,비앙카 첫 선착
+ui.achievement.beatSherwood,셔우드 첫 선착
+ui.achievement.beatJude,주드 첫 선착
+ui.achievement.beatLorentzGp,왕좌를 넘다
+ui.achievement.relationThrone,대등
+ui.achievement.relationReunion,재회의 끝
+ui.achievement.relationKinship,호적수
+ui.achievement.relationSuccession,계승
+ui.achievement.relationSuccessionMaro,두 번째 계승
+ui.achievement.firstDuelWin,첫 듀얼 승리
+ui.achievement.duel10Wins,듀얼 통산 10승
+ui.achievement.cleanGp,무트러블 그랑프리
+ui.achievement.chanceThreeMatch,찬스 3매치
+ui.achievement.noInterventionWin,무개입 우승
+ui.achievement.finalLapComeback,최종 랩 역전 우승
+ui.achievement.crewComplete,크루 완성
+ui.achievement.allSkills,전 스킬 해금
+ui.achievement.deckSlots5,덱 슬롯 5
+ui.achievement.allFacilities,개러지 완성
+ui.achievement.rivalFiles,라이벌 파일 완성
+ui.achievement.l3Throne,왕좌의 목격
+ui.achievement.l3Reunion,재회의 목격
+ui.achievement.l3Kinship,역전의 목격
+ui.achievement.scriptedP2,왕좌의 코앞

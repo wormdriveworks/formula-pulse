@@ -40,6 +40,11 @@ var field_repair_count: int = 0          # 투어 내 정비 회차 (체증 카�
 # GP 중에는 엔진이 쥐고, GP 밖에서는 여기가 정본이다 — 세션이 GP 경계에서 양방향 복사한다.
 var chassis: float = 0.0
 var milestones: Dictionary = {}          # milestone id -> true
+# 통산 지표 (D07 §6.2 확정 6종 + 업적 판정 소재). 감소하지 않는다 — 전진형 카운터.
+var career_stats: Dictionary = {}        # 지표 키 -> 수치
+var achievements: Dictionary = {}        # achievement id -> true (무보상 명예형 — D07 §7.1)
+var circuits_won: Dictionary = {}        # circuit id -> true (전 서킷 제패 판정)
+var discoveries: Dictionary = {}         # 발견형 사건 id -> true (L3 조우 등 — 표현 층이 통지)
 var drive_data_earned_total: int = 0     # 베인 단계 판정용 누적 획득 (소비 무차감 — D13 §5.4)
 
 
@@ -478,6 +483,196 @@ func buy_consumable(consumable_id: String) -> bool:
 	return true
 
 
+# ── 통산 지표·마일스톤·업적 (D07 §6.2·§7.1 · D08 §8.2·§8.11) ──
+# 업적은 **무보상 명예형**이다 (D07 §7.1) — 달성 처리가 재화·아이템을 지급하지 않는다.
+# 지급 경로를 두지 않는 것이 D06 Source 전수(S1~S10) 무개정의 이행이다.
+func career_stat(key: String) -> int:
+	return int(career_stats.get(key, 0))
+
+
+func _bump_stat(key: String, amount: int = 1) -> void:
+	career_stats[key] = career_stat(key) + amount
+
+
+# 그랑프리 결과 반영 — 세션이 GP 종료 시 1회 부른다 (D08 §8.2 시스템 층 = 달성 즉시).
+# 결과 사전은 엔진 산출 그대로이며 업적 규칙은 엔진에 들어가지 않는다.
+func record_gp_result(result: Dictionary) -> void:
+	var rank := int(result.get("player_rank", 16))
+	var retired := bool(result.get("player_retired", false))
+	_bump_stat("gps")
+	if not retired:
+		_bump_stat("finishes")
+		if rank <= 1:
+			_bump_stat("wins")
+			var circuit_id := String(result.get("circuit_id", ""))
+			if circuit_id != "":
+				circuits_won[circuit_id] = true
+			if int(result.get("hold_uses", -1)) == 0:
+				_bump_stat("no_intervention_wins")
+			var entry_rank := int(result.get("final_lap_entry_rank", 0))
+			if entry_rank > 1:
+				_bump_stat("final_lap_comebacks")
+		if rank <= 3:
+			_bump_stat("podiums")
+		if int(result.get("trouble_turns", -1)) == 0:
+			_bump_stat("clean_gps")
+	_bump_stat("duel_wins", int(result.get("duel_wins", 0)))
+	_bump_stat("duels", int(result.get("duels", 0)))
+	_bump_stat("chance_three_matches", int(result.get("chance_three_matches", 0)))
+	career_stats["circuits_won"] = circuits_won.size()
+	# 필패 그랑프리에서 P2 = 발견형 '왕좌의 코앞' (D08 §8.11 (H))
+	if bool(result.get("scripted_loss", false)) and rank == 2:
+		_bump_stat("scripted_loss_p2")
+	# 리타이어한 GP는 순위 기반 마일스톤의 대상이 아니다 — 완주가 성적의 전제다
+	# (D05 §9.2 리타이어 = 1층 포인트 0과 같은 취지). 0 = 판정 불성립 표기.
+	_record_milestones({"gp_rank": 0 if retired else rank, "gp_finish": 0 if retired else 1,
+		"beaten_rivals": result.get("beaten_rivals", [])})
+
+
+func record_tour_result(summary: Dictionary) -> void:
+	var position := int(summary.get("player_position", 16))
+	if position <= 1:
+		_bump_stat("tour_wins")
+	# 투어 4전 전승 = 그랜드 슬램 (D08 §8.11). 전승 임계는 캘린더 구조값을 그대로 쓴다 —
+	# 코어 파라미터에 4를 다시 적으면 캘린더와 갈라질 수 있는 이중 정의가 된다.
+	var races_per_tour := int(data.season_calendar.get("races_per_tour", 0))
+	if races_per_tour > 0 and int(summary.get("gp_wins", 0)) >= races_per_tour:
+		_bump_stat("tour_sweeps")
+	_record_milestones({"tour_rank": position})
+
+
+func record_season_result(report: Dictionary) -> void:
+	_bump_stat("seasons")
+	var position := int(report.get("player_position", 16))
+	var best := career_stat("best_championship_rank")
+	if best == 0 or position < best:
+		career_stats["best_championship_rank"] = position
+	if bool(report.get("epilogue", false)):
+		career_stats["epilogue_reached"] = 1
+	var tours_per_season := int(data.season_calendar.get("tours_per_season", 0))
+	if tours_per_season > 0 and int(report.get("tour_wins", 0)) >= tours_per_season:
+		_bump_stat("season_sweeps")   # 시즌 5투어 전승 = 퍼펙트 시즌 (D08 §8.11)
+	_record_milestones({"season_champion": 1 if String(report.get("champion", "")) == SeasonState.PLAYER_ID else 0})
+
+
+# 발견형 사건 통지 — 표현 층(L3 컷인 재생 등)이 발생 사실만 넘긴다.
+func record_discovery(discovery_id: String) -> void:
+	discoveries[discovery_id] = true
+
+
+# 마일스톤 판정 (D08 §8.2 마스터 표 — 조건은 전량 데이터).
+# 달성은 되돌아가지 않는다: 한 번 켜진 플래그를 끄는 경로를 두지 않는다.
+func _record_milestones(context: Dictionary) -> void:
+	for milestone_id in data.milestones:
+		if milestones.has(milestone_id):
+			continue
+		var row: Dictionary = data.milestones[milestone_id]
+		if not _milestone_met(row, context):
+			continue
+		milestones[String(milestone_id)] = true
+		# 네임드 첫 선착 누계 — 라이벌 파일 개방 축 (D07 §6.1 "네임드 8인 전속").
+		# 같은 라이벌을 가리키는 마일스톤이 둘 있다(로렌츠 = 첫 선착 + 첫 격파 — D08 §8.2)
+		# 이므로 **라이벌 단위로 1회만** 센다. 파일은 인물당 하나다.
+		if String(row["source"]) == "beat_rival" \
+			and not _rival_already_counted(String(row["source_id"]), String(milestone_id)):
+			_bump_stat("named_beats")
+
+
+func _rival_already_counted(rival_id: String, exclude_milestone_id: String) -> bool:
+	for milestone_id in milestones:
+		if String(milestone_id) == exclude_milestone_id:
+			continue
+		var row: Dictionary = data.milestones.get(milestone_id, {})
+		if String(row.get("source", "")) == "beat_rival" \
+			and String(row.get("source_id", "")) == rival_id:
+			return true
+	return false
+
+
+func _milestone_met(row: Dictionary, context: Dictionary) -> bool:
+	var source := String(row["source"])
+	var threshold := CsvTable.to_int(String(row["threshold"]))
+	match source:
+		"gp_rank", "tour_rank":
+			# 순위는 작을수록 상위다 — 임계 '이내'로 판정한다 (D08 §8.2 "P8 이내" 문면)
+			var rank := int(context.get(source, 0))
+			return rank > 0 and rank <= threshold
+		"gp_finish", "season_champion":
+			return int(context.get(source, 0)) >= threshold
+		"beat_rival":
+			return Array(context.get("beaten_rivals", [])).has(String(row["source_id"]))
+		_:
+			push_error("OutgameState: unknown milestone source '%s'" % source)
+			return false
+
+
+# 업적 판정 (D08 §8.11 · D07 §7.1) — 상태를 평가만 한다. 반환 = 이번에 새로 달성한 id 목록.
+# 판정 소스가 아직 결선되지 않은 업적(관계 축 미생성 등)은 조용히 미달성으로 두지 않고
+# pending_achievements()로 셀 수 있게 한다 — "영원히 안 켜지는 업적"을 계수로 드러내기 위함.
+func evaluate_achievements() -> Array:
+	var newly: Array = []
+	for achievement_id in data.achievements:
+		if achievements.has(achievement_id):
+			continue
+		var row: Dictionary = data.achievements[achievement_id]
+		if _achievement_source_missing(row):
+			continue
+		if _achievement_met(row):
+			achievements[String(achievement_id)] = true
+			newly.append(String(achievement_id))
+	return newly
+
+
+# 판정 소스가 데이터에 없는 업적 — 결선 대기분의 명시적 계수 (조용한 미달성 방지)
+func pending_achievements() -> Array:
+	var pending: Array = []
+	for achievement_id in data.achievements:
+		if _achievement_source_missing(data.achievements[achievement_id]):
+			pending.append(String(achievement_id))
+	return pending
+
+
+func _achievement_source_missing(row: Dictionary) -> bool:
+	if String(row["source"]) == "relation":
+		return not data.relation_axes.has(String(row["source_id"]))
+	return false
+
+
+func _achievement_met(row: Dictionary) -> bool:
+	var source := String(row["source"])
+	var source_id := String(row["source_id"])
+	var threshold := CsvTable.to_int(String(row["threshold"]))
+	match source:
+		"milestone":
+			return milestones.has(source_id)
+		"career_stat":
+			return career_stat(source_id) >= threshold
+		"relation":
+			return relation_stage(source_id) >= threshold
+		"discovery":
+			return discoveries.has(source_id)
+		"state":
+			return _achievement_state_value(source_id) >= threshold
+		_:
+			push_error("OutgameState: unknown achievement source '%s'" % source)
+			return false
+
+
+func _achievement_state_value(key: String) -> int:
+	match key:
+		"crew_count":
+			return crew.size()
+		"skill_count":
+			return unlocked_skills.size()
+		"deck_slots":
+			return deck_slots
+		"facility_count":
+			return facilities.size()
+		_:
+			push_error("OutgameState: unknown achievement state key '%s'" % key)
+			return 0
+
+
 # ── 결산 보상 (D13 별첨A §3.1~§3.2) ──
 # S1 그랑프리 상금 = 300 + 투어 포인트 × 100 (D13 별첨A §3.1).
 # S2 완주 보너스 200은 **별개 Source**다 — 합산해 두면 어느 축이 바뀌었는지 추적할 수 없다.
@@ -529,6 +724,10 @@ func serialize() -> Dictionary:
 		"consumables": consumables.duplicate(),
 		"field_repair_count": field_repair_count,
 		"milestones": milestones.duplicate(),
+		"career_stats": career_stats.duplicate(),
+		"achievements": achievements.duplicate(),
+		"circuits_won": circuits_won.duplicate(),
+		"discoveries": discoveries.duplicate(),
 		"chassis": chassis,
 	}
 
@@ -559,6 +758,12 @@ func restore(payload: Dictionary) -> bool:
 	consumables = payload.get("consumables", {})
 	field_repair_count = int(payload.get("field_repair_count", 0))
 	milestones = payload.get("milestones", {})
+	# 통산·업적 도입(T4) 전 세이브에는 없다 — 빈 상태가 충실값 (그 세계는 집계가 없었다).
+	# 업적은 재로드 후 evaluate_achievements()가 현 상태로 재판정하므로 소급 달성이 성립한다.
+	career_stats = payload.get("career_stats", {})
+	achievements = payload.get("achievements", {})
+	circuits_won = payload.get("circuits_won", {})
+	discoveries = payload.get("discoveries", {})
 	# 이월 도입(IMPL-078 해소) 전 세이브에는 없다 — 그 세계는 매 GP 최대치 개시였으므로 최대치가 충실한 기본값이다
 	chassis = float(payload.get("chassis", data.param("param_chassis_max")))
 	return true

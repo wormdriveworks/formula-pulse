@@ -24,6 +24,8 @@ var engine: RaceEngine
 var last_gp_result: Dictionary = {}
 var last_tour_report: Dictionary = {}
 var last_season_report: Dictionary = {}
+# 직전 경계에서 새로 달성된 업적 — 표시 층이 읽어 고지한다 (무보상 명예형이라 지급 없음)
+var newly_achieved: Array = []
 
 
 func setup(game_data: GameData) -> void:
@@ -101,7 +103,13 @@ func close_gp() -> void:
 	if engine == null or engine.result.is_empty():
 		return
 	last_gp_result = engine.result.duplicate(true)
-	season.record_gp(engine.result)
+	# 네임드 첫 선착 판정 소재 (D08 §8.2) — 이 GP에서 플레이어보다 뒤에 들어온 네임드 목록.
+	# 완주자만 대상이다: 리타이어한 상대를 앞선 것은 '선착'이 아니다 [가안 — impl_log].
+	last_gp_result["beaten_rivals"] = _beaten_rivals(engine)
+	last_gp_result["scripted_loss"] = season.is_scripted_loss_gp()
+	season.record_gp(last_gp_result)
+	outgame.record_gp_result(last_gp_result)
+	newly_achieved = outgame.evaluate_achievements()
 	outgame.chassis = engine.chassis  # 잔여 섀시 회수 — GP 밖 정본은 아웃게임 층 (D05 §8)
 	# R5 이월 회수 — 미사용분은 소멸하지 않는다 (D06 §3.5). 상한 가드는 구매 지점(K4) 전속:
 	# 사용은 수량을 늘리지 못하므로 회수분이 상한을 넘을 경로가 없다.
@@ -112,8 +120,30 @@ func tour_has_remaining_gp() -> bool:
 	return season.race_slot <= season.races_per_tour() and not season.tour_dropped_out
 
 
+# 이 GP에서 플레이어가 앞선 네임드 목록 — 완주자 한정 (리타이어 상대는 선착 대상 아님)
+func _beaten_rivals(source: RaceEngine) -> Array:
+	var beaten: Array = []
+	var standings: Array = source.result.get("standings", [])
+	var player_index := standings.find(RaceEngine.PLAYER_ID)
+	if player_index < 0 or bool(source.entrants[RaceEngine.PLAYER_ID]["retired"]):
+		return beaten
+	var named_ids: Dictionary = {}
+	for row in data.rivals:
+		named_ids[String(row["id"])] = true
+	for index in range(player_index + 1, standings.size()):
+		var entrant_id := String(standings[index])
+		if not named_ids.has(entrant_id):
+			continue   # 필러는 라이벌 파일·마일스톤 대상이 아니다 (D07 §6.1)
+		if bool(source.entrants[entrant_id]["retired"]):
+			continue
+		beaten.append(entrant_id)
+	return beaten
+
+
 func close_tour() -> Dictionary:
 	last_tour_report = season.close_tour()
+	outgame.record_tour_result(last_tour_report)
+	newly_achieved = outgame.evaluate_achievements()
 	if not season.season_finished():
 		# 다음 투어 개시 — 체증 카운터 리셋 + 무상 복원선 (D06 §3.3 · D13 별첨A §3.4 R2).
 		# 시즌 마지막 투어면 다음 투어가 없다 — 개시 처리는 begin_next_season()이 한다.
@@ -124,6 +154,8 @@ func close_tour() -> Dictionary:
 # 시즌 결산 — 타이틀 판정·그리드 레벨은 코어가 한다 (D05 §9.4~§10)
 func close_season() -> Dictionary:
 	last_season_report = season.close_season()
+	outgame.record_season_result(last_season_report)
+	newly_achieved = outgame.evaluate_achievements()
 	# 시즌 오버홀 후보 추첨 — 결산 직후 1회 (D06 §5.3). 결과는 아웃게임 층에 보존되어
 	# HUB-08 진입·재로드 어디서도 다시 추첨되지 않는다 (재로드 리롤 무효).
 	outgame.draw_overhaul_candidates(int(last_season_report.get("player_position", 16)), rng)
