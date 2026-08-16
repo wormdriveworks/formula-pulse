@@ -1,0 +1,16 @@
+{
+	"schema_version": 1,
+	"id": "circuit_ar2",
+	"name_key": "ui.circuit.ar2",
+	"stage_id": "stage_alta_ridge",
+	"tour_slot_role": "build_a",
+	"laps": 3,
+	"sectors_per_lap": 5,
+	"sectors": [
+		{"slot": 1, "name_key": "ui.sector.ar2s1", "main_attr": "attr_technical", "sub_attr": ""},
+		{"slot": 2, "name_key": "ui.sector.ar2s2", "main_attr": "attr_technical", "sub_attr": ""},
+		{"slot": 3, "name_key": "ui.sector.ar2s3", "main_attr": "attr_hazard", "sub_attr": ""},
+		{"slot": 4, "name_key": "ui.sector.ar2s4", "main_attr": "attr_sweeper", "sub_attr": ""},
+		{"slot": 5, "name_key": "ui.sector.ar2s5", "main_attr": "attr_battle_zone", "sub_attr": "attr_technical"}
+	]
+}

@@ -1,0 +1,15 @@
+{
+	"schema_version": 1,
+	"id": "circuit_ac3",
+	"name_key": "ui.circuit.ac3",
+	"stage_id": "stage_azure_coast",
+	"tour_slot_role": "build_b",
+	"laps": 3,
+	"sectors_per_lap": 4,
+	"sectors": [
+		{"slot": 1, "name_key": "ui.sector.ac3s1", "main_attr": "attr_technical", "sub_attr": ""},
+		{"slot": 2, "name_key": "ui.sector.ac3s2", "main_attr": "attr_straight", "sub_attr": ""},
+		{"slot": 3, "name_key": "ui.sector.ac3s3", "main_attr": "attr_pulse_section", "sub_attr": ""},
+		{"slot": 4, "name_key": "ui.sector.ac3s4", "main_attr": "attr_sweeper", "sub_attr": "attr_battle_zone"}
+	]
+}

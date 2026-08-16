@@ -19,8 +19,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 450:
-		print("SEASON_TEST_FAIL checks=%d < 하한 450 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 478:
+		print("SEASON_TEST_FAIL checks=%d < 하한 478 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -256,12 +256,30 @@ func _calendar_rules() -> void:
 	var state := _new_state(61)
 	if state == null:
 		return
-	# 시즌 1 = 정순 고정 (셔플 없음)
+	# 시즌 1 = 정순 고정 (D08 §4.1 확정: 메트로 → 아주르 → 알타 → 미라지 → 돔).
+	# 캘린더 데이터가 문서 정순과 갈리면 여기서 깨진다 — 셔플 풀 순서 변조 검출.
 	var season1 := state.build_calendar(1, [])
-	_ok("시즌 1 개막전 = 고정 무대", season1.size() > 0 and String(season1[0]) == "stage_metro_night",
-		str(season1))
-	# 셔플 규칙 — 무대 2~4 콘텐츠가 MS-2 범위 밖이라 순수 함수로 검사한다.
-	# 규칙 자체(직전 편성 재출현 금지·균등 추첨)는 콘텐츠와 무관하게 성립해야 한다.
+	var expected_season1: Array = ["stage_metro_night", "stage_azure_coast", "stage_alta_ridge",
+		"stage_mirage_flat", "stage_pulse_dome"]
+	_ok("D08 §4.1 시즌 1 정순 5무대", season1 == expected_season1, str(season1))
+	_ok("D08 §5.1 최종 무대 고정 = 펄스 돔 (로렌츠 슬롯·무대 이중 고정)",
+		String(state.data.season_calendar["fixed_final_stage"]) == "stage_pulse_dome",
+		String(state.data.season_calendar["fixed_final_stage"]))
+	# season1_tour_slot 필드가 정순 위치와 동기인지 (무대 데이터 ↔ 캘린더 이중 기입의 정합)
+	for index in range(expected_season1.size()):
+		var stage_row: Dictionary = state.data.stages.get(String(expected_season1[index]), {})
+		_ok("무대 %s season1_tour_slot = %d" % [expected_season1[index], index + 1],
+			int(stage_row.get("season1_tour_slot", -1)) == index + 1,
+			"actual=%s" % str(stage_row.get("season1_tour_slot")))
+	# 시즌 2+ = 투어 1·5 고정 + 투어 2~4 셔플 (실데이터 경로 — 셔플 결과도 경계 불변)
+	var season2 := state.build_calendar(2, season1)
+	_ok("시즌 2 개막전 고정 유지", season2.size() == 5 and String(season2[0]) == "stage_metro_night",
+		str(season2))
+	_ok("시즌 2 최종전 고정 유지", String(season2[4]) == "stage_pulse_dome", str(season2))
+	_ok("시즌 2 중간 3무대 = 셔플 풀 구성",
+		_same_multiset(season2.slice(1, 4), ["stage_azure_coast", "stage_alta_ridge", "stage_mirage_flat"]),
+		str(season2))
+	# 셔플 규칙 — 규칙 자체(직전 편성 재출현 금지·균등 추첨)는 콘텐츠와 무관하게 성립해야 한다.
 	var pool: Array = ["a", "b", "c"]
 	var previous: Array = ["a", "b", "c"]
 	var seen: Dictionary = {}

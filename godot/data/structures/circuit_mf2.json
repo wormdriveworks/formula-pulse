@@ -1,0 +1,16 @@
+{
+	"schema_version": 1,
+	"id": "circuit_mf2",
+	"name_key": "ui.circuit.mf2",
+	"stage_id": "stage_mirage_flat",
+	"tour_slot_role": "build_a",
+	"laps": 3,
+	"sectors_per_lap": 5,
+	"sectors": [
+		{"slot": 1, "name_key": "ui.sector.mf2s1", "main_attr": "attr_straight", "sub_attr": ""},
+		{"slot": 2, "name_key": "ui.sector.mf2s2", "main_attr": "attr_straight", "sub_attr": "attr_battle_zone"},
+		{"slot": 3, "name_key": "ui.sector.mf2s3", "main_attr": "attr_hazard", "sub_attr": ""},
+		{"slot": 4, "name_key": "ui.sector.mf2s4", "main_attr": "attr_sweeper", "sub_attr": ""},
+		{"slot": 5, "name_key": "ui.sector.mf2s5", "main_attr": "attr_battle_zone", "sub_attr": ""}
+	]
+}

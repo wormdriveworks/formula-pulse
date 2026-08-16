@@ -124,6 +124,9 @@ func start_gp() -> Array:
 
 func _build_entrants() -> void:
 	entrants.clear()
+	# 벽 무대 가중 (D08 §5.1 ① · D13 별첨A §6.2) — 해당 무대의 벽 라이벌만 페이스 가산.
+	# MS-2(무벽 메트로)에서는 잠복 경로였다 — 무대 2~5 유입과 함께 결선.
+	var wall_id := _wall_rival_id()
 	entrants[PLAYER_ID] = {
 		"id": PLAYER_ID, "name_key": "ui.race.playerName", "is_player": true, "is_filler": false,
 		"pace": 0.0, "aggression": 0.0, "stability": 0.0,
@@ -140,7 +143,8 @@ func _build_entrants() -> void:
 		var rush_random := CsvTable.to_float(String(row["rush_random"]))
 		entrants[String(row["id"])] = {
 			"id": String(row["id"]), "name_key": String(row["name_key"]), "is_player": false, "is_filler": false,
-			"pace": CsvTable.to_float(String(row["pace"])) + CsvTable.to_float(String(team.get("pace_add", "0"))),
+			"pace": CsvTable.to_float(String(row["pace"])) + CsvTable.to_float(String(team.get("pace_add", "0")))
+				+ (CsvTable.to_float(String(row["wall_pace_add"])) if String(row["id"]) == wall_id else 0.0),
 			"aggression": CsvTable.to_float(String(row["aggression"])) + CsvTable.to_float(String(team.get("aggression_add", "0"))),
 			"stability": CsvTable.to_float(String(row["stability"])) + CsvTable.to_float(String(team.get("stability_add", "0"))),
 			"seed_aggression": CsvTable.to_float(String(row["aggression"])),
@@ -552,6 +556,11 @@ func _has_any_three_match() -> bool:
 	return provisional[0] == provisional[1] and provisional[1] == provisional[2]
 
 
+# 활성 무대의 벽 라이벌 (D08 §5.1 — 무벽 무대는 ""). 페이스 가중·듀얼 임계·리타이어 면제의 공용 창구.
+func _wall_rival_id() -> String:
+	return String(data.stage_of_active_circuit().get("wall_rival", ""))
+
+
 # 듀얼 턴 정산 — 전용 스핀: 심볼은 판정 환산 전속, 통상 효과 미적용 [가안 — impl_log]
 func _settle_duel() -> Array:
 	var events: Array = []
@@ -633,6 +642,11 @@ func _duel_judgment(duel_type: int) -> float:
 # 저항 임계 (D13 별첨A §2.4) — 시드 파라미터 기준 (팀 가산 미적용: 별첨A 명시값 정합 [가안])
 func _duel_threshold(duel_type: int, opponent_id: String) -> float:
 	var opponent: Dictionary = entrants[opponent_id]
+	# 벽 라이벌 임계 가산 (D13 별첨A §2.4 "벽 라이벌 (해당 무대) +6" — 추월·방어 공통 행).
+	# [가안] 방어 override(로렌츠 55)에도 가산한다 — §2.4의 벽 행은 필러/네임드/로렌츠 행과
+	# 독립된 조건부 가산 행이고 면제 문면이 없다 (그리드 레벨 +3 행과 동형 구조).
+	var wall_add := data.param("param_duel_wall_threshold_add") \
+		if opponent_id == _wall_rival_id() else 0.0
 	if duel_type == RaceTypes.DuelType.OVERTAKE:
 		# 압박 훅 (D13 별첨A §6.2 비앙카 "안정성 4.0(압박 시 2.5)" · D08 §6.3 조건 분기 위임).
 		# [가안] '압박 시'의 판정 = **추월 듀얼 상황** — 플레이어가 뒤차로서 앞차를 밀어붙이는
@@ -644,12 +658,13 @@ func _duel_threshold(duel_type: int, opponent_id: String) -> float:
 			stability = under_pressure
 		return data.param("param_duel_overtake_base") \
 			+ stability * data.param("param_duel_overtake_stability_coef") \
-			+ float(opponent["duel_overtake_add"])
+			+ float(opponent["duel_overtake_add"]) + wall_add
 	var override_value := float(opponent["duel_defense_override"])
 	if override_value >= 0.0:
-		return override_value
+		return override_value + wall_add
 	return data.param("param_duel_defense_base") \
-		+ float(opponent["seed_aggression"]) * data.param("param_duel_defense_aggression_coef")
+		+ float(opponent["seed_aggression"]) * data.param("param_duel_defense_aggression_coef") \
+		+ wall_add
 
 
 # ── 게이지 보조 ──
@@ -724,9 +739,12 @@ func _ai_retire_check() -> Array:
 	var total_turns := data.circuit_int("laps") * data.circuit_int("sectors_per_lap")
 	var coef := data.param("param_ai_retire_stability_coef")
 	var constant := data.param("param_ai_retire_const")
+	var wall_id := _wall_rival_id()
 	for id in positions.duplicate():
 		if id == PLAYER_ID or ai_retire_count >= cap:
 			continue
+		if id == wall_id:
+			continue   # 벽 라이벌 제외 (D13 별첨A §6.2 AI 리타이어 행 명문)
 		var probability := (coef * (5.0 - float(entrants[id]["stability"])) + constant) / float(total_turns)
 		if rng.randf("ai") < probability:
 			_retire_entrant(id)

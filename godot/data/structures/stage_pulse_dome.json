@@ -1,0 +1,21 @@
+{
+	"schema_version": 1,
+	"id": "stage_pulse_dome",
+	"name_key": "ui.stage.pulseDome",
+	"season1_tour_slot": 5,
+	"circuits": [
+		"circuit_pd1",
+		"circuit_pd2",
+		"circuit_pd3",
+		"circuit_pd4"
+	],
+	"wall_rival": "ai_lorentz",
+	"resonance_bonus_type": "front_gauge_full",
+	"resonance_bonus_value": 0,
+	"event_pool": [
+		"event_pd_media_day",
+		"event_pd_league_gala",
+		"event_pd_ceremony_rehearsal",
+		"event_pd_pit_walk"
+	]
+}

@@ -4,6 +4,10 @@
 	"tours_per_season": 5,
 	"races_per_tour": 4,
 	"fixed_opening_stage": "stage_metro_night",
-	"fixed_final_stage": "",
-	"shuffle_pool": []
+	"fixed_final_stage": "stage_pulse_dome",
+	"shuffle_pool": [
+		"stage_azure_coast",
+		"stage_alta_ridge",
+		"stage_mirage_flat"
+	]
 }

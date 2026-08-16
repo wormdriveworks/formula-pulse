@@ -416,3 +416,111 @@ ui.tip.currencyTitle,재화 안내
 ui.tip.currencyBody,크레딧은 정비·소모품에 쓰는 회전 재화입니다. 주행 데이터는 스킬·시설에 쓰는 축적 재화입니다.
 ui.tip.dismiss,확인
 ui.options.stepStillCut,정지 컷
+ui.stage.azureCoast,아주르 코스트
+ui.circuit.ac1,리비에라 런
+ui.sector.ac1s1,코스트 하이웨이
+ui.sector.ac1s2,팜 커브
+ui.sector.ac1s3,비치프런트
+ui.sector.ac1s4,마리나 게이트
+ui.circuit.ac2,케이프 브레이커
+ui.sector.ac2s1,노스 쇼어 직선
+ui.sector.ac2s2,곶 회전
+ui.sector.ac2s3,크로스윈드 구간
+ui.sector.ac2s4,사우스 런
+ui.sector.ac2s5,등대 코너
+ui.circuit.ac3,마리나 서킷
+ui.sector.ac3s1,항만 시케인
+ui.sector.ac3s2,방파제 대로
+ui.sector.ac3s3,요트 하버 유턴
+ui.sector.ac3s4,씨사이드 스위프
+ui.circuit.ac4,그랑 아주르
+ui.sector.ac4s1,그랑 스트레이트
+ui.sector.ac4s2,오션 뷰 벤드
+ui.sector.ac4s3,클리프 시케인
+ui.sector.ac4s4,터널 출구
+ui.sector.ac4s5,하버 피니시
+ui.event.acWindWarning,해풍 경보
+ui.event.acResortSponsor,리조트 스폰서 데이
+ui.event.acBeachEncounter,비치 조우
+ui.event.acSaltWash,해염 세척
+ui.stage.altaRidge,알타 리지
+ui.circuit.ar1,포트힐 클라임
+ui.sector.ar1s1,산기슭 오르막
+ui.sector.ar1s2,포레스트 에스
+ui.sector.ar1s3,올드 브리지 협로
+ui.sector.ar1s4,고원 마을 직선
+ui.circuit.ar2,헤어핀 밸리
+ui.sector.ar2s1,제1 헤어핀군
+ui.sector.ar2s2,제2 헤어핀군
+ui.sector.ar2s3,절벽 가드레일 구간
+ui.sector.ar2s4,밸리 플로어
+ui.sector.ar2s5,계곡 출구 브레이킹 존
+ui.circuit.ar3,릿지라인
+ui.sector.ar3s1,능선 고속 리듬
+ui.sector.ar3s2,고도 구간
+ui.sector.ar3s3,터널 관통
+ui.sector.ar3s4,다운힐 에스
+ui.circuit.ar4,서밋 패스
+ui.sector.ar4s1,관문 시케인
+ui.sector.ar4s2,파노라마 벤드
+ui.sector.ar4s3,절개지 낙석 구간
+ui.sector.ar4s4,서밋 헤어핀
+ui.sector.ar4s5,다운힐 피니시
+ui.event.arAltitudeCheck,고지 적응 점검
+ui.event.arLodgeRest,산장 휴식
+ui.event.arOldPass,옛 고갯길
+ui.event.arRescueCheer,산악 구조대 격려
+ui.stage.mirageFlat,미라지 플랫
+ui.circuit.mf1,듄 크로싱
+ui.sector.mf1s1,사구 횡단로
+ui.sector.mf1s2,모래 유입 구간
+ui.sector.mf1s3,와디 벤드
+ui.sector.mf1s4,캠프 게이트 직선
+ui.circuit.mf2,솔트 플랫
+ui.sector.mf2s1,솔트 스트레이트
+ui.sector.mf2s2,미러 라인
+ui.sector.mf2s3,열파 구간
+ui.sector.mf2s4,플랫 커브
+ui.sector.mf2s5,그리드 피니시
+ui.circuit.mf3,캐니언 런
+ui.sector.mf3s1,협곡 진입 에스
+ui.sector.mf3s2,암벽 협로
+ui.sector.mf3s3,그늘 협곡
+ui.sector.mf3s4,캐니언 출구
+ui.circuit.mf4,그레이트 미라지
+ui.sector.mf4s1,호라이즌 스트레이트
+ui.sector.mf4s2,모래폭풍 상습 구간
+ui.sector.mf4s3,폐허 시케인
+ui.sector.mf4s4,선셋 벤드
+ui.sector.mf4s5,오아시스 피니시
+ui.event.mfSandstormWarning,모래폭풍 경보
+ui.event.mfOasisCamp,오아시스 캠프
+ui.event.mfDocumentary,횡단 다큐 촬영
+ui.event.mfMirageSighting,신기루 목격담
+ui.stage.pulseDome,펄스 돔
+ui.circuit.pd1,이그니션
+ui.sector.pd1s1,돔 메인 스트레이트
+ui.sector.pd1s2,제1 뱅크
+ui.sector.pd1s3,인필드 스위프
+ui.sector.pd1s4,피니시 뱅크
+ui.circuit.pd2,벨로시티
+ui.sector.pd2s1,백스트레이트
+ui.sector.pd2s2,하이 뱅크
+ui.sector.pd2s3,크로스오버 직선
+ui.sector.pd2s4,세컨드 뱅크
+ui.sector.pd2s5,라인 교차 피니시
+ui.circuit.pd3,크루서블
+ui.sector.pd3s1,인필드 시케인군
+ui.sector.pd3s2,조명 전환 구간
+ui.sector.pd3s3,돔 터널 섹션
+ui.sector.pd3s4,스타디움 헤어핀
+ui.circuit.pd4,더 제니스
+ui.sector.pd4s1,메인 스트레이트
+ui.sector.pd4s2,챔피언 시케인
+ui.sector.pd4s3,하이 뱅크
+ui.sector.pd4s4,터널 명암 구간
+ui.sector.pd4s5,제니스 코너
+ui.event.pdMediaDay,미디어 데이
+ui.event.pdLeagueGala,리그 갈라
+ui.event.pdCeremonyRehearsal,세리머니 리허설
+ui.event.pdPitWalk,피트 워크

@@ -31,13 +31,14 @@ func _init() -> void:
 	_result_and_ranking()
 	_sector_attribute_weights()
 	_resonance_runtime()
+	_wall_rival_wired()
 	_presentation_grade_caps()
 	_check_global_postconditions()
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 925:
-		print("TC_C_TEST_FAIL checks=%d < 하한 925 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 1850:
+		print("TC_C_TEST_FAIL checks=%d < 하한 1850 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -250,23 +251,43 @@ func _d13_anchor_values() -> void:
 		CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_TROUBLE]["per_symbol"])), -15.0)
 	_eq_float("D13 §2.4 찬스 환산 40 (개당)",
 		CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_CHANCE]["per_symbol"])), 40.0)
-	# D13 별첨A §6.6 레조넌스 — 무대 1 = 펄스 차지 +2
-	var stage: Dictionary = data.stages["stage_metro_night"]
-	_ok("D13 §6.6 메트로 나이트 보너스 유형 = 차지",
-		String(stage["resonance_bonus_type"]) == "charge", str(stage))
-	_eq_float("D13 §6.6 메트로 나이트 보너스 +2", float(stage["resonance_bonus_value"]), 2.0)
+	# D13 별첨A §6.6 레조넌스 — 무대별 보너스 5종 전사 대조 (수치의 유일 창구 = D13).
+	# 펄스 돔 값 0 = "즉시 만충"이라 값 미소비 [가안 — impl_log] · 미라지 +30 = 필드 정비 회당 상한과 동치.
+	var expected_resonance := {
+		"stage_metro_night": ["charge", 2.0],
+		"stage_azure_coast": ["front_gauge", 60.0],
+		"stage_alta_ridge":  ["duel_judgment", 25.0],
+		"stage_mirage_flat": ["chassis", 30.0],
+		"stage_pulse_dome":  ["front_gauge_full", 0.0],
+	}
+	for stage_id in expected_resonance:
+		var stage: Dictionary = data.stages.get(stage_id, {})
+		var pair: Array = expected_resonance[stage_id]
+		_ok("D13 §6.6 %s 보너스 유형 = %s" % [stage_id, pair[0]],
+			String(stage.get("resonance_bonus_type", "")) == String(pair[0]), str(stage.get("resonance_bonus_type")))
+		_eq_float("D13 §6.6 %s 보너스 값" % stage_id,
+			float(stage.get("resonance_bonus_value", -1.0)), float(pair[1]))
+	# D08 §5.1 벽 배치 전사 대조 — 무벽 메트로 포함 (벽 오배치 = 난이도 곡선 변조)
+	var expected_walls := {
+		"stage_metro_night": "", "stage_azure_coast": "ai_diaz", "stage_alta_ridge": "ai_sherwood",
+		"stage_mirage_flat": "ai_holloway", "stage_pulse_dome": "ai_lorentz",
+	}
+	for stage_id2 in expected_walls:
+		_ok("D08 §5.1 벽 배치: %s" % stage_id2,
+			String(data.stages.get(stage_id2, {}).get("wall_rival", "?")) == String(expected_walls[stage_id2]),
+			str(data.stages.get(stage_id2, {}).get("wall_rival")))
 	# D13 별첨A §6.2 AI 파라미터 5층 — 네임드 8인 전수 전사.
 	# 전사 없이는 라이벌 주행 파라미터 72칸이 자기 일관성에 걸려 부호 반전도 미검출이다
 	# (독립 검증 G-1 실측: ai_rivals.csv 72칸 전량 미검출).
 	var expected_rivals := {
-		"ai_lorentz":  {"pace": 5.2, "aggression": 3.0, "stability": 5.0, "start_mod": 4.0, "form_var": 0.0},
-		"ai_maro":     {"pace": 4.0, "aggression": 3.0, "stability": 4.0, "start_mod": 5.0, "rush_lap1": 0.5},
-		"ai_diaz":     {"pace": 4.0, "aggression": 5.0, "stability": 2.0, "start_mod": 3.0},
-		"ai_volkova":  {"pace": 3.0, "aggression": 4.0, "stability": 2.0, "start_mod": 4.0, "rush_lap1": 1.5, "rush_lap_final": -1.0},
-		"ai_holloway": {"pace": 4.0, "aggression": 3.0, "stability": 4.0, "start_mod": 3.0, "rush_lap_final": 1.5},
-		"ai_bianca":   {"pace": 4.0, "aggression": 2.0, "stability": 4.0, "start_mod": 4.0},
-		"ai_sherwood": {"pace": 3.0, "aggression": 4.0, "stability": 3.0, "start_mod": 2.0, "rush_random": 1.0},
-		"ai_jude":     {"pace": 3.0, "aggression": 3.0, "stability": 2.0, "start_mod": 2.0, "rush_random": 1.5},
+		"ai_lorentz":  {"pace": 5.2, "aggression": 3.0, "stability": 5.0, "start_mod": 4.0, "form_var": 0.0, "wall_pace_add": 1.0},
+		"ai_maro":     {"pace": 4.0, "aggression": 3.0, "stability": 4.0, "start_mod": 5.0, "rush_lap1": 0.5, "wall_pace_add": 0.0},
+		"ai_diaz":     {"pace": 4.0, "aggression": 5.0, "stability": 2.0, "start_mod": 3.0, "wall_pace_add": 1.4},
+		"ai_volkova":  {"pace": 3.0, "aggression": 4.0, "stability": 2.0, "start_mod": 4.0, "rush_lap1": 1.5, "rush_lap_final": -1.0, "wall_pace_add": 0.0},
+		"ai_holloway": {"pace": 4.0, "aggression": 3.0, "stability": 4.0, "start_mod": 3.0, "rush_lap_final": 1.5, "wall_pace_add": 1.4},
+		"ai_bianca":   {"pace": 4.0, "aggression": 2.0, "stability": 4.0, "start_mod": 4.0, "wall_pace_add": 0.0},
+		"ai_sherwood": {"pace": 3.0, "aggression": 4.0, "stability": 3.0, "start_mod": 2.0, "rush_random": 1.0, "wall_pace_add": 1.9},
+		"ai_jude":     {"pace": 3.0, "aggression": 3.0, "stability": 2.0, "start_mod": 2.0, "rush_random": 1.5, "wall_pace_add": 0.0},
 	}
 	var rival_rows: Dictionary = {}
 	for row in data.rivals:
@@ -300,6 +321,7 @@ func _d13_anchor_values() -> void:
 		"rush_lap_final": ["ai_volkova", "ai_holloway"],
 		"rush_random": ["ai_sherwood", "ai_jude"],
 		"stability_under_pressure": ["ai_bianca"],
+		"wall_pace_add": ["ai_lorentz", "ai_diaz", "ai_sherwood", "ai_holloway"],
 	}
 	for column in exclusive_owners:
 		for rival_id in rival_rows:
@@ -1123,7 +1145,7 @@ func _sector_attribute_weights() -> void:
 		return
 	var data := engine.data
 	# 기대 가중 = 기본 분포 + 주속성 Δ + 부속성 Δ/2 (음수 절단). 재정규화는 추첨 시점 소관.
-	for circuit_id in ["circuit_mn1", "circuit_mn2", "circuit_mn3", "circuit_mn4"]:
+	for circuit_id in _d08_expected_layout():
 		var probe := _new_engine(101, circuit_id)
 		if probe == null:
 			return
@@ -1143,17 +1165,8 @@ func _sector_attribute_weights() -> void:
 					expected += CsvTable.to_float(String(sub_attr[column])) * 0.5
 				_eq_float("%s s%d %s 가중" % [circuit_id, slot, String(row["id"])],
 					float(actual[index]), maxf(expected, 0.0), 0.0001)
-	# 속성 배정이 D08 별첨A §1 표와 일치하는지 (배정 변조 = 서킷 정체성 변조)
-	var expected_layout := {
-		"circuit_mn1": [["attr_straight", ""], ["attr_technical", ""], ["attr_sweeper", ""],
-			["attr_battle_zone", "attr_straight"]],
-		"circuit_mn2": [["attr_straight", ""], ["attr_sweeper", ""], ["attr_technical", ""],
-			["attr_straight", "attr_battle_zone"], ["attr_battle_zone", ""]],
-		"circuit_mn3": [["attr_technical", ""], ["attr_hazard", "attr_technical"],
-			["attr_pulse_section", ""], ["attr_technical", "attr_battle_zone"]],
-		"circuit_mn4": [["attr_straight", ""], ["attr_sweeper", ""], ["attr_technical", ""],
-			["attr_hazard", "attr_technical"], ["attr_battle_zone", "attr_straight"]],
-	}
+	# 속성 배정이 D08 별첨A §1~§5 표와 일치하는지 (배정 변조 = 서킷 정체성 변조)
+	var expected_layout := _d08_expected_layout()
 	for circuit_id in expected_layout:
 		var probe2 := _new_engine(101, circuit_id)
 		if probe2 == null:
@@ -1172,12 +1185,13 @@ func _sector_attribute_weights() -> void:
 				String(entry2.get("sub_attr", "")) == String(expected_pair[1]),
 				"actual=%s expected=%s" % [entry2.get("sub_attr", ""), expected_pair[1]])
 		# 펄스 섹션은 무대 제3전(빌드B)에만 (D08 별첨A §0 공통 규칙 ④)
+		var build_b_circuits := ["circuit_mn3", "circuit_ac3", "circuit_ar3", "circuit_mf3", "circuit_pd3"]
 		var has_pulse := false
 		for slot2 in range(1, probe2.data.circuit_int("sectors_per_lap") + 1):
 			if String(probe2.data.sector_entry(slot2)["main_attr"]) == "attr_pulse_section":
 				has_pulse = true
 		_ok("D08 별첨A 펄스 섹션 배치 = 제3전 전속 (%s)" % circuit_id,
-			has_pulse == (circuit_id == "circuit_mn3"), "has_pulse=%s" % str(has_pulse))
+			has_pulse == build_b_circuits.has(circuit_id), "has_pulse=%s" % str(has_pulse))
 		# 서킷당 배틀 존 최소 1 (D08 별첨A §0 공통 규칙 ③)
 		var battle_zones := 0
 		for slot3 in range(1, probe2.data.circuit_int("sectors_per_lap") + 1):
@@ -1198,6 +1212,129 @@ func _sector_attribute_weights() -> void:
 			probe3.sector = slot4
 			_ok("%s s%d 게이지 계수 ≤ 1.8" % [circuit_id, slot4], probe3._gauge_mult() <= 1.8 + 0.0001,
 				"mult=%f" % probe3._gauge_mult())
+	# 슬롯 구성 (D08 §4.3): 무대별 4서킷 = 오프너(4)/빌드A(5)/빌드B(4)/피니셔(5) + 무대 결속 (§2.3)
+	var role_order := ["opener", "build_a", "build_b", "finisher"]
+	var role_sectors := {"opener": 4, "build_a": 5, "build_b": 4, "finisher": 5}
+	for stage_id in data.stages:
+		var stage_circuits: Array = data.stages[stage_id].get("circuits", [])
+		_ok("D08 §4.3 %s 서킷 4종" % stage_id, stage_circuits.size() == 4, str(stage_circuits))
+		for index in range(stage_circuits.size()):
+			var circuit_id2 := String(stage_circuits[index])
+			var member: Dictionary = data.circuits.get(circuit_id2, {})
+			_ok("D08 §4.3 %s 슬롯 역할" % circuit_id2,
+				String(member.get("tour_slot_role", "")) == String(role_order[index]),
+				"actual=%s expected=%s" % [member.get("tour_slot_role"), role_order[index]])
+			_ok("D08 §4.3 %s 섹터 수(역할 표준)" % circuit_id2,
+				int(member.get("sectors_per_lap", -1)) == int(role_sectors[role_order[index]]),
+				"actual=%d" % int(member.get("sectors_per_lap", -1)))
+			_ok("D08 §2.3 무대 결속: %s.stage_id" % circuit_id2,
+				String(member.get("stage_id", "")) == stage_id, str(member.get("stage_id")))
+
+
+# D08 별첨A §1~§5 섹터 배치표 전사 (서킷 20종 전수) — 검사 기대값의 유일 정본.
+# 자기 일관성 금지 (검증 프로토콜 §2-①): 여기 값은 데이터가 아니라 문서에서 옮겼다.
+func _d08_expected_layout() -> Dictionary:
+	return {
+		"circuit_mn1": [["attr_straight", ""], ["attr_technical", ""], ["attr_sweeper", ""],
+			["attr_battle_zone", "attr_straight"]],
+		"circuit_mn2": [["attr_straight", ""], ["attr_sweeper", ""], ["attr_technical", ""],
+			["attr_straight", "attr_battle_zone"], ["attr_battle_zone", ""]],
+		"circuit_mn3": [["attr_technical", ""], ["attr_hazard", "attr_technical"],
+			["attr_pulse_section", ""], ["attr_technical", "attr_battle_zone"]],
+		"circuit_mn4": [["attr_straight", ""], ["attr_sweeper", ""], ["attr_technical", ""],
+			["attr_hazard", "attr_technical"], ["attr_battle_zone", "attr_straight"]],
+		"circuit_ac1": [["attr_straight", ""], ["attr_sweeper", ""],
+			["attr_straight", "attr_battle_zone"], ["attr_battle_zone", ""]],
+		"circuit_ac2": [["attr_straight", ""], ["attr_sweeper", ""], ["attr_hazard", ""],
+			["attr_straight", ""], ["attr_battle_zone", "attr_sweeper"]],
+		"circuit_ac3": [["attr_technical", ""], ["attr_straight", ""],
+			["attr_pulse_section", ""], ["attr_sweeper", "attr_battle_zone"]],
+		"circuit_ac4": [["attr_straight", ""], ["attr_sweeper", ""], ["attr_technical", ""],
+			["attr_hazard", "attr_straight"], ["attr_battle_zone", ""]],
+		"circuit_ar1": [["attr_sweeper", ""], ["attr_technical", ""],
+			["attr_technical", "attr_hazard"], ["attr_battle_zone", ""]],
+		"circuit_ar2": [["attr_technical", ""], ["attr_technical", ""], ["attr_hazard", ""],
+			["attr_sweeper", ""], ["attr_battle_zone", "attr_technical"]],
+		"circuit_ar3": [["attr_sweeper", ""], ["attr_hazard", ""],
+			["attr_pulse_section", ""], ["attr_technical", "attr_battle_zone"]],
+		"circuit_ar4": [["attr_technical", ""], ["attr_sweeper", ""], ["attr_hazard", ""],
+			["attr_technical", ""], ["attr_battle_zone", "attr_hazard"]],
+		"circuit_mf1": [["attr_straight", ""], ["attr_hazard", ""], ["attr_sweeper", ""],
+			["attr_battle_zone", ""]],
+		"circuit_mf2": [["attr_straight", ""], ["attr_straight", "attr_battle_zone"],
+			["attr_hazard", ""], ["attr_sweeper", ""], ["attr_battle_zone", ""]],
+		"circuit_mf3": [["attr_technical", ""], ["attr_hazard", "attr_technical"],
+			["attr_pulse_section", ""], ["attr_sweeper", "attr_battle_zone"]],
+		"circuit_mf4": [["attr_straight", ""], ["attr_hazard", ""], ["attr_technical", ""],
+			["attr_sweeper", "attr_hazard"], ["attr_battle_zone", ""]],
+		"circuit_pd1": [["attr_straight", ""], ["attr_battle_zone", ""], ["attr_sweeper", ""],
+			["attr_battle_zone", "attr_straight"]],
+		"circuit_pd2": [["attr_straight", ""], ["attr_sweeper", ""],
+			["attr_straight", "attr_battle_zone"], ["attr_sweeper", ""], ["attr_battle_zone", ""]],
+		"circuit_pd3": [["attr_technical", ""], ["attr_hazard", ""],
+			["attr_pulse_section", ""], ["attr_technical", "attr_battle_zone"]],
+		"circuit_pd4": [["attr_straight", ""], ["attr_technical", ""], ["attr_sweeper", ""],
+			["attr_hazard", "attr_technical"], ["attr_battle_zone", ""]],
+	}
+
+
+# ── 벽 라이벌 결선 (D08 §5.1 ① · D13 별첨A §2.4·§6.2) ──
+# MS-2(무벽 메트로)에서는 전 경로 잠복이었다 — 무대 2~5 유입과 함께 소비부 3종을 검증한다.
+func _wall_rival_wired() -> void:
+	# 페이스 가중 (D13 §6.2 벽 무대 가중 행 전사): 벽 서킷 vs 무벽 서킷(mn1)의 pace 차 = 가중치.
+	# form은 pace에 합산되지 않는 별도 필드라 시드 차이의 영향이 없다.
+	var wall_adds := {
+		"circuit_ac1": ["ai_diaz", 1.4], "circuit_ar1": ["ai_sherwood", 1.9],
+		"circuit_mf1": ["ai_holloway", 1.4], "circuit_pd1": ["ai_lorentz", 1.0],
+	}
+	var off_wall := _new_engine(303, "circuit_mn1")
+	if off_wall == null:
+		return
+	off_wall.start_gp()
+	for circuit_id in wall_adds:
+		var rival_id := String(Array(wall_adds[circuit_id])[0])
+		var expected_add := float(Array(wall_adds[circuit_id])[1])
+		var on_wall := _new_engine(303, circuit_id)
+		on_wall.start_gp()
+		_eq_float("D13 §6.2 벽 페이스 가중: %s(%s) +%.1f" % [rival_id, circuit_id, expected_add],
+			float(on_wall.entrants[rival_id]["pace"]) - float(off_wall.entrants[rival_id]["pace"]),
+			expected_add)
+		# 가중은 벽 전속 — 비벽 라이벌(마로)은 무대가 바뀌어도 페이스 불변
+		_eq_float("벽 가중은 벽 전속 (%s에서 마로 Δ0)" % circuit_id,
+			float(on_wall.entrants["ai_maro"]["pace"]) - float(off_wall.entrants["ai_maro"]["pace"]), 0.0)
+		# 듀얼 임계 +6 (D13 §2.4 "벽 라이벌 (해당 무대) +6" — 추월·방어 공통)
+		_eq_float("D13 §2.4 벽 추월 임계 +6 (%s)" % rival_id,
+			on_wall._duel_threshold(RaceTypes.DuelType.OVERTAKE, rival_id)
+				- off_wall._duel_threshold(RaceTypes.DuelType.OVERTAKE, rival_id), 6.0)
+		_eq_float("D13 §2.4 벽 방어 임계 +6 (%s)" % rival_id,
+			on_wall._duel_threshold(RaceTypes.DuelType.DEFENSE, rival_id)
+				- off_wall._duel_threshold(RaceTypes.DuelType.DEFENSE, rival_id), 6.0)
+	# 무벽 무대에서는 가산 없음 — 임계가 §2.4 기본 산식 그대로인지 대조 (디아스 방어 45+무벽0)
+	var base_defense := off_wall.data.param("param_duel_defense_base") \
+		+ float(off_wall.entrants["ai_diaz"]["seed_aggression"]) \
+		* off_wall.data.param("param_duel_defense_aggression_coef")
+	_eq_float("무벽 무대 임계 = 기본 산식 (디아스)",
+		off_wall._duel_threshold(RaceTypes.DuelType.DEFENSE, "ai_diaz"), base_defense)
+	# 로렌츠 방어 override(55)에도 +6 [가안 — §2.4 벽 행은 독립 가산 행, 면제 문면 없음]
+	var dome := _new_engine(303, "circuit_pd1")
+	dome.start_gp()
+	_eq_float("D13 §2.4 로렌츠 방어 55 + 벽 6 (펄스 돔)",
+		dome._duel_threshold(RaceTypes.DuelType.DEFENSE, "ai_lorentz"), 61.0)
+	# AI 리타이어 벽 면제 (D13 §6.2 "벽 라이벌 제외") — 확률 경로라 표본을 강제 확보한다
+	# (검증 프로토콜 §1-5: 단발 시행 금지 · 표본 확보 자체를 별도 단언으로).
+	var probe := _new_engine(304, "circuit_ac1")
+	probe.start_gp()
+	var trials := 3000
+	for i in range(trials):
+		probe.ai_retire_count = 0   # GP 상한을 매 회 초기화 — 순수 개체 판정만 표본화
+		probe._ai_retire_check()
+	var retired_others := 0
+	for entrant_id in probe.entrants:
+		if entrant_id != RaceEngine.PLAYER_ID and bool(probe.entrants[entrant_id]["retired"]):
+			retired_others += 1
+	_ok("리타이어 표본 확보 (%d회 시행)" % trials, retired_others >= 5, "retired=%d" % retired_others)
+	_ok("D13 §6.2 벽 라이벌 리타이어 면제 (디아스·아주르)",
+		not bool(probe.entrants["ai_diaz"]["retired"]), str(probe.entrants["ai_diaz"]["retired"]))
 
 
 # ── 레조넌스 오버레이 런타임 (D08 §3.7 R3·R6·R7 · D13 별첨A §6.6) ──

@@ -1,0 +1,16 @@
+{
+	"schema_version": 1,
+	"id": "circuit_mf4",
+	"name_key": "ui.circuit.mf4",
+	"stage_id": "stage_mirage_flat",
+	"tour_slot_role": "finisher",
+	"laps": 3,
+	"sectors_per_lap": 5,
+	"sectors": [
+		{"slot": 1, "name_key": "ui.sector.mf4s1", "main_attr": "attr_straight", "sub_attr": ""},
+		{"slot": 2, "name_key": "ui.sector.mf4s2", "main_attr": "attr_hazard", "sub_attr": ""},
+		{"slot": 3, "name_key": "ui.sector.mf4s3", "main_attr": "attr_technical", "sub_attr": ""},
+		{"slot": 4, "name_key": "ui.sector.mf4s4", "main_attr": "attr_sweeper", "sub_attr": "attr_hazard"},
+		{"slot": 5, "name_key": "ui.sector.mf4s5", "main_attr": "attr_battle_zone", "sub_attr": ""}
+	]
+}

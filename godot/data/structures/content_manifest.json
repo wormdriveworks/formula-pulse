@@ -1,8 +1,37 @@
 {
 	"schema_version": 1,
 	"id": "content_manifest",
-	"stages": ["stage_metro_night"],
-	"circuits": ["circuit_mn1", "circuit_mn2", "circuit_mn3", "circuit_mn4"],
-	"scripted_losses": ["scripted_loss_s1"],
+	"stages": [
+		"stage_metro_night",
+		"stage_azure_coast",
+		"stage_alta_ridge",
+		"stage_mirage_flat",
+		"stage_pulse_dome"
+	],
+	"circuits": [
+		"circuit_mn1",
+		"circuit_mn2",
+		"circuit_mn3",
+		"circuit_mn4",
+		"circuit_ac1",
+		"circuit_ac2",
+		"circuit_ac3",
+		"circuit_ac4",
+		"circuit_ar1",
+		"circuit_ar2",
+		"circuit_ar3",
+		"circuit_ar4",
+		"circuit_mf1",
+		"circuit_mf2",
+		"circuit_mf3",
+		"circuit_mf4",
+		"circuit_pd1",
+		"circuit_pd2",
+		"circuit_pd3",
+		"circuit_pd4"
+	],
+	"scripted_losses": [
+		"scripted_loss_s1"
+	],
 	"default_circuit": "circuit_mn1"
 }

@@ -19,8 +19,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 6000:
-		print("EVENTS_TEST_FAIL checks=%d < 하한 6000 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 7000:
+		print("EVENTS_TEST_FAIL checks=%d < 하한 7000 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -93,7 +93,7 @@ func _d13_event_values() -> void:
 	_ok("D08 §7.2 경제 가드: C1 상한 ≤ 필드 정비 상한",
 		CsvTable.to_float(String(c1["reward_max"])) <= data.param("param_repair_field_cap"),
 		"c1_max=%s cap=%f" % [c1["reward_max"], data.param("param_repair_field_cap")])
-	# 풀 규모 (D08 별첨A §6): 공통 28 + 무대 전용 4(무대 1분) — 카테고리별 구성 대조
+	# 풀 규모 (D08 별첨A §6 확정): 공통 28 + 무대 전용 20(무대 5 × 4) = 총 48종
 	var common_by_category: Dictionary = {}
 	var stage_count := 0
 	for event_id in data.events:
@@ -108,7 +108,25 @@ func _d13_event_values() -> void:
 		_ok("D08 별첨A §6 공통 풀 %s = %d종" % [category_id, expected_common[category_id]],
 			int(common_by_category.get(category_id, 0)) == int(expected_common[category_id]),
 			"actual=%s" % str(common_by_category.get(category_id)))
-	_ok("D08 별첨A §1 무대 1 전용 풀 4종", stage_count == 4, "actual=%d" % stage_count)
+	_ok("D08 별첨A §6 무대 전용 풀 20종", stage_count == 20, "actual=%d" % stage_count)
+	_ok("D08 별첨A §6 총 48종 (목표 범위 44~52 내)", data.events.size() == 48, "actual=%d" % data.events.size())
+	# 무대별 전용 풀 카테고리 구성 (별첨A 각 무대 총론 표 전사 — 순서 무관 다중집합 대조)
+	var expected_stage_pools := {
+		"stage_metro_night": ["category_c2", "category_c3", "category_c1", "category_c5"],
+		"stage_azure_coast": ["category_c4", "category_c2", "category_c3", "category_c1"],
+		"stage_alta_ridge":  ["category_c4", "category_c1", "category_c3", "category_c5"],
+		"stage_mirage_flat": ["category_c4", "category_c1", "category_c2", "category_c5"],
+		"stage_pulse_dome":  ["category_c3", "category_c3", "category_c5", "category_c1"],
+	}
+	for stage_id in expected_stage_pools:
+		var pool: Array = data.stages.get(stage_id, {}).get("event_pool", [])
+		var categories: Array = []
+		for pooled_id in pool:
+			categories.append(String(data.event(String(pooled_id))["category_id"]))
+		categories.sort()
+		var expected_cats: Array = Array(expected_stage_pools[stage_id]).duplicate()
+		expected_cats.sort()
+		_ok("D08 별첨A %s 전용 풀 카테고리 구성" % stage_id, categories == expected_cats, str(categories))
 
 
 # ── 제한 조건 DSL (D12 §5.4: 필드 비교·AND/OR 한정 · 스크립트 임베드 금지) ──
@@ -233,13 +251,24 @@ func _stage_pool_scope() -> void:
 	var data := _new_data()
 	if data == null:
 		return
-	var service := _new_service(888, data)
-	var stage_events := 0
-	for i in range(3000):
-		var result := service.judge("stage_metro_night", _context())
-		if not result.is_empty() and String(data.event(String(result["event_id"]))["scope"]) == "stage":
+	# 무대 5종 전수 — 발생하는 무대 전용 이벤트가 전부 자기 무대 풀 소속인지 (교차 유입 0)
+	for stage_id in ["stage_metro_night", "stage_azure_coast", "stage_alta_ridge",
+			"stage_mirage_flat", "stage_pulse_dome"]:
+		var service := _new_service(888, data)
+		var own_pool: Array = data.stages[stage_id].get("event_pool", [])
+		var stage_events := 0
+		var foreign := 0
+		for i in range(3000):
+			var result := service.judge(String(stage_id), _context())
+			if result.is_empty():
+				continue
+			if String(data.event(String(result["event_id"]))["scope"]) != "stage":
+				continue
 			stage_events += 1
-	_ok("무대 전용 이벤트가 해당 무대에서 발생", stage_events > 0, "count=%d" % stage_events)
+			if not own_pool.has(String(result["event_id"])):
+				foreign += 1
+		_ok("무대 전용 이벤트 발생 (%s)" % stage_id, stage_events > 0, "count=%d" % stage_events)
+		_ok("타 무대 전용 풀 교차 유입 0 (%s)" % stage_id, foreign == 0, "foreign=%d" % foreign)
 	# 무대를 지정하지 않으면 무대 전용은 후보에서 빠진다
 	var service2 := _new_service(888, data)
 	var leaked := 0

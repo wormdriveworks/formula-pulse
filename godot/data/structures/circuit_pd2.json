@@ -1,0 +1,16 @@
+{
+	"schema_version": 1,
+	"id": "circuit_pd2",
+	"name_key": "ui.circuit.pd2",
+	"stage_id": "stage_pulse_dome",
+	"tour_slot_role": "build_a",
+	"laps": 3,
+	"sectors_per_lap": 5,
+	"sectors": [
+		{"slot": 1, "name_key": "ui.sector.pd2s1", "main_attr": "attr_straight", "sub_attr": ""},
+		{"slot": 2, "name_key": "ui.sector.pd2s2", "main_attr": "attr_sweeper", "sub_attr": ""},
+		{"slot": 3, "name_key": "ui.sector.pd2s3", "main_attr": "attr_straight", "sub_attr": "attr_battle_zone"},
+		{"slot": 4, "name_key": "ui.sector.pd2s4", "main_attr": "attr_sweeper", "sub_attr": ""},
+		{"slot": 5, "name_key": "ui.sector.pd2s5", "main_attr": "attr_battle_zone", "sub_attr": ""}
+	]
+}

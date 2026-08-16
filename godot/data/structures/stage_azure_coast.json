@@ -1,0 +1,21 @@
+{
+	"schema_version": 1,
+	"id": "stage_azure_coast",
+	"name_key": "ui.stage.azureCoast",
+	"season1_tour_slot": 2,
+	"circuits": [
+		"circuit_ac1",
+		"circuit_ac2",
+		"circuit_ac3",
+		"circuit_ac4"
+	],
+	"wall_rival": "ai_diaz",
+	"resonance_bonus_type": "front_gauge",
+	"resonance_bonus_value": 60,
+	"event_pool": [
+		"event_ac_wind_warning",
+		"event_ac_resort_sponsor",
+		"event_ac_beach_encounter",
+		"event_ac_salt_wash"
+	]
+}

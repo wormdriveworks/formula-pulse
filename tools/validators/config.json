@@ -87,7 +87,8 @@
     "duel_overtake_add": "float",
     "duel_defense_override": "float_optional",
     "stability_under_pressure": "float_optional",
-    "number": "int"
+    "number": "int",
+    "wall_pace_add": "float"
    }
   },
   "points_tier1.csv": {
@@ -378,16 +379,7 @@
   },
   "stage_metro_night.json": {
    "root": true,
-   "required": {
-    "id": "string",
-    "name_key": "string_key",
-    "season1_tour_slot": "int:1,5",
-    "circuits": "structure_ref_array",
-    "wall_rival": "fk_optional:ai_rivals.csv",
-    "resonance_bonus_type": "enum:charge,front_gauge,duel_judgment,chassis,front_gauge_full",
-    "resonance_bonus_value": "float",
-    "event_pool": "fk_array:events.csv"
-   }
+   "template": "stage"
   },
   "scripted_loss_s1.json": {
    "root": true,
@@ -415,9 +407,89 @@
     "tours_per_season": "int:1,9",
     "races_per_tour": "int:1,9",
     "fixed_opening_stage": "structure_ref",
-    "fixed_final_stage": "string",
+    "fixed_final_stage": "structure_ref",
     "shuffle_pool": "structure_ref_array"
    }
+  },
+  "circuit_ac1.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_ac2.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_ac3.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_ac4.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_ar1.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_ar2.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_ar3.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_ar4.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_mf1.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_mf2.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_mf3.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_mf4.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_pd1.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_pd2.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_pd3.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "circuit_pd4.json": {
+   "root": true,
+   "template": "circuit"
+  },
+  "stage_azure_coast.json": {
+   "root": true,
+   "template": "stage"
+  },
+  "stage_alta_ridge.json": {
+   "root": true,
+   "template": "stage"
+  },
+  "stage_mirage_flat.json": {
+   "root": true,
+   "template": "stage"
+  },
+  "stage_pulse_dome.json": {
+   "root": true,
+   "template": "stage"
   }
  },
  "structure_templates": {
@@ -446,6 +518,18 @@
       ]
      ]
     }
+   }
+  },
+  "stage": {
+   "required": {
+    "id": "string",
+    "name_key": "string_key",
+    "season1_tour_slot": "int:1,5",
+    "circuits": "structure_ref_array",
+    "wall_rival": "fk_optional:ai_rivals.csv",
+    "resonance_bonus_type": "enum:charge,front_gauge,duel_judgment,chassis,front_gauge_full",
+    "resonance_bonus_value": "float",
+    "event_pool": "fk_array:events.csv"
    }
   }
  },

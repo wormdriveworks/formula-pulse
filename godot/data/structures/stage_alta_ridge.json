@@ -1,0 +1,21 @@
+{
+	"schema_version": 1,
+	"id": "stage_alta_ridge",
+	"name_key": "ui.stage.altaRidge",
+	"season1_tour_slot": 3,
+	"circuits": [
+		"circuit_ar1",
+		"circuit_ar2",
+		"circuit_ar3",
+		"circuit_ar4"
+	],
+	"wall_rival": "ai_sherwood",
+	"resonance_bonus_type": "duel_judgment",
+	"resonance_bonus_value": 25,
+	"event_pool": [
+		"event_ar_altitude_check",
+		"event_ar_lodge_rest",
+		"event_ar_old_pass",
+		"event_ar_rescue_cheer"
+	]
+}

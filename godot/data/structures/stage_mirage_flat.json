@@ -1,0 +1,21 @@
+{
+	"schema_version": 1,
+	"id": "stage_mirage_flat",
+	"name_key": "ui.stage.mirageFlat",
+	"season1_tour_slot": 4,
+	"circuits": [
+		"circuit_mf1",
+		"circuit_mf2",
+		"circuit_mf3",
+		"circuit_mf4"
+	],
+	"wall_rival": "ai_holloway",
+	"resonance_bonus_type": "chassis",
+	"resonance_bonus_value": 30,
+	"event_pool": [
+		"event_mf_sandstorm_warning",
+		"event_mf_oasis_camp",
+		"event_mf_documentary",
+		"event_mf_mirage_sighting"
+	]
+}
