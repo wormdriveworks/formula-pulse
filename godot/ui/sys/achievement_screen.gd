@@ -5,10 +5,9 @@
 # 명칭·조건 전부 비노출이되 자리는 남겨 총수 가늠은 허용한다(§5.5 확정 규격).
 # 무보상 명예형이므로 **보상 열 자체가 없다**(D07 §7.1 — Source 신설 금지).
 #
-# **발견형 4종은 라이벌 탭에 든다.** 데이터의 `category` 열은 'discovery' 지만 그것은
-# 조건 유형이지 카테고리가 아니다(D07 §7.1 · 총괄 판정 IMPL-121 ②). 데이터 열을 고치지 않고
-# 표시 층에서 묶는 이유는 TC-O 가 category 계수를 6종으로 못박고 있어(원격 데이터 계약)
-# 열을 바꾸면 데이터 검사와 화면 규격이 서로를 무효화하기 때문이다.
+# **탭 = `category` 열 그대로다.** 발견형 4종은 카테고리가 아니라 조건 유형이므로
+# (D07 §7.1 · 총괄 판정 IMPL-121 ②) 데이터의 `category` 가 라이벌로 교정됐고
+# (IMPL-128 §5) 화면은 흡수 매핑 없이 1:1로 읽는다.
 #
 # 두 진입 경로를 지원한다(SYS-03 전례): 라우터 경유(타이틀 — payload.return 으로 복귀) /
 # 오버레이 인스턴스(일시정지 위 — `closed` 시그널로 호출자가 회수).
@@ -16,13 +15,13 @@ extends FlowScreen
 
 signal closed
 
-# 탭 = D07 §7.1 5카테고리. `categories` = 이 탭이 흡수하는 데이터 category 값.
+# 탭 = D07 §7.1 5카테고리 (데이터 `category` 값과 1:1).
 const TABS := [
-	{"key": "ui.achievement.tabCareer", "categories": ["career"]},
-	{"key": "ui.achievement.tabRival", "categories": ["rival", "discovery"]},
-	{"key": "ui.achievement.tabDriving", "categories": ["driving"]},
-	{"key": "ui.achievement.tabGarage", "categories": ["garage"]},
-	{"key": "ui.achievement.tabArchive", "categories": ["archive"]},
+	{"key": "ui.achievement.tabCareer", "category": "career"},
+	{"key": "ui.achievement.tabRival", "category": "rival"},
+	{"key": "ui.achievement.tabDriving", "category": "driving"},
+	{"key": "ui.achievement.tabGarage", "category": "garage"},
+	{"key": "ui.achievement.tabArchive", "category": "archive"},
 ]
 
 var _return_route := "SYS-01"
@@ -98,16 +97,15 @@ func _build_tabs() -> void:
 		scroll.add_child(panel)
 		_tab_panels.append(scroll)
 
-		for achievement_id in _ids_for(Array(tab["categories"])):
+		for achievement_id in _ids_for(String(tab["category"])):
 			panel.add_child(_build_row(String(achievement_id)))
 
 
 # 탭에 드는 업적 id — 데이터 적재 순서를 따른다(D08 §8.11 열거 순 = CSV 행 순).
-func _ids_for(categories: Array) -> Array:
+func _ids_for(category: String) -> Array:
 	var ids: Array = []
 	for achievement_id in session.data.achievements:
-		var row: Dictionary = session.data.achievements[achievement_id]
-		if categories.has(String(row["category"])):
+		if String(session.data.achievements[achievement_id]["category"]) == category:
 			ids.append(String(achievement_id))
 	return ids
 
@@ -157,18 +155,34 @@ func _build_row(achievement_id: String) -> Control:
 	# 조건 축 — **임계가 2 이상인 축적형에만 진척을 적는다** [가안].
 	# 임계 1 인 도달형은 명칭 자체가 조건 문면이라("첫 포디움") "0 / 1" 이 정보를 더하지 않는다.
 	# 조건 전용 문면은 정본에 없다 — 별도 문안이 서면 이 자리에 든다.
+	var progress_label := Label.new()
+	progress_label.name = "Progress"
+	progress_label.custom_minimum_size = Vector2(60, 0)
 	var threshold := int(progress["threshold"])
+	var progress_text := ""
 	if threshold > 1:
-		var progress_label := Label.new()
-		progress_label.name = "Progress"
-		var progress_text := s.text("ui.achievement.progressFormat", {
+		progress_text = s.text("ui.achievement.progressFormat", {
 			"current": mini(int(progress["current"]), threshold),
 			"threshold": threshold,
 		})
-		progress_label.text = progress_text
-		progress_label.add_theme_font_size_override("font_size", _body_font_size)
-		progress_label.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
-		row.add_child(progress_label)
+	progress_label.text = progress_text
+	progress_label.add_theme_font_size_override("font_size", _body_font_size)
+	progress_label.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+	row.add_child(progress_label)
+
+	# 달성 일시 — 시각 축 = **인게임 시즌**(총괄 판정 IMPL-128 A-1 · §5.5 칭호 이력 `(시즌 N)` 전례).
+	# 달성분인데 시즌이 없으면 구세이브 소급분이다 — 없는 값을 지어내지 않고 '—' 로 적는다.
+	if met:
+		var season_label := Label.new()
+		season_label.name = "Season"
+		var achieved_season := int(progress["season"])
+		var season_text := s.text("ui.achievement.seasonUnknown")
+		if achieved_season > 0:
+			season_text = s.text("ui.achievement.seasonFormat", {"season": achieved_season})
+		season_label.text = season_text
+		season_label.add_theme_font_size_override("font_size", _body_font_size)
+		season_label.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+		row.add_child(season_label)
 	return row
 
 

@@ -358,7 +358,7 @@
    "columns": {
     "id": "id",
     "name_key": "string_key",
-    "category": "enum:career,rival,driving,garage,archive,discovery",
+    "category": "enum:career,rival,driving,garage,archive",
     "condition_type": "enum:reach,cumulative,discovery",
     "source": "enum:milestone,career_stat,relation,discovery,state",
     "source_id": "string",

@@ -15,6 +15,8 @@
 extends FlowScreen
 
 const REEL_COUNT := 3
+# 라이벌 id — 데이터 행 키 참조이며 표시 문자열이 아니다(불변규칙 6의 테이블 ID 체계).
+const JUDE_ID := "ai_jude"
 const HOLD_KEYS := [KEY_1, KEY_2, KEY_3]
 const ICON_DIR := "res://assets/ui/icons/"
 
@@ -647,12 +649,12 @@ func _collect_triggers(events: Array) -> Array:
 
 
 # L3 조우 판정 (D10 §7 결정 #6 — CG-01~03은 D08 §8.11 발견형 히든 업적과 1:1).
-# **CG-01(왕좌 — 로렌츠)만 결선한다.** 조건 = 시즌 최종 무대의 벽 라이벌과의 듀얼 결판 국면.
-# 나머지 2종은 아직 설 수 없다 — CG-02(재회 — 카이)는 '대면' 도달 축이 `relation_axes` 에
-# 부재(T7 서사 유입 의존 — IMPL-113 §5), CG-03(동기 — 주드)은 '첫 순위 역전 인접 듀얼'의
-# 판정 규격이 정본에 없다(총괄 보고 대상). 임의 해석하지 않는다(불변규칙 9).
+# 세 행이 같은 문형(**[상대] ([조건] 듀얼)**)이라 판정도 같은 구조다: 조건 성립 + 그 상대와의 듀얼.
+# **CG-02(재회 — 카이)만 미결선** — '대면' 도달 축이 `relation_axes` 에 부재하다
+# (T7 서사 유입 의존 — IMPL-113 §5). 축이 들어오면 여기 한 갈래가 는다.
+#
 # 조건 판정은 화면 상태를 타지 않는 순수 함수로 둔다 — 화면을 세우지 않고 검사할 수 있어야
-# 조건이 조용히 어긋나는 일을 막는다(무대 5 도달 없이는 실기로 못 밟는 경로다).
+# 조건이 조용히 어긋나는 일을 막는다(무대 5·시즌 중반은 실기로 밟기 어려운 경로다).
 static func l3_encounter_for(stage: Dictionary, final_stage_id: String, opponent: String,
 		duel_decided: bool) -> String:
 	if not duel_decided:
@@ -665,17 +667,36 @@ static func l3_encounter_for(stage: Dictionary, final_stage_id: String, opponent
 	return "cg_01_throne"
 
 
+# CG-03(동기 — 주드): **역전 성립 후 최초의 주드 인접 듀얼** (총괄 판정 IMPL-128 B-2).
+# 역전 자체는 GP 결과로 확정되므로 래치는 세션이 GP 종료에서 세운다 — 여기서는 그 결과만 읽는다.
+# 인접 임계는 D13 별첨A §6.5 확정값의 데이터 전사(`param_jude_adjacent_max`)를 받는다.
+static func l3_kinship_for(opponent: String, overtaken: bool, rank_delta: int,
+		adjacent_max: int) -> String:
+	if not overtaken or opponent != JUDE_ID or rank_delta > adjacent_max:
+		return ""
+	return "cg_03_kinship"
+
+
 func _l3_encounter_id(events: Array) -> String:
 	var decided := false
 	for event in events:
 		if String(TRIGGER_BY_KEY.get(String(event.get("key", "")), "")) == "trigger_duel_decision":
 			decided = true
 			break
-	return l3_encounter_for(
+	if not decided:
+		return ""
+	var throne := l3_encounter_for(
 		data.stage_of_active_circuit(),
 		String(data.season_calendar.get("fixed_final_stage", "")),
 		engine.duel_opponent,
-		decided)
+		true)
+	if not throne.is_empty():
+		return throne
+	return l3_kinship_for(
+		engine.duel_opponent,
+		session.outgame.jude_overtaken,
+		session.jude_rank_delta(),
+		int(data.param("param_jude_adjacent_max")))
 
 
 func _run_presentation(events: Array) -> void:

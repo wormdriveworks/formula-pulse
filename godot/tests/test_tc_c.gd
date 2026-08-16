@@ -39,8 +39,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 1945:
-		print("TC_C_TEST_FAIL checks=%d < 하한 1945 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 1950:
+		print("TC_C_TEST_FAIL checks=%d < 하한 1950 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -1158,6 +1158,22 @@ func _presentation_grade_caps() -> void:
 	_ok("대조 무대에 벽 존재 (검사 비공허)", not mid_wall.is_empty() and mid_wall != wall_rival, mid_wall)
 	_ok("최종 무대 아니면 미성립 (벽 듀얼이어도)",
 		String(race_screen_script.l3_encounter_for(mid_stage, final_stage_id, mid_wall, true)).is_empty())
+	# CG-03(동기 — 주드): 역전 래치 성립 후 최초의 인접 듀얼 (총괄 판정 IMPL-128 B-2).
+	# 인접 임계는 D13 별첨A §6.5 확정값의 데이터 전사 — 코드에 2를 적지 않는다(불변규칙 2).
+	var adjacent_max := int(data.param("param_jude_adjacent_max"))
+	_ok("D13 §6.5 주드 인접 임계 = 2", adjacent_max == 2, str(adjacent_max))
+	_ok("CG-03 = 래치 + 주드 + 인접",
+		String(race_screen_script.l3_kinship_for("ai_jude", true, adjacent_max, adjacent_max))
+		== "cg_03_kinship")
+	_ok("인접 초과면 미성립",
+		String(race_screen_script.l3_kinship_for("ai_jude", true, adjacent_max + 1, adjacent_max)).is_empty())
+	_ok("역전 래치 전이면 미성립 (인접이어도)",
+		String(race_screen_script.l3_kinship_for("ai_jude", false, 0, adjacent_max)).is_empty())
+	_ok("상대가 주드가 아니면 미성립",
+		String(race_screen_script.l3_kinship_for("ai_lorentz", true, 0, adjacent_max)).is_empty())
+	# 순위표 미등재(무득점 초반)의 99 가 인접으로 새지 않는가 — `_jude_rank_delta` 의 큰 값 규약
+	_ok("순위표 미등재(99)는 인접 아님",
+		String(race_screen_script.l3_kinship_for("ai_jude", true, 99, adjacent_max)).is_empty())
 
 
 # ── 섹터 속성 6축 가중 — 릴 분포 대조 (D13 별첨A §1.3 · D08 별첨A §1) ──

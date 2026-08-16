@@ -43,8 +43,17 @@ var milestones: Dictionary = {}          # milestone id -> true
 # 통산 지표 (D07 §6.2 확정 6종 + 업적 판정 소재). 감소하지 않는다 — 전진형 카운터.
 var career_stats: Dictionary = {}        # 지표 키 -> 수치
 var achievements: Dictionary = {}        # achievement id -> true (무보상 명예형 — D07 §7.1)
+# 달성 시각 축 = **인게임 시즌**(D09 §5.5 칭호 이력 `(시즌 N)` 전례 — 총괄 판정 IMPL-128 A-1).
+# 벽시계를 쓰지 않는 이유: 재로드 시 evaluate_achievements()가 현 상태로 재판정해 소급 달성이
+# 성립하므로 해제 시각이 실제 달성 시점과 어긋난다. 시즌은 세이브에 있고 되돌아가지 않는다.
+# **최초 성립 시점 1회만 적는다(래치)** — 재판정마다 갱신되면 래치가 아니다.
+var achievement_seasons: Dictionary = {}  # achievement id -> 달성 시즌 (구세이브 = 부재 → 표기 생략)
 var circuits_won: Dictionary = {}        # circuit id -> true (전 서킷 제패 판정)
 var discoveries: Dictionary = {}         # 발견형 사건 id -> true (L3 조우 등 — 표현 층이 통지)
+# CG-03(동기 — 주드) 조우의 전제 래치: 챔피언십에서 주드를 **처음 앞선** 시점(GP 종료 판정).
+# 역전은 GP 결과로 확정되고 듀얼은 GP 진행 중이라, 같은 GP 안에서는 역전 여부가 미확정이다 —
+# 그래서 '역전 성립 후 최초의 인접 듀얼'이 유일하게 실행 가능한 해석이다 (총괄 판정 IMPL-128 B-2).
+var jude_overtaken: bool = false
 var drive_data_earned_total: int = 0     # 베인 단계 판정용 누적 획득 (소비 무차감 — D13 §5.4)
 
 
@@ -612,7 +621,9 @@ func _milestone_met(row: Dictionary, context: Dictionary) -> bool:
 # 업적 판정 (D08 §8.11 · D07 §7.1) — 상태를 평가만 한다. 반환 = 이번에 새로 달성한 id 목록.
 # 판정 소스가 아직 결선되지 않은 업적(관계 축 미생성 등)은 조용히 미달성으로 두지 않고
 # pending_achievements()로 셀 수 있게 한다 — "영원히 안 켜지는 업적"을 계수로 드러내기 위함.
-func evaluate_achievements() -> Array:
+# `season` = 달성 시각 축(인게임 시즌). 0 이면 기록하지 않는다 — 시즌 문맥 없이 부른
+# 호출부(단위 검사·구경로)가 0 을 남기면 표기가 "시즌 0"이 되므로 아예 적지 않는다.
+func evaluate_achievements(season: int = 0) -> Array:
 	var newly: Array = []
 	for achievement_id in data.achievements:
 		if achievements.has(achievement_id):
@@ -622,6 +633,8 @@ func evaluate_achievements() -> Array:
 			continue
 		if _achievement_met(row):
 			achievements[String(achievement_id)] = true
+			if season > 0:
+				achievement_seasons[String(achievement_id)] = season
 			newly.append(String(achievement_id))
 	return newly
 
@@ -650,6 +663,8 @@ func achievement_progress(achievement_id: String) -> Dictionary:
 		"threshold": CsvTable.to_int(String(row["threshold"])),
 		"met": achievements.has(achievement_id),
 		"pending": _achievement_source_missing(row),
+		# 달성 시즌 — 0 = 미달성이거나 구세이브 소급분(표기 생략 대상)
+		"season": int(achievement_seasons.get(achievement_id, 0)),
 	}
 
 
@@ -752,7 +767,9 @@ func serialize() -> Dictionary:
 		"milestones": milestones.duplicate(),
 		"career_stats": career_stats.duplicate(),
 		"achievements": achievements.duplicate(),
+		"achievement_seasons": achievement_seasons.duplicate(),
 		"circuits_won": circuits_won.duplicate(),
+		"jude_overtaken": jude_overtaken,
 		"discoveries": discoveries.duplicate(),
 		"chassis": chassis,
 	}
@@ -788,7 +805,12 @@ func restore(payload: Dictionary) -> bool:
 	# 업적은 재로드 후 evaluate_achievements()가 현 상태로 재판정하므로 소급 달성이 성립한다.
 	career_stats = payload.get("career_stats", {})
 	achievements = payload.get("achievements", {})
+	# 달성 시즌 도입(IMPL-129) 전 세이브에는 없다 — **소급분은 시즌을 지어내지 않고 비운다**
+	# (표시 층이 '—'로 적는다. 총괄 판정 IMPL-128 A-1 부대 지시 2 · IMPL-090 구세이브 관용 전례).
+	achievement_seasons = payload.get("achievement_seasons", {})
 	circuits_won = payload.get("circuits_won", {})
+	# 래치 도입(IMPL-130) 전 세이브 = 미성립이 충실값 (그 세계는 역전을 세지 않았다).
+	jude_overtaken = bool(payload.get("jude_overtaken", false))
 	discoveries = payload.get("discoveries", {})
 	# 이월 도입(IMPL-078 해소) 전 세이브에는 없다 — 그 세계는 매 GP 최대치 개시였으므로 최대치가 충실한 기본값이다
 	chassis = float(payload.get("chassis", data.param("param_chassis_max")))

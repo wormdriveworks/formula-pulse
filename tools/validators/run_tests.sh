@@ -28,11 +28,11 @@ fi
 TESTS=(
 	"tests/test_core_loop.gd:0"
 	"tests/test_save_reload.gd:0"
-	"tests/test_tc_c.gd:1955"
+	"tests/test_tc_c.gd:1961"
 	"tests/test_tc_p.gd:140"
 	"tests/test_events.gd:7039"
 	"tests/test_season.gd:488"
-	"tests/test_tc_o.gd:374"
+	"tests/test_tc_o.gd:381"
 	"tests/test_narrative.gd:68"
 	"tests/test_data_driven.gd:55"
 	# SEAL-E — 실화면을 인스턴스화해 릴 정지 연출 전 UI 노출을 잡는다.

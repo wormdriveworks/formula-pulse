@@ -24,8 +24,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 370:
-		print("TC_O_TEST_FAIL checks=%d < 하한 370 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 376:
+		print("TC_O_TEST_FAIL checks=%d < 하한 376 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -383,19 +383,30 @@ func _milestones_and_achievements() -> void:
 		by_category[key] = int(by_category.get(key, 0)) + 1
 		if CsvTable.to_int(String(row["hidden"])) == 1:
 			hidden_count += 1
-	var expected_categories := {"career": 10, "rival": 14, "driving": 6, "garage": 4, "archive": 1, "discovery": 4}
+	# **카테고리는 D07 §7.1 의 5종이 전부다** — 발견형은 카테고리가 아니라 조건 유형이며
+	# `condition_type` 열이 그 축을 담는다 (총괄 판정 IMPL-121 ② · 데이터 교정 IMPL-128 §5).
+	var expected_categories := {"career": 10, "rival": 18, "driving": 6, "garage": 4, "archive": 1}
 	for category in expected_categories:
 		_ok("D08 §8.11 %s 카테고리 %d종" % [category, expected_categories[category]],
 			int(by_category.get(category, 0)) == int(expected_categories[category]),
 			"actual=%s" % str(by_category.get(category)))
-	# **[보고] 총계 불일치**: 정본 헤딩은 "총 35종"이나 열거 실측은 39종(5카테고리 35 + 발견형 4).
-	# 열거를 정본 실체로 보아 전량 등재했다 — 헤딩 계수는 총괄 판정 대기 (impl_log IMPL-113).
+	_ok("카테고리 축 = 5종 전속 (6번째 값 유입 차단)", by_category.size() == 5, str(by_category.keys()))
+	# 조건 유형 3형식 (D07 §7.1) — 발견형 4종은 여기에 산다
+	var by_condition: Dictionary = {}
+	for achievement_id2 in data.achievements:
+		var condition := String(data.achievements[achievement_id2]["condition_type"])
+		by_condition[condition] = int(by_condition.get(condition, 0)) + 1
+	_ok("조건 3형식 = reach 31 · cumulative 4 · discovery 4",
+		int(by_condition.get("reach", 0)) == 31 and int(by_condition.get("cumulative", 0)) == 4
+		and int(by_condition.get("discovery", 0)) == 4, str(by_condition))
+	# 총계: 정본 헤딩은 "총 35종"이나 열거 실측은 39종 — 총괄 판정 ①이 **열거 준거로 확정**했다
+	# (헤딩의 35는 발견형 4종 미계상 — IMPL-121 ①).
 	_ok("업적 열거 실측 39종", data.achievements.size() == 39, "actual=%d" % data.achievements.size())
 	# 비노출(H) = 관계 최종 상태 5종 + 발견형 4종 (D07 §7.1 비노출 규칙 · D08 §8.11)
 	_ok("히든 업적 9종 (관계 5 + 발견형 4)", hidden_count == 9, "actual=%d" % hidden_count)
 	for achievement_id in data.achievements:
 		var row2: Dictionary = data.achievements[achievement_id]
-		if String(row2["source"]) == "relation" or String(row2["category"]) == "discovery":
+		if String(row2["source"]) == "relation" or String(row2["condition_type"]) == "discovery":
 			_ok("D07 §7.1 비노출: %s" % achievement_id,
 				CsvTable.to_int(String(row2["hidden"])) == 1, String(row2["hidden"]))
 	# 무보상 명예형 (D07 §7.1) — 업적 테이블에 보상 열 자체가 없다 (Source 신설 0)
@@ -552,6 +563,48 @@ func _milestones_and_achievements() -> void:
 			parity_ok = false
 			parity_detail = String(progress_id)
 	_ok("진척 조회-판정 패리티 39종 전수", parity_ok, parity_detail)
+	# ── 달성 시즌 래치 (총괄 판정 IMPL-128 A-1) ──
+	# 시각 축 = 인게임 시즌. **최초 성립 시점 1회만** 적는다 — 재판정마다 갱신되면 래치가 아니고,
+	# 소급 달성(재로드 후 재판정)에서 시즌이 뒤로 밀리는 거짓 표기가 된다.
+	var stamper := _new_state()
+	for i3 in range(4):
+		stamper.record_gp_result({"player_rank": 5, "player_retired": false, "duels": 3, "duel_wins": 2,
+			"trouble_turns": 1, "circuit_id": "circuit_mn1"})
+	stamper.evaluate_achievements(1)
+	var stamped: Dictionary = stamper.achievement_progress("achievement_first_duel_win")
+	_ok("달성 시즌 = 성립 시점 시즌", int(stamped["season"]) == 1, str(stamped))
+	# 시즌 3에서 재판정해도 이미 달성한 항목의 시즌은 움직이지 않는다
+	stamper.evaluate_achievements(3)
+	_ok("재판정해도 시즌 불변 (래치)",
+		int(stamper.achievement_progress("achievement_first_duel_win")["season"]) == 1)
+	# 같은 재판정에서 **새로** 달성한 항목은 그 시점 시즌을 받는다
+	for i4 in range(3):
+		stamper.record_gp_result({"player_rank": 5, "player_retired": false, "duels": 3, "duel_wins": 2,
+			"trouble_turns": 1, "circuit_id": "circuit_mn1"})
+	stamper.evaluate_achievements(3)
+	_ok("신규 달성분은 당시 시즌",
+		int(stamper.achievement_progress("achievement_duel_10_wins")["season"]) == 3,
+		str(stamper.achievement_seasons))
+	# 시즌 문맥 없는 호출(0)은 아예 적지 않는다 — '시즌 0' 표기 방지
+	var unstamped := _new_state()
+	unstamped.record_gp_result({"player_rank": 5, "player_retired": false, "duels": 3, "duel_wins": 2,
+		"trouble_turns": 1, "circuit_id": "circuit_mn1"})
+	unstamped.evaluate_achievements()
+	_ok("시즌 문맥 없으면 미기록 (0 표기 방지)",
+		unstamped.achievements.has("achievement_first_duel_win")
+		and int(unstamped.achievement_progress("achievement_first_duel_win")["season"]) == 0)
+	# 왕복 보존 + 구세이브(필드 부재) 관용 — 소급분은 시즌을 지어내지 않는다
+	var stamp_payload := stamper.serialize()
+	var stamp_reloaded := _new_state()
+	stamp_reloaded.restore(stamp_payload)
+	_ok("달성 시즌 왕복 보존",
+		int(stamp_reloaded.achievement_progress("achievement_first_duel_win")["season"]) == 1)
+	stamp_payload.erase("achievement_seasons")
+	var legacy_stamp := _new_state()
+	legacy_stamp.restore(stamp_payload)
+	_ok("구세이브 = 시즌 부재 (표시 층이 '—')",
+		legacy_stamp.achievements.has("achievement_first_duel_win")
+		and int(legacy_stamp.achievement_progress("achievement_first_duel_win")["season"]) == 0)
 	# 직렬화 왕복 — 통산·업적·제패·발견 4축 보존
 	var payload := beater.serialize()
 	var restored := _new_state()

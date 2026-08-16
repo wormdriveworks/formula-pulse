@@ -34,7 +34,7 @@ achievement_all_skills,ui.achievement.allSkills,garage,reach,state,skill_count,1
 achievement_deck_slots_5,ui.achievement.deckSlots5,garage,reach,state,deck_slots,5,0
 achievement_all_facilities,ui.achievement.allFacilities,garage,reach,state,facility_count,4,0
 achievement_rival_files,ui.achievement.rivalFiles,archive,cumulative,career_stat,named_beats,8,0
-achievement_l3_throne,ui.achievement.l3Throne,discovery,discovery,discovery,cg_01_throne,1,1
-achievement_l3_reunion,ui.achievement.l3Reunion,discovery,discovery,discovery,cg_02_reunion,1,1
-achievement_l3_kinship,ui.achievement.l3Kinship,discovery,discovery,discovery,cg_03_kinship,1,1
-achievement_scripted_p2,ui.achievement.scriptedP2,discovery,discovery,career_stat,scripted_loss_p2,1,1
+achievement_l3_throne,ui.achievement.l3Throne,rival,discovery,discovery,cg_01_throne,1,1
+achievement_l3_reunion,ui.achievement.l3Reunion,rival,discovery,discovery,cg_02_reunion,1,1
+achievement_l3_kinship,ui.achievement.l3Kinship,rival,discovery,discovery,cg_03_kinship,1,1
+achievement_scripted_p2,ui.achievement.scriptedP2,rival,discovery,career_stat,scripted_loss_p2,1,1

@@ -71,7 +71,7 @@ func judge_event() -> Dictionary:
 		"season": season.season,
 		"tour_slot": season.tour_slot,
 		"vane_stage": outgame.vane_stage(),
-		"jude_rank_delta": _jude_rank_delta(),
+		"jude_rank_delta": jude_rank_delta(),
 	}
 	return events.judge(stage_id, context)
 
@@ -79,13 +79,25 @@ func judge_event() -> Dictionary:
 # 주드 인접 판정 (D13 별첨A §6.5): |플레이어 챔피언십 순위 − 주드 순위|.
 # 순위표에 없으면(무득점 초반) 인접이 성립하지 않도록 큰 값을 낸다 — 0 은 '가장 인접'이라
 # 조용히 항상 성립하는 반대 결함이 된다.
-func _jude_rank_delta() -> int:
+# **이벤트 변형(D08 §7.3)과 CG-03 조우(D10 §7)가 같은 축을 쓴다** — 두 소비부가 같은 값을 본다.
+func jude_rank_delta() -> int:
 	var order := season.championship_standings()
 	var player_index := order.find(SeasonState.PLAYER_ID)
 	var jude_index := order.find("ai_jude")
 	if player_index < 0 or jude_index < 0:
 		return 99
 	return absi(player_index - jude_index)
+
+
+# 챔피언십에서 플레이어가 주드보다 앞서 있는가 (순위표 인덱스가 작을수록 상위).
+# 둘 중 하나라도 순위표에 없으면 성립하지 않는다 — 무득점 초반의 '앞섬'은 앞선 것이 아니다.
+func _player_ahead_of_jude() -> bool:
+	var order := season.championship_standings()
+	var player_index := order.find(SeasonState.PLAYER_ID)
+	var jude_index := order.find("ai_jude")
+	if player_index < 0 or jude_index < 0:
+		return false
+	return player_index < jude_index
 
 
 # 이벤트 보상 적용 — 화면은 표시만 하고 적용은 세션이 코어에 위임한다
@@ -127,7 +139,11 @@ func close_gp() -> void:
 	last_gp_result["scripted_loss"] = season.is_scripted_loss_gp()
 	season.record_gp(last_gp_result)
 	outgame.record_gp_result(last_gp_result)
-	newly_achieved = outgame.evaluate_achievements()
+	# CG-03 전제 래치 — 챔피언십에서 주드를 처음 앞선 시점은 **GP 결과 확정 후**에만 알 수 있다
+	# (총괄 판정 IMPL-128 B-2). 한 번 서면 되돌리지 않는다 — 이후 순위가 다시 밀려도 '첫 역전'은 있었다.
+	if not outgame.jude_overtaken and _player_ahead_of_jude():
+		outgame.jude_overtaken = true
+	newly_achieved = outgame.evaluate_achievements(season.season)
 	outgame.chassis = engine.chassis  # 잔여 섀시 회수 — GP 밖 정본은 아웃게임 층 (D05 §8)
 	# R5 이월 회수 — 미사용분은 소멸하지 않는다 (D06 §3.5). 상한 가드는 구매 지점(K4) 전속:
 	# 사용은 수량을 늘리지 못하므로 회수분이 상한을 넘을 경로가 없다.
@@ -203,7 +219,7 @@ func settle_season() -> Dictionary:
 func close_tour() -> Dictionary:
 	last_tour_report = season.close_tour()
 	outgame.record_tour_result(last_tour_report)
-	newly_achieved = outgame.evaluate_achievements()
+	newly_achieved = outgame.evaluate_achievements(season.season)
 	if not season.season_finished():
 		# 다음 투어 개시 — 체증 카운터 리셋 + 무상 복원선 (D06 §3.3 · D13 별첨A §3.4 R2).
 		# 시즌 마지막 투어면 다음 투어가 없다 — 개시 처리는 begin_next_season()이 한다.
@@ -215,7 +231,7 @@ func close_tour() -> Dictionary:
 func close_season() -> Dictionary:
 	last_season_report = season.close_season()
 	outgame.record_season_result(last_season_report)
-	newly_achieved = outgame.evaluate_achievements()
+	newly_achieved = outgame.evaluate_achievements(season.season)
 	# 시즌 오버홀 후보 추첨 — 결산 직후 1회 (D06 §5.3). 결과는 아웃게임 층에 보존되어
 	# HUB-08 진입·재로드 어디서도 다시 추첨되지 않는다 (재로드 리롤 무효).
 	outgame.draw_overhaul_candidates(int(last_season_report.get("player_position", 16)), rng)
