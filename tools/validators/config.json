@@ -705,5 +705,17 @@
    ],
    "allow": []
   }
- ]
+ ],
+ "palette_sources": [
+  "godot/assets/palettes/master_56.gpl",
+  "godot/assets/palettes/colorblind_alt.gpl"
+ ],
+ "palette_functional_source": "godot/ui/theme/ui_palette.gd",
+ "palette_scan_dirs": [
+  "godot/ui"
+ ],
+ "palette_exempt": [
+  "godot/ui/theme/ui_palette.gd"
+ ],
+ "palette_allow": []
 }

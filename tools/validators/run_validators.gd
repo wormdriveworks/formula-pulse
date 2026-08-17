@@ -36,6 +36,7 @@ func _init() -> void:
 	_run_contamination_scan()
 	_run_architecture_scan()
 	_run_font_scan()
+	_run_palette_scan()
 	print("")
 	if _fail_count == 0:
 		print("VALIDATORS_PASS warnings=%d" % _warn_count)
@@ -111,6 +112,9 @@ func _collect_code_files(dir_path: String) -> void:
 				_collect_code_files(full_path)
 		elif entry.ends_with(".gd"):
 			_code_files.append({"path": full_path, "source": _read_text(full_path)})
+		elif entry.ends_with(".tscn"):
+			# 씬도 색 리터럴을 갖는다 (PAL) — 코드만 훑으면 그쪽이 통째로 사각이 된다.
+			_scene_files.append({"path": full_path, "source": _read_text(full_path)})
 		entry = dir.get_next()
 	dir.list_dir_end()
 
@@ -1027,3 +1031,168 @@ func _run_contamination_scan() -> void:
 				if code_line.contains(String(pattern)):
 					_fail("MIX0", "%s:%d: platform pattern '%s'" % [entry["path"], line_index + 1, pattern])
 	_report("MIX0", "core contamination scan", checked, before_fail, before_warn)
+
+
+# ── PAL 색 조달 대장 검사 (총괄 인계 IMPL-176 ⑤ — **경고형 신설**) ──
+#
+# **무엇을 보는가.** 화면 코드·씬의 색 리터럴이 조달 대장 안의 색인가.
+# 대장 = 마스터 56(`master_56.gpl`) + 정본 §6 색각 대체(`colorblind_alt.gpl`)
+#      + 기능색 부속(= `ui_palette.gd` 전사분 — IMPL-144·167 로 정본 대조가 선 유일 기계 출처)
+#      + 명시 허용 목록(`palette_allow` — 항목마다 `reason` 필수)
+#
+# **성격 = 경고형이며 차단형 전환은 별도 판정이다** (인계 §5 명문). 신설 시점에 기존 위반이
+# 다수 실재하므로 차단형으로 켜면 정리 전에 게이트가 멈춘다. FONT 전례(IMPL-147 → 148)의
+# 경고형 대기 절차를 그대로 따른다. **V7 무접촉.**
+#
+# **8bit 환산 경계.** 씬은 float 표기(`Color(0.9, 0.92, 0.95, 1)`)이고 팔레트는 8bit 정수다.
+# `0.9 × 255 = 229.5` 처럼 반올림이 갈리는 값이 있어 **채널당 ±1 을 허용**한다. 마스터 팔레트의
+# 인접 색은 그보다 훨씬 멀어 이 허용이 다른 색을 삼키지 않는다.
+const PAL_CHANNEL_TOLERANCE := 1
+
+var _scene_files: Array = []      # {path, source}
+
+
+func _run_palette_scan() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	var allowed := _palette_allowed_set()
+	if allowed.is_empty():
+		_warn("PAL", "조달 대장을 적재하지 못했다 — 팔레트 실물·기능색 출처 확인 필요")
+		_report("PAL", "color literal ledger", checked, before_fail, before_warn)
+		return
+	var exempt: Array = _config.get("palette_exempt", [])
+	var sources: Array = []
+	for entry in _code_files:
+		sources.append(entry)
+	for entry in _scene_files:
+		sources.append(entry)
+	for entry in sources:
+		var path := String(entry["path"])
+		if not _palette_in_scan_scope(path) or exempt.has(path):
+			continue
+		var lines: Array = String(entry["source"]).split("\n")
+		for line_index in range(lines.size()):
+			var code_line := _strip_comment(String(lines[line_index]))
+			for literal in _palette_literals(code_line):
+				checked += 1
+				if _palette_is_allowed(literal, allowed):
+					continue
+				_warn("PAL", "%s:%d: 대장 밖 색 %s" % [path, line_index + 1, literal])
+	_report("PAL", "color literal ledger", checked, before_fail, before_warn)
+
+
+func _palette_in_scan_scope(path: String) -> bool:
+	for prefix in _config.get("palette_scan_dirs", []):
+		if path.begins_with(String(prefix)):
+			return true
+	return false
+
+
+# 대장 = 팔레트 실물 + 기능색 전사 + 명시 허용. 값은 8bit 3채널 배열로 정규화해 둔다.
+func _palette_allowed_set() -> Array:
+	var allowed: Array = []
+	for palette_path in _config.get("palette_sources", []):
+		for line in _read_text(String(palette_path)).split("\n"):
+			var channels := _palette_gpl_channels(String(line))
+			if not channels.is_empty():
+				allowed.append(channels)
+	# 기능색 — `ui_palette.gd` 의 `Color("#RRGGBB")` 상수 전량
+	var functional := _read_text(String(_config.get("palette_functional_source", "")))
+	for line in functional.split("\n"):
+		for literal in _palette_literals(_strip_comment(String(line))):
+			var channels := _palette_channels_of(literal)
+			if not channels.is_empty():
+				allowed.append(channels)
+	for entry in _config.get("palette_allow", []):
+		var spec: Dictionary = entry
+		if String(spec.get("reason", "")).strip_edges() == "":
+			_warn("PAL", "허용 목록 항목에 근거(reason)가 없다: %s" % str(spec.get("color", "?")))
+			continue
+		var channels := _palette_channels_of(String(spec.get("color", "")))
+		if not channels.is_empty():
+			allowed.append(channels)
+	return allowed
+
+
+# GIMP 팔레트 행 = `R G B\t이름`
+func _palette_gpl_channels(line: String) -> Array:
+	if not line.contains("\t"):
+		return []
+	var parts := line.split("\t", false, 1)
+	if parts.is_empty():
+		return []
+	var numbers := String(parts[0]).split(" ", false)
+	if numbers.size() < 3:
+		return []
+	for number in numbers:
+		if not String(number).is_valid_int():
+			return []
+	return [int(numbers[0]), int(numbers[1]), int(numbers[2])]
+
+
+# 한 줄에서 색 리터럴을 뽑는다: `Color("#RRGGBB")` / `Color(r, g, b[, a])` / `Color8(r, g, b[, a])`.
+# 이름 상수 참조(`Color.RED`)·변수는 리터럴이 아니므로 대상이 아니다.
+func _palette_literals(line: String) -> Array:
+	var found: Array = []
+	var search_from := 0
+	while true:
+		var open_at := line.find("Color(", search_from)
+		var is_color8 := false
+		var alt_at := line.find("Color8(", search_from)
+		if alt_at >= 0 and (open_at < 0 or alt_at < open_at):
+			open_at = alt_at
+			is_color8 = true
+		if open_at < 0:
+			break
+		var args_at := open_at + (7 if is_color8 else 6)
+		var close_at := line.find(")", args_at)
+		if close_at < 0:
+			break
+		var args := line.substr(args_at, close_at - args_at).strip_edges()
+		search_from = close_at + 1
+		if args.is_empty():
+			continue
+		found.append(("Color8(%s)" % args) if is_color8 else ("Color(%s)" % args))
+	return found
+
+
+# 리터럴 → 8bit 3채널. 알파는 조달 판정에 관여하지 않는다(같은 색의 투명도 차이일 뿐).
+# 판정 불가 형태(변수·수식)는 빈 배열 = 검사 대상 아님.
+func _palette_channels_of(literal: String) -> Array:
+	var body := literal
+	var is_color8 := body.begins_with("Color8(")
+	body = body.trim_prefix("Color8(").trim_prefix("Color(").trim_suffix(")").strip_edges()
+	if body.begins_with("\"") or body.begins_with("#"):
+		var hex := body.replace("\"", "").replace("#", "").strip_edges()
+		if hex.length() < 6:
+			return []
+		var channels: Array = []
+		for index in range(3):
+			channels.append(hex.substr(index * 2, 2).hex_to_int())
+		return channels
+	var parts := body.split(",", false)
+	if parts.size() < 3:
+		return []
+	var values: Array = []
+	for index in range(3):
+		var text := String(parts[index]).strip_edges()
+		if not (text.is_valid_float() or text.is_valid_int()):
+			return []
+		values.append(int(round(float(text))) if is_color8 else int(round(float(text) * 255.0)))
+	return values
+
+
+func _palette_is_allowed(literal: String, allowed: Array) -> bool:
+	var channels := _palette_channels_of(literal)
+	if channels.is_empty():
+		return true   # 판정 불가 형태 — 없는 근거로 위반을 만들지 않는다
+	for candidate in allowed:
+		var match_all := true
+		for index in range(3):
+			if absi(int(channels[index]) - int(candidate[index])) > PAL_CHANNEL_TOLERANCE:
+				match_all = false
+				break
+		if match_all:
+			return true
+	return false
