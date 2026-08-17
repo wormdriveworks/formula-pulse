@@ -5,12 +5,14 @@
 # 무가드로 읽으면, 커리어를 연 경로에서는 멀쩡하고 **타이틀 직행 경로에서만** 죽는다.
 # 실제로 SYS-04 가 그렇게 샜다(총괄 판정 IMPL-176 ① — 타이틀 첫 진입 100% 재현).
 #
-# 검사 축 5종:
+# 검사 축 7종:
 #   ① 무커리어 문맥 성립 — SYS-01 → SYS-04 직행(D09 본문 145행·§A-1 규격 진입)
 #   ② 패드 순회 폐쇄 — 초기 포커스 보유 (D09 §1.3 · 총괄 판정 IMPL-176 ②)
 #   ③ 단독 경로 옵션 정합 — 라우터를 안 거치는 경로가 O9 를 적용하는가 (동 ③)
 #   ④ 미구성 상태 차단 — 값 창구를 안 거친 폰트 크기가 렌더될 여지가 없는가 (동 ④)
 #   ⑤ 입력맵 계약 — D09 §1.3 매핑표의 액션·기본 바인딩이 실재하는가 (IMPL-184 ①)
+#   ⑥ 액션 경유 청취 — 같은 조작이 키보드·패드·액션 3경로에서 같은 결과인가 (IMPL-190 ①②)
+#   ⑦ 표시 기구 — 툴팁 고정·감광 등채널 (동 ③④)
 #
 # **첫 프레임(`_process`)에서 돈다.** `_init()` 시점에는 `root` 가 없어 `add_child` 자체가
 # 불가능하고, `_initialize()` 시점에는 `root` 가 있어도 **아직 트리 안이 아니다** — 그래서
@@ -40,10 +42,14 @@ func _process(_delta: float) -> bool:
 	_standalone_boot_applies_o9()
 	_log_feed_requires_configure()
 	_input_map_contract()
+	_race_input_via_actions()
+	_tab_cycle_actions(data)
+	_detail_info_pin(data)
+	_hold_dim_is_neutral()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 38:
-		print("UI_SCREENS_FAIL checks=%d < 하한 38 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 67:
+		print("UI_SCREENS_FAIL checks=%d < 하한 67 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -250,3 +256,144 @@ func _assert_stick_axis(action: String) -> void:
 		if event is InputEventJoypadMotion:
 			found = true
 	_ok("%s — 좌스틱 축 바인딩" % action, found)
+
+
+# 액션 이벤트 1건을 만들어 준다. `InputEventAction` 은 `is_action_pressed()` 에 그대로 걸리므로
+# 키맵·뷰포트 배관을 타지 않고 **청취 층만** 검사할 수 있다.
+func _action_event(action: String) -> InputEventAction:
+	var event := InputEventAction.new()
+	event.action = action
+	event.pressed = true
+	return event
+
+
+func _key_event(keycode: int) -> InputEventKey:
+	var event := InputEventKey.new()
+	event.keycode = keycode
+	event.pressed = true
+	return event
+
+
+func _pad_event(button_index: int) -> InputEventJoypadButton:
+	var event := InputEventJoypadButton.new()
+	event.button_index = button_index
+	event.pressed = true
+	return event
+
+
+# ── ⑥ RACE-01 액션 경유 전환 (총괄 판정 IMPL-190 ①) ──
+#
+# 원시 키코드 직독은 `InputEventKey` 만 보므로 **패드가 아예 도달하지 못한다**.
+# 세 입력(키보드·패드·액션)이 같은 결과를 내는지를 본다 — 키보드 거동 보존이 전환의 계약이다.
+func _race_input_via_actions() -> void:
+	for entry in [["액션", "ui_accept"], ["키보드 Space", ""], ["패드 A", ""]]:
+		var packed := load(RACE_SCENE) as PackedScene
+		if packed == null:
+			_ok("레이스 씬 로드", false)
+			return
+		var screen := packed.instantiate() as Control
+		root.add_child(screen)
+		var label := String(entry[0])
+		var before: int = screen.engine.turn_phase
+		_ok("%s — 전제: T1 대기" % label, before == RaceTypes.TurnPhase.T1_SECTOR_OPEN,
+			"phase=%d" % before)
+		var event: InputEvent
+		match label:
+			"액션": event = _action_event("ui_accept")
+			"키보드 Space": event = _key_event(KEY_SPACE)
+			_: event = _pad_event(0)
+		screen._unhandled_input(event)
+		# 스핀 커밋 = 봉인 개시. 국면이 T1 을 벗어났는지로 본다 (결과는 보지 않는다 — 불변규칙 5).
+		_ok("%s — 스핀 커밋 도달" % label,
+			screen.engine.turn_phase != RaceTypes.TurnPhase.T1_SECTOR_OPEN,
+			"phase=%d" % screen.engine.turn_phase)
+		_unmount(screen)
+	# 일시정지도 같은 축 — 액션·키보드·패드 3경로
+	for entry2 in [["액션", "pause_menu"], ["키보드 Esc", ""], ["패드 Start", ""]]:
+		var packed2 := load(RACE_SCENE) as PackedScene
+		var screen2 := packed2.instantiate() as Control
+		root.add_child(screen2)
+		var label2 := String(entry2[0])
+		_ok("%s — 전제: 정지 아님" % label2, not screen2._paused)
+		var event2: InputEvent
+		match label2:
+			"액션": event2 = _action_event("pause_menu")
+			"키보드 Esc": event2 = _key_event(KEY_ESCAPE)
+			_: event2 = _pad_event(6)
+		screen2._unhandled_input(event2)
+		_ok("%s — 일시정지 열림" % label2, screen2._paused)
+		_unmount(screen2)
+
+
+# ── ⑦ 탭 순회 액션 (총괄 판정 IMPL-190 ②) ──
+func _tab_cycle_actions(data: GameData) -> void:
+	var session := RunSession.new()
+	session.setup(data)
+	for entry in [["SYS-03 옵션", OPTIONS_SCENE, 5], ["SYS-04 업적", ACHIEVEMENT_SCENE, 5]]:
+		var screen := _mount(String(entry[1]), session)
+		if screen == null:
+			continue
+		var label := String(entry[0])
+		_ok("%s — 전제: 탭 %d개·첫 탭 활성" % [label, int(entry[2])],
+			screen._tab_panels.size() == int(entry[2]) and screen._active_tab == 0,
+			"tabs=%d active=%d" % [screen._tab_panels.size(), screen._active_tab])
+		screen._unhandled_input(_action_event("tab_next"))
+		_ok("%s — tab_next 로 다음 탭" % label, screen._active_tab == 1,
+			"active=%d" % screen._active_tab)
+		_ok("%s — 패널 가시성이 따라온다" % label,
+			(screen._tab_panels[1] as Control).visible
+				and not (screen._tab_panels[0] as Control).visible)
+		screen._unhandled_input(_action_event("tab_prev"))
+		_ok("%s — tab_prev 로 되돌아온다" % label, screen._active_tab == 0)
+		# [가안] 경계 감김 — 첫 탭에서 prev 는 마지막으로
+		screen._unhandled_input(_action_event("tab_prev"))
+		_ok("%s — 경계에서 감긴다(wrap)" % label,
+			screen._active_tab == int(entry[2]) - 1, "active=%d" % screen._active_tab)
+		_unmount(screen)
+
+
+# ── ⑧ 상세 정보 고정 (총괄 판정 IMPL-190 ③) ──
+func _detail_info_pin(data: GameData) -> void:
+	var session := RunSession.new()
+	session.setup(data)
+	var screen := _mount(ACHIEVEMENT_SCENE, session)
+	if screen == null:
+		return
+	var focused := root.gui_get_focus_owner()
+	_ok("전제: 포커스 대상 존재", focused != null)
+	if focused == null:
+		_unmount(screen)
+		return
+	# 툴팁이 비어 있으면 아무것도 띄우지 않는다 — 빈 상자 금지
+	focused.tooltip_text = ""
+	screen._shortcut_input(_action_event("detail_info"))
+	_ok("툴팁 없음 → 미표출", screen.detail_text().is_empty(), screen.detail_text())
+	focused.tooltip_text = "detail probe"
+	screen._shortcut_input(_action_event("detail_info"))
+	_ok("툴팁 고정 표출", screen.detail_text() == "detail probe", screen.detail_text())
+	# 코드 생성 Control 이므로 폰트 창구를 거쳐야 한다 (FONT · 불변규칙 2)
+	var pinned := screen.get_node("%s/DetailText" % FlowScreen.DETAIL_PANEL_NAME) as Label
+	_ok("고정 라벨이 D13 폰트 크기 보유",
+		pinned.get_theme_font_size("font_size") == data.param_int("param_font_size_body"),
+		"actual=%d" % pinned.get_theme_font_size("font_size"))
+	# 같은 액션 재입력 = 해제
+	screen._shortcut_input(_action_event("detail_info"))
+	_ok("재입력으로 해제", screen.detail_text().is_empty())
+	_unmount(screen)
+
+
+# ── ⑨ 홀드 감광 등채널 (총괄 판정 IMPL-190 ④) ──
+# 감광은 상태 표시이지 색 정보가 아니다 — 채널이 갈리면 비홀드 릴에 색상 편이가 생기고,
+# 그것은 심볼 판독(색+도상 이중 부호화)에 잡음이 된다.
+func _hold_dim_is_neutral() -> void:
+	var packed := load(RACE_SCENE) as PackedScene
+	if packed == null:
+		_ok("레이스 씬 로드", false)
+		return
+	var screen := packed.instantiate() as Control
+	root.add_child(screen)
+	var dim: Color = (screen._reel_panels[0] as Control).modulate
+	_ok("전제: 비홀드 릴은 감광 상태", dim.r < 1.0, str(dim))
+	_ok("감광이 등채널 (색상 편이 0)",
+		is_equal_approx(dim.r, dim.g) and is_equal_approx(dim.g, dim.b), str(dim))
+	_unmount(screen)

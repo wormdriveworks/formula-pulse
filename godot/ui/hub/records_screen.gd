@@ -9,6 +9,7 @@
 extends HubScreen
 
 var _tabs: Dictionary = {}
+var _active_tab := ""
 
 
 func _on_hub_ready(_payload: Dictionary) -> void:
@@ -37,8 +38,34 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 
 
 func _select_tab(tab_name: String) -> void:
+	_active_tab = tab_name
 	for entry_name in _tabs:
 		(_tabs[entry_name]["panel"] as Control).visible = String(entry_name) == tab_name
+
+
+# ── 탭 순회 (D09 §1.3 '탭 전환 = Q·E | LB·RB' · 총괄 판정 IMPL-190 ②) ──
+#
+# 액션 청취를 **추가**한다 — 버튼 `pressed` 경로는 그대로다(마우스·포커스 조작 불변).
+# **[가안] 경계에서 감긴다(wrap)** — D09 는 순환 방향·경계에 침묵한다.
+# 탭 순서는 `_tabs` 의 삽입 순서 = 화면의 탭 배치 순서다(별도 순서 배열을 두지 않는다).
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("tab_prev"):
+		_cycle_tab(-1)
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("tab_next"):
+		_cycle_tab(1)
+		get_viewport().set_input_as_handled()
+
+
+func _cycle_tab(step: int) -> void:
+	var names := _tabs.keys()
+	if names.is_empty():
+		return
+	var at := names.find(_active_tab)
+	if at < 0:
+		at = 0
+	_select_tab(String(names[wrapi(at + step, 0, names.size())]))
 
 
 func _fill_rivals() -> void:

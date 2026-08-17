@@ -105,3 +105,89 @@ func _audio_bind_button(button: BaseButton) -> void:
 
 func _on_audio_toggled(_pressed: bool) -> void:
 	sfx("ui_toggle")
+
+
+# ── 상세 정보 고정 (D09 §1.3 '상세 정보(툴팁 고정) = T | Y (포커스 대상)') ──
+#
+# 엔진 기본 툴팁은 **마우스 호버 전속**이라 패드·키보드로는 띄울 방법이 없었다 —
+# 매핑표에 행이 있는데 소비부가 0 이던 자리다(5차 실태 조사 · 총괄 판정 IMPL-190 ③).
+#
+# **`_shortcut_input` 에 둔 것은 의도다.** 화면들이 저마다 `_unhandled_input` 을 정의하는데
+# GDScript 는 자동 super 호출이 없어, 베이스에 같은 이름을 두면 **정의한 화면에서만 조용히
+# 죽는다**. `_shortcut_input` 은 아무 화면도 쓰지 않는 층이라 상속이 성립한다.
+#
+# 최소 기구다 — 씬·라우트를 신설하지 않고 화면 위 오버레이 1장을 코드로 만든다
+# (씬 소유권 = 주력 · `.tscn` 무접촉).
+#
+# **[가안] 규격 3건 (D09 침묵분 — impl_log 등재):**
+#   · 위치 = 화면 하단 중앙. 포커스 대상 옆에 붙이면 정작 그 대상을 가린다
+#   · 해제 = 같은 액션 재입력 · 포커스 이동 · 화면 이탈
+#   · 대상에 `tooltip_text` 가 비어 있으면 **아무것도 띄우지 않는다** (빈 상자를 띄우지 않는다)
+const DETAIL_PANEL_NAME := "DetailInfoPanel"
+
+var _detail_panel: PanelContainer = null
+
+
+func _shortcut_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("detail_info"):
+		return
+	get_viewport().set_input_as_handled()
+	if _detail_panel != null:
+		_hide_detail()
+		return
+	_show_detail()
+
+
+func _show_detail() -> void:
+	var focused := get_viewport().gui_get_focus_owner()
+	if focused == null:
+		return
+	var text := focused.tooltip_text.strip_edges()
+	if text.is_empty():
+		return   # 띄울 내용이 없으면 상자도 없다
+	_detail_panel = PanelContainer.new()
+	_detail_panel.name = DETAIL_PANEL_NAME
+	_detail_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = UiPalette.BG_PANEL
+	style.border_color = UiPalette.FRAME_LINE
+	style.set_border_width_all(1)
+	style.set_content_margin_all(4)
+	_detail_panel.add_theme_stylebox_override("panel", style)
+
+	var label := Label.new()
+	label.name = "DetailText"
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.custom_minimum_size = Vector2(220, 0)
+	# 코드 생성 Control 은 프로젝트 기본 폰트를 상속하지 않는다 — 값 창구 경유 (FONT · 불변규칙 2)
+	label.add_theme_font_size_override("font_size", _body_font_size)
+	label.add_theme_color_override("font_color", UiPalette.TEXT_PRIMARY)
+	_detail_panel.add_child(label)
+
+	add_child(_detail_panel)
+	_detail_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	# 포커스가 옮겨가면 내용이 어긋나므로 함께 내린다. 화면이 사라질 때는 자식이라 같이 간다.
+	if not get_viewport().gui_focus_changed.is_connected(_on_detail_focus_changed):
+		get_viewport().gui_focus_changed.connect(_on_detail_focus_changed)
+
+
+func _hide_detail() -> void:
+	if get_viewport() != null and get_viewport().gui_focus_changed.is_connected(_on_detail_focus_changed):
+		get_viewport().gui_focus_changed.disconnect(_on_detail_focus_changed)
+	if _detail_panel == null:
+		return
+	remove_child(_detail_panel)
+	_detail_panel.queue_free()
+	_detail_panel = null
+
+
+func _on_detail_focus_changed(_node: Control) -> void:
+	_hide_detail()
+
+
+# 검사·호출부 조회용 — 고정 상태와 내용은 화면 밖에서 볼 수 있어야 회귀가 성립한다.
+func detail_text() -> String:
+	if _detail_panel == null:
+		return ""
+	return (_detail_panel.get_node("DetailText") as Label).text

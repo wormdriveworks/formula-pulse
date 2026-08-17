@@ -27,6 +27,7 @@ const TABS := [
 var _return_route := "SYS-01"
 var _overlay_mode := false
 var _tab_panels: Array = []
+var _active_tab := 0
 
 
 func open_as_overlay(run_session: RunSession) -> void:
@@ -68,10 +69,31 @@ func _focus_initial() -> void:
 # 취소 / 뒤로 = Esc · 우클릭 · **패드 B** (D09 §1.3 공통 층 매핑표 — 정본 명시).
 # 닫기 버튼까지 포커스를 옮겨야만 나갈 수 있으면 그것도 순회 폐쇄 위반이다.
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("tab_prev"):
+		_cycle_tab(-1)
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("tab_next"):
+		_cycle_tab(1)
+		get_viewport().set_input_as_handled()
+		return
 	if not event.is_action_pressed("ui_cancel"):
 		return
 	get_viewport().set_input_as_handled()
 	_on_close()
+
+# ── 탭 순회 (D09 §1.3 '탭 전환 = Q·E | LB·RB' · 총괄 판정 IMPL-190 ②) ──
+#
+# 액션 청취를 **추가**한다 — 버튼 `pressed` 경로는 그대로다(마우스·포커스 조작 불변).
+# 액션이 없으면 탭을 바꾸려고 탭 버튼까지 포커스를 옮겨야 하는데, 그러면 본문에서
+# 나갔다 들어오는 왕복이 매번 생긴다.
+#
+# **[가안] 경계에서 감긴다(wrap)** — D09 는 순환 방향·경계에 침묵한다. 탭이 3~5개로 적고
+# 끝에서 막히면 반대 방향 키를 다시 찾아야 하므로 감는 편이 조작 비용이 낮다고 봤다.
+func _cycle_tab(step: int) -> void:
+	if _tab_panels.is_empty():
+		return
+	_select_tab(wrapi(_active_tab + step, 0, _tab_panels.size()))
 
 
 # 플랫폼 도전과제 미연동 고지 (D09 §6.5 필수 항목 — 업적 1:1 매핑).
@@ -263,6 +285,7 @@ func _build_row(achievement_id: String) -> Control:
 
 
 func _select_tab(index: int) -> void:
+	_active_tab = index
 	for panel_index in range(_tab_panels.size()):
 		(_tab_panels[panel_index] as Control).visible = panel_index == index
 

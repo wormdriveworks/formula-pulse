@@ -251,19 +251,34 @@ func _process(delta: float) -> void:
 
 # 입력 매핑은 D09 §1.3 — 확정과 스핀이 같은 키인 것이 원칙이다
 # ("결과를 불러온다 → 결과를 받아들인다"가 같은 물리 동작으로 순환).
-func _unhandled_key_input(event: InputEvent) -> void:
-	var key := event as InputEventKey
-	if key == null or not key.pressed or key.echo:
-		return
-	if key.keycode == KEY_ESCAPE:
+#
+# **공통 층 조작은 액션 경유다** (매핑표 공통 층 · 총괄 판정 IMPL-190 ①).
+# 원시 키코드 직독은 `InputEventKey` 만 보기 때문에 **패드 이벤트가 아예 도달하지 않는다** —
+# 실제로 스핀·확정·일시정지가 패드에 무반응이었다(5차 발견). 액션에는 매핑표의 키보드 열이
+# 이미 담겨 있으므로(IMPL-186) 이 전환은 동작 집합을 **보존하면서 넓힌다**:
+# Space·Enter·KpEnter 는 `ui_accept` 안에, Esc 는 `pause_menu` 안에 그대로 있다.
+#
+# 바뀌는 것은 **입력 판독 층뿐**이다 — 위 순환 설계(확정 = 스핀과 같은 물리 동작)는 불변이며,
+# 오히려 패드에서도 A 하나로 같은 순환이 성립하게 된다.
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("pause_menu"):
 		_open_pause()
 		get_viewport().set_input_as_handled()
 		return
 	if _paused:
 		return  # 정지 중 레이스 입력 차단 — 오버레이가 자체 포커스를 갖는다
-	if key.keycode == KEY_SPACE or key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER:
+	if event.is_action_pressed("ui_accept"):
 		_on_primary_action()
 		get_viewport().set_input_as_handled()
+
+
+# 레이스 컨텍스트 층 전속 조작 (D09 §1.3 두 번째 표) — 아직 키보드 열만 결선돼 있다.
+# 패드 열(리스핀·차지 개입·홀드 토글)은 조합 입력이라 별도 배정 대상이다.
+func _unhandled_key_input(event: InputEvent) -> void:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo:
+		return
+	if _paused:
 		return
 	if key.keycode == KEY_R:
 		_on_respin()
@@ -621,10 +636,17 @@ func _hide_reels() -> void:
 
 
 # 홀드 상태 = 프레임 잠금 표시 + 토글 점등의 이중 표시 (D09 §3.2)
+#
+# 비홀드 프레임은 **등채널 감광**이다 — 밝기만 낮추고 색상은 건드리지 않는다.
+# 구 값 `Color(0.75, 0.78, 0.82)` 은 채널이 불균등해 비홀드 릴에 **한색 편이**를 넣었는데,
+# 설계 근거가 없었다(D09 §3.2 는 감광 자체를 규정하지 않고, git 이력상 RACE-01 초판에서
+# 근거 없이 들어왔다 — 총괄 판정 IMPL-190 ④ "근거 없으면 비의도"). 감광은 상태 표시이지
+# 색 정보가 아니므로 색상 이동은 심볼 판독(D10 §5.1 색+도상 이중 부호화)에 잡음이 된다.
+# 감광률은 구 값의 중앙 채널을 취해 실화면 인상을 보존했다.
 func _refresh_reel_frames() -> void:
 	for i in range(REEL_COUNT):
 		var held: bool = _hold_boxes[i].button_pressed
-		_reel_panels[i].modulate = Color(1.0, 1.0, 1.0) if held else Color(0.75, 0.78, 0.82)
+		_reel_panels[i].modulate = Color(1.0, 1.0, 1.0) if held else Color(0.78, 0.78, 0.78)
 
 
 func _refresh_strip() -> void:
