@@ -6,7 +6,7 @@
  * 전례: IMPL-097 (TL-2 체크리스트) — 생성기 커밋 · 산출물 수기 편집 금지 · 재생성 = 같은 명령
  *
  * ── 이 파일은 색상값을 하나도 갖지 않는다 (부대조건 — 값을 두 번 적으면 그것이 곧 두 벌이다).
- *    마스터 56색 = `godot/assets/palettes/master_56.gpl`      ← 총괄 §1 판정이 지정한 입력
+ *    마스터 60색 = `godot/assets/palettes/master_60.gpl`      ← 총괄 §1 판정이 지정한 입력
  *    색각 교체 4 = `godot/assets/palettes/colorblind_alt.gpl`
  *    기능 부속 13 = `docs/assets/팔레트_정본_v*.md` §5          ← .gpl 밖이라(대장 §4.9) 정본에서 읽는다
  *    교체 대응관계 = 같은 정본 §6
@@ -33,7 +33,7 @@ function need(cond, msg) { if (!cond) die(msg); }
 // ─────────────────────────────────────────────────────────── 라벨 매핑 (값 아님)
 const BLOCKS = [
   { heading: 'CORE NEUTRAL 16', n: 16, prefix: /^N\d\d$/ },
-  { heading: 'TELEMETRY NEON 12', n: 12, prefix: /^[CMA]\d$/ },
+  { heading: 'TELEMETRY NEON 16', n: 16, prefix: /^[CMAV]\d$/ },
   { heading: 'TEAM COLOR 16', n: 16, prefix: /^(AX|VU|GR|NW)\d$/ },
   { heading: 'ENV / SKIN / MATERIAL 12', n: 12, prefix: /^(EV|SK|MT)\d$/ },
 ];
@@ -69,18 +69,18 @@ function readGpl(file) {
   return out;
 }
 
-const master = readGpl(path.join(PAL_DIR, 'master_56.gpl'));
+const master = readGpl(path.join(PAL_DIR, 'master_60.gpl'));
 const cbGpl = readGpl(path.join(PAL_DIR, 'colorblind_alt.gpl'));
 
-need(master.length === 56, `마스터 엔트리 ${master.length} != 56`);
-{ // D10 §2.3 구성 16+12+16+12 — 위치 분할이 ID 접두와 맞는지
+need(master.length === 60, `마스터 엔트리 ${master.length} != 60`);
+{ // D10 §2.3 구성 16+16+16+12 (v1.2 — 자색 계열 신설) — 위치 분할이 ID 접두와 맞는지
   let i = 0;
   for (const b of BLOCKS) {
     for (let k = 0; k < b.n; k++, i++) {
       need(b.prefix.test(master[i].id), `블록 '${b.heading}' ${k + 1}번째 ID '${master[i].id}' 가 접두 규칙에 맞지 않는다 — .gpl 순서가 D10 §2.3 구성과 어긋났다`);
     }
   }
-  need(i === 56, '블록 합이 56 이 아니다');
+  need(i === 60, '블록 합이 60 이 아니다');
 }
 { // 마스터 중복 0
   const seen = new Map();
@@ -90,10 +90,10 @@ need(master.length === 56, `마스터 엔트리 ${master.length} != 56`);
   }
 }
 // 색각 대체본은 마스터 본체를 손대지 않는다 (D10 §2.4 · 대장 §4.9)
-need(cbGpl.length === 60, `색각 대체 엔트리 ${cbGpl.length} != 60 (마스터 56 + 교체 4)`);
+need(cbGpl.length === 64, `색각 대체 엔트리 ${cbGpl.length} != 64 (마스터 60 + 교체 4)`);
 master.forEach((c, i) => need(cbGpl[i].hex === c.hex && cbGpl[i].id === c.id,
   `colorblind_alt.gpl 의 ${i + 1}번째가 마스터와 다르다 (${cbGpl[i].id} ${cbGpl[i].hex} vs ${c.id} ${c.hex}) — 마스터 본체는 무접촉이어야 한다`));
-const cbTail = cbGpl.slice(56);
+const cbTail = cbGpl.slice(60);
 
 // ─────────────────────────────────────────────────────────── 입력 ② 팔레트 정본 (기능 13 · 교체 대응)
 const docs = fs.readdirSync(DOC_DIR).filter((f) => /^팔레트_정본_v.*\.md$/.test(f));
@@ -146,7 +146,32 @@ swaps.forEach((s, i) => {
   need(cbTail[i].hex === s.alt, `colorblind_alt.gpl 꼬리 ${i + 1}번(${cbTail[i].id} ${cbTail[i].hex}) 이 정본 §6 대체색 ${s.alt} 와 다르다`);
 });
 
-console.log(`검사 통과 — 마스터 ${master.length}(중복 0·구성 16+12+16+12) · 기능 ${functional.length} · 교체 ${swaps.length} · 마스터 본체 무접촉 · 정본⇔.gpl 교차 일치`);
+// ─────────────────────────────────────────────────────────── 네온 블록 교차 검사 (IMPL-198 신설)
+// **왜 신설했는가.** 자색 4단을 `.gpl` 과 정본 §2 표 **양쪽에** 적는 순간 그것이 곧 두 벌이다
+// (대장 §9-⑬ 이 경고한 바로 그 형태). 마스터 색은 종전까지 `.gpl` ↔ `colorblind_alt.gpl` 앞부분
+// 대조만 있었고 **정본 표와는 대조가 없었다** — 즉 정본 §2 의 hex 를 오타로 고쳐도 아무것도 안 걸렸다.
+// 네온 블록만 거는 이유는 실용이다: §2 는 `| 계열 | 딥 | 베이스 | 브라이트 | 글로우 |` 4열 표라
+// 기계 판독이 안정적인데, §1(2단 병렬 표)·§3(산문 혼재)·§4(군/ID/HEX)는 파서가 셋 더 필요하다.
+// **부분 커버리지임을 감추지 않는다** — 뉴트럴 16·팀 16·환경 12 는 여전히 정본⇔`.gpl` 미대조다.
+const neonDoc = (() => {
+  const body = section('2. 텔레메트리 네온');
+  const rows = body.split('\n').filter((l) => /^\|/.test(l) && /#[0-9A-Fa-f]{6}/.test(l));
+  need(rows.length >= 1, '정본 §2 에서 네온 행을 못 읽었다 — 표 구조가 바뀌었는가');
+  const out = [];
+  for (const r of rows) out.push(...hexesIn(r));
+  return out;
+})();
+{
+  const neonBlock = BLOCKS.findIndex((b) => b.heading.startsWith('TELEMETRY NEON'));
+  const start = BLOCKS.slice(0, neonBlock).reduce((n, b) => n + b.n, 0);
+  const gplNeon = master.slice(start, start + BLOCKS[neonBlock].n);
+  need(neonDoc.length === gplNeon.length,
+    `정본 §2 네온 ${neonDoc.length}색 != .gpl 네온 블록 ${gplNeon.length}색`);
+  gplNeon.forEach((c, i) => need(c.hex === neonDoc[i],
+    `정본 §2 네온 ${i + 1}번째 ${neonDoc[i]} != .gpl ${c.id} ${c.hex} — 두 벌이 갈렸다`));
+}
+
+console.log(`검사 통과 — 마스터 ${master.length}(중복 0·구성 ${BLOCKS.map((b) => b.n).join('+')}) · 기능 ${functional.length} · 교체 ${swaps.length} · 마스터 본체 무접촉 · 정본⇔.gpl 교차 일치(§2 네온 ${neonDoc.length} 포함)`);
 
 // ── 커버리지 보고 — 검증 못 하는 것을 검증한 척하지 않는다 (돌연변이 실측으로 드러난 구멍)
 //    기능 13 중 §6 교체쌍 4건만 대조 상대(.gpl 꼬리)가 있다. 나머지는 정본이 유일 출처라
@@ -296,9 +321,9 @@ function emit(name, cv) {
 }
 
 // ─────────────────────────────────────────────────────────── 양자화용 순색 스트립
-// 총괄 판정 ⓑ (IMPL-161 §1): `tools/palette/master_56_strip.png` — 제작 공정의 입력이지
+// 총괄 판정 ⓑ (IMPL-161 §1): `tools/palette/master_60_strip.png` — 제작 공정의 입력이지
 // 런타임 리소스가 아니므로 `res://` 밖에 둔다 (대장 §1.1 의 `store/` 논거 그대로 적용).
-// 스와치 시트는 기능 4색이 섞여 60색이라 비아이콘 원도의 양자화 기준이 될 수 없다.
+// 스와치 시트는 기능 4색이 섞여 64색이라 비아이콘 원도의 양자화 기준이 될 수 없다.
 function readIDAT(file) {
   const b = fs.readFileSync(file), parts = [];
   let o = 8;
@@ -313,7 +338,7 @@ function readIDAT(file) {
 {
   const w = master.length, buf = Buffer.alloc(w * 3);
   master.forEach((c, i) => { const [r, g, b] = hex2rgb(c.hex); buf[i * 3] = r; buf[i * 3 + 1] = g; buf[i * 3 + 2] = b; });
-  const file = path.join(__dirname, 'master_56_strip.png');
+  const file = path.join(__dirname, 'master_60_strip.png');
   fs.writeFileSync(file, encodePNG(w, 1, buf));
 
   // 부대조건 ② — 쓴 파일을 되읽어 검산한다. 60색 실측이 "스와치를 그대로 먹이면 안 된다"의
@@ -322,13 +347,13 @@ function readIDAT(file) {
   need(raw.length === 1 + w * 3 && raw[0] === 0, '스트립 재독 실패 — 1행·필터 0 이 아니다');
   const got = new Set();
   for (let i = 0; i < w; i++) got.add(toHex(raw[1 + i * 3], raw[2 + i * 3], raw[3 + i * 3]));
-  need(got.size === 56, `스트립 고유색 ${got.size} != 56 (장식·중복이 섞였다)`);
+  need(got.size === 60, `스트립 고유색 ${got.size} != 60 (장식·중복이 섞였다)`);
   for (const c of master) need(got.has(c.hex), `스트립에 ${c.id} ${c.hex} 없음 — .gpl 과 1:1 이 아니다`);
-  console.log(`master_56_strip.png ${w}x1 — 되읽기 검산 통과 (고유색 56 · .gpl 1:1)`);
+  console.log(`master_60_strip.png ${w}x1 — 되읽기 검산 통과 (고유색 60 · .gpl 1:1)`);
 }
-emit('master_56.png', sheet('FORMULA PULSE MASTER 56', [
+emit('master_60.png', sheet('FORMULA PULSE MASTER 60', [
   ...masterBlocks,
-  { heading: 'FUNCTIONAL 13 (OUTSIDE MASTER 56)', cells: functional },
+  { heading: 'FUNCTIONAL 13 (OUTSIDE MASTER 60)', cells: functional },
 ], 'A-PALETTE-01 V1.0 / GENERATED - DO NOT EDIT BY HAND'));
 
 const swapMap = new Map(swaps.map((s) => [s.id, s.alt]));
@@ -336,4 +361,4 @@ emit('colorblind_alt.png', sheet('FORMULA PULSE COLORBLIND ALT', [
   ...masterBlocks,
   { heading: 'FUNCTIONAL 13 (CB APPLIED)', cells: functional.map((f) => ({ id: f.id, hex: swapMap.get(f.id) || f.hex })) },
   { heading: 'REPLACED 4 (BASE > ALT)', cells: swaps.map((s) => ({ id: s.id, hex: s.base, alt: s.alt })) },
-], 'A-PALETTE-02 V1.0 / MASTER 56 UNCHANGED / DO NOT EDIT'));
+], 'A-PALETTE-02 V1.0 / MASTER 60 UNCHANGED / DO NOT EDIT'));

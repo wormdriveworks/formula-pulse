@@ -101,8 +101,8 @@ function canonHexes(sectionNum) {
 }
 
 const ledger = new Set([
-  ...gplHexes(path.join(PAL_DIR, 'master_56.gpl')),       // 마스터 56
-  ...gplHexes(path.join(PAL_DIR, 'colorblind_alt.gpl')),  // 56 + 교체 4
+  ...gplHexes(path.join(PAL_DIR, 'master_60.gpl')),       // 마스터 60 (D10 v1.2 — 자색 4단 포함)
+  ...gplHexes(path.join(PAL_DIR, 'colorblind_alt.gpl')),  // 60 + 교체 4
   ...canonHexes(5),                                        // 기능 부속 13 (56 밖 — 정본 §5)
   ...canonHexes(6),                                        // 색각 교체 대응 (정본 §6)
 ]);
