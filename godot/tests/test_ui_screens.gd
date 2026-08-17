@@ -5,7 +5,7 @@
 # 무가드로 읽으면, 커리어를 연 경로에서는 멀쩡하고 **타이틀 직행 경로에서만** 죽는다.
 # 실제로 SYS-04 가 그렇게 샜다(총괄 판정 IMPL-176 ① — 타이틀 첫 진입 100% 재현).
 #
-# 검사 축 7종:
+# 검사 축 9종:
 #   ① 무커리어 문맥 성립 — SYS-01 → SYS-04 직행(D09 본문 145행·§A-1 규격 진입)
 #   ② 패드 순회 폐쇄 — 초기 포커스 보유 (D09 §1.3 · 총괄 판정 IMPL-176 ②)
 #   ③ 단독 경로 옵션 정합 — 라우터를 안 거치는 경로가 O9 를 적용하는가 (동 ③)
@@ -13,6 +13,8 @@
 #   ⑤ 입력맵 계약 — D09 §1.3 매핑표의 액션·기본 바인딩이 실재하는가 (IMPL-184 ①)
 #   ⑥ 액션 경유 청취 — 같은 조작이 키보드·패드·액션 3경로에서 같은 결과인가 (IMPL-190 ①②)
 #   ⑦ 표시 기구 — 툴팁 고정·감광 등채널 (동 ③④)
+#   ⑧ 컨텍스트 층 패드 — X 단독/X 홀드 판별·Y 재배치 (D09 v1.3 · IMPL-200 ③)
+#   ⑨ 검사 설정 정합 — PAL 조달 소스 경로가 실재하는가 (동 ①)
 #
 # **첫 프레임(`_process`)에서 돈다.** `_init()` 시점에는 `root` 가 없어 `add_child` 자체가
 # 불가능하고, `_initialize()` 시점에는 `root` 가 있어도 **아직 트리 안이 아니다** — 그래서
@@ -24,6 +26,13 @@ extends SceneTree
 const ACHIEVEMENT_SCENE := "res://ui/sys/achievement_screen.tscn"
 const OPTIONS_SCENE := "res://ui/sys/options_screen.tscn"
 const RACE_SCENE := "res://ui/race/race_screen.tscn"
+# 패드 버튼 인덱스 — 엔진 실측분(IMPL-186). 검사도 화면과 같은 상수를 짐작하지 않는다.
+const PAD_A_INDEX := 0
+const PAD_X_INDEX := 2
+const PAD_Y_INDEX := 3
+const PAD_LB_INDEX := 9
+const PAD_DPAD_LEFT_INDEX := 13
+const PAD_DPAD_RIGHT_INDEX := 14
 const LOG_FEED_SCRIPT := "res://ui/race/log_feed.gd"
 
 var _checked := 0
@@ -46,10 +55,13 @@ func _process(_delta: float) -> bool:
 	_tab_cycle_actions(data)
 	_detail_info_pin(data)
 	_hold_dim_is_neutral()
+	_race_pad_context()
+	_race_detail_relocation(data)
+	_palette_sources_exist()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 67:
-		print("UI_SCREENS_FAIL checks=%d < 하한 67 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 82:
+		print("UI_SCREENS_FAIL checks=%d < 하한 82 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -397,3 +409,162 @@ func _hold_dim_is_neutral() -> void:
 	_ok("감광이 등채널 (색상 편이 0)",
 		is_equal_approx(dim.r, dim.g) and is_equal_approx(dim.g, dim.b), str(dim))
 	_unmount(screen)
+
+
+func _pad_release(button_index: int) -> InputEventJoypadButton:
+	var event := InputEventJoypadButton.new()
+	event.button_index = button_index
+	event.pressed = false
+	return event
+
+
+# 패드 입력 1건을 화면에 흘린다. **`_input` 먼저** — 모디파이어 장부가 그 층에서 갱신되므로
+# 실제 엔진 순서(`_input` → `_shortcut_input` → `_unhandled_input`)를 그대로 재현해야
+# 조합 판정이 실기와 같은 조건에서 검사된다.
+func _feed_pad(screen: Control, event: InputEventJoypadButton) -> void:
+	screen._input(event)
+	screen._shortcut_input(event)
+	screen._unhandled_input(event)
+
+
+func _new_race_screen() -> Control:
+	var packed := load(RACE_SCENE) as PackedScene
+	if packed == null:
+		_ok("레이스 씬 로드", false)
+		return null
+	var screen := packed.instantiate() as Control
+	root.add_child(screen)
+	return screen
+
+
+# ── ⑩ 레이스 컨텍스트 층 패드 (D09 v1.3 §1.3 · 총괄 판정 IMPL-200 ③) ──
+#
+# 핵심 축은 **X 단독 대 X 홀드의 판별**이다 — 같은 버튼이 두 조작을 겸하므로, 한쪽이 다른
+# 쪽을 삼키면 리스핀이 안 되거나 홀드를 만질 때마다 리스핀이 딸려 나온다.
+#
+# **관측 지점 = 사운드 발화 기록.** 검사 대상은 리스핀 *규칙*이 아니라 **입력 배선**이므로,
+# "리스핀 경로에 도달했는가"만 보면 된다. `_on_respin()` 은 성사(SE-I04)든 거절(SE-I14)이든
+# 반드시 한 번 울리므로 그 발화가 도달의 증거다. 개입 창은 프레임을 돌아야 열리므로
+# 게이트만 열어 두고 본다(턴 상태를 흉내 내지 않는다 — 규칙은 코어 검사 몫이다).
+const RESPIN_SFX := ["SE-I04", "SE-I14"]
+# 차지 개입도 같은 성격 — 성사(SE-I09)든 거절(SE-I14)이든 도달하면 한 번 울린다.
+const CHARGE_SFX := ["SE-I09", "SE-I14"]
+
+
+func _respin_sfx_count(screen: Control) -> int:
+	var total := 0
+	for sfx_id in screen.session.audio.fired:
+		if RESPIN_SFX.has(String(sfx_id)):
+			total += 1
+	return total
+
+
+func _charge_sfx_count(screen: Control) -> int:
+	var total := 0
+	for sfx_id in screen.session.audio.fired:
+		if CHARGE_SFX.has(String(sfx_id)):
+			total += 1
+	return total
+
+
+func _race_pad_context() -> void:
+	# ⓐ X 단독(뗌) = 리스핀 — 누름만으로는 발화하지 않는다
+	var screen := _new_race_screen()
+	if screen == null:
+		return
+	screen._timer_active = true   # 개입 창 게이트만 연다 (프레임 없이 열리지 않는다)
+	var before: int = _respin_sfx_count(screen)
+	_feed_pad(screen, _pad_event(PAD_X_INDEX))
+	_ok("X 누름만으로는 리스핀하지 않는다 (모디파이어일 수 있다)",
+		_respin_sfx_count(screen) == before, "fired=%d" % _respin_sfx_count(screen))
+	_feed_pad(screen, _pad_release(PAD_X_INDEX))
+	_ok("X 단독(뗌) = 리스핀 경로 도달",
+		_respin_sfx_count(screen) == before + 1, "fired=%d" % _respin_sfx_count(screen))
+	_unmount(screen)
+
+	# ⓑ X 홀드 + A = 홀드 토글 · 그 X 는 뗄 때 리스핀하지 않는다
+	var screen2 := _new_race_screen()
+	screen2._timer_active = true
+	var before2: int = _respin_sfx_count(screen2)
+	var held_before: bool = screen2._hold_boxes[0].button_pressed
+	_feed_pad(screen2, _pad_event(PAD_X_INDEX))
+	_feed_pad(screen2, _pad_event(PAD_A_INDEX))
+	_ok("X 홀드 + A = 릴 홀드 토글",
+		screen2._hold_boxes[0].button_pressed != held_before,
+		"before=%s after=%s" % [str(held_before), str(screen2._hold_boxes[0].button_pressed)])
+	_ok("X 홀드 중 A 는 스핀·리스핀으로 새지 않는다",
+		_respin_sfx_count(screen2) == before2)
+	_feed_pad(screen2, _pad_release(PAD_X_INDEX))
+	_ok("조합으로 쓰인 X 는 뗄 때 리스핀하지 않는다",
+		_respin_sfx_count(screen2) == before2, "fired=%d" % _respin_sfx_count(screen2))
+	_unmount(screen2)
+
+	# ⓒ X 홀드 + D패드 = 릴 커서 이동
+	var screen3 := _new_race_screen()
+	_ok("전제: 릴 커서 0", screen3._hold_cursor == 0)
+	_feed_pad(screen3, _pad_event(PAD_X_INDEX))
+	_feed_pad(screen3, _pad_event(PAD_DPAD_RIGHT_INDEX))
+	_ok("X 홀드 + D패드 우 = 커서 이동", screen3._hold_cursor == 1,
+		"cursor=%d" % screen3._hold_cursor)
+	_feed_pad(screen3, _pad_event(PAD_DPAD_LEFT_INDEX))
+	_ok("X 홀드 + D패드 좌 = 되돌아온다", screen3._hold_cursor == 0)
+	_unmount(screen3)
+
+
+# ── ⑪ Y 단독 대 LB 홀드 + Y (v1.3 재배치 행) ──
+func _race_detail_relocation(data: GameData) -> void:
+	# Y 단독 = 차지 개입 (공통 층 상세 정보를 컨텍스트 층이 가린다).
+	# **툴팁 있는 대상에 포커스를 준 상태로 누른다** — 그래야 "상세 정보로 새면 상자가 뜬다"가
+	# 성립해 이 축이 실제로 이빨을 갖는다. 포커스 없이 누르면 어느 쪽으로 새든 상자가 안 떠서
+	# 검사가 조용히 통과한다(설계 함정 ③ 항진명제 — 실측으로 걸러낸 형태다).
+	var screen := _new_race_screen()
+	if screen == null:
+		return
+	screen._timer_active = true
+	var bait := screen.get_node("%E08Respin") as Button
+	bait.tooltip_text = "must not appear"
+	bait.grab_focus()
+	var charge_before: int = _charge_sfx_count(screen)
+	_feed_pad(screen, _pad_event(PAD_Y_INDEX))
+	_ok("Y 단독 → 상세 정보로 새지 않는다", screen.detail_text().is_empty(),
+		screen.detail_text())
+	_ok("Y 단독 = 차지 개입 경로 도달",
+		_charge_sfx_count(screen) == charge_before + 1,
+		"fired=%d" % _charge_sfx_count(screen))
+	_unmount(screen)
+	# LB 홀드 + Y = 상세 정보
+	var screen2 := _new_race_screen()
+	var target := screen2.get_node("%E08Respin") as Button
+	target.tooltip_text = "race detail probe"
+	target.grab_focus()
+	_feed_pad(screen2, _pad_event(PAD_LB_INDEX))
+	_feed_pad(screen2, _pad_event(PAD_Y_INDEX))
+	_ok("LB 홀드 + Y = 상세 정보 고정", screen2.detail_text() == "race detail probe",
+		screen2.detail_text())
+	_unmount(screen2)
+	# 키보드 T 는 공통 층 그대로 (거동 보존 계약)
+	var screen3 := _new_race_screen()
+	var target3 := screen3.get_node("%E08Respin") as Button
+	target3.tooltip_text = "keyboard detail probe"
+	target3.grab_focus()
+	screen3._shortcut_input(_key_event(KEY_T))
+	_ok("키보드 T = 상세 정보 보존", screen3.detail_text() == "keyboard detail probe",
+		screen3.detail_text())
+	_unmount(screen3)
+
+
+# ── ⑫ PAL 조달 소스 적재 (총괄 판정 IMPL-200 ①) ──
+# 소스가 죽으면 **무신호로 통과**한다 — 나머지 소스가 대장을 채워 주기 때문이다.
+# 실제로 `master_56` → `master_60` 개명이 그 경로로 지나갔다. 설정의 경로가 실재하는지를
+# 검사 층이 아니라 여기서도 본다(검사 자신이 죽었을 때 검사가 자기를 신고할 수는 없다).
+func _palette_sources_exist() -> void:
+	var config: Variant = JSON.parse_string(FileAccess.get_file_as_string(
+		"res://../tools/validators/config.json"))
+	if typeof(config) != TYPE_DICTIONARY:
+		_ok("검사 설정 적재", false)
+		return
+	var paths: Array = (config as Dictionary).get("palette_sources", [])
+	_ok("조달 소스 선언 ≥ 1", not paths.is_empty())
+	for path in paths:
+		var text := FileAccess.get_file_as_string("res://../%s" % String(path))
+		_ok("조달 소스 실재·비어 있지 않음: %s" % String(path), not text.is_empty())

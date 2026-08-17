@@ -132,6 +132,13 @@ func _shortcut_input(event: InputEvent) -> void:
 	if not event.is_action_pressed("detail_info"):
 		return
 	get_viewport().set_input_as_handled()
+	_toggle_detail()
+
+
+# 토글을 별도 함수로 뺀 것은 **컨텍스트 층이 재배치된 화면 때문**이다 (D09 v1.3 §1.3).
+# RACE-01 은 패드 Y 를 차지 개입에 쓰고 상세 정보를 `LB 홀드 + Y` 로 옮겼으므로,
+# 그 화면은 `_shortcut_input` 을 재정의해 Y 를 먼저 가로챈 뒤 이 토글만 불러야 한다.
+func _toggle_detail() -> void:
 	if _detail_panel != null:
 		_hide_detail()
 		return

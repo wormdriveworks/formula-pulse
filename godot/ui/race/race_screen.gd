@@ -22,6 +22,16 @@ const JUDE_ID := "ai_jude"
 # 튜토리얼이 잠긴다. 검사가 두 쪽을 대조하므로 한쪽만 고치면 통과하지 못한다.
 const TUTORIAL_ACTIONS := ["spin", "hold", "respin", "charge", "confirm"]
 const HOLD_KEYS := [KEY_1, KEY_2, KEY_3]
+
+# ── 레이스 컨텍스트 층 패드 (D09 v1.3 §1.3 두 번째 표 · 총괄 판정 IMPL-200 ③) ──
+# 버튼 인덱스는 엔진 실측 확정(IMPL-186): A=0 · X=2 · Y=3 · LB=9 · RB=10 · D패드 좌13/우14.
+const PAD_A := 0
+const PAD_X := 2
+const PAD_Y := 3
+const PAD_LB := 9
+const PAD_RB := 10
+const PAD_DPAD_LEFT := 13
+const PAD_DPAD_RIGHT := 14
 const ICON_DIR := "res://assets/ui/icons/"
 
 # 엔진 로그 키 → 사운드 이벤트 id (D11 §1.4 이벤트 결속 · §2.4 SE-E 계열 정의).
@@ -109,6 +119,17 @@ var _skill_buttons: Array[Button] = []
 @onready var _tutorial: Control = %TutorialOverlay
 
 var _paused := false
+
+# 패드 모디파이어 장부 — 어떤 버튼이 지금 눌려 있는가 / 그 홀드가 조합으로 소비됐는가.
+# **[가안] 조합 판별 = 릴리스 시점 판정** (D09 는 조합의 구현 방식에 침묵 — 인계 §3 재량분).
+# `X` 는 단독이면 리스핀이고 홀드면 릴 선택 모디파이어다. 누르는 순간에는 어느 쪽인지 알 수
+# 없으므로 **뗄 때** 판정한다: 홀드 중 조합이 한 번이라도 성립했으면 그 X 는 모디파이어였고,
+# 아니면 단독 입력이었다. 같은 형식을 `LB + Y`(상세 정보) 대 `Y`(차지 개입)에도 쓰되,
+# 그쪽은 모디파이어가 LB 라서 Y 를 누르는 시점에 이미 판별이 선다(릴리스 대기 불요).
+var _pad_held: Dictionary = {}         # button_index -> true
+var _pad_combo_used: Dictionary = {}   # button_index -> 이 홀드가 조합으로 소비됐는가
+# X 홀드 중 D패드 좌우가 고르는 릴. **선택 표시는 아직 없다** — 입력 판독 층만 결선했다.
+var _hold_cursor := 0
 
 # 통상 턴의 릴 표시 배열 — 듀얼 중에는 오버레이의 릴로 스왑된다 (아래 _enter_duel 참조)
 var _base_reel_icons: Array[TextureRect] = []
@@ -249,6 +270,40 @@ func _process(delta: float) -> void:
 		_next_turn()
 
 
+# 패드 눌림/뗌 장부. **소비하지 않는다** — `_input` 은 전 입력을 가장 먼저 보므로 여기서만
+# 기록해 두면 이후 어느 층(`_shortcut_input`·`_unhandled_input`)에서 판정하든 상태가 최신이다.
+func _input(event: InputEvent) -> void:
+	var pad := event as InputEventJoypadButton
+	if pad == null:
+		return
+	if pad.pressed:
+		_pad_held[pad.button_index] = true
+		_pad_combo_used[pad.button_index] = false
+	else:
+		_pad_held.erase(pad.button_index)
+
+
+func _pad_is_held(button_index: int) -> bool:
+	return _pad_held.has(button_index)
+
+
+# ── 층위 우선 (D09 v1.3 §1.3 명문): 컨텍스트 층이 이 화면에서 공통 층에 우선한다 ──
+# 패드 `Y` 는 공통 층에서 상세 정보지만 이 화면에서는 **차지 개입**이고, 상세 정보는
+# v1.3 에서 `LB 홀드 + Y` 로 **재배치**됐다. 키보드 열(T)은 공통 층 그대로다 — 그래서
+# 가로채는 것은 패드 Y 하나뿐이고 나머지는 `super` 로 넘긴다(무언의 소실 금지).
+func _shortcut_input(event: InputEvent) -> void:
+	var pad := event as InputEventJoypadButton
+	if pad != null and pad.pressed and pad.button_index == PAD_Y:
+		get_viewport().set_input_as_handled()
+		if _pad_is_held(PAD_LB):
+			_pad_combo_used[PAD_LB] = true
+			_toggle_detail()
+		else:
+			_on_charge_intervene()
+		return
+	super._shortcut_input(event)
+
+
 # 입력 매핑은 D09 §1.3 — 확정과 스핀이 같은 키인 것이 원칙이다
 # ("결과를 불러온다 → 결과를 받아들인다"가 같은 물리 동작으로 순환).
 #
@@ -267,9 +322,51 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _paused:
 		return  # 정지 중 레이스 입력 차단 — 오버레이가 자체 포커스를 갖는다
+	if _handle_pad_context(event):
+		return
 	if event.is_action_pressed("ui_accept"):
 		_on_primary_action()
 		get_viewport().set_input_as_handled()
+
+
+# 컨텍스트 층 조합 판독. **`ui_accept` 보다 먼저 본다** — 층위 우선 규칙상 X·RB 홀드 중의
+# A 는 스핀이 아니라 조합의 일부다. 처리했으면 true 를 돌려 공통 층으로 내려가지 않게 한다.
+func _handle_pad_context(event: InputEvent) -> bool:
+	var pad := event as InputEventJoypadButton
+	if pad == null:
+		return false
+	# ── X 홀드 + D패드 좌우 → A : 릴 홀드 토글 ──
+	if pad.pressed and _pad_is_held(PAD_X):
+		if pad.button_index == PAD_DPAD_LEFT or pad.button_index == PAD_DPAD_RIGHT:
+			var step := -1 if pad.button_index == PAD_DPAD_LEFT else 1
+			_hold_cursor = wrapi(_hold_cursor + step, 0, REEL_COUNT)
+			_pad_combo_used[PAD_X] = true
+			get_viewport().set_input_as_handled()
+			return true
+		if pad.button_index == PAD_A:
+			_toggle_hold(_hold_cursor)
+			_pad_combo_used[PAD_X] = true
+			get_viewport().set_input_as_handled()
+			return true
+	# ── RB 홀드 + D패드/A : 스킬 슬롯 ──
+	# **활성화 경로가 아직 없다** — 스킬 버튼에 소비부가 없고 키보드 F1~F5 도 미결선이다
+	# (인게임 스킬 소비부 결선 = 별도 이월 트랙). 여기서는 조합을 **가로채기만** 한다:
+	# 놓아두면 RB 홀드 중의 A 가 공통 층으로 흘러 **스핀으로 오발화**하기 때문이다.
+	if pad.pressed and _pad_is_held(PAD_RB) \
+		and (pad.button_index == PAD_A or pad.button_index == PAD_DPAD_LEFT
+			or pad.button_index == PAD_DPAD_RIGHT):
+		_pad_combo_used[PAD_RB] = true
+		get_viewport().set_input_as_handled()
+		return true
+	# ── X 단독(뗌 시점 판정) : 리스핀 ──
+	if not pad.pressed and pad.button_index == PAD_X:
+		var used: bool = bool(_pad_combo_used.get(PAD_X, false))
+		_pad_combo_used[PAD_X] = false
+		if not used:
+			_on_respin()
+			get_viewport().set_input_as_handled()
+			return true
+	return false
 
 
 # 레이스 컨텍스트 층 전속 조작 (D09 §1.3 두 번째 표) — 아직 키보드 열만 결선돼 있다.

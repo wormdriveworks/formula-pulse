@@ -1036,7 +1036,7 @@ func _run_contamination_scan() -> void:
 # ── PAL 색 조달 대장 검사 (총괄 인계 IMPL-176 ⑤ — **경고형 신설**) ──
 #
 # **무엇을 보는가.** 화면 코드·씬의 색 리터럴이 조달 대장 안의 색인가.
-# 대장 = 마스터 56(`master_56.gpl`) + 정본 §6 색각 대체(`colorblind_alt.gpl`)
+# 대장 = 마스터 60(`master_60.gpl` — D10 v1.2) + 정본 §6 색각 대체(`colorblind_alt.gpl`)
 #      + 기능색 부속(= `ui_palette.gd` 전사분 — IMPL-144·167 로 정본 대조가 선 유일 기계 출처)
 #      + 명시 허용 목록(`palette_allow` — 항목마다 `reason` 필수)
 #
@@ -1137,20 +1137,36 @@ func _palette_in_scan_scope(path: String) -> bool:
 
 
 # 대장 = 팔레트 실물 + 기능색 전사 + 명시 허용. 값은 8bit 3채널 배열로 정규화해 둔다.
+# **소스별 적재를 개별로 단언한다** (에셋 발견 IMPL-198 §5 · 총괄 판정 IMPL-200 ①).
+# 이전 구조는 전체 대장이 비었을 때만 경고했다 — 소스 하나가 죽어도(경로 오타·에셋 개명)
+# 나머지가 채워 주면 **무신호로 지나간다.** 실제로 `master_56.gpl` → `master_60.gpl` 개명이
+# 그 경로로 조용히 통과했고, 대장 절반이 빈 채 174건이 "정상"으로 보였다.
+# 그래서 **항목마다 기여 ≥ 1** 을 건다 — 죽은 경로는 그 자체가 신호가 된다.
 func _palette_allowed_set() -> Array:
 	var allowed: Array = []
 	for palette_path in _config.get("palette_sources", []):
+		var contributed := 0
 		for line in _read_text(String(palette_path)).split("\n"):
 			var channels := _palette_gpl_channels(String(line))
 			if not channels.is_empty():
 				allowed.append(channels)
+				contributed += 1
+		if contributed == 0:
+			_warn("PAL", "조달 소스가 아무 색도 기여하지 못했다 (경로·형식 확인): %s"
+				% String(palette_path))
 	# 기능색 — `ui_palette.gd` 의 `Color("#RRGGBB")` 상수 전량
-	var functional := _read_text(String(_config.get("palette_functional_source", "")))
+	var functional_path := String(_config.get("palette_functional_source", ""))
+	var functional := _read_text(functional_path)
+	var functional_count := 0
 	for line in functional.split("\n"):
 		for literal in _palette_literals(_strip_comment(String(line))):
 			var channels := _palette_channels_of(literal)
 			if not channels.is_empty():
 				allowed.append(channels)
+				functional_count += 1
+	if functional_count == 0:
+		_warn("PAL", "기능색 출처가 아무 색도 기여하지 못했다 (경로·형식 확인): %s"
+			% functional_path)
 	for entry in _config.get("palette_allow", []):
 		var spec: Dictionary = entry
 		if String(spec.get("reason", "")).strip_edges() == "":
