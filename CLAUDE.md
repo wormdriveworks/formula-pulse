@@ -46,7 +46,8 @@ else echo "ENV=원격헤드리스"; fi
 # pull 먼저
 git pull
 
-# (필요시) 캐시 재생성 — .godot 는 커밋 안 되므로 pull 후 한 번
+# 캐시 재생성 — pull 로 신규 파일·신규 class_name 이 유입된 회차는 **필수** (IMPL-168 실측:
+# 미실행 시 타 레인의 class_name 미선언이 파스 에러로 위장해 COMPILE_GATE_FAIL). 그 외엔 .godot 부재 시 한 번.
 godot --headless --import
 
 # 로직 실행 (SceneTree 스크립트)
@@ -120,7 +121,7 @@ C:\SDKs\godot\Godot_v4.7.1-stable_win64_console.exe  ← CLI 전용 (실측 검�
 내러티브 턴제 레이싱 로그라이트. 슬롯 릴로 섹터를 주파하고, 자원으로 무작위성을 통제한다.
 설계 문서 **D01~D16 전량 확정** 상태이며, 본 리포지토리는 **구현 단계** 전용이다.
 
-- **단일 진실 원천:** `docs/master_plan_v2_41.md`
+- **단일 진실 원천:** `docs/master_plan_v2_42.md`
 - **설계 정본:** `docs/design/` (21개 파일 — **읽기 전용. 수정 금지**)
 - **구현 결정 로그:** `docs/decisions/impl_log.md`
 - **현재 마일스톤:** MS-3 Steam EA (D15 §1.1) — 착수 프롬프트 = `prompts/MS3_kickoff.md` (양 레인 공용)
