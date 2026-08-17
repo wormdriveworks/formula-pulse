@@ -8,12 +8,12 @@ content_margin_left = 10.0
 content_margin_top = 10.0
 content_margin_right = 10.0
 content_margin_bottom = 10.0
-bg_color = Color(0.11, 0.12, 0.15, 1)
+bg_color = Color(0.082353, 0.105882, 0.133333, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.28, 0.32, 0.38, 1)
+border_color = Color(0.356863, 0.392157, 0.435294, 1)
 
 [node name="EventNodeScreen" type="Control" unique_id=776179280]
 layout_mode = 3
@@ -27,7 +27,7 @@ layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
-color = Color(0.07, 0.08, 0.1, 1)
+color = Color(0.031373, 0.043137, 0.066667, 1)
 
 [node name="Center" type="CenterContainer" parent="." unique_id=456596264]
 layout_mode = 0
@@ -48,13 +48,13 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_i3lhm")
 theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 
 [node name="BodyLabel" type="Label" parent="Center/Panel/Column" unique_id=603617870]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 9
-theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 autowrap_mode = 3
 
 [node name="RewardRow" type="HBoxContainer" parent="Center/Panel/Column" unique_id=656442315]
@@ -80,7 +80,7 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_font_sizes/font_size = 9
-theme_override_colors/font_color = Color(1, 0.9, 0.4, 1)
+theme_override_colors/font_color = Color(1, 0.894118, 0.639216, 1)
 
 [node name="Footer" type="HBoxContainer" parent="Center/Panel/Column" unique_id=1331875308]
 layout_mode = 2
