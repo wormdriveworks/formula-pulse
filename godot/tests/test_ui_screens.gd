@@ -5,11 +5,12 @@
 # 무가드로 읽으면, 커리어를 연 경로에서는 멀쩡하고 **타이틀 직행 경로에서만** 죽는다.
 # 실제로 SYS-04 가 그렇게 샜다(총괄 판정 IMPL-176 ① — 타이틀 첫 진입 100% 재현).
 #
-# 검사 축 4종:
+# 검사 축 5종:
 #   ① 무커리어 문맥 성립 — SYS-01 → SYS-04 직행(D09 본문 145행·§A-1 규격 진입)
 #   ② 패드 순회 폐쇄 — 초기 포커스 보유 (D09 §1.3 · 총괄 판정 IMPL-176 ②)
 #   ③ 단독 경로 옵션 정합 — 라우터를 안 거치는 경로가 O9 를 적용하는가 (동 ③)
 #   ④ 미구성 상태 차단 — 값 창구를 안 거친 폰트 크기가 렌더될 여지가 없는가 (동 ④)
+#   ⑤ 입력맵 계약 — D09 §1.3 매핑표의 액션·기본 바인딩이 실재하는가 (IMPL-184 ①)
 #
 # **첫 프레임(`_process`)에서 돈다.** `_init()` 시점에는 `root` 가 없어 `add_child` 자체가
 # 불가능하고, `_initialize()` 시점에는 `root` 가 있어도 **아직 트리 안이 아니다** — 그래서
@@ -38,10 +39,11 @@ func _process(_delta: float) -> bool:
 	_initial_focus(data)
 	_standalone_boot_applies_o9()
 	_log_feed_requires_configure()
+	_input_map_contract()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 18:
-		print("UI_SCREENS_FAIL checks=%d < 하한 18 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 38:
+		print("UI_SCREENS_FAIL checks=%d < 하한 38 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -193,3 +195,58 @@ func _log_feed_requires_configure() -> void:
 	feed.configure(4, 9)
 	_ok("구성 후에는 D13 값을 보유", feed._font_size == 9, "actual=%d" % feed._font_size)
 	feed.free()
+
+
+# ── ⑤ 입력맵 계약 (D09 §1.3 공통 층 매핑표 · 총괄 판정 IMPL-184 ①) ──
+#
+# **액션의 존재와 기본 바인딩은 리매핑 탭(§6.4)의 전제 골격이다** — 재바인딩 UI 는 액션이
+# 이미 있을 때만 성립한다. 그래서 "나중에 기본값이 바뀌어도 액션 자체는 있다"를 계약으로 고정한다.
+#
+# 패드 바인딩은 **버튼 인덱스로 단언한다**(as_text 는 표기 문구라 엔진 판올림에 흔들린다).
+# 인덱스는 엔진에서 실측한 값이다 — A=0 · B=1 · Y=3 · Start=6 · LB=9 · RB=10 · D패드 11~14.
+const INPUT_CONTRACT := {
+	"ui_accept": 0,     # 확인 / 선택 = A
+	"ui_cancel": 1,     # 취소 / 뒤로 = B
+	"tab_prev": 9,      # 탭 전환 = LB
+	"tab_next": 10,     # 탭 전환 = RB
+	"pause_menu": 6,    # 일시정지 메뉴 = Start
+	"detail_info": 3,   # 상세 정보 = Y
+}
+# 포커스 이동 — D패드. 좌스틱 축은 별도로 본다(버튼이 아니라 모션 이벤트다).
+const FOCUS_CONTRACT := {"ui_up": 11, "ui_down": 12, "ui_left": 13, "ui_right": 14}
+
+
+func _input_map_contract() -> void:
+	for action in INPUT_CONTRACT:
+		_assert_pad_button(String(action), int(INPUT_CONTRACT[action]))
+	for action in FOCUS_CONTRACT:
+		_assert_pad_button(String(action), int(FOCUS_CONTRACT[action]))
+		_assert_stick_axis(String(action))
+	# **키보드 열이 살아 있는가.** `[input]` 에 액션을 적으면 엔진 기본 이벤트를 대체하므로,
+	# 패드만 적고 키보드를 빠뜨리면 조용히 키보드 조작이 죽는다 — 실제 위험이라 축을 둔다.
+	for action in ["ui_accept", "ui_cancel", "tab_prev", "tab_next", "pause_menu", "detail_info"]:
+		var has_key := false
+		for event in InputMap.action_get_events(String(action)):
+			if event is InputEventKey:
+				has_key = true
+		_ok("%s — 키보드 바인딩 보존" % String(action), has_key)
+
+
+func _assert_pad_button(action: String, button_index: int) -> void:
+	if not InputMap.has_action(action):
+		_ok("액션 실재: %s" % action, false)
+		return
+	var found := false
+	for event in InputMap.action_get_events(action):
+		if event is InputEventJoypadButton \
+			and (event as InputEventJoypadButton).button_index == button_index:
+			found = true
+	_ok("%s — 패드 버튼 %d 바인딩" % [action, button_index], found)
+
+
+func _assert_stick_axis(action: String) -> void:
+	var found := false
+	for event in InputMap.action_get_events(action):
+		if event is InputEventJoypadMotion:
+			found = true
+	_ok("%s — 좌스틱 축 바인딩" % action, found)

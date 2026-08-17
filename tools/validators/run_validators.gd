@@ -1074,12 +1074,59 @@ func _run_palette_scan() -> void:
 		var lines: Array = String(entry["source"]).split("\n")
 		for line_index in range(lines.size()):
 			var code_line := _strip_comment(String(lines[line_index]))
+			var is_modulate := _palette_modulate_context(code_line)
 			for literal in _palette_literals(code_line):
 				checked += 1
+				if is_modulate or _palette_is_layer_not_paint(literal):
+					continue
 				if _palette_is_allowed(literal, allowed):
 					continue
 				_warn("PAL", "%s:%d: 대장 밖 색 %s" % [path, line_index + 1, literal])
 	_report("PAL", "color literal ledger", checked, before_fail, before_warn)
+
+
+# ── 문맥 제외 2축 (총괄 판정 IMPL-184 ② — 에셋 §4-③ C계 집행) ──
+#
+# **조달 대장은 *도색* 전속이다.** 배율·감광은 색이 아니라 층이므로 대장의 대상이 아니다.
+# 제외를 허용 목록으로 처리하지 않는 이유: 허용 목록은 "대장 밖이지만 이 건은 봐준다"는
+# **판단 기록**이고, 아래 둘은 "애초에 검사 대상이 아니다"라는 **검사 정의**다. 섞으면
+# 목록이 판단인지 정의인지 알 수 없게 된다.
+
+# ① 프로퍼티 문맥 — `modulate` / `self_modulate` 는 곱해지는 게인이지 칠하는 색이 아니다.
+#    씬의 `modulate = Color(...)`·코드의 `.modulate =`·트윈의 `"modulate"` 인자를 모두 덮는다.
+#    판정 단위가 줄인 것은 의도다 — 한 줄이 게인과 도색을 함께 쓰는 형태는 실재하지 않고
+#    (실측), 표현식 파싱까지 가면 검사가 스스로 오검출원이 된다.
+func _palette_modulate_context(code_line: String) -> bool:
+	return code_line.contains("modulate")
+
+
+# ② 순 무채 + 알파 — 스크림(감광)·완전 투명. **무채 조건을 좁게 건다**:
+#    R=G=B 가 정확히 같고 알파가 1 미만일 때만이다. `Color(0.04,0.05,0.06,0.72)` 같은
+#    **유채+알파는 제외되지 않는다** — 감광 층으로 위장한 도색이 그 틈으로 샌다.
+func _palette_is_layer_not_paint(literal: String) -> bool:
+	var alpha := _palette_alpha_of(literal)
+	if alpha < 0.0 or alpha >= 1.0:
+		return false
+	var channels := _palette_channels_of(literal)
+	if channels.size() < 3:
+		return false
+	return int(channels[0]) == int(channels[1]) and int(channels[1]) == int(channels[2])
+
+
+# 알파 인자. 없거나 판정 불가면 -1 (= 제외 대상 아님).
+func _palette_alpha_of(literal: String) -> float:
+	var body := literal
+	var is_color8 := body.begins_with("Color8(")
+	body = body.trim_prefix("Color8(").trim_prefix("Color(").trim_suffix(")").strip_edges()
+	if body.begins_with("\"") or body.begins_with("#"):
+		return -1.0
+	var parts := body.split(",", false)
+	if parts.size() < 4:
+		return -1.0
+	var text := String(parts[3]).strip_edges()
+	if not (text.is_valid_float() or text.is_valid_int()):
+		return -1.0
+	return float(text) / 255.0 if is_color8 else float(text)
 
 
 func _palette_in_scan_scope(path: String) -> bool:
