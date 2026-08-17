@@ -242,6 +242,28 @@ func _season_close_and_grid_level() -> void:
 		str(out_result["player_position"]))
 	_ok("순위 밖 → 최하위 순위로 절상", int(out_result["player_position"]) == grid_size,
 		"actual=%d grid=%d" % [int(out_result["player_position"]), grid_size])
+	# ── 투어 쪽 동형 절상 (총괄 판정 IMPL-166 ③ · 집행 IMPL-169) ──
+	# 시즌 건과 나란히 둔다. 투어 쪽이 더 날카롭다 — 소비처 `record_tour_result()` 가
+	# `position <= 1` 로 투어 우승을 세므로, 절상이 없으면 **무순위가 투어 우승으로 뒤집힌다**.
+	var tour_outsider := _new_state(44)
+	if tour_outsider == null:
+		return
+	tour_outsider.begin_season(1)
+	var tour_result := tour_outsider.close_tour()
+	_ok("투어 순위 밖 플레이어는 순위표에 없다",
+		not Array(tour_result["standings"]).has(SeasonState.PLAYER_ID),
+		str(tour_result["standings"]))
+	_ok("투어 순위 밖 → 0이 아니다 (우승 오계상 차단)",
+		int(tour_result["player_position"]) != 0, str(tour_result["player_position"]))
+	_ok("투어 순위 밖 → 1이 아니다 (최상위 대우 차단)",
+		int(tour_result["player_position"]) != 1, str(tour_result["player_position"]))
+	_ok("투어 순위 밖 → 최하위 순위로 절상",
+		int(tour_result["player_position"]) == grid_size,
+		"actual=%d grid=%d" % [int(tour_result["player_position"]), grid_size])
+	# 절상값이 소비처에서 실제로 우승으로 세어지지 않는지까지 본다 —
+	# 값만 고치고 소비처가 다른 축을 보고 있으면 교정이 성립하지 않는다.
+	_ok("투어 우승 누계 무증가", tour_outsider.season_tour_wins == 0,
+		"actual=%d" % tour_outsider.season_tour_wins)
 
 
 # ── 조기 확정 (D08 §5.5): 공표만 하고 시즌은 계속된다 ──

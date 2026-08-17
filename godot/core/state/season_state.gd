@@ -275,7 +275,13 @@ func close_tour() -> Dictionary:
 		else:
 			push_error("SeasonState: points_tier2 has no position %d" % position)
 		championship_points[entrant_id] = int(championship_points.get(entrant_id, 0)) + points
-	var player_position := order.find(PLAYER_ID) + 1
+	# 순위 밖(투어 순위표 미등재) = **최하위 순위로 절상** — `close_season()` 과 동형 처리
+	# (총괄 판정 IMPL-166 ③ · 시즌 쪽은 IMPL-142). 여기서 0을 흘리면 **무순위가 투어 우승으로
+	# 뒤집힌다**: 소비처 `record_tour_result()` 가 `position <= 1` 로 투어 우승을 세고,
+	# `tour_rank` 마일스톤도 0을 '가장 좋은 순위'로 읽는다.
+	# **절상은 이 단일 지점 전속** — 하류는 받은 값을 그대로 쓴다.
+	var player_index := order.find(PLAYER_ID)
+	var player_position := player_index + 1 if player_index >= 0 else _grid_size()
 	var summary := {
 		"tour_slot": tour_slot,
 		"standings": order,

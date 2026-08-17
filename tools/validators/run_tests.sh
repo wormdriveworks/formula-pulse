@@ -31,7 +31,7 @@ TESTS=(
 	"tests/test_tc_c.gd:2002"
 	"tests/test_tc_p.gd:153"
 	"tests/test_events.gd:7039"
-	"tests/test_season.gd:492"
+	"tests/test_season.gd:497"
 	"tests/test_tc_o.gd:386"
 	"tests/test_narrative.gd:68"
 	# AUDIO — 오디오 디스패처 정책 4종(봉인·게이트·채널 상한·P1 보호) + 표 전수 대조.

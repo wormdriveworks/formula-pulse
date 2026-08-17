@@ -4,6 +4,7 @@
 #   godot --headless --path . --script tools/validators/run_validators.gd
 #
 # 차단 규칙: V1~V6·V8 + 혼입 0 스캔 = 위반 1건이면 실패(exit 1).
+# 구현 층 신설 검사 **MIX0·ARCH·FONT 도 차단형**이다 (FONT = 총괄 판정 IMPL-148 · 불변규칙 7).
 # V7(금칙 어휘)은 경고 전용 — 빌드를 차단하지 않는다 (D12 §4.2 V7 행 · D14 TL-1 명문).
 # V6 내부: ID 중복·접두 위반 = 차단 / 고아 데이터 = 경고 (D12 §4.2 V6 행 "고아 데이터 … 경고").
 #
@@ -769,9 +770,11 @@ func _run_architecture_scan() -> void:
 #   FONT-A 코드 생성 텍스트 Control 에 `add_theme_font_size_override` 부재
 #   FONT-B 폰트 크기를 리터럴로 기입 (불변규칙 2 — 값 창구는 D13·core_params)
 #
-# **성격(차단형/경고형) 판정은 총괄 소관이다** — V7 전례대로 스스로 정하지 않는다.
-# 판정 전까지는 **경고형**으로 둔다: 차단형으로 먼저 켜면 판정 전에 게이트를 점유하게 되고,
-# 그것은 "검증기 성격을 구현이 정했다"는 사실을 되돌리기 어렵게 만든다.
+# **성격 = 차단형 (총괄 판정 IMPL-148 · 집행 IMPL-168).** 신설 시에는 성격을 구현이 정하지
+# 않는다는 원칙(V7 전례)에 따라 경고형으로 두고 판정을 올렸고, 판정은 차단형으로 났다 —
+# "폰트를 지정했는가"는 **문법 수준 기계 판정**이라 V7(작법 판단이 D04 소관이라 경고형)의
+# 사유가 적용되지 않고, 오검출 0 실측·눈 검증 불가(37건)가 근거다. 축은 V4 계열이다.
+# **V7은 여전히 경고 전용** — 불변규칙 7.
 const FONT_TEXT_CONTROLS := ["Label", "Button", "RichTextLabel", "LineEdit", "CheckBox",
 	"CheckButton", "OptionButton", "TextEdit", "LinkButton", "MenuButton", "ItemList",
 	"Tree", "TabBar", "SpinBox"]
@@ -794,7 +797,7 @@ func _run_font_scan() -> void:
 			var literal_size := _font_literal_size(code_line)
 			if literal_size != "":
 				checked += 1
-				_warn("FONT", "%s:%d: 폰트 크기 리터럴 '%s' — 값 창구는 D13(core_params) 전속"
+				_fail("FONT", "%s:%d: 폰트 크기 리터럴 '%s' — 값 창구는 D13(core_params) 전속"
 					% [path, line_index + 1, literal_size])
 			# FONT-A — 오버라이드 부재
 			var created := _font_control_declaration(code_line)
@@ -802,7 +805,7 @@ func _run_font_scan() -> void:
 				continue
 			checked += 1
 			if not overridden.has(String(created["name"])):
-				_warn("FONT", "%s:%d: 코드 생성 %s '%s' 폰트 크기 미지정 — 엔진 기본 16 으로 해석된다"
+				_fail("FONT", "%s:%d: 코드 생성 %s '%s' 폰트 크기 미지정 — 엔진 기본 16 으로 해석된다"
 					% [path, line_index + 1, String(created["type"]), String(created["name"])])
 	_report("FONT", "code-created control fonts", checked, before_fail, before_warn)
 
