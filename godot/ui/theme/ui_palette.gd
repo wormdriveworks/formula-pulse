@@ -58,6 +58,12 @@ const CURRENCY_DATA := Color("#3FE0F5")         # 마스터 C3 시안 브라이�
 const BG_DEEP := Color("#080B11")               # 마스터 N01 최심 그림자
 const BG_PANEL := Color("#151B22")              # 마스터 N03 화면 바탕
 const FRAME_LINE := Color("#5B646F")            # 마스터 N10 강철 암부 (§9.2.1 대비 조정)
+
+# 활성 강조 테두리 — 중립 크롬선(`FRAME_LINE` N10 · 2.89:1)과 **한눈에 갈려야 하는** 축.
+# 값·역할 모두 정본 확정분의 전사다: §9.2.2 증보 2 가 `DuelFrame` 테두리를 **C3** 로 확정하며
+# 근거를 "중립 크롬선과 한눈에 갈려야 하는 활성 표시 · C3 는 크롬선의 3.8배(10.89:1)"로 적었다.
+# 릴 선택 커서(IMPL-207)가 같은 역할이라 같은 슬롯을 쓴다 — 신규 색이 아니다.
+const ACCENT_ACTIVE := Color("#3FE0F5")         # 마스터 C3 시안 브라이트
 const TEXT_PRIMARY := Color("#C7D0D8")          # 마스터 N16 본문 텍스트
 const TEXT_DIM := Color("#8B949F")              # 마스터 N13 (§9.2.1 대비 조정)
 

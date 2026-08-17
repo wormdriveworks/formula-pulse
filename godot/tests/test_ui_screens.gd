@@ -47,6 +47,9 @@ func _process(_delta: float) -> bool:
 		return true
 	_achievement_without_career(data)
 	_achievement_with_career(data)
+	_achievement_icons(data)
+	_log_feed_speaker_marks(data)
+	_reel_cursor(data)
 	_initial_focus(data)
 	_standalone_boot_applies_o9()
 	_log_feed_requires_configure()
@@ -154,6 +157,148 @@ func _achievement_with_career(data: GameData) -> void:
 	# 달성 1건이 요약에 반영되는가 — 무커리어(0)와 **다른 문면**이어야 한다.
 	var summary := (screen.get_node("%SummaryLabel") as Label).text
 	_ok("커리어 달성분이 요약에 반영", summary.contains("1"), summary)
+	_unmount(screen)
+
+
+# ── ②-1 아이콘 결선 (IMPL-207) ──
+#
+# **텍스처가 실제로 실렸는지만 증거로 인정한다.** 상수 표(`ICON_BY_CATEGORY`)가 있다는
+# 것도, `_build_icon()` 을 직접 부르는 것도 결선의 증거가 아니다 — 행 생성 경로가 그 함수를
+# 지나지 않으면 표는 그대로 남고 화면만 빈다(돌연변이 3건 미검출 전례).
+# 그래서 **실배치된 행 노드를 훑어** 도상 파일까지 대조한다.
+func _achievement_icons(data: GameData) -> void:
+	var session := RunSession.new()
+	session.setup(data)
+	session.begin_career(2)
+	var screen := _mount(ACHIEVEMENT_SCENE, session)
+	if screen == null:
+		return
+	var body := screen.get_node("%TabBody") as Control
+	var missing := 0
+	var wrong_category := 0
+	var hidden_rows := 0
+	var hidden_wrong := 0
+	var visible_rows := 0
+	var tab_index := 0
+	for scroll in body.get_children():
+		var category := String(AchievementScreen.TABS[tab_index]["category"])
+		var expected := String(AchievementScreen.ICON_BY_CATEGORY[category])
+		tab_index += 1
+		for panel in scroll.get_children():
+			for row in panel.get_children():
+				var icon := row.get_node_or_null("Icon") as TextureRect
+				if icon == null or icon.texture == null:
+					missing += 1
+					continue
+				var path := (icon.texture as Texture2D).resource_path.get_file().get_basename()
+				# 히든 미달성 행은 "Masked" 라벨을 갖는다 — 그것으로 두 갈래를 가른다.
+				if row.get_node_or_null("Masked") != null:
+					hidden_rows += 1
+					if path != AchievementScreen.ICON_HIDDEN:
+						hidden_wrong += 1
+					continue
+				visible_rows += 1
+				if path != expected:
+					wrong_category += 1
+	_ok("전 행에 도상이 실렸다", missing == 0, "missing=%d" % missing)
+	_ok("공개 행 도상 = 소속 카테고리", wrong_category == 0, "wrong=%d" % wrong_category)
+	_ok("공개 행이 존재한다", visible_rows > 0, "visible=%d" % visible_rows)
+	# 히든 9종(발견형 4 + 관계 도달형 5 — 전건 rival) 은 공용 도상을 진다.
+	_ok("히든 미달성 행 검출", hidden_rows == 9, "hidden=%d" % hidden_rows)
+	_ok("히든 행 도상 = 공용 히든", hidden_wrong == 0, "wrong=%d" % hidden_wrong)
+	# 카테고리 도상이 히든 행으로 새면 탭 위치와 합쳐 정체가 좁혀진다(§5.5 은닉 취지).
+	_ok("히든 행에 카테고리 도상 누출 0", hidden_rows + visible_rows == data.achievements.size(),
+		"rows=%d expected=%d" % [hidden_rows + visible_rows, data.achievements.size()])
+	_unmount(screen)
+
+
+# ── ②-1 화자 도상 결선 (IMPL-207) ──
+#
+# 로그 피드는 화자별로 도상/텍스트가 갈린다. **도상이 있는 화자는 TextureRect, 없는 화자는
+# Label** 이어야 하고 둘의 표지 폭이 같아야 한다(폭이 갈리면 본문 시작 x 가 어긋난다).
+func _log_feed_speaker_marks(data: GameData) -> void:
+	var feed := LogFeed.new()
+	feed.configure(4, data.param_int("param_font_size_body"))
+	feed.push_line("MARK", "body", LogFeed.Speaker.RELAY)
+	feed.push_line("MARK", "body", LogFeed.Speaker.CREW)
+	feed.push_line("MARK", "body")
+	var relay_mark := feed.get_child(0).get_node("Mark")
+	var crew_mark := feed.get_child(1).get_node("Mark")
+	var none_mark := feed.get_child(2).get_node("Mark")
+	_ok("중계 화자 = 도상", relay_mark is TextureRect, relay_mark.get_class())
+	_ok("중계 도상 실적재",
+		relay_mark is TextureRect and (relay_mark as TextureRect).texture != null)
+	# 크루는 D09 §3.3 이 '미니 초상'으로 규정한 축이라 아이콘 27종에 없다 — 텍스트로 되돌아간다.
+	_ok("도상 없는 화자 = 텍스트 되돌림", crew_mark is Label, crew_mark.get_class())
+	_ok("화자 미지정도 텍스트 되돌림", none_mark is Label, none_mark.get_class())
+	_ok("표지 폭 = 도상·텍스트 공통",
+		(relay_mark as Control).custom_minimum_size.x
+			== (crew_mark as Control).custom_minimum_size.x)
+	feed.free()
+
+
+# ── ②-2 릴 선택 커서 (IMPL-207) ──
+#
+# **실물 패드가 없는 환경에서도 조합 판독을 검증한다** — `InputEventJoypadButton` 을 실제로
+# 만들어 화면의 조합 판독기에 넣는다. 액션 시뮬레이션(`InputEventAction`)으로는 이 경로가
+# 열리지 않는다(판독기가 이벤트 **형**을 본다) — 그래서 형까지 같은 이벤트를 쓴다.
+# OS→엔진 전달 구간만 검사 밖이고, 그 위 전부가 여기 든다.
+func _reel_cursor(data: GameData) -> void:
+	var session := RunSession.new()
+	session.setup(data)
+	session.begin_career(2)
+	var screen := _mount(RACE_SCENE, session)
+	if screen == null:
+		return
+	var frames := (screen.get_node("%E05Reels") as Control).get_children()
+	var borders := func() -> Array:
+		var out: Array = []
+		for column in frames:
+			var style := (column.get_node("Frame") as Control).get_theme_stylebox("panel")
+			out.append((style as StyleBoxFlat).border_color)
+		return out
+	# 커서 이전 = 전 프레임이 중립 크롬선
+	var neutral: Array = borders.call()
+	var all_neutral := neutral.all(func(c): return c == UiPalette.FRAME_LINE)
+	_ok("커서 전: 전 프레임 = FRAME_LINE", all_neutral, str(neutral))
+
+	# 커서는 **개입 창(T4)이 열려 있는 동안**만 뜬다 — 홀드 토글이 가능한 국면이 그것뿐이다.
+	# 창은 스핀 → 정지 연출 완료 후에 열리고 그 완료는 프레임 진행에 달려 있으므로,
+	# 헤드리스에서는 국면만 세우고 **조합 판독 → 표시**의 결선을 본다.
+	# (창을 여는 경로 자체는 봉인 검사가 프레임을 돌려 가며 따로 검증한다.)
+	_ok("전제: 마운트 직후엔 개입 창이 닫혀 있다", not screen._timer_active)
+	screen._timer_active = true
+	_feed_pad(screen, _pad_event(2, true))     # PAD_X press
+	var lit: Array = borders.call()
+	_ok("X 홀드 중: 선택 릴만 ACCENT_ACTIVE",
+		lit[0] == UiPalette.ACCENT_ACTIVE and lit[1] == UiPalette.FRAME_LINE
+			and lit[2] == UiPalette.FRAME_LINE, str(lit))
+
+	# D패드 오른쪽 → 커서 이동. 강조가 따라와야 한다(상태만 바뀌고 표시가 안 따라오면 실사용 불가).
+	_feed_pad(screen, _pad_event(14, true))    # PAD_DPAD_RIGHT press
+	var moved: Array = borders.call()
+	_ok("D패드 우 → 강조가 릴 2 로 이동",
+		moved[1] == UiPalette.ACCENT_ACTIVE and moved[0] == UiPalette.FRAME_LINE, str(moved))
+
+	# 경계 감김 [가안] — 릴 3 에서 한 번 더 누르면 릴 1 로 돌아온다.
+	_feed_pad(screen, _pad_event(14, true))
+	_feed_pad(screen, _pad_event(14, true))
+	var wrapped: Array = borders.call()
+	_ok("경계 감김: 릴 1 로 복귀", wrapped[0] == UiPalette.ACCENT_ACTIVE, str(wrapped))
+
+	# X 뗌 → 소등. 커서가 남으면 키보드 사용자에게 뜻 없는 영구 강조가 된다.
+	_feed_pad(screen, _pad_event(2, false))
+	var off: Array = borders.call()
+	_ok("X 뗌: 전 프레임 = FRAME_LINE",
+		off.all(func(c): return c == UiPalette.FRAME_LINE), str(off))
+
+	# **봉인(불변규칙 5):** 릴 정지 연출 중에는 커서가 뜨지 않는다.
+	_feed_pad(screen, _pad_event(2, true))
+	screen._revealing = true
+	screen._refresh_reel_frames()
+	var sealed: Array = borders.call()
+	_ok("정지 연출 중 커서 소등 (봉인)",
+		sealed.all(func(c): return c == UiPalette.FRAME_LINE), str(sealed))
 	_unmount(screen)
 
 
@@ -286,10 +431,12 @@ func _key_event(keycode: int) -> InputEventKey:
 	return event
 
 
-func _pad_event(button_index: int) -> InputEventJoypadButton:
+# 뗌 이벤트도 필요하다 — 커서 소등·X 단독 리스핀은 **릴리스 시점 판정**이라
+# 누름만으로는 그 절반이 검사 밖에 남는다 (IMPL-207).
+func _pad_event(button_index: int, pressed: bool = true) -> InputEventJoypadButton:
 	var event := InputEventJoypadButton.new()
 	event.button_index = button_index
-	event.pressed = true
+	event.pressed = pressed
 	return event
 
 

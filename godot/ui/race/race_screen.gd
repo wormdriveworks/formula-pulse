@@ -91,6 +91,21 @@ var _charge_shown := 0
 
 var _reel_icons: Array[TextureRect] = []
 var _reel_panels: Array[PanelContainer] = []
+var _reel_frame_styles: Array[StyleBoxFlat] = []
+
+# 릴 선택 커서 표시 (IMPL-207 · 원격 7차 §3-라 보고분).
+#
+# **D09 는 커서의 시각 표시에 침묵한다** — §1.3 은 입력만("X + D패드 좌우 → A"), §3.2 는
+# *홀드 상태*의 이중 표시(프레임 잠금 + 토글 점등)만 규정한다. 선택 위치는 별개 축이라
+# 규격이 없다. 그래서 [가안]이고, 색은 신규가 아니라 기확정 슬롯이다(`ACCENT_ACTIVE` = C3).
+#
+# **표시 조건을 X 홀드 중으로 좁혔다.** 상시 표시하면 키보드·마우스 사용자에게는 릴 1에
+# 영구 강조가 붙는데 그 강조가 아무 뜻도 없다 — 홀드는 1·2·3 키로 직접 찍기 때문이다.
+# 조합을 쥐고 있는 동안만 뜨면 "지금 어디를 고르는 중인가"만 답하고 사라진다.
+#
+# **봉인(불변규칙 5):** 커서는 선택 위치 전속이다. 심볼·결과·매치와 상관하는 어떤 값도
+# 읽지 않으며, 릴 정지 연출 중(`_revealing`)에는 아예 뜨지 않는다.
+var _cursor_active := false
 var _hold_boxes: Array[CheckBox] = []
 var _skill_buttons: Array[Button] = []
 
@@ -110,7 +125,7 @@ var _skill_buttons: Array[Button] = []
 @onready var _e08_skills: HBoxContainer = %E08Skills
 @onready var _e08_charge: Button = %E08ChargeIntervene
 @onready var _e08_confirm: Button = %E08Confirm
-@onready var _e10_log: VBoxContainer = %E10LogFeed
+@onready var _e10_log: LogFeed = %E10LogFeed
 @onready var _e11_chassis_bar: ProgressBar = %E11ChassisBar
 @onready var _e11_chassis_value: Label = %E11ChassisValue
 @onready var _e12_charge: Label = %E12Charge
@@ -335,11 +350,18 @@ func _handle_pad_context(event: InputEvent) -> bool:
 	var pad := event as InputEventJoypadButton
 	if pad == null:
 		return false
+	# ── X 눌림/뗌 = 커서 표시 개폐 (IMPL-207) ──
+	# 조합을 쥐는 순간 어디를 고르는 중인지 보여야 한다. **리스핀 판정과 무관하다** —
+	# 여기서는 `_pad_combo_used` 를 건드리지 않으므로 X 단독 뗌의 리스핀 경로가 그대로다.
+	if pad.button_index == PAD_X:
+		_cursor_active = pad.pressed
+		_refresh_reel_frames()
 	# ── X 홀드 + D패드 좌우 → A : 릴 홀드 토글 ──
 	if pad.pressed and _pad_is_held(PAD_X):
 		if pad.button_index == PAD_DPAD_LEFT or pad.button_index == PAD_DPAD_RIGHT:
 			var step := -1 if pad.button_index == PAD_DPAD_LEFT else 1
 			_hold_cursor = wrapi(_hold_cursor + step, 0, REEL_COUNT)
+			_refresh_reel_frames()
 			_pad_combo_used[PAD_X] = true
 			get_viewport().set_input_as_handled()
 			return true
@@ -395,7 +417,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _collect_reels() -> void:
 	for i in range(REEL_COUNT):
 		var column := _e05_reels.get_child(i)
-		_reel_panels.append(column.get_node("Frame"))
+		var frame: PanelContainer = column.get_node("Frame")
+		_reel_panels.append(frame)
+		# 커서가 테두리 색을 바꾸므로 **스타일박스를 릴별로 복제해 둔다.** 씬 리소스를 그대로
+		# 만지면 그 변경이 리소스에 남아 다음 인스턴스·에디터까지 따라간다(섀시바 전례 :788).
+		var style := frame.get_theme_stylebox("panel").duplicate() as StyleBoxFlat
+		frame.add_theme_stylebox_override("panel", style)
+		_reel_frame_styles.append(style)
 		_base_reel_icons.append(column.get_node("Frame/Symbol"))
 		var box: CheckBox = column.get_node("Hold")
 		box.toggled.connect(_on_hold_toggled)
@@ -741,9 +769,16 @@ func _hide_reels() -> void:
 # 색 정보가 아니므로 색상 이동은 심볼 판독(D10 §5.1 색+도상 이중 부호화)에 잡음이 된다.
 # 감광률은 구 값의 중앙 채널을 취해 실화면 인상을 보존했다.
 func _refresh_reel_frames() -> void:
+	# 커서는 홀드 토글이 실제로 가능한 국면에서만 뜬다 — `_toggle_hold()` 의 가드와 같은 조건이다.
+	# 조건이 갈리면 "커서는 보이는데 A 가 안 먹는" 상태가 생긴다.
+	var cursor_on := _cursor_active and _timer_active and not _revealing
 	for i in range(REEL_COUNT):
 		var held: bool = _hold_boxes[i].button_pressed
 		_reel_panels[i].modulate = Color(1.0, 1.0, 1.0) if held else Color(0.78, 0.78, 0.78)
+		if i < _reel_frame_styles.size():
+			# 감광(modulate)과 테두리 색은 **다른 채널**이다 — 홀드와 커서가 서로를 지우지 않는다.
+			_reel_frame_styles[i].border_color = UiPalette.ACCENT_ACTIVE \
+				if cursor_on and i == _hold_cursor else UiPalette.FRAME_LINE
 
 
 func _refresh_strip() -> void:
@@ -1144,6 +1179,13 @@ func _push_events(events: Array) -> void:
 			# 화자 축이 이벤트에 아직 없다 — 발행 층(코어)이 화자를 구분하지 않으므로
 			# 전량 중계로 표기한다. [가안] 화자 구분(D09 §3.3 4종)은 이벤트 스키마에
 			# 화자 필드가 생긴 뒤 결선한다. — IMPL-071
-			_e10_log.push_line(data.strings.text("ui.race.speakerRelay"), body)
+			#
+			# 도상 축은 결선했다 (IMPL-207) — 중계 = 마이크 아이콘(D09 §3.3 공용 1종).
+			# 텍스트 표지는 도상 부재·적재 실패 시의 되돌림 경로로 함께 넘긴다.
+			# **`speaker_filler` 는 여기서 뜨지 않는다** — 필러 드라이버 발화를 코어가
+			# 발행하지 않으므로 결속할 호출 지점이 없다(회신 §2-② 보고분).
+			_e10_log.push_line(
+				data.strings.text("ui.race.speakerRelay"), body, LogFeed.Speaker.RELAY
+			)
 	_refresh_strip()
 	_refresh_resources()

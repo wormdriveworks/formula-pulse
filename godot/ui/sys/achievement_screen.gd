@@ -11,6 +11,7 @@
 #
 # 두 진입 경로를 지원한다(SYS-03 전례): 라우터 경유(타이틀 — payload.return 으로 복귀) /
 # 오버레이 인스턴스(일시정지 위 — `closed` 시그널로 호출자가 회수).
+class_name AchievementScreen
 extends FlowScreen
 
 signal closed
@@ -23,6 +24,31 @@ const TABS := [
 	{"key": "ui.achievement.tabGarage", "category": "garage"},
 	{"key": "ui.achievement.tabArchive", "category": "archive"},
 ]
+
+const ICON_DIR := "res://assets/ui/icons/"
+
+# 항목 행 아이콘 (§A-4 "항목 행 = 아이콘·명칭·조건·달성 일시").
+# **카테고리 1:1 이고 업적별 도상은 없다** — 대장이 A-UI-22~26 을 카테고리 이름으로 배정했다
+# (`achv_career`=①커리어 … `achv_archive`=⑤아카이브). 즉 아이콘은 업적의 정체가 아니라
+# 소속 축의 표지이므로, 39행이 5종을 나눠 쓰는 것이 규격대로다.
+const ICON_BY_CATEGORY := {
+	"career": "achv_career",
+	"rival": "achv_rival",
+	"driving": "achv_driving",
+	"garage": "achv_garage",
+	"archive": "achv_archive",
+}
+
+# 히든 미달성 공용 도상 (A-UI-27 — 대장 문면 "업적 히든 (미달성 공용)").
+# **이것이 §5.5 '아이콘 비노출'을 어기지 않는 이유:** 은닉의 대상은 *그 업적의 정체*이고,
+# 공용 도상은 39행 중 어느 것인지에 대해 아무것도 말하지 않는다(카테고리조차 가린다 —
+# 카테고리 아이콘을 그대로 쓰면 탭 위치와 합쳐 후보가 좁혀지므로 그쪽이 오히려 누출이다).
+# [가안] — §5.5 문면은 "아이콘 전부 비노출"이라 공용 도상도 비우는 독법이 가능하다.
+# 대장이 이 도상에 "미달성 공용" 용도를 명시해 둔 쪽을 택했고, 총괄 판정으로 뒤집을 수 있다.
+const ICON_HIDDEN := "achv_hidden"
+
+# 원도 32×32 를 **등배로** 쓴다 — 축소하면 비정수 배율이 되어 믹셀이 된다(D10 §2.2 · D12 §9.1).
+const ICON_SLOT := 32
 
 var _return_route := "SYS-01"
 var _overlay_mode := false
@@ -199,6 +225,28 @@ func _build_tabs() -> void:
 			panel.add_child(_build_row(String(achievement_id)))
 
 
+# 항목 행 아이콘 1칸. **도상이 없어도 칸은 남긴다** — 폭이 사라지면 명칭 열이 밀려
+# 행끼리 어긋나고, 그 어긋남은 "이 업적만 다르다"로 오독된다(§A-4 "자리만 존재"와 같은 취지).
+#
+# **달성/미달성으로 아이콘을 감광하지 않는다.** 상태는 표기 열(달성/미달성)과 명칭 색이
+# 이미 지고 있고, 아이콘은 카테고리 표지라 상태 축이 아니다. 감광이 필요하다는 판단이 서면
+# 그것은 배율 신설이므로 총괄 경유다(IMPL-195 감광 등채널 전례).
+func _build_icon(asset_id: String) -> TextureRect:
+	var icon := TextureRect.new()
+	icon.name = "Icon"
+	icon.custom_minimum_size = Vector2(ICON_SLOT, ICON_SLOT)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	if asset_id.is_empty():
+		return icon
+	var path := "%s%s.png" % [ICON_DIR, asset_id]
+	if not ResourceLoader.exists(path):
+		# 진단 문자열은 영문 — 표시 문자열이 아니지만 V4 는 한글 리터럴을 경로 불문 차단한다
+		push_error("AchievementScreen: icon asset missing - %s" % path)
+		return icon
+	icon.texture = load(path) as Texture2D
+	return icon
+
+
 # 탭에 드는 업적 id — 데이터 적재 순서를 따른다(D08 §8.11 열거 순 = CSV 행 순).
 func _ids_for(category: String) -> Array:
 	var ids: Array = []
@@ -219,8 +267,9 @@ func _build_row(achievement_id: String) -> Control:
 	row.name = achievement_id.to_pascal_case() + "Row"
 	row.add_theme_constant_override("separation", 6)
 
-	# 히든 미달성 = "???" 슬롯 하나로 끝 (명칭·조건·아이콘 전부 비노출 — §5.5)
+	# 히든 미달성 = "???" 슬롯 (명칭·조건 비노출 · 아이콘은 공용 도상 — §5.5 · ICON_HIDDEN 주석)
 	if hidden and not met:
+		row.add_child(_build_icon(ICON_HIDDEN))
 		var masked := Label.new()
 		masked.name = "Masked"
 		var masked_text := s.text("ui.achievement.hiddenSlot")
@@ -229,6 +278,8 @@ func _build_row(achievement_id: String) -> Control:
 		masked.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
 		row.add_child(masked)
 		return row
+
+	row.add_child(_build_icon(String(ICON_BY_CATEGORY.get(String(row_data["category"]), ""))))
 
 	var mark := Label.new()
 	mark.name = "Mark"
