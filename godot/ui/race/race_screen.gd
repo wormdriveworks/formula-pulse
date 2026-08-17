@@ -140,6 +140,11 @@ func _boot() -> void:
 		session.setup(standalone)
 		session.begin_career(1)
 	data = session.data
+	# O9 색각 대체 적용 — **라우터가 하는 일을 그대로 한다** (총괄 판정 IMPL-176 ③).
+	# 팔레트는 정적 클래스라 세션을 쥘 수 없어 옵션을 밀어 넣는 구조인데, 그 밀어 넣기는
+	# `FlowScreen.bind()` 에 있다. 단독 인스턴스화 경로는 `bind()` 를 거치지 않으므로
+	# 여기서 같은 일을 하지 않으면 **이 경로에서만** 화면이 옛 색으로 뜬다.
+	UiPalette.apply_options(session.options)
 	_timer_base = data.param("param_timer_base_sec")
 	_lockout_base = data.param("param_confirm_lockout_sec")
 	_collect_reels()

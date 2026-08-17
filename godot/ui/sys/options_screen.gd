@@ -32,6 +32,44 @@ func _on_bound(payload: Dictionary) -> void:
 	close.pressed.connect(_on_close)
 	_build_tabs()
 	_select_tab(0)
+	_focus_initial()
+
+
+# ── 패드 순회 폐쇄 (D09 §1.3 89행 · 총괄 판정 IMPL-176 ②) ──
+#
+# **초기 포커스 = 첫 탭 첫 항목** (§A-3 명시). 항목 행의 첫 조작 요소는 단계 감소 버튼이다 —
+# 라벨은 포커스를 받지 않으므로 "첫 항목"의 실물은 그 버튼이다.
+# 조작 탭처럼 항목이 없는 탭이 첫 탭이 되는 경우를 대비해 탭 버튼으로 물러선다.
+func _focus_initial() -> void:
+	if not _tab_panels.is_empty():
+		var first_panel := _tab_panels[0] as Control
+		if first_panel.get_child_count() > 0:
+			var focusable := _first_focusable(first_panel.get_child(0) as Control)
+			if focusable != null:
+				focusable.grab_focus()
+				return
+	var tab_row := %TabRow as Control
+	if tab_row.get_child_count() > 0:
+		(tab_row.get_child(0) as Control).grab_focus()
+
+
+func _first_focusable(node: Control) -> Control:
+	if node.focus_mode != Control.FOCUS_NONE:
+		return node
+	for child in node.get_children():
+		if child is Control:
+			var found := _first_focusable(child as Control)
+			if found != null:
+				return found
+	return null
+
+
+# 취소 / 뒤로 = Esc · 우클릭 · **패드 B** (D09 §1.3 공통 층 매핑표 — 정본 명시).
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	get_viewport().set_input_as_handled()
+	_on_close()
 
 
 func _build_tabs() -> void:

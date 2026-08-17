@@ -16,9 +16,15 @@ const VISUAL_LINES := 2  # [데스크탑] 물리 고정 — D09 §7.3
 # 아이콘 실물은 D10(A-UI아이콘) 유입 대상이라 지금은 자리만 잡고 라벨로 대체한다.
 enum Speaker { RELAY, CREW, RIVAL, FILLER }
 
+# 폰트 크기는 **구성 전에는 값이 없다** (총괄 판정 IMPL-176 ④ — FONT-B 와 같은 축).
+# 리터럴 초기값(구 8)을 두면 `configure()` 미호출 경로가 생겼을 때 D13 창구 밖의 수치가
+# **조용히 실렌더된다** — 화면은 뜨고 글자만 미묘하게 다르므로 눈으로는 잡히지 않는다.
+# 미구성은 기본값이 아니라 오류 상태로 다룬다: 센티넬을 두고 소비 지점에서 보고 후 중단한다.
+const UNCONFIGURED := -1
+
 var slot_cap := 4
 var _slots: Array[Control] = []
-var _font_size := 8
+var _font_size := UNCONFIGURED
 
 
 func configure(cap: int, font_size: int) -> void:
@@ -44,6 +50,9 @@ func clear_feed() -> void:
 
 
 func _build_slot(speaker_mark: String, body: String) -> Control:
+	if _font_size == UNCONFIGURED:
+		# 값 누락은 "중단·보고" 사안이다 (불변규칙 2) — 임의 대체값으로 그리지 않는다.
+		push_error("LogFeed: configure() not called — font size must come from D13 (param_font_size_body)")
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 3)
 

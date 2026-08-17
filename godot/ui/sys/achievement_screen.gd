@@ -47,6 +47,31 @@ func _on_bound(payload: Dictionary) -> void:
 	_refresh_link_notice()
 	_build_tabs()
 	_select_tab(0)
+	_focus_initial()
+
+
+# ── 패드 순회 폐쇄 (D09 §1.3 89행 · 총괄 판정 IMPL-176 ②) ──
+#
+# 포커스를 가진 노드가 없으면 패드로는 아무것도 고를 수 없다 — 화면이 잠긴다.
+# **[가안] 초기 포커스 = 첫 탭 버튼.** §A-4 는 초기 포커스를 명시하지 않는다(§A-3 은 명시).
+# 본문 §1.3 의 일반 규칙 "초기 포커스는 화면별 주 행동 버튼"을 적용하되, 이 화면의 행동은
+# 탐색(탭 전환)과 닫기뿐이고 닫기를 첫 포커스로 두면 "열자마자 나가기"가 되므로 탭을 잡는다.
+# §A-4 에 명시가 서면 그쪽을 따른다.
+func _focus_initial() -> void:
+	var tab_row := %TabRow as Control
+	if tab_row.get_child_count() > 0:
+		(tab_row.get_child(0) as Control).grab_focus()
+		return
+	(%CloseButton as Button).grab_focus()
+
+
+# 취소 / 뒤로 = Esc · 우클릭 · **패드 B** (D09 §1.3 공통 층 매핑표 — 정본 명시).
+# 닫기 버튼까지 포커스를 옮겨야만 나갈 수 있으면 그것도 순회 폐쇄 위반이다.
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	get_viewport().set_input_as_handled()
+	_on_close()
 
 
 # 플랫폼 도전과제 미연동 고지 (D09 §6.5 필수 항목 — 업적 1:1 매핑).
@@ -66,12 +91,48 @@ func _refresh_link_notice() -> void:
 	notice.text = session.data.strings.text("ui.achievement.serviceUnlinked")
 
 
+# ── 무커리어 문맥 (SYS-01 → SYS-04 직행) ──
+#
+# **타이틀에서 바로 열리는 것이 규격이다** (D09 본문 145행·§A-1 — 총괄 판정 IMPL-176 ①).
+# 그런데 `outgame` 은 `begin_career()` 에서만 생긴다 — 즉 커리어 미개시가 **정상 상태**이고
+# 널은 예외가 아니다. 그래서 호출부마다 널 검사를 흩뿌리지 않고 조달 창구 하나로 닫는다:
+# 진척은 `_progress_for()`, 달성 여부는 `_achieved()` 만 거친다. 창구가 하나면 새 소비부가
+# 생겨도 같은 자리를 지나므로, 가드를 "기억해서 붙이는" 구조가 되지 않는다.
+#
+# **[가안] 무커리어 = 달성 0 표시.** 통산 업적 적재 층(플랫폼 도전과제 역방향 조회 —
+# D12 §7.4 Steam 연동 결선 시 확정)이 서기 전까지의 잠정 표시 규칙이다. 그 층이 서면
+# 커리어 없이도 "이 계정이 통산 달성한 것"을 보여줄 수 있고, 그때 이 규칙은 교체된다.
+func _has_career() -> bool:
+	return session != null and session.outgame != null
+
+
+func _achieved(achievement_id: String) -> bool:
+	return _has_career() and session.outgame.achievements.has(achievement_id)
+
+
+# 진척 조회 — 무커리어에서도 **행이 서야 하므로** 형태가 같은 0 진척을 낸다.
+# `threshold` 는 데이터에서 그대로 읽는다: 0 으로 뭉개면 "임계 2 이상만 진척 표기" 분기가
+# 무커리어에서만 다르게 갈려, 커리어 유무로 목록의 모양이 바뀐다.
+func _progress_for(achievement_id: String) -> Dictionary:
+	if _has_career():
+		return session.outgame.achievement_progress(achievement_id)
+	var row: Dictionary = session.data.achievements[achievement_id]
+	return {
+		"current": 0,
+		"threshold": CsvTable.to_int(String(row["threshold"])),
+		"met": false,
+		"pending": false,
+		"season": 0,
+	}
+
+
 # 달성률 요약 헤더 (§A-4). 히든 미달성분도 분모에 든다 — 총수 가늠 허용이 §5.5 명문이다.
+# 분모는 정적 데이터라 무커리어에서도 그대로 선다 — 목록 총수는 커리어와 무관한 사실이다.
 func _refresh_summary() -> void:
 	var total := session.data.achievements.size()
 	var done := 0
 	for achievement_id in session.data.achievements:
-		if session.outgame.achievements.has(achievement_id):
+		if _achieved(String(achievement_id)):
 			done += 1
 	var percent := 0
 	if total > 0:
@@ -128,7 +189,7 @@ func _ids_for(category: String) -> Array:
 func _build_row(achievement_id: String) -> Control:
 	var s := session.data.strings
 	var row_data: Dictionary = session.data.achievements[achievement_id]
-	var progress: Dictionary = session.outgame.achievement_progress(achievement_id)
+	var progress: Dictionary = _progress_for(achievement_id)
 	var met := bool(progress["met"])
 	var hidden := CsvTable.to_int(String(row_data["hidden"])) == 1
 

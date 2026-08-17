@@ -116,6 +116,11 @@ func _untouched_slots() -> void:
 # 팔레트가 세션을 못 쥐므로 옵션은 **밀어 넣는** 구조다. 그 밀어 넣기가 빠지면 화면은
 # 옛 색으로 남는데 위 검사들은 전부 통과한다(직접 `apply_options` 를 부르기 때문 —
 # 돌연변이 ⑧ 미검출로 실측). 화면 결속이 실제로 적용하는지를 베이스 화면으로 확인한다.
+#
+# **사각 1건 해소 (IMPL-180).** 이 검사는 `bind()` 경로만 본다. `race_screen` 은 세션이
+# 없으면 **스스로 세션을 세우는 단독 경로**를 갖는데(`_boot()`), 그 경로는 `bind()` 를
+# 거치지 않아 O9 가 적용되지 않았다 — 그 축은 UISCR(`test_ui_screens.gd`)이 본다.
+# 실화면 인스턴스화가 필요해 프레임을 도는 스위트로 보냈다(이 스위트는 `_init` 동기 실행).
 func _applied_on_screen_bind() -> void:
 	var data := GameData.new()
 	data.load_all()
