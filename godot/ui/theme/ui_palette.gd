@@ -55,9 +55,9 @@ const CURRENCY_DATA := Color("#3FE0F5")         # 마스터 C3 시안 브라이�
 # ── 배경·프레임 (텔레메트리 계기 의장 — D10 §5.4) ──
 const BG_DEEP := Color("#080B11")               # 마스터 N01 최심 그림자
 const BG_PANEL := Color("#151B22")              # 마스터 N03 화면 바탕
-const FRAME_LINE := Color("#424A54")            # 마스터 N08
+const FRAME_LINE := Color("#5B646F")            # 마스터 N10 강철 암부 (§9.2.1 대비 조정)
 const TEXT_PRIMARY := Color("#C7D0D8")          # 마스터 N16 본문 텍스트
-const TEXT_DIM := Color("#6A737E")              # 마스터 N11
+const TEXT_DIM := Color("#8B949F")              # 마스터 N13 (§9.2.1 대비 조정)
 
 # ── 색각 대체 팔레트 (A-팔레트-02 · 정본 §6 — O9 소비부, IMPL-155) ──
 #
