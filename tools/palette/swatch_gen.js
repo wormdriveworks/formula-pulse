@@ -294,6 +294,38 @@ function emit(name, cv) {
   fs.writeFileSync(path.join(PAL_DIR, name), encodePNG(cv.w, cv.h, cv.buf));
   console.log(`${name} ${cv.w}x${cv.h}`);
 }
+
+// ─────────────────────────────────────────────────────────── 양자화용 순색 스트립
+// 총괄 판정 ⓑ (IMPL-161 §1): `tools/palette/master_56_strip.png` — 제작 공정의 입력이지
+// 런타임 리소스가 아니므로 `res://` 밖에 둔다 (대장 §1.1 의 `store/` 논거 그대로 적용).
+// 스와치 시트는 기능 4색이 섞여 60색이라 비아이콘 원도의 양자화 기준이 될 수 없다.
+function readIDAT(file) {
+  const b = fs.readFileSync(file), parts = [];
+  let o = 8;
+  while (o < b.length) {
+    const len = b.readUInt32BE(o), t = b.toString('ascii', o + 4, o + 8);
+    if (t === 'IDAT') parts.push(b.slice(o + 8, o + 8 + len));
+    if (t === 'IEND') break;
+    o += 12 + len;
+  }
+  return Buffer.concat(parts);
+}
+{
+  const w = master.length, buf = Buffer.alloc(w * 3);
+  master.forEach((c, i) => { const [r, g, b] = hex2rgb(c.hex); buf[i * 3] = r; buf[i * 3 + 1] = g; buf[i * 3 + 2] = b; });
+  const file = path.join(__dirname, 'master_56_strip.png');
+  fs.writeFileSync(file, encodePNG(w, 1, buf));
+
+  // 부대조건 ② — 쓴 파일을 되읽어 검산한다. 60색 실측이 "스와치를 그대로 먹이면 안 된다"의
+  // 증거였으므로 스트립 자신도 같은 방식으로 감시한다. 장식이 한 픽셀이라도 섞이면 여기서 죽는다.
+  const raw = zlib.inflateSync(readIDAT(file));
+  need(raw.length === 1 + w * 3 && raw[0] === 0, '스트립 재독 실패 — 1행·필터 0 이 아니다');
+  const got = new Set();
+  for (let i = 0; i < w; i++) got.add(toHex(raw[1 + i * 3], raw[2 + i * 3], raw[3 + i * 3]));
+  need(got.size === 56, `스트립 고유색 ${got.size} != 56 (장식·중복이 섞였다)`);
+  for (const c of master) need(got.has(c.hex), `스트립에 ${c.id} ${c.hex} 없음 — .gpl 과 1:1 이 아니다`);
+  console.log(`master_56_strip.png ${w}x1 — 되읽기 검산 통과 (고유색 56 · .gpl 1:1)`);
+}
 emit('master_56.png', sheet('FORMULA PULSE MASTER 56', [
   ...masterBlocks,
   { heading: 'FUNCTIONAL 13 (OUTSIDE MASTER 56)', cells: functional },
