@@ -1,0 +1,355 @@
+{
+  "_doc": "손 작화 아이콘 원도의 도상 정의. 한 칸 = 한 픽셀. '.' = 투명. 나머지 글자는 palette 의 키.",
+  "_why": "RD 생성이 실패한 도상은 손으로 그린다. 그 손 작화를 PNG 바이트로만 남기면 다음 편집자가 도상을 읽을 수 없고 재현도 못 한다 — 그래서 도상을 텍스트로 두고 PNG 를 파생시킨다. `icon_draw.js --check` 가 둘이 갈리지 않았는지 본다(대장 §9-⑬ '대조는 값이 두 곳에 있을 때만 성립한다').",
+  "_limit": "여기 없는 아이콘(RD 산출물)은 대조 대상이 아니다. 본 파일은 손 작화분 전속이다.",
+
+  "_16px": "이하 `*_16` 은 16×16 원도 세트(IMPL-215). 32px 원도의 축약이지 별개 도상이 아니다 — 실루엣·색 계열을 그대로 잇고 부속 디테일만 뗀다. 기계 축소(정수 2:1)와 RD 재생성은 둘 다 실측으로 기각했다(회신문 참조).",
+
+  "currency_credit_16": {
+    "size": 16,
+    "note": "원형 칩 — 실루엣 1차 구분(D10 §5.2). 32px 의 테두리 눈금은 16px 에서 사라지므로 대각 광택띠만 남긴다",
+    "palette": { "D": "#D98A12", "M": "#FFBF3D", "S": "#FF9A3C" },
+    "layers": [
+      {
+        "origin": [0, 0],
+        "map": [
+          ".....DDDDDD.....",
+          "...DDMMMMMMDD...",
+          "..DMMMMMMMMMMD..",
+          ".DMMMMMMMMMMSSD.",
+          ".DMMMMMMMMMSSSD.",
+          "DMMMMMMMMMSSSSMD",
+          "DMMMMMMMMSSSSMMD",
+          "DMMMMMMMSSSSMMMD",
+          "DMMMMMMSSSSMMMMD",
+          ".DMMMMSSSSMMMMD.",
+          ".DMMMSSSSMMMMMD.",
+          "..DMMMMMMMMMMD..",
+          "...DDMMMMMMDD...",
+          ".....DDDDDD....."
+        ]
+      }
+    ]
+  },
+
+  "currency_data_16": {
+    "size": 16,
+    "note": "사각 카트리지 — 원형 칩과 실루엣으로 갈린다. 상단 단자 핀 + 라벨 홈 2요소만 남긴다",
+    "palette": { "L": "#3FE0F5", "M": "#12A6C4", "P": "#C7D0D8", "G": "#2D343D", "K": "#4E5661" },
+    "layers": [
+      {
+        "origin": [2, 1],
+        "map": [
+          "LLLLLLLLLLLL",
+          "LMMPPPPPPMML",
+          "LMMPPPPPPMML",
+          "LMMMMMMMMMML",
+          "LMMMMMMMMMML",
+          "LMGGGGGGGGML",
+          "LMGKKGGKKGML",
+          "LMGGGGGGGGML",
+          "LMGKKGGKKGML",
+          "LMGGGGGGGGML",
+          "LMMMMMMMMMML",
+          "LMMMMMMMMMML",
+          "LMMMMMMMMMML",
+          "LLLLLLLLLLLL"
+        ]
+      }
+    ]
+  },
+
+  "achv_career_16": {
+    "size": 16,
+    "note": "월계관 + 체커 플래그. 32px 의 잎맥은 16px 에서 뭉치므로 월계는 두 팔 곡선으로만 남긴다",
+    "palette": { "D": "#7A4408", "M": "#E2620F", "C": "#FFBF3D" },
+    "layers": [
+      {
+        "origin": [0, 2],
+        "map": [
+          "..D..........D..",
+          "..MD.CDCDCD.DM..",
+          "..MM.DCDCDC.MM..",
+          "..MM.CDCDCD.MM..",
+          "..MM.DCDCDC.MM..",
+          "..DM........MD..",
+          "...M........M...",
+          "...DM......MD...",
+          "....M......M....",
+          "....DMM..MMD....",
+          "......MMMM......"
+        ]
+      }
+    ]
+  },
+
+  "achv_rival_16": {
+    "size": 16,
+    "note": "32px 재작업분(서로를 향한 두 헬멧)의 축약. 헬멧 7×12 × 2 · 좌 시안 · 우 주황",
+    "palette": {
+      "D": "#0A5A6E", "M": "#12A6C4",
+      "d": "#7A4408", "m": "#E2620F",
+      "R": "#2A211A", "G": "#2D343D"
+    },
+    "layers": [
+      {
+        "origin": [1, 2],
+        "map": [
+          "..DDD..",
+          ".DMMMD.",
+          "DMMMMMD",
+          "DMMMMMD",
+          "DMRRRRD",
+          "DMRGGGR",
+          "DMRGGGR",
+          "DMRRRRD",
+          "DMMMMMD",
+          "DMMMMMD",
+          ".DMMMMD",
+          "..DDDD."
+        ]
+      },
+      {
+        "origin": [8, 2],
+        "mirror": true,
+        "map": [
+          "..ddd..",
+          ".dmmmd.",
+          "dmmmmmd",
+          "dmmmmmd",
+          "dmRRRRd",
+          "dmRGGGR",
+          "dmRGGGR",
+          "dmRRRRd",
+          "dmmmmmd",
+          "dmmmmmd",
+          ".dmmmmd",
+          "..dddd."
+        ]
+      }
+    ]
+  },
+
+  "achv_driving_16": {
+    "size": 16,
+    "note": "스티어링 휠 — 32px 의 주행 라인·기교 표현을 16px 에서는 림+스포크 골격만 남긴다",
+    "palette": { "M": "#3FE0F5", "D": "#373E48" },
+    "layers": [
+      {
+        "origin": [0, 1],
+        "map": [
+          ".....MMMMMM.....",
+          "...MMMMMMMMMM...",
+          "..MMMDDDDDDMMM..",
+          ".MMDDDDDDDDDDMM.",
+          ".MMDDDDMMDDDDMM.",
+          "MMDDDDDMMDDDDDMM",
+          "MMDDMMMMMMMMDDMM",
+          "MMDDMMMMMMMMDDMM",
+          "MMDDDDDMMDDDDDMM",
+          ".MMDDDDMMDDDDMM.",
+          ".MMDDDDMMDDDDMM.",
+          "..MMMDDMMDDMMM..",
+          "...MMMMMMMMMM...",
+          ".....MMMMMM....."
+        ]
+      }
+    ]
+  },
+
+  "achv_garage_16": {
+    "size": 16,
+    "note": "양구 렌치 — 32px 의 렌치+리프트 2요소는 16px 에서 서로를 먹는다. 공구 1요소로 줄인다",
+    "palette": { "M": "#12A6C4", "D": "#0A5A6E" },
+    "layers": [
+      {
+        "origin": [0, 1],
+        "map": [
+          "...DD......DD...",
+          "...DMM....MMD...",
+          "....DMM..MMD....",
+          "....MMMMMMMM....",
+          ".....MMMMMM.....",
+          "......MMMM......",
+          "......MMMM......",
+          "......MMMM......",
+          "......MMMM......",
+          ".....MMMMMM.....",
+          "....MMMMMMMM....",
+          "....DMM..MMD....",
+          "...DMM....MMD...",
+          "...DD......DD..."
+        ]
+      }
+    ]
+  },
+
+  "achv_archive_16": {
+    "size": 16,
+    "note": "색인 탭 + 서랍 손잡이. 탭이 카트리지(단자 핀)와 실루엣을 가른다 — 둘 다 사각이라 이 축이 판별이다",
+    "palette": { "M": "#3FE0F5", "L": "#C7D0D8", "H": "#2B3239" },
+    "layers": [
+      {
+        "origin": [0, 1],
+        "map": [
+          "....MM..MM..M...",
+          "....MM..MM..M...",
+          "..MMMMMMMMMMMM..",
+          "..MLLLLLLLLLLM..",
+          "..MMMMMMMMMMMM..",
+          "..MMMMMMMMMMMM..",
+          "..MMMMHHHHMMMM..",
+          "..MMMMMMMMMMMM..",
+          "..MMMMMMMMMMMM..",
+          "..MMMMMMMMMMMM..",
+          "..MMMMHHHHMMMM..",
+          "..MMMMMMMMMMMM..",
+          "..MMMMMMMMMMMM.."
+        ]
+      }
+    ]
+  },
+
+  "achv_hidden_16": {
+    "size": 16,
+    "note": "빈 배지 + 물음표. 대비를 일부러 낮게 둔다 — 이 도상의 목적은 판독이 아니라 은닉이다(D09 §5.5)",
+    "palette": { "D": "#1C222A", "M": "#2B3239", "Q": "#7A838E" },
+    "layers": [
+      {
+        "origin": [0, 1],
+        "map": [
+          "......DDDD......",
+          "....DDMMMMDD....",
+          "...DMMMMMMMMD...",
+          "..DMMMQQQQMMMD..",
+          "..DMMQQMMQQMMD..",
+          ".DMMMMMMMQQMMMD.",
+          ".DMMMMMMQQMMMMD.",
+          ".DMMMMMQQMMMMMD.",
+          ".DMMMMMQQMMMMMD.",
+          "..DMMMMMMMMMMD..",
+          "..DMMMMMMMMMMD..",
+          "...DMMMQQMMMD...",
+          "....DDMMMMDD....",
+          "......DDDD......"
+        ]
+      }
+    ]
+  },
+
+  "speaker_relay_16": {
+    "size": 16,
+    "note": "방송 마이크 — 그릴 + 요크 + 스탠드. 32px 의 삼각대는 16px 에서 다리가 1px 로 흩어지므로 받침으로 바꾼다",
+    "palette": { "M": "#8B949F", "G": "#5B646F", "S": "#2E6FA8" },
+    "layers": [
+      {
+        "origin": [0, 1],
+        "map": [
+          ".......MM.......",
+          "......MMMM......",
+          "......GMMG......",
+          "......MMMM......",
+          "......GMMG......",
+          "......MMMM......",
+          ".....SSSSSS.....",
+          ".....SMMMMS.....",
+          ".....SMMMMS.....",
+          "......SSSS......",
+          ".......SS.......",
+          ".......SS.......",
+          ".......SS.......",
+          ".....SSSSSS....."
+        ]
+      }
+    ]
+  },
+
+  "speaker_filler_16": {
+    "size": 16,
+    "note": "제네릭 헬멧 정면 — 무채색·발광 없음(사양서 §6.5). 라이벌 헬멧(측면·유채)과 시점·색으로 갈린다",
+    "palette": { "D": "#2B3239", "M": "#4E5661", "R": "#373E48", "G": "#242A33" },
+    "layers": [
+      {
+        "origin": [0, 1],
+        "map": [
+          ".....DDDDDD.....",
+          "...DDMMMMMMDD...",
+          "..DMMMMMMMMMMD..",
+          ".DMMMMMMMMMMMMD.",
+          ".DMMMMMMMMMMMMD.",
+          ".DMRRRRRRRRRRMD.",
+          ".DMRGGGGGGGGRMD.",
+          ".DMRGGGGGGGGRMD.",
+          ".DMRRRRRRRRRRMD.",
+          ".DMMMMMMMMMMMMD.",
+          "..DMMMMMMMMMMD..",
+          "..DDMMMMMMMMDD..",
+          "....DDDDDDDD...."
+        ]
+      }
+    ]
+  },
+
+  "achv_rival": {
+    "size": 32,
+    "note": "라이벌 = 서로를 향한 두 헬멧 측면. 좌 시안 · 우 주황. 세로 19행(구 11행) — 32px 슬롯을 채운다.",
+    "palette": {
+      "D": "#0A5A6E", "M": "#12A6C4", "L": "#3FE0F5",
+      "d": "#7A4408", "m": "#E2620F", "l": "#FF9A3C",
+      "R": "#2A211A", "G": "#2D343D"
+    },
+    "layers": [
+      {
+        "origin": [3, 6],
+        "comment": "좌 헬멧 — 오른쪽(중앙)을 향한다",
+        "map": [
+          "....DDDD....",
+          "..DDMMMMDD..",
+          ".DMMMMMMMMD.",
+          ".DMMMMMMMMMD",
+          "DDMMMMMMMMMD",
+          "DMMMMMMMMMMD",
+          "DMMMMMMMMMMD",
+          "DMMMRRRRRRRD",
+          "DMLMRGGGGGGR",
+          "DMLMRGGGGGGR",
+          "DMLMRGGGGGGR",
+          "DMMMRRRRRRRD",
+          "DMMMMMMMMMMD",
+          "DMMMMMMMMMMD",
+          ".DMMMMMMMMMD",
+          ".DDMMMMMMMMD",
+          "..DDMMMMMMDD",
+          "...DDDDDDDD.",
+          ".....DDDD..."
+        ]
+      },
+      {
+        "origin": [17, 6],
+        "mirror": true,
+        "comment": "우 헬멧 — 좌 헬멧의 좌우 반전. 도트 축 반전이라 픽셀 손실 0 (IMPL-162 전례)",
+        "map": [
+          "....dddd....",
+          "..ddmmmmdd..",
+          ".dmmmmmmmmd.",
+          ".dmmmmmmmmmd",
+          "ddmmmmmmmmmd",
+          "dmmmmmmmmmmd",
+          "dmmmmmmmmmmd",
+          "dmmmRRRRRRRd",
+          "dmlmRGGGGGGR",
+          "dmlmRGGGGGGR",
+          "dmlmRGGGGGGR",
+          "dmmmRRRRRRRd",
+          "dmmmmmmmmmmd",
+          "dmmmmmmmmmmd",
+          ".dmmmmmmmmmd",
+          ".ddmmmmmmmmd",
+          "..ddmmmmmmdd",
+          "...dddddddd.",
+          ".....dddd..."
+        ]
+      }
+    ]
+  }
+}

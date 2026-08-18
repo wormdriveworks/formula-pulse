@@ -58,7 +58,7 @@ const DOC_DIR = path.join(ROOT, 'docs', 'assets');
 const MANIFEST = path.join(__dirname, 'icon_manifest.json');
 const REPORT_ONLY = process.argv.includes('--report');
 
-const DIM = 32;                  // 대장 §4.1 — ui/icons 전량 32×32
+const DIM = 32;                  // 대장 §4.1 기본 — 16px 세트는 매니페스트 `size` 로 선언한다 (IMPL-215)
 const FRG_MAX_PX = 3;            // 파편 후보 절대 상한 (경고 축) — 주력 검출분이 3px 이었다
 const FRG_MIN_GAP = 4;           // 본체와의 체비셰프 간격 하한 (경고 축)
 const FRG_MAX_SHARE = 0.05;      // 전 잉크 대비 비중 상한 (경고 축)
@@ -235,9 +235,12 @@ for (const f of files) {
   const lines = [];
   const say = (fn, axis, msg) => { lines.push(() => fn(axis, `${f}: ${msg}`)); };
 
-  // DIM
+  // DIM — 치수는 파일마다 다를 수 있다(32px 본 세트 + 16px 목록·피드 세트). **선언이 없으면 32 다**,
+  // 즉 새 치수는 매니페스트에 적어야만 통과한다 — 임의 치수가 조용히 들어오는 길을 막는다.
+  const declEntry = decl[f];
+  const dim = (declEntry && declEntry.size) || DIM;
   checks++;
-  if (img.w !== DIM || img.h !== DIM) say(fail, 'DIM', `${img.w}×${img.h} != ${DIM}×${DIM}`);
+  if (img.w !== dim || img.h !== dim) say(fail, 'DIM', `${img.w}×${img.h} != 선언 ${dim}×${dim}`);
 
   // PAL
   const outside = new Map();
@@ -249,7 +252,7 @@ for (const f of files) {
   }
   for (const [hx, n] of outside) say(fail, 'PAL', `조달 대장 밖 ${hx} ${n}px`);
 
-  const entry = decl[f];
+  const entry = declEntry;
   const comps = components(img);
   const main = comps[0] || [];
   const ink = comps.reduce((n, c) => n + c.length, 0);
@@ -281,7 +284,9 @@ for (const f of files) {
   // **잉크 비중이 미미하면서 멀 때**(≤5% AND gap≥4)만 후보로 올린다.
   for (const c of comps.slice(1)) {
     const gap = chebyshevGap(c, main);
-    if (c.length <= FRG_MAX_PX || (c.length / ink <= FRG_MAX_SHARE && gap >= FRG_MIN_GAP)) {
+    // 간격 하한은 캔버스에 비례시킨다 — 16px 원도에서 gap 4 는 32px 의 gap 8 에 해당한다.
+    const minGap = Math.max(2, Math.round(FRG_MIN_GAP * dim / DIM));
+    if (c.length <= FRG_MAX_PX || (c.length / ink <= FRG_MAX_SHARE && gap >= minGap)) {
       checks++;
       say(warn, 'FRG', `파편 후보 ${c.length}px(${(c.length / ink * 100).toFixed(1)}%) ${bboxOf(c)} gap=${gap} — 눈 판독 대상`);
     }
