@@ -84,25 +84,22 @@
 
   "attr_hazard_16": {
     "size": 16,
-    "note": "갈라진 노면 — 어긋난 슬래브 6장 + 아래 그림자 띠. 32px 의 낙하 점열은 버렸다(16px 에서 1~2px 점은 파편과 구별되지 않는다). 성분 6은 도상 그 자체다 — 갈라짐이 곧 이 아이콘이다",
+    "note": "갈라진 노면 — **한 판을 가르는 지그재그 균열**(IMPL-230 재작화). 구 도상은 어긋난 슬래브 6장이었는데 주력 실배치 판독이 *\"블록 격자로 읽혀 요철까지는 가지만 해저드로 바로 오지 않는다 — 6종 중 유일\"* 로 돌려주었다. **격자는 규칙이고 해저드는 파손이다** — 규칙적 반복이 오히려 의미를 지웠으므로, 반복을 버리고 **불규칙한 갈라짐 하나**를 도상으로 세웠다. 32px 의 낙하 점열은 그대로 버린다(16px 에서 1~2px 점은 파편과 구별되지 않는다)",
     "palette": { "M": "#3FE0F5", "S": "#5B646F" },
     "layers": [
       {
-        "origin": [0, 2],
+        "origin": [0, 3],
         "map": [
-          "..MMMMMM..MMMM..",
-          "..MMMMMM..MMMM..",
-          "..MMMMMM..MMMM..",
-          "..SSSSSS..SSSS..",
-          "................",
-          "...MMMM..MMMMM..",
-          "...MMMM..MMMMM..",
-          "...MMMM..MMMMM..",
-          "...SSSS..SSSSS..",
-          "................",
-          "..MMMMM..MMMMMM.",
-          "..MMMMM..MMMMMM.",
-          "..SSSSS..SSSSSS."
+          "..MMMMM.MMMMMM..",
+          "..MMMMM.MMMMMM..",
+          "..MMMM..MMMMMM..",
+          "..MMMM.MMMMMMM..",
+          "..MMM..MMMMMMM..",
+          "..MMM.MMMMMMMM..",
+          "..MMM..MMMMMMM..",
+          "..MMMM..MMMMMM..",
+          "..MMMMM.MMMMMM..",
+          "..SSSSS.SSSSSS.."
         ]
       }
     ]
