@@ -5,7 +5,7 @@
 # 무가드로 읽으면, 커리어를 연 경로에서는 멀쩡하고 **타이틀 직행 경로에서만** 죽는다.
 # 실제로 SYS-04 가 그렇게 샜다(총괄 판정 IMPL-176 ① — 타이틀 첫 진입 100% 재현).
 #
-# 검사 축 10종:
+# 검사 축 11종:
 #   ① 무커리어 문맥 성립 — SYS-01 → SYS-04 직행(D09 본문 145행·§A-1 규격 진입)
 #   ② 패드 순회 폐쇄 — 초기 포커스 보유 (D09 §1.3 · 총괄 판정 IMPL-176 ②)
 #   ③ 단독 경로 옵션 정합 — 라우터를 안 거치는 경로가 O9 를 적용하는가 (동 ③)
@@ -16,6 +16,7 @@
 #   ⑧ 컨텍스트 층 패드 — X 단독/X 홀드 판별·Y 재배치 (D09 v1.3 · IMPL-200 ③)
 #   ⑨ 검사 설정 정합 — PAL 조달 소스 경로가 실재하는가 (동 ①)
 #   ⑩ 필러 대상 로그 문면 — 발행 층이 표기 매개를 짝으로 넘기는가 (IMPL-209 ⑧)
+#   ⑪ 저장 표시 — 라우터 결선·값 창구·성공/실패 분기·전환 생존 (IMPL-219 ②)
 #
 # **첫 프레임(`_process`)에서 돈다.** `_init()` 시점에는 `root` 가 없어 `add_child` 자체가
 # 불가능하고, `_initialize()` 시점에는 `root` 가 있어도 **아직 트리 안이 아니다** — 그래서
@@ -27,6 +28,7 @@ extends SceneTree
 const ACHIEVEMENT_SCENE := "res://ui/sys/achievement_screen.tscn"
 const OPTIONS_SCENE := "res://ui/sys/options_screen.tscn"
 const RACE_SCENE := "res://ui/race/race_screen.tscn"
+const APP_ROOT_SCENE := "res://ui/flow/app_root.tscn"
 # 패드 버튼 인덱스 — 엔진 실측분(IMPL-186). 검사도 화면과 같은 상수를 짐작하지 않는다.
 const PAD_A_INDEX := 0
 const PAD_X_INDEX := 2
@@ -63,10 +65,11 @@ func _process(_delta: float) -> bool:
 	_race_detail_relocation(data)
 	_palette_sources_exist()
 	_filler_log_substitution(data)
+	_save_indicator_wiring(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 118:
-		print("UI_SCREENS_FAIL checks=%d < 하한 118 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 130:
+		print("UI_SCREENS_FAIL checks=%d < 하한 130 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -825,3 +828,68 @@ func _rendered_log_lines(screen: Control) -> Array:
 		if body != null:
 			lines.append(body.text)
 	return lines
+
+
+# ── ⑪ 저장 표시 (D09 본문 §181 · D13 v1.8 별첨A §8.1 — 총괄 판정 IMPL-219 ②) ──
+#
+# **라우터 층 검사다.** 표시는 화면이 아니라 `app_root` 가 들고 있고, 저장 지점(D09 §2.4 3곳)의
+# 화면이 무엇인지는 정해져 있지 않다. 그래서 실화면 하나가 아니라 **라우터를 세워** 본다.
+#
+# 축 4종:
+#   ⓐ 값 창구 — 표시 시간·회전 주기가 D13(`core_params`) 에서 오는가
+#   ⓑ 성공 저장 = 표시 · ⓒ 실패 저장 = 미표시 (§181 용도 = 저장 중 종료 경고의 근거)
+#   ⓓ 화면 전환 생존 — `_show()` 가 갈아치우는 것은 `_current` 뿐이다
+#
+# **미구성이면 ⓑ 가 먼저 죽는다** — `flash()` 는 값이 없으면 보고 후 반환하므로, 이 축은
+# `configure()` 결선이 실제로 서 있는지를 표시 여부로 되읽는다(상수 표가 아니라 거동).
+func _save_indicator_wiring(data: GameData) -> void:
+	var packed := load(APP_ROOT_SCENE) as PackedScene
+	if packed == null:
+		_ok("라우터 씬 로드", false)
+		return
+	var app := packed.instantiate() as Control
+	root.add_child(app)
+	var indicator: SaveIndicator = app._save_indicator
+	_ok("라우터가 저장 표시를 든다", indicator != null)
+	if indicator == null:
+		root.remove_child(app)
+		app.queue_free()
+		return
+
+	# ⓐ 값 창구. **표 행 실재를 먼저 본다** — 행이 없으면 `GameData.param()` 은 양쪽에서
+	# 똑같이 0.0 을 돌려주므로, 비교만으로는 `0.0 == 0.0` 이 되어 조용히 통과한다
+	# (돌연변이 M5 실측 — 항진명제). 행의 존재는 비교와 독립된 사실이라 먼저 세운다.
+	_ok("D13 표 행 실재 — 표시 시간", data.params.has("param_fx_save_hold_sec"))
+	_ok("D13 표 행 실재 — 회전 주기", data.params.has("param_fx_save_spin_sec"))
+	_ok("표시 시간 = D13 창구 경유",
+		indicator._hold_sec == data.param("param_fx_save_hold_sec"),
+		"actual=%.3f" % indicator._hold_sec)
+	_ok("회전 주기 = D13 창구 경유",
+		indicator._spin_sec == data.param("param_fx_save_spin_sec"),
+		"actual=%.3f" % indicator._spin_sec)
+	_ok("미구성 센티넬 해소",
+		indicator._hold_sec != SaveIndicator.UNCONFIGURED
+			and indicator._spin_sec != SaveIndicator.UNCONFIGURED)
+	_ok("저장 전에는 표시되지 않는다", not indicator.visible)
+
+	# ⓑ 성공 저장 = 표시
+	app.session.progress_saved.emit(true)
+	_ok("성공 저장 = 표시", indicator.visible)
+	# 회전은 **초로 도는 것이 규격**이다 — 주기가 실제로 소비되는지 1프레임분으로 본다.
+	var before_rotation: float = indicator.rotation
+	indicator._process(indicator._spin_sec * 0.25)
+	_ok("표시 중 회전 진행", indicator.rotation > before_rotation,
+		"rotation=%.3f" % indicator.rotation)
+
+	# ⓒ 실패 저장 = 미표시. 앞선 표시가 남아 있으면 판정이 흐려지므로 먼저 닫는다.
+	indicator._process(indicator._hold_sec)
+	_ok("표시 시간 경과 후 소등", not indicator.visible)
+	app.session.progress_saved.emit(false)
+	_ok("실패 저장 = 미표시", not indicator.visible)
+
+	# ⓓ 화면 전환 생존 — 저장이 전환과 겹치는 회차에 표시가 함께 사라지면 안 된다.
+	app.session.progress_saved.emit(true)
+	app._show("SYS-02", {})
+	_ok("화면 전환 후에도 표시 생존", indicator.visible and indicator.is_inside_tree())
+	root.remove_child(app)
+	app.queue_free()

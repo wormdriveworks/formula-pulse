@@ -4,7 +4,8 @@
 #   godot --headless --path . --script tools/validators/run_validators.gd
 #
 # 차단 규칙: V1~V6·V8 + 혼입 0 스캔 = 위반 1건이면 실패(exit 1).
-# 구현 층 신설 검사 **MIX0·ARCH·FONT 도 차단형**이다 (FONT = 총괄 판정 IMPL-148 · 불변규칙 7).
+# 구현 층 신설 검사 **MIX0·ARCH·FONT·PAL 도 차단형**이다
+#   (FONT = 총괄 판정 IMPL-148 · PAL = 조건부 기승인 IMPL-209 → 발동 IMPL-219 · 불변규칙 7).
 # V7(금칙 어휘)은 경고 전용 — 빌드를 차단하지 않는다 (D12 §4.2 V7 행 · D14 TL-1 명문).
 # V6 내부: ID 중복·접두 위반 = 차단 / 고아 데이터 = 경고 (D12 §4.2 V6 행 "고아 데이터 … 경고").
 #
@@ -1033,16 +1034,23 @@ func _run_contamination_scan() -> void:
 	_report("MIX0", "core contamination scan", checked, before_fail, before_warn)
 
 
-# ── PAL 색 조달 대장 검사 (총괄 인계 IMPL-176 ⑤ — **경고형 신설**) ──
+# ── PAL 색 조달 대장 검사 (총괄 인계 IMPL-176 ⑤ 신설 → **차단형** IMPL-219) ──
 #
 # **무엇을 보는가.** 화면 코드·씬의 색 리터럴이 조달 대장 안의 색인가.
 # 대장 = 마스터 60(`master_60.gpl` — D10 v1.2) + 정본 §6 색각 대체(`colorblind_alt.gpl`)
 #      + 기능색 부속(= `ui_palette.gd` 전사분 — IMPL-144·167 로 정본 대조가 선 유일 기계 출처)
 #      + 명시 허용 목록(`palette_allow` — 항목마다 `reason` 필수)
 #
-# **성격 = 경고형이며 차단형 전환은 별도 판정이다** (인계 §5 명문). 신설 시점에 기존 위반이
-# 다수 실재하므로 차단형으로 켜면 정리 전에 게이트가 멈춘다. FONT 전례(IMPL-147 → 148)의
-# 경고형 대기 절차를 그대로 따른다. **V7 무접촉.**
+# **성격 = 차단형** (조건부 기승인 IMPL-209 → 조건 성립 후 발동 IMPL-219). 신설 시점에는
+# 기존 위반 174건이 실재해 차단형으로 켜면 정리 전에 게이트가 멈추므로 경고형으로 두고
+# 판정을 올렸고, 승인 조건이 **"위반 0 실측"** 이었다. 주력 치환(IMPL-206·217)으로 0 에
+# 도달했고 총괄이 독립 재실측해 발동했다 — FONT 전례(IMPL-147 → 148)와 같은 절차다.
+# **V7 무접촉** (작법 판단은 D04 소관 — 불변규칙 7).
+#
+# **PAL 의 `_warn` 은 남기지 않았다.** 대장 밖 색뿐 아니라 *검사 자신이 서지 못한 상태*
+# (조달 대장 적재 실패·소스가 한 색도 기여 못 함·허용 항목에 근거 부재)도 차단이다.
+# 그쪽을 경고로 두면 **조달 경로를 망가뜨리는 것이 검사를 끄는 우회로**가 된다 —
+# 실제로 `master_56` → `master_60` 개명이 그 형태로 대장 절반을 죽인 채 통과했다(IMPL-198).
 #
 # **8bit 환산 경계.** 씬은 float 표기(`Color(0.9, 0.92, 0.95, 1)`)이고 팔레트는 8bit 정수다.
 # `0.9 × 255 = 229.5` 처럼 반올림이 갈리는 값이 있어 **채널당 ±1 을 허용**한다. 마스터 팔레트의
@@ -1058,7 +1066,7 @@ func _run_palette_scan() -> void:
 	var checked := 0
 	var allowed := _palette_allowed_set()
 	if allowed.is_empty():
-		_warn("PAL", "조달 대장을 적재하지 못했다 — 팔레트 실물·기능색 출처 확인 필요")
+		_fail("PAL", "조달 대장을 적재하지 못했다 — 팔레트 실물·기능색 출처 확인 필요")
 		_report("PAL", "color literal ledger", checked, before_fail, before_warn)
 		return
 	var exempt: Array = _config.get("palette_exempt", [])
@@ -1081,7 +1089,7 @@ func _run_palette_scan() -> void:
 					continue
 				if _palette_is_allowed(literal, allowed):
 					continue
-				_warn("PAL", "%s:%d: 대장 밖 색 %s" % [path, line_index + 1, literal])
+				_fail("PAL", "%s:%d: 대장 밖 색 %s" % [path, line_index + 1, literal])
 	_report("PAL", "color literal ledger", checked, before_fail, before_warn)
 
 
@@ -1152,7 +1160,7 @@ func _palette_allowed_set() -> Array:
 				allowed.append(channels)
 				contributed += 1
 		if contributed == 0:
-			_warn("PAL", "조달 소스가 아무 색도 기여하지 못했다 (경로·형식 확인): %s"
+			_fail("PAL", "조달 소스가 아무 색도 기여하지 못했다 (경로·형식 확인): %s"
 				% String(palette_path))
 	# 기능색 — `ui_palette.gd` 의 `Color("#RRGGBB")` 상수 전량
 	var functional_path := String(_config.get("palette_functional_source", ""))
@@ -1165,12 +1173,12 @@ func _palette_allowed_set() -> Array:
 				allowed.append(channels)
 				functional_count += 1
 	if functional_count == 0:
-		_warn("PAL", "기능색 출처가 아무 색도 기여하지 못했다 (경로·형식 확인): %s"
+		_fail("PAL", "기능색 출처가 아무 색도 기여하지 못했다 (경로·형식 확인): %s"
 			% functional_path)
 	for entry in _config.get("palette_allow", []):
 		var spec: Dictionary = entry
 		if String(spec.get("reason", "")).strip_edges() == "":
-			_warn("PAL", "허용 목록 항목에 근거(reason)가 없다: %s" % str(spec.get("color", "?")))
+			_fail("PAL", "허용 목록 항목에 근거(reason)가 없다: %s" % str(spec.get("color", "?")))
 			continue
 		var channels := _palette_channels_of(String(spec.get("color", "")))
 		if not channels.is_empty():

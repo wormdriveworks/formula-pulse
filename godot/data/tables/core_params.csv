@@ -101,6 +101,8 @@ param_fx_flash_alpha,0.35
 param_fx_flash_sec,0.25
 param_fx_gauge_pulse_sec,0.4
 param_fx_duel_result_hold_sec,0.6
+param_fx_save_hold_sec,2.0
+param_fx_save_spin_sec,1.0
 param_duel_wall_threshold_add,6
 param_consumable_shield_mult,0.5
 param_jude_adjacent_max,2

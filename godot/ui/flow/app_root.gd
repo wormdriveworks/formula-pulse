@@ -45,7 +45,7 @@ func _ready() -> void:
 	session = RunSession.new()
 	# 합성 지점 — 라우터도 구현체 이름을 모른다. 플랫폼 선택은 `PlatformServices.create()` 전속.
 	session.setup(data, PlatformServices.create())
-	_mount_save_indicator()
+	_mount_save_indicator(data)
 	_show(ENTRY_SCREEN, {})
 
 
@@ -81,18 +81,21 @@ func _on_navigate(target: String, payload: Dictionary) -> void:
 # 라우터가 든다 — 화면 위에 얹혀 있어야 저장이 화면 전환과 겹쳐도 사라지지 않는다.
 # **화면 교체 대상이 아니다**: `_show()` 는 `_current` 만 갈아치우므로 이 노드는 남는다.
 #
-# ⚠ **`configure()` 를 부르지 않는다 — D13 에 값이 없다.**
-# §181 은 "2초 내외"를 *확정 기준값*이라 명시하지만 D13 확정 기준값 대장에 해당 행이 없다
-# (`param_fx_*_sec` 계열 실측 — 저장 표시 행 0). 불변규칙 2 대로 임의 기입하지 않았고,
-# 표시는 구성 전까지 잠들어 있다(호출 시 1회 보고). **행 2개가 서면 아래 두 줄이 살아난다:**
-#
-#   _save_indicator.configure(data.param("<표시 시간>"), data.param("<회전 주기>"))
-#
-# 지금 그 호출을 넣으면 `GameData.param()` 이 없는 키에서 `_load_ok` 를 내려 **앱이 부팅을
-# 거부한다**(`app_root.gd` 상단 가드) — 그래서 이름만 정해 두고 호출은 판정 후로 넘긴다.
-func _mount_save_indicator() -> void:
+# **값 창구 결선 완료 (D13 v1.8 별첨A §8.1 +2행 — 사용자 승인 2026-08-18 · 결정 #17).**
+# 8차 시점에는 D13 에 행이 없어 `configure()` 를 부르지 않고 표시를 잠재워 뒀다(불변규칙 2 —
+# 없는 값을 임의 기입하지 않는다). 행이 서면서 그 유보가 풀린다: 표시 시간 2.0초 ·
+# 회전 주기 1.0초/회전이며, **두 값 다 코드가 아니라 `param()` 창구에서 온다.**
+# **주의 — 상단 `is_ok()` 가드는 여기까지 덮지 않는다.** 그 가드는 `load_all()` 직후에 서
+# 있고 이 조회는 그 뒤라, 행이 사라져도 부팅은 거부되지 않는다(8차 주석의 "부팅을 거부한다"는
+# 이 호출 지점에는 성립하지 않는다 — 돌연변이 M5 실측). 행이 없으면 `param()` 이 0.0 을
+# 돌려주고 표시가 "구성됐는데 안 도는" 상태가 된다. 그래서 **표 행의 실재 자체를 회귀가
+# 별도 축으로 본다**(UISCR ⑪ — 값 비교만으로는 0.0 == 0.0 이 되어 통과한다).
+func _mount_save_indicator(data: GameData) -> void:
 	_save_indicator = SaveIndicator.new()
 	_save_indicator.name = "SaveIndicator"
+	_save_indicator.configure(
+		data.param("param_fx_save_hold_sec"), data.param("param_fx_save_spin_sec")
+	)
 	add_child(_save_indicator)
 	session.progress_saved.connect(_on_progress_saved)
 
