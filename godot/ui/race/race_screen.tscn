@@ -1,13 +1,13 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://xnwn7isyutjp"]
 
-[ext_resource type="Script" path="res://ui/race/race_screen.gd" id="1_pfsyr"]
-[ext_resource type="Script" path="res://ui/race/timer_ring.gd" id="2_6xlbq"]
-[ext_resource type="Script" path="res://ui/race/vane_waveform.gd" id="3_5jw0g"]
-[ext_resource type="Script" path="res://ui/race/log_feed.gd" id="4_y37x3"]
-[ext_resource type="Script" path="res://ui/race/duel_overlay.gd" id="5_5jw0g"]
-[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="6_y37x3"]
-[ext_resource type="Script" path="res://ui/race/pause_overlay.gd" id="7_y37x3"]
-[ext_resource type="Script" path="res://ui/race/tutorial_overlay.gd" id="8_tut01"]
+[ext_resource type="Script" uid="uid://c2g07x5qhdx8m" path="res://ui/race/race_screen.gd" id="1_pfsyr"]
+[ext_resource type="Script" uid="uid://bq6luiqgbndk3" path="res://ui/race/timer_ring.gd" id="2_6xlbq"]
+[ext_resource type="Script" uid="uid://dt7s0jh2d585d" path="res://ui/race/vane_waveform.gd" id="3_5jw0g"]
+[ext_resource type="Script" uid="uid://cldv4l6qg1o56" path="res://ui/race/log_feed.gd" id="4_y37x3"]
+[ext_resource type="Script" uid="uid://b8x3m0ygu3bs4" path="res://ui/race/duel_overlay.gd" id="5_5jw0g"]
+[ext_resource type="FontFile" uid="uid://dyw2qbqpna4ub" path="res://assets/fonts/Galmuri14.ttf" id="6_y37x3"]
+[ext_resource type="Script" uid="uid://dvlix85bj0kjm" path="res://ui/race/pause_overlay.gd" id="7_y37x3"]
+[ext_resource type="Script" uid="uid://dwjyutjlfa7ll" path="res://ui/race/tutorial_overlay.gd" id="8_tut01"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_n72o0"]
 content_margin_left = 4.0
@@ -181,14 +181,14 @@ theme_override_constants/separation = 8
 [node name="E01Position" type="Label" parent="Root/ZoneA/StripRow" unique_id=602652184]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 14
 
 [node name="E02LapSector" type="Label" parent="Root/ZoneA/StripRow" unique_id=296967593]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="E02SectorAttr" type="TextureRect" parent="Root/ZoneA/StripRow" unique_id=1466225235]
 unique_name_in_owner = true
@@ -200,15 +200,15 @@ stretch_mode = 5
 [node name="E02Corner" type="Label" parent="Root/ZoneA/StripRow" unique_id=1693710312]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="E02Resonance" type="Label" parent="Root/ZoneA/StripRow" unique_id=353477631]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.815686, 0.552941, 1, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="Spacer" type="Control" parent="Root/ZoneA/StripRow" unique_id=871202347]
 layout_mode = 2
@@ -225,8 +225,8 @@ theme_override_constants/separation = 3
 [node name="FrontLabel" type="Label" parent="Root/ZoneA/StripRow/Gauges/FrontRow" unique_id=1240368274]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="E03FrontGauge" type="ProgressBar" parent="Root/ZoneA/StripRow/Gauges/FrontRow" unique_id=1383202854]
 unique_name_in_owner = true
@@ -243,8 +243,8 @@ theme_override_constants/separation = 3
 [node name="RearLabel" type="Label" parent="Root/ZoneA/StripRow/Gauges/RearRow" unique_id=1730492670]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="E03RearGauge" type="ProgressBar" parent="Root/ZoneA/StripRow/Gauges/RearRow" unique_id=1396261851]
 unique_name_in_owner = true
@@ -376,8 +376,8 @@ script = ExtResource("3_5jw0g")
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 autowrap_mode = 3
 max_lines_visible = 2
 
@@ -385,8 +385,8 @@ max_lines_visible = 2
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="DividerActions" type="ColorRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=33652563]
 custom_minimum_size = Vector2(0, 1)
@@ -470,8 +470,8 @@ theme_override_constants/separation = 10
 [node name="ChassisLabel" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=1903010799]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="E11ChassisBar" type="ProgressBar" parent="Root/ZoneD/ResourceRow" unique_id=1302443714]
 unique_name_in_owner = true
@@ -484,20 +484,20 @@ show_percentage = false
 [node name="E11ChassisValue" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=1046721644]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="ChargeLabel" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=1825133703]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="E12Charge" type="Label" parent="Root/ZoneD/ResourceRow" unique_id=627381782]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="E13Consumables" type="HBoxContainer" parent="Root/ZoneD/ResourceRow" unique_id=1098146839]
 unique_name_in_owner = true
@@ -558,22 +558,22 @@ alignment = 1
 [node name="PlayerLabel" type="Label" parent="DuelOverlay/DuelFrame/Column/VersusRow" unique_id=782642811]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_fonts/font = ExtResource("6_y37x3")
 theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 
 [node name="KindLabel" type="Label" parent="DuelOverlay/DuelFrame/Column/VersusRow" unique_id=914331291]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="OpponentLabel" type="Label" parent="DuelOverlay/DuelFrame/Column/VersusRow" unique_id=116771687]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.309804, 0.690196, 1)
 theme_override_fonts/font = ExtResource("6_y37x3")
 theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(1, 0.309804, 0.690196, 1)
 
 [node name="DuelReels" type="HBoxContainer" parent="DuelOverlay/DuelFrame/Column" unique_id=1540716051]
 layout_mode = 2
@@ -624,8 +624,8 @@ alignment = 1
 [node name="BoostStack" type="Label" parent="DuelOverlay/DuelFrame/Column/BoostRow" unique_id=1591703892]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.815686, 0.552941, 1, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="BoostButton" type="Button" parent="DuelOverlay/DuelFrame/Column/BoostRow" unique_id=1229003140]
 unique_name_in_owner = true
@@ -636,9 +636,9 @@ theme_override_font_sizes/font_size = 9
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.894118, 0.639216, 1)
 theme_override_fonts/font = ExtResource("6_y37x3")
 theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(1, 0.894118, 0.639216, 1)
 horizontal_alignment = 1
 
 [node name="PauseOverlay" type="Control" parent="." unique_id=1891229247]
@@ -700,8 +700,8 @@ theme_override_font_sizes/font_size = 9
 [node name="TitleWarning" type="Label" parent="PauseOverlay/Center/Panel/MenuColumn" unique_id=359458265]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 autowrap_mode = 3
 
 [node name="CountLabel" type="Label" parent="PauseOverlay" unique_id=900363162]
@@ -712,9 +712,9 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
+theme_override_colors/font_color = Color(0.247059, 0.878431, 0.960784, 1)
 theme_override_fonts/font = ExtResource("6_y37x3")
 theme_override_font_sizes/font_size = 28
-theme_override_colors/font_color = Color(0.247059, 0.878431, 0.960784, 1)
 
 [node name="FxFlash" type="ColorRect" parent="." unique_id=1786640899]
 unique_name_in_owner = true
@@ -727,7 +727,7 @@ color = Color(1, 1, 1, 0)
 [node name="TutorialOverlay" type="Control" parent="." unique_id=612430894]
 unique_name_in_owner = true
 visible = false
-layout_mode = 0
+anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
@@ -786,5 +786,5 @@ layout_mode = 2
 [node name="CalloutText" type="Label" parent="TutorialOverlay/CalloutPanel/Column" unique_id=612430905]
 unique_name_in_owner = true
 layout_mode = 2
-autowrap_mode = 3
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+autowrap_mode = 3
