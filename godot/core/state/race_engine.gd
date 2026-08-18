@@ -567,12 +567,7 @@ func _settle_sector(momentum: bool) -> Array:
 					pending_duel = _armed_duel
 					duel_opponent = front_target if _armed_duel == RaceTypes.DuelType.OVERTAKE else rear_target
 					var log_key := "raceLog.duelStartOvertake01" if _armed_duel == RaceTypes.DuelType.OVERTAKE else "raceLog.duelStartDefense01"
-					# number 는 필러 name_key(`No.{number} 머신`)의 표기 매개다 — 표기 층이
-					# name_key 를 번역할 때 함께 치환한다 (네임드 문면에는 자리 자체가 없어 무해)
-					events.append(_ev("T5", log_key, {
-						"target": entrants[duel_opponent]["name_key"],
-						"number": entrants[duel_opponent]["number"],
-					}))
+					events.append(_ev("T5", log_key, _entrant_params(duel_opponent)))
 			RaceTypes.SettleStage.STAGE_7_RANK_UPDATE:
 				pass  # 섹터 턴의 플레이어 순위 변동은 듀얼 전속 (D05 §4)
 			RaceTypes.SettleStage.STAGE_8_BACKGROUND_AI:
@@ -677,9 +672,9 @@ func _resolve_duel() -> Array:
 		if duel_type == RaceTypes.DuelType.OVERTAKE:
 			_swap_with(opponent_id)
 			events.append(_ev("T5", "raceLog.overtakeSuccess01",
-				{"target": entrants[opponent_id]["name_key"], "rank": player_position()}))
+				_entrant_params(opponent_id, {"rank": player_position()})))
 		else:
-			events.append(_ev("T5", "raceLog.defendSuccess01", {"target": entrants[opponent_id]["name_key"]}))
+			events.append(_ev("T5", "raceLog.defendSuccess01", _entrant_params(opponent_id)))
 	else:
 		if duel_type == RaceTypes.DuelType.OVERTAKE:
 			# P3 경감 대상 [가안]: 문면 "잔여 구간 섀시 소모"가 소모원을 한정하지 않아
@@ -690,7 +685,7 @@ func _resolve_duel() -> Array:
 		else:
 			_swap_with(opponent_id)
 			events.append(_ev("T5", "raceLog.duelLoseDefense01", {}))
-			events.append(_ev("T5", "raceLog.defendFail01", {"target": entrants[opponent_id]["name_key"]}))
+			events.append(_ev("T5", "raceLog.defendFail01", _entrant_params(opponent_id)))
 	resonance_duel_bonus = 0.0  # 차기 듀얼 1회 소비 (D13 별첨A §6.6 '차기 듀얼 판정')
 	front_gauge = 0.0
 	rear_gauge = 0.0
@@ -826,7 +821,7 @@ func _ai_retire_check() -> Array:
 		if rng.randf("ai") < probability:
 			_retire_entrant(id)
 			ai_retire_count += 1
-			events.append(_ev("T5", "raceLog.aiRetire01", {"target": entrants[id]["name_key"]}))
+			events.append(_ev("T5", "raceLog.aiRetire01", _entrant_params(id)))
 	return events
 
 
@@ -984,6 +979,29 @@ func _gain_charge(amount: int) -> void:
 
 func _ev(phase: String, key: String, params: Dictionary) -> Dictionary:
 	return {"phase": phase, "key": key, "params": params}
+
+
+# 대상 참가자 표기 매개 한 벌 — `name_key` 와 `number` 는 **반드시 함께 간다.**
+# 필러의 name_key 는 그 자체가 문면(`No.{number} 머신`)이라, 표기 층이 그것을 번역할 때
+# `number` 를 **같은 params 에서** 찾는다. 짝을 호출부마다 손으로 적으면 한쪽이 빠지고,
+# 네임드 문면에는 `{number}` 자리가 아예 없어 **그 누락이 화면에 드러나지도 않는다** —
+# 실제로 5지점 중 4지점이 빠진 채 통과했다(주력 실기 관측 `No.{number} 머신 리타이어.`
+# — IMPL-210). 그래서 손 규약이 아니라 창구 하나로 짝을 구조에 고정한다.
+#
+# **`number` 를 `target` 앞에 둔 것은 의도다** (IMPL-211 돌연변이 M3 실측). `StringTable.text()`
+# 는 params 를 **삽입 순서대로 1회 훑으며** 치환하므로, `target` 이 먼저면 `{target}` 자리에
+# 들어온 `No.{number} 머신` 의 `{number}` 가 **같은 훑기에서 뒤이어 우연히 치환된다** —
+# 그러면 표기 층의 중첩 키 선해결(`race_screen._push_events`)이 있으나 마나가 되고, 그것을
+# 지워도 아무 검사도 울리지 않는다(실측 미검출 1건). 순서를 뒤집어 **선해결만이 유일한
+# 성립 경로**가 되게 두면, 그 한 줄이 사라지는 순간 8축이 동시에 실패한다.
+func _entrant_params(id: String, extra: Dictionary = {}) -> Dictionary:
+	var params: Dictionary = {
+		"number": entrants[id]["number"],
+		"target": entrants[id]["name_key"],
+	}
+	for extra_key in extra:
+		params[extra_key] = extra[extra_key]
+	return params
 
 
 # ── 직렬화 (서스펜드 스냅샷 §7.2 — RNG 포함, 재로드 리롤 무효 §6.2) ──

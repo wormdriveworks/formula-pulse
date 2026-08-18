@@ -5,7 +5,7 @@
 # 무가드로 읽으면, 커리어를 연 경로에서는 멀쩡하고 **타이틀 직행 경로에서만** 죽는다.
 # 실제로 SYS-04 가 그렇게 샜다(총괄 판정 IMPL-176 ① — 타이틀 첫 진입 100% 재현).
 #
-# 검사 축 9종:
+# 검사 축 10종:
 #   ① 무커리어 문맥 성립 — SYS-01 → SYS-04 직행(D09 본문 145행·§A-1 규격 진입)
 #   ② 패드 순회 폐쇄 — 초기 포커스 보유 (D09 §1.3 · 총괄 판정 IMPL-176 ②)
 #   ③ 단독 경로 옵션 정합 — 라우터를 안 거치는 경로가 O9 를 적용하는가 (동 ③)
@@ -15,6 +15,7 @@
 #   ⑦ 표시 기구 — 툴팁 고정·감광 등채널 (동 ③④)
 #   ⑧ 컨텍스트 층 패드 — X 단독/X 홀드 판별·Y 재배치 (D09 v1.3 · IMPL-200 ③)
 #   ⑨ 검사 설정 정합 — PAL 조달 소스 경로가 실재하는가 (동 ①)
+#   ⑩ 필러 대상 로그 문면 — 발행 층이 표기 매개를 짝으로 넘기는가 (IMPL-209 ⑧)
 #
 # **첫 프레임(`_process`)에서 돈다.** `_init()` 시점에는 `root` 가 없어 `add_child` 자체가
 # 불가능하고, `_initialize()` 시점에는 `root` 가 있어도 **아직 트리 안이 아니다** — 그래서
@@ -61,10 +62,11 @@ func _process(_delta: float) -> bool:
 	_race_pad_context()
 	_race_detail_relocation(data)
 	_palette_sources_exist()
+	_filler_log_substitution(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 82:
-		print("UI_SCREENS_FAIL checks=%d < 하한 82 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 118:
+		print("UI_SCREENS_FAIL checks=%d < 하한 118 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -715,3 +717,111 @@ func _palette_sources_exist() -> void:
 	for path in paths:
 		var text := FileAccess.get_file_as_string("res://../%s" % String(path))
 		_ok("조달 소스 실재·비어 있지 않음: %s" % String(path), not text.is_empty())
+
+
+# ── ⑬ 필러 대상 로그 문면 실치환 (총괄 판정 IMPL-209 ⑧) ──
+#
+# 필러의 `name_key` 는 이름이 아니라 **문면**(`No.{number} 머신`)이다. 표기 층이 그것을
+# 번역할 때 `number` 를 **같은 params 에서** 찾으므로, 발행 층이 짝을 안 넘기면 화면에
+# `No.{number} 머신 리타이어.` 가 그대로 뜬다(주력 실기 관측 · IMPL-210).
+#
+# **관측 지점 = 실제로 렌더된 로그 줄의 문자열.** 엔진이 넘긴 params 만 보면 표기 층이
+# 치환을 건너뛰어도 통과한다(죽은 쪽 단언). 그래서 엔진이 발행한 이벤트를 실화면의
+# `_push_events()` 에 흘려 넣고 `LogFeed` 슬롯의 본문 라벨을 읽는다.
+#
+# **네임드로는 이 결함이 드러나지 않는다** — 네임드 문면에는 `{number}` 자리가 아예 없다.
+# 그래서 대상을 필러로 고정하고, 필러가 없으면 전제 단언으로 먼저 멈춘다(빈 통과 차단).
+func _filler_log_substitution(data: GameData) -> void:
+	var session := RunSession.new()
+	session.setup(data)
+	session.begin_career(2)
+	var screen := _mount(RACE_SCENE, session)
+	if screen == null:
+		return
+	var engine: RaceEngine = screen.engine
+	var filler_id := ""
+	for entrant_id in engine.entrants:
+		if bool(engine.entrants[entrant_id]["is_filler"]):
+			filler_id = String(entrant_id)
+			break
+	_ok("전제: 그리드에 필러가 있다", filler_id != "", filler_id)
+	if filler_id == "":
+		_unmount(screen)
+		return
+	var number := int(engine.entrants[filler_id]["number"])
+	# 전제 2 — 필러 문면에 치환 자리가 실재해야 이 축이 성립한다.
+	_ok("전제: 필러 name_key 에 {number} 자리가 있다",
+		data.strings.text("ui.race.fillerName").contains("{number}"))
+
+	# 듀얼 3분기 — 대상 매개를 싣는 문면 전부. 승패는 `judgment >= threshold` 이고
+	# 레조넌스 보너스가 판정에 직접 가산되는 외부 레버라 그것으로 가른다
+	# (릴 결과를 흉내 내지 않는다 — 규칙은 코어 검사 몫이다).
+	var cases := [
+		{"type": RaceTypes.DuelType.OVERTAKE, "win": true, "label": "추월 성공"},
+		{"type": RaceTypes.DuelType.DEFENSE, "win": true, "label": "방어 성공"},
+		{"type": RaceTypes.DuelType.DEFENSE, "win": false, "label": "방어 실패"},
+	]
+	for duel_case in cases:
+		var events := _force_filler_duel(engine, filler_id, int(duel_case["type"]), bool(duel_case["win"]))
+		_assert_filler_line(screen, events, String(duel_case["label"]), number)
+
+	# AI 리타이어 — 주력이 실기에서 실제로 본 문면이 이 경로다.
+	_assert_filler_line(screen, _force_filler_retire(engine, filler_id), "AI 리타이어", number)
+	_unmount(screen)
+
+
+# 듀얼 성립 조건(인접·미소멸)을 세우고 승패를 강제해 대상 문면을 뽑는다.
+func _force_filler_duel(engine: RaceEngine, opponent_id: String, duel_type: int, win: bool) -> Array:
+	engine.entrants[opponent_id]["retired"] = false
+	engine.positions.erase(opponent_id)
+	var player_index: int = engine.positions.find(RaceEngine.PLAYER_ID)
+	engine.positions.insert(player_index + 1, opponent_id)
+	engine.pending_duel = duel_type
+	engine.duel_opponent = opponent_id
+	engine.resonance_duel_bonus = 9999.0 if win else -9999.0
+	return engine._resolve_duel()
+
+
+# 리타이어는 확률 분기다. RNG 는 마스터 시드 파생이라 회차 간 재현되지만, 시행을 한정하고
+# **못 뽑았으면 빈 배열로 돌려보낸다** — 안 뽑힌 것을 통과로 적지 않기 위해서다.
+func _force_filler_retire(engine: RaceEngine, filler_id: String) -> Array:
+	# 그리드를 플레이어 + 그 필러로 좁힌다 — 다른 필러가 먼저 뽑히면 같은 `name_key` 라
+	# 문면만으로는 구분되지 않아 엉뚱한 카 넘버를 검사하게 된다(첫 시행 실측).
+	for _attempt in range(4000):
+		engine.ai_retire_count = 0
+		engine.entrants[filler_id]["retired"] = false
+		engine.positions = [RaceEngine.PLAYER_ID, filler_id]
+		var events: Array = engine._ai_retire_check()
+		if not events.is_empty():
+			return events
+	return []
+
+
+# 발행 → 실화면 표기 → 렌더된 문자열까지 한 줄로 본다.
+func _assert_filler_line(screen: Control, events: Array, label: String, number: int) -> void:
+	var target_events: Array = []
+	for event in events:
+		if (event["params"] as Dictionary).has("target"):
+			target_events.append(event)
+	_ok("%s — 대상 문면 발행" % label, target_events.size() == 1,
+		"발행 %d건" % target_events.size())
+	if target_events.is_empty():
+		return
+	screen._e10_log.clear_feed()
+	screen._push_events(target_events)
+	var lines := _rendered_log_lines(screen)
+	_ok("%s — 로그 줄 1개 렌더" % label, lines.size() == 1, "줄 %d개" % lines.size())
+	if lines.is_empty():
+		return
+	var line := String(lines[0])
+	_ok("%s — 필러 카 넘버 실치환" % label, line.contains("No.%d" % number), line)
+	_ok("%s — 미치환 자리 잔존 0" % label, not line.contains("{"), line)
+
+
+func _rendered_log_lines(screen: Control) -> Array:
+	var lines: Array = []
+	for slot in screen._e10_log.get_children():
+		var body := slot.get_child(1) as Label
+		if body != null:
+			lines.append(body.text)
+	return lines

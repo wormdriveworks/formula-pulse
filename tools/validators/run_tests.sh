@@ -44,7 +44,7 @@ TESTS=(
 	"tests/test_ui_options.gd:22"
 	# UISCR — 화면을 실제로 세워 본다. 문맥 결손(무커리어 진입)·포커스 부재는 데이터·코어
 	# 검사가 원리적으로 닿지 못하고, 커리어를 연 경로에서는 멀쩡해 보인다.
-	"tests/test_ui_screens.gd:100"
+	"tests/test_ui_screens.gd:118"
 	# SEAL-E — 실화면을 인스턴스화해 릴 정지 연출 전 UI 노출을 잡는다.
 	# 라운드 수가 GP 길이(12~15턴 + 듀얼 삽입)에 따라 달라지므로 하한은 최소 GP 기준이다.
 	"tests/test_seal_ui.gd:84"
