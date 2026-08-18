@@ -5,7 +5,7 @@
 # 무가드로 읽으면, 커리어를 연 경로에서는 멀쩡하고 **타이틀 직행 경로에서만** 죽는다.
 # 실제로 SYS-04 가 그렇게 샜다(총괄 판정 IMPL-176 ① — 타이틀 첫 진입 100% 재현).
 #
-# 검사 축 11종:
+# 검사 축 12종:
 #   ① 무커리어 문맥 성립 — SYS-01 → SYS-04 직행(D09 본문 145행·§A-1 규격 진입)
 #   ② 패드 순회 폐쇄 — 초기 포커스 보유 (D09 §1.3 · 총괄 판정 IMPL-176 ②)
 #   ③ 단독 경로 옵션 정합 — 라우터를 안 거치는 경로가 O9 를 적용하는가 (동 ③)
@@ -17,6 +17,7 @@
 #   ⑨ 검사 설정 정합 — PAL 조달 소스 경로가 실재하는가 (동 ①)
 #   ⑩ 필러 대상 로그 문면 — 발행 층이 표기 매개를 짝으로 넘기는가 (IMPL-209 ⑧)
 #   ⑪ 저장 표시 — 라우터 결선·값 창구·성공/실패 분기·전환 생존 (IMPL-219 ②)
+#   ⑫ 도상 치수 2규격 공존 — 릴 32 무배율 ↔ 섹터 속성 16 (IMPL-226)
 #
 # **첫 프레임(`_process`)에서 돈다.** `_init()` 시점에는 `root` 가 없어 `add_child` 자체가
 # 불가능하고, `_initialize()` 시점에는 `root` 가 있어도 **아직 트리 안이 아니다** — 그래서
@@ -66,10 +67,11 @@ func _process(_delta: float) -> bool:
 	_palette_sources_exist()
 	_filler_log_substitution(data)
 	_save_indicator_wiring(data)
+	_icon_size_regimes(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 130:
-		print("UI_SCREENS_FAIL checks=%d < 하한 130 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 138:
+		print("UI_SCREENS_FAIL checks=%d < 하한 138 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -856,6 +858,20 @@ func _save_indicator_wiring(data: GameData) -> void:
 		app.queue_free()
 		return
 
+	# ⓐ-2 **위치 = 우상단** (D09 §181 명문). 앵커만 보면 통과하지만 오프셋이 어긋나면
+	# 화면에서는 좌상단에 뜬다 — 실제로 그랬다(9차 실측: rect P=(0,0) · 우측 여백 608).
+	# 그래서 앵커가 아니라 **부모 폭 기준 실 rect** 로 본다.
+	app.size = Vector2(640, 360)
+	var r := indicator.get_rect()
+	_ok("저장 표시 = 우상단 (우측 여백 0)",
+		is_equal_approx(r.position.x + r.size.x, 640.0),
+		"rect=%s 우측여백=%.1f" % [str(r), 640.0 - (r.position.x + r.size.x)])
+	_ok("저장 표시 = 상단 (상단 여백 0)", is_equal_approx(r.position.y, 0.0),
+		"y=%.1f" % r.position.y)
+	# 회전이 중심을 돌아야 한다 — 피벗이 0 이면 아이콘이 좌상단 축으로 휘돈다.
+	_ok("회전 피벗 = 도상 중심",
+		indicator.pivot_offset.is_equal_approx(r.size * 0.5), str(indicator.pivot_offset))
+
 	# ⓐ 값 창구. **표 행 실재를 먼저 본다** — 행이 없으면 `GameData.param()` 은 양쪽에서
 	# 똑같이 0.0 을 돌려주므로, 비교만으로는 `0.0 == 0.0` 이 되어 조용히 통과한다
 	# (돌연변이 M5 실측 — 항진명제). 행의 존재는 비교와 독립된 사실이라 먼저 세운다.
@@ -893,3 +909,70 @@ func _save_indicator_wiring(data: GameData) -> void:
 	_ok("화면 전환 후에도 표시 생존", indicator.visible and indicator.is_inside_tree())
 	root.remove_child(app)
 	app.queue_free()
+
+
+# ── ⑫ 도상 치수 2규격 공존 (IMPL-226) ──
+#
+# `_icon_texture()` 를 **릴 심볼(32 무배율)과 섹터 속성(16)이 함께 쓴다.** 창구가 하나이므로
+# 한쪽 규격을 창구 안에서 판단하면 다른 쪽을 밟는다 — 그 밟힘을 여기서 고정한다.
+#
+# **파일명까지 대조한다.** 슬롯 크기만 보면 두 규격이 우연히 맞는 경우를 통과시키고,
+# 상수(`ATTR_VARIANT`)만 보면 창구가 그것을 쓰는지 알 수 없다(돌연변이 전례).
+func _icon_size_regimes(data: GameData) -> void:
+	var session := RunSession.new()
+	session.setup(data)
+	session.begin_career(2)
+	var screen := _mount(RACE_SCENE, session)
+	if screen == null:
+		return
+
+	# ── 섹터 속성 = `_16` ──
+	# 표에 있는 6종 전부를 창구에 통과시킨다. 데이터가 실제로 쓰는 id 로만 보면
+	# 그 회차에 안 뜬 속성의 결선 누락이 검사를 빠져나간다.
+	var attr_ids := ["attr_straight", "attr_technical", "attr_sweeper",
+		"attr_hazard", "attr_battle_zone", "attr_pulse_section"]
+	var attr_missing := 0
+	var attr_wrong := 0
+	for id in attr_ids:
+		var tex: Texture2D = screen._icon_texture(id, screen.ATTR_VARIANT)
+		if tex == null:
+			attr_missing += 1
+			continue
+		if tex.resource_path.get_file().get_basename() != id + "_16":
+			attr_wrong += 1
+		if tex.get_size() != Vector2(16, 16):
+			attr_wrong += 1
+	_ok("섹터 속성 6종 _16 적재", attr_missing == 0, "missing=%d" % attr_missing)
+	_ok("섹터 속성 = _16 파일 · 16×16", attr_wrong == 0, "wrong=%d" % attr_wrong)
+
+	# ── 릴 심볼 = 32 무배율 (접미 없음) ──
+	# **여기가 창구 공유의 위험 지점이다** — 창구가 치수를 스스로 정하면 릴도 16 이 된다.
+	var reel_ids := ["symbol_slipstream", "symbol_braking", "symbol_line",
+		"symbol_trouble", "symbol_chance", "symbol_pulse"]
+	var reel_wrong := 0
+	for id in reel_ids:
+		var tex: Texture2D = screen._icon_texture(id)
+		if tex == null or tex.resource_path.get_file().get_basename() != id \
+			or tex.get_size() != Vector2(32, 32):
+			reel_wrong += 1
+	_ok("릴 심볼 6종 = 32 무배율 유지", reel_wrong == 0, "wrong=%d" % reel_wrong)
+
+	# ── 실배치 슬롯이 등배인가 ──
+	# 파일이 맞아도 슬롯이 어긋나면 화면에서 다시 축소된다(Zone A 가 그랬다).
+	var attr_rect := screen.get_node("%E02SectorAttr") as TextureRect
+	if attr_rect.texture != null:
+		var box := attr_rect.size
+		var tex_size := attr_rect.texture.get_size()
+		var scale: float = minf(box.x / tex_size.x, box.y / tex_size.y)
+		_ok("A존 속성 실배치 등배(축소 0)", is_equal_approx(scale, 1.0),
+			"scale=%.4f box=%s tex=%s" % [scale, str(box), str(tex_size)])
+
+	# ── 캐시가 두 규격을 섞지 않는가 ──
+	# 같은 id 를 두 치수로 부르면 키가 갈려야 한다 — 안 갈리면 먼저 부른 쪽이 이긴다.
+	var big: Texture2D = screen._icon_texture("attr_hazard")
+	var small: Texture2D = screen._icon_texture("attr_hazard", screen.ATTR_VARIANT)
+	_ok("캐시 키가 치수로 갈린다", big != null and small != null and big != small,
+		"big=%s small=%s" % [
+			big.resource_path.get_file() if big else "-",
+			small.resource_path.get_file() if small else "-"])
+	_unmount(screen)

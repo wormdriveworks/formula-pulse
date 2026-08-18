@@ -32,17 +32,30 @@ func configure(hold_sec: float, spin_sec: float) -> void:
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
-	# 우상단 고정 (§181). 회전이 중심을 기준으로 돌게 피벗을 가운데 둔다.
-	set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	if ResourceLoader.exists(ICON):
 		texture = load(ICON) as Texture2D
 	else:
 		# 진단 문자열은 영문 — V4 는 한글 리터럴을 경로 불문 차단한다
 		push_error("SaveIndicator: icon asset missing - %s" % ICON)
 	if texture != null:
-		custom_minimum_size = texture.get_size()
-		size = texture.get_size()
-		pivot_offset = texture.get_size() * 0.5
+		var box := texture.get_size()
+		custom_minimum_size = box
+		# 회전이 중심을 기준으로 돌게 피벗을 가운데 둔다.
+		pivot_offset = box * 0.5
+		# ── 우상단 고정 (§181) ──
+		# **오프셋을 직접 적는다.** `set_anchors_preset()` 은 기본값(`keep_offsets=false`)에서
+		# **현재 rect 를 보존하도록 오프셋을 역산**하는데, `_ready()` 시점의 rect 는 아직
+		# (0,0,0,0) 이다. 그러면 우측 앵커에 0폭 rect 가 보존돼 `offset_left = -부모폭` 이 되고,
+		# 아이콘이 **좌상단에 뜬다**(실측: 640 캔버스에서 rect P=(0,0) · 우측 여백 608).
+		# 앵커만 세우고 오프셋은 도상 크기로 직접 적는 편이 순서에 의존하지 않는다.
+		anchor_left = 1.0
+		anchor_right = 1.0
+		anchor_top = 0.0
+		anchor_bottom = 0.0
+		offset_left = -box.x
+		offset_right = 0.0
+		offset_top = 0.0
+		offset_bottom = box.y
 	visible = false
 	set_process(false)
 

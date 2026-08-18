@@ -68,6 +68,11 @@ const SOUND_BY_KEY := {
 # 게이지 위험·주의는 런타임 색이라 `UiPalette` 조회 창구가 바로 처리한다.
 const ALT_ICON_IDS := ["symbol_line", "symbol_trouble"]
 
+# 섹터 속성(A존)의 치수 접미. **릴 심볼에는 붙이지 않는다** — 릴은 `KEEP_CENTERED` 무배율로
+# 32 를 그대로 쓰는 것이 계약이고(D10 §2.2 · 대장 §4.1.1 경고), A존 속성은 슬롯이 16 이라
+# 32 원도를 넣으면 1/2 축소가 되어 원도의 절반이 버려진다(8차 §5-③ 실측).
+const ATTR_VARIANT := "_16"
+
 var _icon_cache: Dictionary = {}
 
 var data: GameData
@@ -724,28 +729,37 @@ func _reveal_reels(indices: Array, start_window: bool) -> void:
 # 런타임 틴트로는 정본 색을 재현할 수 없다 — 같은 도상의 대체색 파일(`<id>_alt.png`)을
 # 우선 찾고, **없으면 조용히 기본 도상으로 돌아간다.** 대체 도상 실물은 에셋 트랙 몫이며
 # (교체 대상 = 라인·트러블 2종) 부재는 결함이 아니라 미유입이므로 여기서 보고하지 않는다.
-func _icon_texture(asset_id: String) -> Texture2D:
+#
+# **치수 축은 소비 지점이 정한다** (IMPL-226 — 이 창구를 릴 심볼과 섹터 속성이 함께 쓴다).
+# 릴은 32 고정(무배율 계약)이고 섹터 속성만 `_16` 이므로, 창구 안에서 치수를 판단하면
+# 두 소비부가 서로의 규격을 밟는다. 그래서 `variant` 를 인자로 받고 기본값은 32(빈 접미)다.
+#
+# **두 축의 이름 순서를 고정한다: `<id>[_alt][_16]`.** 색각 대체는 도상 축, 치수는 치수 축이라
+# 서로 독립인데, 순서를 정하지 않으면 같은 파일을 두 이름으로 찾게 된다.
+#
+# **`_16` 부재는 32 로 되돌리지 않는다** — 되돌리면 비정수 축소가 조용히 되살아난다
+# (Zone A 가 정확히 그 상태였다 — 8차 §5-③ 실측 `RENDER_SCALE=0.5`). 없으면 보고한다.
+func _icon_texture(asset_id: String, variant: String = "") -> Texture2D:
 	if asset_id.is_empty():
 		return null
-	var cache_key := asset_id
+	var base := asset_id
 	if UiPalette.colorblind and ALT_ICON_IDS.has(asset_id):
-		cache_key = "%s_alt" % asset_id
+		base = "%s_alt" % asset_id
+	var cache_key := base + variant
 	if _icon_cache.has(cache_key):
 		return _icon_cache[cache_key]
-	var alt_path := "%s%s.png" % [ICON_DIR, cache_key]
-	if cache_key != asset_id and ResourceLoader.exists(alt_path):
-		_icon_cache[cache_key] = load(alt_path) as Texture2D
+	var path := "%s%s.png" % [ICON_DIR, cache_key]
+	if ResourceLoader.exists(path):
+		_icon_cache[cache_key] = load(path) as Texture2D
 		return _icon_cache[cache_key]
-	if _icon_cache.has(asset_id):
-		return _icon_cache[asset_id]
-	var path := "%s%s.png" % [ICON_DIR, asset_id]
-	var texture: Texture2D = load(path) if ResourceLoader.exists(path) else null
-	if texture == null:
-		# 진단 문자열은 영문 — 표시 문자열이 아니지만 V4는 한글 리터럴을 경로 불문 차단한다
-		# (코어의 push_error 관행과 동일하게 맞춘다)
-		push_error("RaceScreen: icon asset missing - %s" % path)
-	_icon_cache[asset_id] = texture
-	return texture
+	# 대체 도상 부재 = 미유입이므로 조용히 기본 도상으로. **치수는 유지한다.**
+	if base != asset_id:
+		return _icon_texture(asset_id, variant)
+	# 진단 문자열은 영문 — 표시 문자열이 아니지만 V4는 한글 리터럴을 경로 불문 차단한다
+	# (코어의 push_error 관행과 동일하게 맞춘다)
+	push_error("RaceScreen: icon asset missing - %s" % path)
+	_icon_cache[cache_key] = null
+	return null
 
 
 # ── 표시 갱신 ──
@@ -796,7 +810,8 @@ func _refresh_strip() -> void:
 		var sector_entry := data.sector_entry(engine.sector)
 		var corner_key := String(sector_entry.get("name_key", ""))
 		_e02_corner.text = s.text(corner_key)
-		_e02_attr.texture = _icon_texture(String(sector_entry.get("main_attr", "")))
+		# 섹터 속성만 `_16` 이다 — 릴 심볼은 32 무배율 계약(`ATTR_VARIANT` 주석 참조).
+		_e02_attr.texture = _icon_texture(String(sector_entry.get("main_attr", "")), ATTR_VARIANT)
 	else:
 		_e02_corner.text = ""
 		_e02_attr.texture = null
