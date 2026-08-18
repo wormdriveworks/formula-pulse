@@ -217,10 +217,39 @@ func _refresh_value(option_id: String, value: Label, notice: Label) -> void:
 		notice.visible = index == store.step_count(option_id) - 1
 
 
+# 활성 탭 표시 — **[가안] 신설** (총괄 회신 §4-③ · 7차 §6-① 이월분).
+#
+# D09 는 활성 탭의 시각 표시에 침묵한다(§1.3 은 입력만, §A-3·§A-4 는 탭 구성만).
+# 그런데 표시가 없으면 **LB/RB 가 먹지 않는 것처럼 보인다** — 마우스·키보드로는 눌린 탭에
+# 포커스 링이 남아 우연히 활성 표시처럼 보이지만, 액션으로 돌리면 내용만 바뀌고
+# 탭 줄에서는 아무것도 움직이지 않는다(7차 실측).
+#
+# **포커스와 활성은 다른 축이다** — 포커스는 "지금 어디를 조작하려는가", 활성은
+# "지금 무엇을 보고 있는가"다. 그래서 포커스 링에 얹지 않고 색으로 따로 표시한다.
+#
+# 색은 **기확정 슬롯 2종**이다(신규 색 0): 활성 = `ACCENT_ACTIVE` C3(정본 증보 2 의
+# '활성 강조' 역할) · 비활성 = `TEXT_PRIMARY` N16. **비활성을 감광하지 않는 이유** —
+# 탭 5종은 전부 도달 가능하므로 흐리게 두면 잠긴 것으로 오독된다. 활성은 밝기가 아니라
+# 색상으로 갈린다.
+func _mark_active_tab() -> void:
+	var tab_row := %TabRow as Control
+	for index in range(tab_row.get_child_count()):
+		var button := tab_row.get_child(index) as Button
+		if button == null:
+			continue
+		button.add_theme_color_override("font_color",
+			UiPalette.ACCENT_ACTIVE if index == _active_tab else UiPalette.TEXT_PRIMARY)
+		# 포커스가 옮겨 가도 활성 표시는 유지돼야 한다 — 세 상태 전부 같은 색으로 고정한다.
+		button.add_theme_color_override("font_hover_color",
+			UiPalette.ACCENT_ACTIVE if index == _active_tab else UiPalette.TEXT_PRIMARY)
+		button.add_theme_color_override("font_focus_color",
+			UiPalette.ACCENT_ACTIVE if index == _active_tab else UiPalette.TEXT_PRIMARY)
+
 func _select_tab(index: int) -> void:
 	_active_tab = index
 	for panel_index in range(_tab_panels.size()):
 		(_tab_panels[panel_index] as Control).visible = panel_index == index
+	_mark_active_tab()
 
 
 func _on_reset() -> void:

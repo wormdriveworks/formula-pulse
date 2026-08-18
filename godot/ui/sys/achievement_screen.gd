@@ -32,11 +32,11 @@ const ICON_DIR := "res://assets/ui/icons/"
 # (`achv_career`=①커리어 … `achv_archive`=⑤아카이브). 즉 아이콘은 업적의 정체가 아니라
 # 소속 축의 표지이므로, 39행이 5종을 나눠 쓰는 것이 규격대로다.
 const ICON_BY_CATEGORY := {
-	"career": "achv_career",
-	"rival": "achv_rival",
-	"driving": "achv_driving",
-	"garage": "achv_garage",
-	"archive": "achv_archive",
+	"career": "achv_career_16",
+	"rival": "achv_rival_16",
+	"driving": "achv_driving_16",
+	"garage": "achv_garage_16",
+	"archive": "achv_archive_16",
 }
 
 # 히든 미달성 공용 도상 (A-UI-27 — 대장 문면 "업적 히든 (미달성 공용)").
@@ -45,10 +45,12 @@ const ICON_BY_CATEGORY := {
 # 카테고리 아이콘을 그대로 쓰면 탭 위치와 합쳐 후보가 좁혀지므로 그쪽이 오히려 누출이다).
 # [가안] — §5.5 문면은 "아이콘 전부 비노출"이라 공용 도상도 비우는 독법이 가능하다.
 # 대장이 이 도상에 "미달성 공용" 용도를 명시해 둔 쪽을 택했고, 총괄 판정으로 뒤집을 수 있다.
-const ICON_HIDDEN := "achv_hidden"
+const ICON_HIDDEN := "achv_hidden_16"
 
-# 원도 32×32 를 **등배로** 쓴다 — 축소하면 비정수 배율이 되어 믹셀이 된다(D10 §2.2 · D12 §9.1).
-const ICON_SLOT := 32
+# **16px 원도 세트 등배** (대장 §4.1.1 · IMPL-215). 9px 텍스트 행에 32px 를 얹으면 행이
+# 3배로 벌어져 목록 밀도가 무너진다(7차 §6-③ 보고분) — 그 해소로 16px 원도가 유입됐다.
+# 축소가 아니라 **원도 교체**다: 32px 를 줄이면 비정수 배율이 되어 믹셀이 된다(D10 §2.2 · D12 §9.1).
+const ICON_SLOT := 16
 
 var _return_route := "SYS-01"
 var _overlay_mode := false
@@ -335,10 +337,39 @@ func _build_row(achievement_id: String) -> Control:
 	return row
 
 
+# 활성 탭 표시 — **[가안] 신설** (총괄 회신 §4-③ · 7차 §6-① 이월분).
+#
+# D09 는 활성 탭의 시각 표시에 침묵한다(§1.3 은 입력만, §A-3·§A-4 는 탭 구성만).
+# 그런데 표시가 없으면 **LB/RB 가 먹지 않는 것처럼 보인다** — 마우스·키보드로는 눌린 탭에
+# 포커스 링이 남아 우연히 활성 표시처럼 보이지만, 액션으로 돌리면 내용만 바뀌고
+# 탭 줄에서는 아무것도 움직이지 않는다(7차 실측).
+#
+# **포커스와 활성은 다른 축이다** — 포커스는 "지금 어디를 조작하려는가", 활성은
+# "지금 무엇을 보고 있는가"다. 그래서 포커스 링에 얹지 않고 색으로 따로 표시한다.
+#
+# 색은 **기확정 슬롯 2종**이다(신규 색 0): 활성 = `ACCENT_ACTIVE` C3(정본 증보 2 의
+# '활성 강조' 역할) · 비활성 = `TEXT_PRIMARY` N16. **비활성을 감광하지 않는 이유** —
+# 탭 5종은 전부 도달 가능하므로 흐리게 두면 잠긴 것으로 오독된다. 활성은 밝기가 아니라
+# 색상으로 갈린다.
+func _mark_active_tab() -> void:
+	var tab_row := %TabRow as Control
+	for index in range(tab_row.get_child_count()):
+		var button := tab_row.get_child(index) as Button
+		if button == null:
+			continue
+		button.add_theme_color_override("font_color",
+			UiPalette.ACCENT_ACTIVE if index == _active_tab else UiPalette.TEXT_PRIMARY)
+		# 포커스가 옮겨 가도 활성 표시는 유지돼야 한다 — 세 상태 전부 같은 색으로 고정한다.
+		button.add_theme_color_override("font_hover_color",
+			UiPalette.ACCENT_ACTIVE if index == _active_tab else UiPalette.TEXT_PRIMARY)
+		button.add_theme_color_override("font_focus_color",
+			UiPalette.ACCENT_ACTIVE if index == _active_tab else UiPalette.TEXT_PRIMARY)
+
 func _select_tab(index: int) -> void:
 	_active_tab = index
 	for panel_index in range(_tab_panels.size()):
 		(_tab_panels[panel_index] as Control).visible = panel_index == index
+	_mark_active_tab()
 
 
 func _on_close() -> void:

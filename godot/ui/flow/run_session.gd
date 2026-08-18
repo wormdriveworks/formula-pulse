@@ -9,6 +9,11 @@
 class_name RunSession
 extends RefCounted
 
+# 저장 표시(D09 §181)의 관측 지점 — **표시 층이 코어를 보지 않게** 세션이 알린다.
+# `SaveManager` 는 static 이라 시그널을 걸 자리가 없고, 코어에 시그널을 신설하면 표시 층
+# 사정이 코어로 올라간다(혼입 0). 저장을 요청하는 곳이 세션 하나뿐이라 여기가 유일 관문이다.
+signal progress_saved(ok: bool)
+
 var data: GameData
 var rng: RngService
 var season: SeasonState
@@ -312,7 +317,9 @@ func begin_next_season() -> void:
 # 자동 저장 — 저장 지점은 D09 §2.4가 확정한다(RACE-03 진입·투어 경계·시즌 경계).
 # **SaveManager 경유 전속** — SaveService 직접 호출은 ARCH 정적 규칙이 빌드를 막는다(IMPL-037).
 func save_progress() -> Dictionary:
-	return SaveManager.save_progress(profile_index, serialize())
+	var result := SaveManager.save_progress(profile_index, serialize())
+	progress_saved.emit(bool(result.get("ok", true)))
+	return result
 
 
 func serialize() -> Dictionary:

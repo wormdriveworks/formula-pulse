@@ -22,17 +22,18 @@ const ICON_DIR := "res://assets/ui/icons/"
 # D09 §3.3 이 아이콘이 아니라 **초상·배지**로 규정한 축이라 A-UI 아이콘 27종에 애초에 없다.
 # 표에 없는 화자는 텍스트 표지로 되돌아간다 — 실물이 서면 여기 한 줄이 붙는다.
 const ICON_BY_SPEAKER := {
-	Speaker.RELAY: "speaker_relay",
-	Speaker.FILLER: "speaker_filler",
+	Speaker.RELAY: "speaker_relay_16",
+	Speaker.FILLER: "speaker_filler_16",
 }
 
 # 도상 미지정 — 텍스트 표지 경로. 기본값을 특정 화자로 두면 새 호출부가 조용히
 # 남의 도상을 달고 나온다(RELAY 를 기본으로 두면 전 화자가 마이크가 된다).
 const SPEAKER_NONE := -1
 
-# 원도 32×32 등배 (D10 §2.2 믹셀 금지 · D12 §9.1). 표지 칸은 도상·텍스트 공통 폭이다 —
-# 갈라 두면 도상 행과 텍스트 행의 본문 시작 x 가 어긋나 피드가 들쭉날쭉해진다.
-const MARK_SLOT := 32
+# **16px 원도 세트 등배** (대장 §4.1.1). 32px 는 9px 2줄 슬롯보다 커서 피드 행간이
+# 벌어졌다(7차 §6-③) — 16px 원도 유입으로 해소한다. 축소가 아니라 원도 교체다.
+# 표지 칸은 도상·텍스트 공통 폭이다 — 갈라 두면 본문 시작 x 가 어긋나 피드가 들쭉날쭉해진다.
+const MARK_SLOT := 16
 
 # 폰트 크기는 **구성 전에는 값이 없다** (총괄 판정 IMPL-176 ④ — FONT-B 와 같은 축).
 # 리터럴 초기값(구 8)을 두면 `configure()` 미호출 경로가 생겼을 때 D13 창구 밖의 수치가

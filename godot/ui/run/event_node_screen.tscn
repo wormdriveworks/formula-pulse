@@ -65,7 +65,7 @@ theme_override_constants/separation = 4
 [node name="RewardIcon" type="TextureRect" parent="Center/Panel/Column/RewardRow" unique_id=1927919028]
 unique_name_in_owner = true
 texture_filter = 1
-custom_minimum_size = Vector2(14, 14)
+custom_minimum_size = Vector2(16, 16)
 layout_mode = 2
 stretch_mode = 5
 

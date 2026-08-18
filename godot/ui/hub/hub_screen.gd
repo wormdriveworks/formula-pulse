@@ -30,8 +30,8 @@ func _fill_common_bar() -> void:
 	if bar == null:
 		return
 	var s := session.data.strings
-	(%CreditIcon as TextureRect).texture = load(ICON_DIR + "currency_credit.png")
-	(%DataIcon as TextureRect).texture = load(ICON_DIR + "currency_data.png")
+	(%CreditIcon as TextureRect).texture = load(ICON_DIR + "currency_credit_16.png")
+	(%DataIcon as TextureRect).texture = load(ICON_DIR + "currency_data_16.png")
 	# 재화 수치 = 대형·VN 계열 (D10 v1.1 §5.7 — 결정 #8). 아이콘 병기 상시 표기라
 	# 아이콘 대비 판독 균형이 요구되는 지점이다. 씬의 리터럴을 런타임에 덮는다 —
 	# 계열 값의 창구는 D13(param_font_size_head)이고 씬에 수치를 굳히지 않는다(불변규칙 2).

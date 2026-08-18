@@ -29,7 +29,7 @@ func _card(facility_id: String) -> Control:
 
 	# 비용 — 주행 데이터 아이콘 동반 (B-1 절대 규격)
 	var icon := TextureRect.new()
-	icon.texture = load(ICON_DIR + "currency_data.png")
+	icon.texture = load(ICON_DIR + "currency_data_16.png")
 	icon.custom_minimum_size = Vector2(14, 14)
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST

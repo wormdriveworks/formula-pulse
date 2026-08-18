@@ -53,9 +53,9 @@ func _show_reward(reward: Dictionary) -> void:
 	var icon := %RewardIcon as TextureRect
 	match reward_type:
 		"credit":
-			icon.texture = load(ICON_DIR + "currency_credit.png")
+			icon.texture = load(ICON_DIR + "currency_credit_16.png")
 		"dp":
-			icon.texture = load(ICON_DIR + "currency_data.png")
+			icon.texture = load(ICON_DIR + "currency_data_16.png")
 		_:
 			icon.texture = null
 	var reward_key := "ui.eventNode.rewardChassisFormat" if reward_type == "chassis" \

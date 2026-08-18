@@ -109,7 +109,7 @@ func _fill_career() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
 	var icon := TextureRect.new()
-	icon.texture = load(ICON_DIR + "currency_data.png")
+	icon.texture = load(ICON_DIR + "currency_data_16.png")
 	icon.custom_minimum_size = Vector2(16, 16)
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST

@@ -33,6 +33,7 @@ const ENTRY_SCREEN := "SYS-01"
 
 var session: RunSession
 var _current: FlowScreen
+var _save_indicator: SaveIndicator
 
 
 func _ready() -> void:
@@ -44,6 +45,7 @@ func _ready() -> void:
 	session = RunSession.new()
 	# 합성 지점 — 라우터도 구현체 이름을 모른다. 플랫폼 선택은 `PlatformServices.create()` 전속.
 	session.setup(data, PlatformServices.create())
+	_mount_save_indicator()
 	_show(ENTRY_SCREEN, {})
 
 
@@ -72,3 +74,31 @@ func _show(target: String, payload: Dictionary) -> void:
 
 func _on_navigate(target: String, payload: Dictionary) -> void:
 	_show(target, payload)
+
+
+# ── 저장 표시 (D09 본문 §181) ──
+#
+# 라우터가 든다 — 화면 위에 얹혀 있어야 저장이 화면 전환과 겹쳐도 사라지지 않는다.
+# **화면 교체 대상이 아니다**: `_show()` 는 `_current` 만 갈아치우므로 이 노드는 남는다.
+#
+# ⚠ **`configure()` 를 부르지 않는다 — D13 에 값이 없다.**
+# §181 은 "2초 내외"를 *확정 기준값*이라 명시하지만 D13 확정 기준값 대장에 해당 행이 없다
+# (`param_fx_*_sec` 계열 실측 — 저장 표시 행 0). 불변규칙 2 대로 임의 기입하지 않았고,
+# 표시는 구성 전까지 잠들어 있다(호출 시 1회 보고). **행 2개가 서면 아래 두 줄이 살아난다:**
+#
+#   _save_indicator.configure(data.param("<표시 시간>"), data.param("<회전 주기>"))
+#
+# 지금 그 호출을 넣으면 `GameData.param()` 이 없는 키에서 `_load_ok` 를 내려 **앱이 부팅을
+# 거부한다**(`app_root.gd` 상단 가드) — 그래서 이름만 정해 두고 호출은 판정 후로 넘긴다.
+func _mount_save_indicator() -> void:
+	_save_indicator = SaveIndicator.new()
+	_save_indicator.name = "SaveIndicator"
+	add_child(_save_indicator)
+	session.progress_saved.connect(_on_progress_saved)
+
+
+# 실패한 저장에는 표시를 띄우지 않는다 — §181 의 용도가 "저장 중 종료 경고의 근거"라
+# 저장이 안 된 회차에 회전을 보여 주면 근거가 거짓이 된다.
+func _on_progress_saved(ok: bool) -> void:
+	if ok:
+		_save_indicator.flash()
