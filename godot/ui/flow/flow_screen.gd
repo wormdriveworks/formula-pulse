@@ -173,7 +173,28 @@ func _show_detail() -> void:
 	_detail_panel.add_child(label)
 
 	add_child(_detail_panel)
-	_detail_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	# ── 하단 중앙 고정 ([가안] 1 — IMPL-194) ──
+	# **`set_anchors_preset()` 을 쓰지 않는다.** 그 호출은 기본값(`keep_offsets=false`)에서
+	# **현재 rect 를 보존하도록 오프셋을 역산**하는데, 이 시점의 패널은 컨테이너 정렬 전이라
+	# rect 가 (0,0,0,0) 이다. 그러면 하단·중앙 앵커에 0크기 rect 가 보존돼
+	# `offset_left = -부모폭` · `offset_top = -부모높이` 가 박히고 — **패널이 좌상단에 뜬다**
+	# (실측: 640×360 에서 offsets L=-320 T=-360 · rect P=(0,0)). 저장 표시와 같은 함정이다
+	# (주력 9차 실증 IMPL-228 · 총괄 배정 IMPL-229 ⑥).
+	#
+	# **크기를 모르는 컨트롤이라 오프셋에 치수를 적을 수도 없다** — 패널은 내용이 정하는
+	# 크기이고 그 값은 다음 프레임에야 선다. 그래서 오프셋은 0 으로 두고 **성장 방향**으로
+	# 배치한다: 가로 BOTH = 중앙에서 양쪽으로 · 세로 BEGIN = 하단에서 위로.
+	# 이러면 배치가 호출 순서에도, 그 시점의 크기에도 의존하지 않는다.
+	_detail_panel.anchor_left = 0.5
+	_detail_panel.anchor_right = 0.5
+	_detail_panel.anchor_top = 1.0
+	_detail_panel.anchor_bottom = 1.0
+	_detail_panel.offset_left = 0.0
+	_detail_panel.offset_right = 0.0
+	_detail_panel.offset_top = 0.0
+	_detail_panel.offset_bottom = 0.0
+	_detail_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_detail_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	# 포커스가 옮겨가면 내용이 어긋나므로 함께 내린다. 화면이 사라질 때는 자식이라 같이 간다.
 	if not get_viewport().gui_focus_changed.is_connected(_on_detail_focus_changed):
 		get_viewport().gui_focus_changed.connect(_on_detail_focus_changed)

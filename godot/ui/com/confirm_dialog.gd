@@ -29,7 +29,19 @@ func _init(strings: StringTable, summary: String, cost_text: String, irreversibl
 
 	var panel := PanelContainer.new()
 	panel.name = "Panel"
-	panel.set_anchors_preset(Control.PRESET_CENTER)
+	# ── 화면 중앙 고정 ──
+	# `set_anchors_preset(PRESET_CENTER)` 은 **앵커만 세우고 오프셋은 그대로 둔다.** 여기서는
+	# 트리 밖 호출이라 오프셋이 0 으로 남는데, 기본 성장 방향이 END 라 패널의 **좌상단이
+	# 화면 중앙에 놓이고 거기서 오른쪽·아래로 자란다** — 중앙이 아니라 우하단 사분면이다
+	# (실측: 640×360 에서 pos=(320,180) size=(240,70) · 중앙이면 (200,145)).
+	# 성장 방향을 양쪽으로 두어야 앵커가 뜻하는 대로 놓인다 — 온보딩 팁(`garage_screen.gd`)이
+	# 이미 그 형태이고, 이쪽만 빠져 있었다. 전수 조사분 (총괄 배정 IMPL-229 ⑥).
+	panel.anchor_left = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_bottom = 0.5
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	panel.custom_minimum_size = Vector2(240, 0)
 	var style := StyleBoxFlat.new()
 	style.bg_color = UiPalette.BG_PANEL

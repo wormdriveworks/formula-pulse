@@ -17,6 +17,7 @@
 #   ⑨ 검사 설정 정합 — PAL 조달 소스 경로가 실재하는가 (동 ①)
 #   ⑩ 필러 대상 로그 문면 — 발행 층이 표기 매개를 짝으로 넘기는가 (IMPL-209 ⑧)
 #   ⑪ 저장 표시 — 라우터 결선·값 창구·성공/실패 분기·전환 생존 (IMPL-219 ②)
+#   ⑫ 코드 생성 Control 배치 — `set_anchors_preset` 순서 함정 전수 (IMPL-229 ⑥)
 #   ⑫ 도상 치수 2규격 공존 — 릴 32 무배율 ↔ 섹터 속성 16 (IMPL-226)
 #
 # **첫 프레임(`_process`)에서 돈다.** `_init()` 시점에는 `root` 가 없어 `add_child` 자체가
@@ -43,12 +44,26 @@ var _checked := 0
 var _failures := 0
 
 
+# **컨테이너 정렬은 다음 프레임에 선다.** 배치 축(⑫)은 부모의 실 크기를 재는 검사이므로
+# 첫 프레임에 재면 부모도 자식도 0 이라 "여백 0 = 부모를 채운다"가 **0 == 0 으로 성립**한다
+# (돌연변이 M6 미검출로 드러난 공회전). 그래서 그 축만 정렬이 끝난 프레임으로 미룬다.
+const LAYOUT_SETTLE_FRAMES := 4
+
+var _frame := 0
+var _settle_probe: Control
+
+
 func _process(_delta: float) -> bool:
+	_frame += 1
 	var data := GameData.new()
 	if not data.load_all():
 		print("UI_SCREENS_FAIL data load")
 		quit(1)
 		return true
+	if _frame < LAYOUT_SETTLE_FRAMES:
+		if _frame == 1:
+			_settle_probe = _mount(ACHIEVEMENT_SCENE, _fresh_session(data))
+		return false
 	_achievement_without_career(data)
 	_achievement_with_career(data)
 	_achievement_icons(data)
@@ -67,11 +82,12 @@ func _process(_delta: float) -> bool:
 	_palette_sources_exist()
 	_filler_log_substitution(data)
 	_save_indicator_wiring(data)
+	_anchor_preset_placement(data)
 	_icon_size_regimes(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 138:
-		print("UI_SCREENS_FAIL checks=%d < 하한 138 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 153:
+		print("UI_SCREENS_FAIL checks=%d < 하한 153 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -81,6 +97,13 @@ func _process(_delta: float) -> bool:
 		print("UI_SCREENS_FAIL failures=%d checks=%d" % [_failures, _checked])
 		quit(1)
 	return true
+
+
+func _fresh_session(data: GameData) -> RunSession:
+	var session := RunSession.new()
+	session.setup(data)
+	session.begin_career(2)
+	return session
 
 
 func _ok(label: String, condition: bool, detail: String = "") -> void:
@@ -976,3 +999,122 @@ func _icon_size_regimes(data: GameData) -> void:
 			big.resource_path.get_file() if big else "-",
 			small.resource_path.get_file() if small else "-"])
 	_unmount(screen)
+
+
+# ── ⑫ 코드 생성 Control 배치 — `set_anchors_preset` 순서 함정 전수 (총괄 배정 IMPL-229 ⑥) ──
+#
+# **앵커가 아니라 부모 폭 기준 실 rect 로 본다** (주력 9차 검사 방식 준용 — IMPL-228).
+# 저장 표시 결함은 **앵커가 정상인데 오프셋이 어긋난** 형태였고, 앵커만 보는 검사는 그것을
+# 통과시킨다. 그래서 "무엇을 지정했는가"가 아니라 **부모 안에서 실제로 어디에 놓였는가**를
+# 여백으로 잰다.
+#
+# 함정은 두 갈래이며 **둘 다 `set_anchors_preset()` 이 배치를 완성하지 않는다는 같은 뿌리**다:
+#   ⓐ 트리 안·크기 미정 상태 호출 → 오프셋을 rect(0,0,0,0) 보존으로 **역산** → 좌상단 고정
+#   ⓑ 트리 밖 호출 → 오프셋 0 → 배치가 **성장 방향**에 맡겨진다(기본 END = 앵커에서 우하향)
+# FULL_RECT 계열은 ⓑ 경로에서 오프셋 0 이 곧 정답이라 무해하다 — 추정이 아니라 실측으로 건다.
+const CANVAS := Vector2(640.0, 360.0)
+const GARAGE_SCENE := "res://ui/hub/garage_screen.tscn"
+
+
+func _margins(c: Control) -> Dictionary:
+	var box := c.get_parent_area_size()
+	return {
+		"left": c.position.x,
+		"right": box.x - c.position.x - c.size.x,
+		"top": c.position.y,
+		"bottom": box.y - c.position.y - c.size.y,
+		"parent": box,
+	}
+
+
+func _ok_centered_h(label: String, c: Control) -> void:
+	var m := _margins(c)
+	_ok("%s — 가로 중앙 (좌여백 = 우여백)" % label,
+		absf(float(m["left"]) - float(m["right"])) <= 1.0,
+		"좌=%.1f 우=%.1f 부모=%s" % [m["left"], m["right"], str(m["parent"])])
+
+
+func _ok_fills_parent(label: String, c: Control) -> void:
+	var m := _margins(c)
+	_ok("%s — 부모를 채운다 (여백 4면 0)" % label,
+		absf(float(m["left"])) <= 1.0 and absf(float(m["right"])) <= 1.0
+			and absf(float(m["top"])) <= 1.0 and absf(float(m["bottom"])) <= 1.0,
+		"L=%.1f R=%.1f T=%.1f B=%.1f 부모=%s"
+			% [m["left"], m["right"], m["top"], m["bottom"], str(m["parent"])])
+
+
+func _anchor_preset_placement(data: GameData) -> void:
+	var session := _fresh_session(data)
+
+	# ⓐ 툴팁 패널 — CENTER_BOTTOM. 제1 후보였고 실제로 결함이었다.
+	# **화면은 첫 프레임에 세워 둔 것을 쓴다** — 컨테이너 정렬이 끝나야 부모가 실 크기를
+	# 갖고, 그래야 여백 단언이 공회전하지 않는다(§ LAYOUT_SETTLE_FRAMES).
+	var achv := _settle_probe
+	if achv == null:
+		_ok("전제: 배치 측정용 화면 실재", false)
+		return
+	_ok("전제: 측정 대상 부모가 실 크기를 가진다",
+		(achv.get_node("%TabBody") as Control).size.x > 0.0
+			and (achv.get_node("%TabBody") as Control).size.y > 0.0,
+		str((achv.get_node("%TabBody") as Control).size))
+	var tab := (achv.get_node("%TabRow") as Control).get_child(0) as Control
+	tab.tooltip_text = "TIP"
+	tab.grab_focus()
+	achv._show_detail()
+	var panel: Control = achv._detail_panel
+	_ok("전제: 툴팁 패널 표출", panel != null)
+	if panel != null:
+		# **크기가 0 이면 여백 단언이 전부 공회전한다** — 놓인 자리를 재기 전에 실재를 세운다.
+		_ok("전제: 툴팁 패널이 크기를 가진다", panel.size.x > 0.0 and panel.size.y > 0.0,
+			str(panel.size))
+		_ok_centered_h("툴팁 패널", panel)
+		var m := _margins(panel)
+		_ok("툴팁 패널 — 하단 접지 (하여백 0)", absf(float(m["bottom"])) <= 1.0,
+			"하여백=%.1f" % m["bottom"])
+		# 역산 함정의 서명은 **좌상단 고정**이다 — 그 형태를 직접 부인한다.
+		_ok("툴팁 패널 — 좌상단 고정이 아니다",
+			panel.position.x > 1.0 or panel.position.y > 1.0, str(panel.position))
+
+	# ⓑ 확인 대화상자 패널 — CENTER. 오프셋 0 + 성장 END 로 우하단에 놓여 있었다.
+	var dialog := ConfirmDialog.new(data.strings, "summary", "cost", false,
+		data.param_int("param_font_size_body"))
+	achv.add_child(dialog)
+	var dialog_panel := dialog.get_node("Panel") as Control
+	_ok_centered_h("확인 대화상자 패널", dialog_panel)
+	var dm := _margins(dialog_panel)
+	_ok("확인 대화상자 패널 — 세로 중앙 (상여백 = 하여백)",
+		absf(float(dm["top"]) - float(dm["bottom"])) <= 1.0,
+		"상=%.1f 하=%.1f" % [dm["top"], dm["bottom"]])
+
+	# ⓒ FULL_RECT 계열 무해 — **추정이 아니라 실측으로 명기한다** (인계 명문).
+	_ok_fills_parent("모달 루트 FULL_RECT", dialog)
+	_ok_fills_parent("모달 감광판 FULL_RECT", dialog.get_node("Dim") as Control)
+	_ok_fills_parent("업적 탭 스크롤 FULL_RECT",
+		(achv.get_node("%TabBody") as Control).get_child(0) as Control)
+	# 모달은 초기 포커스를 **지연 호출**로 잡는다(`confirm_dialog.gd` — 오입력 방어). 화면을
+	# 먼저 내리면 그 호출이 트리 밖 노드에 떨어져 검사가 자기 뒤처리로 진단을 만든다.
+	# 그래서 지연분이 도는 프레임이 오기 전에 즉시 해제한다.
+	achv.remove_child(dialog)
+	dialog.free()
+	# 툴팁도 같은 이유 — 띄운 채 내리면 뷰포트에 남은 포커스 구독이 사라진 화면을 부른다.
+	achv._hide_detail()
+	_unmount(achv)
+
+	# ⓓ 라우터가 세운 화면 — 캔버스 전면을 덮는가 (FULL_RECT · add_child 이전 호출)
+	var app := (load(APP_ROOT_SCENE) as PackedScene).instantiate() as Control
+	root.add_child(app)
+	_ok("전제: 캔버스 규격", app._current.get_parent_area_size() == CANVAS,
+		str(app._current.get_parent_area_size()))
+	_ok_fills_parent("라우터 화면 FULL_RECT", app._current)
+	root.remove_child(app)
+	app.queue_free()
+
+	# ⓔ 온보딩 팁 — CENTER_TOP. 트리 밖 호출 + 성장 BOTH 라 이미 옳다(대조군).
+	var garage := _mount(GARAGE_SCENE, session)
+	if garage == null:
+		return
+	var tip := garage.get_node_or_null("OnboardingTip") as Control
+	_ok("전제: 온보딩 팁 표출", tip != null)
+	if tip != null:
+		_ok_centered_h("온보딩 팁", tip)
+	_unmount(garage)
