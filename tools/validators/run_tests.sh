@@ -36,6 +36,10 @@ TESTS=(
 	"tests/test_narrative.gd:120"
 	# AUDIO — 오디오 디스패처 정책 4종(봉인·게이트·채널 상한·P1 보호) + 표 전수 대조.
 	"tests/test_audio.gd:350"
+	# AUDIO-A — 오디오 **실물** 68식. 표·디스패처 검사(AUDIO)와 파일 검사(검증기 AUD)가 못 보는
+	# 자리 = 임포트 결과다. 임포터 `edit/loop_mode` 열거는 런타임 상수와 한 칸 어긋나서
+	# 선언을 읽는 것으로는 루프 판정이 성립하지 않는다(IMPL-245 등재 함정) — 되읽기만이 증거다.
+	"tests/test_audio_assets.gd:340"
 	# AUDIO-W — 표와 화면 사이의 공백. 부를 곳이 없는 행은 실물이 유입돼도 영원히 울리지
 	# 않는데, 무음 폴백 단계에서는 그 침묵이 정상과 구분되지 않는다.
 	"tests/test_audio_wiring.gd:70"

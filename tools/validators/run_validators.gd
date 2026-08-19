@@ -8,6 +8,8 @@
 #   FONT = 총괄 판정 IMPL-148 · PAL = 조건부 기승인 IMPL-209 → 발동 IMPL-219 ·
 #   ANCH = 경고형 신설 IMPL-233 → 규칙 확대 + 차단형 전환 IMPL-237 ·
 #   STRF = 차단형 즉시 신설 IMPL-249 ③).
+# **AUD(오디오 실물)는 경고형 신설이다** (2026-08-19 · 에셋 발주 §4 — 차단/경고는 총괄 판정 경유).
+#   받침 = `tests/test_audio_assets.gd`(AUDIO-A · 차단형 스위트)가 헤더·루프·길이를 런타임 경로로 함께 본다.
 # V7(금칙 어휘)은 경고 전용 — 빌드를 차단하지 않는다 (D12 §4.2 V7 행 · D14 TL-1 명문).
 # V6 내부: ID 중복·접두 위반 = 차단 / 고아 데이터 = 경고 (D12 §4.2 V6 행 "고아 데이터 … 경고").
 #
@@ -42,6 +44,7 @@ func _init() -> void:
 	_run_palette_scan()
 	_run_anchor_scan()
 	_run_string_field_scan()
+	_run_audio_asset_scan()
 	print("")
 	if _fail_count == 0:
 		print("VALIDATORS_PASS warnings=%d" % _warn_count)
@@ -1535,3 +1538,169 @@ func _strf_records(text: String) -> Array:
 		records.append({"line": start_line, "fields": fields,
 			"head": head if not first_cell else cell})
 	return records
+
+
+# ── AUD: 오디오 실물 검사 (신설 2026-08-19 · 발주 `에셋트랙_SFX잔여60_발주.md` §4) ──
+#
+# **왜 여기 있는가.** 오디오 에셋은 지금까지 기계가 한 번도 보지 않았다 — `test_audio.gd` 는
+# 표(`sound_map.csv`)를 보고, 여기까지는 실물을 보는 눈이 없었다. 표가 옳고 파일이 없으면
+# 게이트는 전부 통과하는데 게임은 조용하다.
+#
+# **축 6종 (발주 §4 안 대비 가감 — 근거 명기):**
+#   ① 파일 실재 — `sound_map.csv` channel=sfx 행에서 파일명을 **도출**하고, 계수 68(D11 §2.11
+#      확정 기준값)을 상수로 대조한다. 발주 ①(대장 목록)과 ⑥(표 대조)을 하나로 합쳤다 —
+#      목록을 검사에 손으로 옮겨 적으면 그 사본이 표와 갈리고, 갈리면 검사가 표를 못 지킨다.
+#   ② WAV 헤더 — PCM(1)·44100·16bit·모노를 **파일 바이트에서** 읽는다(발주 ②).
+#   ③ `.import` 동반 + `compress/mode=0` + `edit/loop_mode` 선언(루프 6식 = 2 · 나머지 = 1).
+#      **선언 축이며 증거가 아니다** — 임포터 열거는 런타임 상수와 한 칸 어긋난다(IMPL-245 함정).
+#      실효 여부는 `tests/test_audio_assets.gd`(AUDIO-A · 차단형 스위트)가 런타임 되읽기로 받는다.
+#      발주 ③(루프 런타임 FORWARD)을 여기 두지 않은 이유 = 이 검증기는 **프로젝트리스 실행**이
+#      설계 전제라(`--path .` = 리포 루트) 임포트된 리소스를 적재할 수 없다. 축을 옮긴 것이지 버린 게 아니다.
+#   ④ L군 길이 상한 0.8/1.5/2.5초 — 헤더의 프레임 수로 산출(발주 ⑤). AUDIO-A 와 **이중으로** 본다:
+#      한쪽은 파일 바이트, 한쪽은 적재된 리소스 — 경로가 달라 같은 실패를 못 놓친다.
+#   ⑤ **[가산] 파라미터 등재 대조** — `tools/audio/sfx_params.json` 에 항목이 없는 WAV 는
+#      재생성이 불가능하다(재현 계약 위반). 손으로 넣은 파일·생성기 밖 산출물이 이 축에 걸린다.
+#   ⑥ **[가산] 잉여 파일** — `audio/sfx/` 안에 표 밖 WAV 가 있으면 열거한다. ①이 부족을 보고
+#      ⑥이 과잉을 본다 — 파일만 늘어나는 오염은 어느 게이트도 보지 않았다.
+#
+# **성격: 경고형으로 신설한다.** 차단/경고는 구현이 정하지 않고 총괄 판정을 경유한다(불변규칙 7).
+# 차단형 전환은 `_warn` → `_fail` 1줄이며 FONT(IMPL-148)·PAL(IMPL-219)·ANCH(IMPL-237) 전례 그대로다.
+# 경고형이 스스로 죽는 것을 막는 받침 = AUDIO-A 스위트(차단형 · 검사 수 하한 340)가 ②③④를
+# 다른 경로로 함께 본다. ①⑤⑥만 이 검사에 전속이다.
+const AUD_SFX_DIR := "godot/assets/audio/sfx"
+const AUD_TOTAL := 68                    # D11 §2.11 확정 기준값 (SFX 63 + AMB 5)
+const AUD_LOOP_IDS := ["se_r02", "se_t03", "se_u15", "amb_01", "amb_04", "amb_05"]
+const AUD_LENGTH_CAP := {"se_l1": 0.8, "se_l2": 1.5, "se_l3": 2.5}
+
+
+func _run_audio_asset_scan() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+
+	var ids: Array = []
+	for row in _tables.get("sound_map.csv", []):
+		if String(row.get("channel", "")) != "sfx":
+			continue
+		ids.append(String(row.get("sfx_id", "")).to_lower().replace("-", "_"))
+	checked += 1
+	if ids.size() != AUD_TOTAL:
+		_warn("AUD", "sound_map channel=sfx 행 %d != D11 §2.11 확정 %d식" % [ids.size(), AUD_TOTAL])
+
+	# 파라미터 등재 목록 (⑤)
+	var declared: Dictionary = {}
+	var params_raw: Variant = JSON.parse_string(_read_text("tools/audio/sfx_params.json"))
+	if typeof(params_raw) == TYPE_DICTIONARY:
+		for entry in params_raw.get("sounds", []):
+			if typeof(entry) == TYPE_DICTIONARY:
+				declared[String(entry.get("id", ""))] = true
+	checked += 1
+	if declared.is_empty():
+		_warn("AUD", "sfx_params.json 을 읽지 못했다 — 재현 계약 축이 성립하지 않는다")
+
+	for id in ids:
+		var wav_path: String = "%s/%s.wav" % [AUD_SFX_DIR, id]
+		checked += 1
+		if not FileAccess.file_exists(wav_path):
+			_warn("AUD", "%s: 실물 부재 (표에 행이 있고 파일이 없다 — 발화 지점이 조용해진다)" % id)
+			continue
+		checked += 1
+		if not declared.has(id):
+			_warn("AUD", "%s: sfx_params.json 미등재 — 재생성 불가(재현 계약 위반)" % id)
+		var header: Dictionary = _aud_wav_header(wav_path)
+		checked += 1
+		if header.has("error"):
+			_warn("AUD", "%s: %s" % [id, String(header["error"])])
+			continue
+		checked += 4
+		if int(header["format"]) != 1:
+			_warn("AUD", "%s: audioFormat %d != 1(PCM) — D12 §10.1" % [id, int(header["format"])])
+		if int(header["rate"]) != 44100:
+			_warn("AUD", "%s: sampleRate %d != 44100 — D12 §10.1" % [id, int(header["rate"])])
+		if int(header["bits"]) != 16:
+			_warn("AUD", "%s: bitsPerSample %d != 16 — D12 §10.1" % [id, int(header["bits"])])
+		if int(header["channels"]) != 1:
+			_warn("AUD", "%s: numChannels %d != 1(모노)" % [id, int(header["channels"])])
+		checked += 1
+		if int(header["data_size"]) <= 0:
+			_warn("AUD", "%s: data 청크가 비었다" % id)
+		if AUD_LENGTH_CAP.has(id):
+			checked += 1
+			var seconds: float = float(header["seconds"])
+			var cap: float = float(AUD_LENGTH_CAP[id])
+			if seconds > cap:
+				_warn("AUD", "%s: 길이 %.3fs > 상한 %.1fs (D13 확정 기준값)" % [id, seconds, cap])
+		# ③ `.import` 선언
+		var import_path: String = wav_path + ".import"
+		checked += 1
+		if not FileAccess.file_exists(import_path):
+			_warn("AUD", "%s: `.import` 부재 — 반대편 머신이 기본값으로 재임포트한다(IMPL-003)" % id)
+			continue
+		var import_text: String = _read_text(import_path)
+		checked += 2
+		if not import_text.contains("compress/mode=0"):
+			_warn("AUD", "%s: compress/mode 가 0(무압축)이 아니다 — 손실 코덱은 16비트 베이크를 흔든다" % id)
+		var want_loop: int = 2 if id in AUD_LOOP_IDS else 1
+		if not import_text.contains("edit/loop_mode=%d" % want_loop):
+			_warn("AUD", "%s: edit/loop_mode 선언이 %d 이 아니다 (임포터 열거 = 1 Disabled · 2 Forward)"
+				% [id, want_loop])
+
+	# ⑥ 잉여 파일
+	var known: Dictionary = {}
+	for id in ids:
+		known[String(id)] = true
+	var dir := DirAccess.open(AUD_SFX_DIR)
+	if dir != null:
+		dir.list_dir_begin()
+		var entry := dir.get_next()
+		while entry != "":
+			if entry.ends_with(".wav"):
+				checked += 1
+				var stem := entry.get_basename()
+				if not known.has(stem):
+					_warn("AUD", "%s: 표 밖 파일 (sound_map 에 행이 없다 — 아무도 부르지 않는다)" % entry)
+			entry = dir.get_next()
+		dir.list_dir_end()
+	_report("AUD", "audio assets", checked, before_fail, before_warn)
+
+
+# WAV 헤더를 바이트에서 읽는다 — `.import` 나 임포트 캐시를 믿지 않는다.
+# (돌연변이 실측: 소스 WAV 를 치워도 `.godot/imported/` 캐시가 남아 있으면 적재는 성공한다.
+#  즉 **파일 실재 축은 리소스 적재로 확인할 수 없고** 파일 시스템으로만 확인된다 — 축을 여기 둔 이유다.)
+func _aud_wav_header(path: String) -> Dictionary:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {"error": "열 수 없다"}
+	var bytes := file.get_buffer(4096)
+	var size := file.get_length()
+	file.close()
+	if bytes.size() < 44:
+		return {"error": "44바이트 미만 — WAV 가 아니다"}
+	if bytes.slice(0, 4).get_string_from_ascii() != "RIFF":
+		return {"error": "RIFF 시그니처 없음"}
+	if bytes.slice(8, 12).get_string_from_ascii() != "WAVE":
+		return {"error": "WAVE 형식 아님"}
+	var offset := 12
+	var result: Dictionary = {}
+	while offset + 8 <= bytes.size():
+		var chunk_id := bytes.slice(offset, offset + 4).get_string_from_ascii()
+		var chunk_size := bytes.decode_u32(offset + 4)
+		if chunk_id == "fmt ":
+			result["format"] = bytes.decode_u16(offset + 8)
+			result["channels"] = bytes.decode_u16(offset + 10)
+			result["rate"] = bytes.decode_u32(offset + 12)
+			result["align"] = bytes.decode_u16(offset + 20)
+			result["bits"] = bytes.decode_u16(offset + 22)
+		elif chunk_id == "data":
+			# data 크기는 헤더 선언값을 쓰되 **파일 크기와 대조**한다 — 잘린 파일을 놓치지 않는다.
+			var declared_size := int(chunk_size)
+			var actual := size - (offset + 8)
+			if declared_size > actual:
+				return {"error": "data 선언 %dB > 실제 %dB (파일이 잘렸다)" % [declared_size, actual]}
+			result["data_size"] = declared_size
+			var align: int = int(result.get("align", 2))
+			var rate: int = int(result.get("rate", 44100))
+			result["seconds"] = float(declared_size) / float(maxi(align, 1)) / float(maxi(rate, 1))
+			return result
+		offset += 8 + int(chunk_size) + (int(chunk_size) & 1)
+	return {"error": "data 청크 없음"}

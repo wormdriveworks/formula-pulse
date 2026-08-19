@@ -14,7 +14,7 @@
 | 저장소 | `https://github.com/chr15m/jsfxr` |
 | npm `dist.shasum` | `b379c2d27172cf9579a417319f36c769e325c848` |
 | npm `dist.integrity` | `sha512-Xbamo2dpLF5B+ssyv6TUEIoHJ/KRt4SRK2J3JOOmUG+45XBjkGKTjR/KOyQ9sqjrx/uea/UTWI0+p5pOVm1bUw==` |
-| 취득 일자 | 2026-08-19 (IMPL-243) |
+| 취득 일자 | 2026-08-19 (IMPL-245) |
 | 라이선스 | **UNLICENSE (퍼블릭 도메인)** — 사본 동봉 |
 
 ## 2. 사본 해시 (SHA-256) — 상류 대조용

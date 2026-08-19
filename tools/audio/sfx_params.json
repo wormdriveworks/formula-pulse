@@ -2,8 +2,10 @@
   "_doc": "SFX 절차 생성 파라미터. 이 파일 + `sfx_gen.js` + `vendor/` 사본이 실물 WAV 의 유일한 출처다 — WAV 를 손으로 고치면 `--check` 가 걸어낸다.",
   "_engine": "jsfxr 1.4.1 (vendor/ 사본 · UNLICENSE) — 파라미터 이름·값 범위는 sfxr 원본 규격 그대로. 대부분 0~1, 램프 계열(freq_ramp·duty_ramp·lpf_ramp·hpf_ramp·pha_ramp·arp_mod)은 -1~1.",
   "_format": "D12 §10.1 확정 — WAV/PCM 44.1kHz 16bit. sample_rate·sample_size 는 생성기가 전 항목에 강제하므로 여기 적지 않는다.",
-  "_seed": "잡음(wave_type 3) 합성은 상류가 Math.random 을 쓴다 — 그대로 두면 재생성이 비결정이다(실측: 같은 파라미터 2회가 다른 바이트). 생성기가 항목별 seed 로 PRNG 를 갈아끼워 결정성을 만든다. **현행 8식은 잡음을 쓰지 않아 seed 가 출력에 영향이 없다**(실측 확인) — 보험이지 장식이 아니며, 잡음 항목이 들어오는 순간 필요해진다.",
-  "_scope": "파일럿 8식 (총괄 발주 §7.1). 대장 68식 전량이 아니다.",
+  "_fields": "id·spec(정본 인용)·intent(값 선택 근거)·seed 필수. 선택 = loop(임포터 loop_mode=2 대상 — 6식) · max_sec(D13 길이 상한 결속 — L군 3식) · compose(단계 합성 — 포락선 1벌로 낼 수 없는 타수·시퀀스 항목 5식: se_t02·se_l2·se_l3·se_u17·se_u18).",
+  "_level": "볼륨은 **측정으로 맞춘다** — `sound_vol` 은 sfxr 내부에서 `exp(v)-1` 게인이라 값과 체감이 선형이 아니고, 같은 값이라도 파형·펀치에 따라 피크가 6dB 이상 갈린다. 목표 dBFS 를 정하고 이분법으로 `sound_vol` 을 역산했다(클리핑 0 을 함께 요구). 기조 = 발주 §2 승계: 고빈도(커서·토글·큐음) −13~−10 · 일반 UI·개입 −10~−7 · 결과음·정보음 −5 근방 · 스팅·결판·리타이어 −5~−3. 초판에서 6식이 **피크 32768 = 하드 클리핑**(합성 클리핑 21~390회)이었고 그 자리에서 잡았다.",
+  "_seed": "잡음(wave_type 3) 합성은 상류가 Math.random 을 쓴다 — 그대로 두면 재생성이 비결정이다(실측: 같은 파라미터 2회가 다른 바이트). 생성기가 항목별 seed 로 PRNG 를 갈아끼워 결정성을 만든다. 파일럿 8식은 잡음을 쓰지 않아 seed 가 출력에 영향이 없었다(실측). **잔여 60식에서 잡음이 실제로 들어왔다 — E군 6식(주행 텍스처) + AMB 5식(베드·함성) 11식**이 그 구간이고, 보험이 실작동한다. `--twice` 가 항목별 2회 합성 해시 대조로 이를 확증한다.",
+  "_scope": "**대장 §5.1 SFX 68식 전량.** 파일럿 8식(총괄 발주 §7.1 · IMPL-245) + 잔여 60식(발주 `에셋트랙_SFX잔여60_발주.md`). 배열 순서 = 생성 순서이며 잔여분은 발주 §1 순서(레이스 코어 I·T·E·L·RS·D → U → V → AMB → `se_e05` 최후)를 따른다. 파일럿 8식은 귀 판정을 통과한 실물이므로 위치·값을 건드리지 않았다(순서 재배치는 바이트를 바꾸지 않아도 이력을 흐린다).",
 
   "sounds": [
     {
@@ -62,6 +64,439 @@
       "intent": "가장 자주 울리므로 가장 작고 짧아야 한다 — 반복 내성이 본령(D11 §1.1). 볼륨은 8식 중 최저, 길이는 **36ms**. 초안의 6ms 는 되읽기에서 너무 짧아 블립이 아니라 클릭으로 떨어져 늘렸다 — sfxr 포락선은 값의 제곱에 비례하므로 0.012 는 14샘플이었다",
       "seed": 120,
       "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.040, "p_env_punch": 0.10, "p_env_decay": 0.120, "p_base_freq": 0.62, "p_duty": 0.50, "sound_vol": 0.18 }
+    },
+    {
+      "id": "se_i02",
+      "spec": "SE-I02 홀드 온 — D11 §2.3 \"토글 쌍 — 온이 상향·오프가 하향 음정 (확정)\"",
+      "intent": "쌍의 규격이 '같은 소리의 방향 반전'이므로 `se_i03` 과 **freq_ramp 부호 하나만** 다르게 둔다. 다른 값을 함께 바꾸면 토글이 두 개의 소리가 되어 쌍으로 안 들린다",
+      "seed": 210,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.06, "p_env_punch": 0.10, "p_env_decay": 0.13, "p_base_freq": 0.34, "p_freq_ramp": 0.18, "p_duty": 0.40, "p_lpf_freq": 0.85, "sound_vol": 0.26 }
+    },
+    {
+      "id": "se_i03",
+      "spec": "SE-I03 홀드 오프 — D11 §2.3 토글 쌍의 하향 측",
+      "intent": "`se_i02` 와 전 파라미터 동일, `p_freq_ramp` 만 +0.18 → −0.18",
+      "seed": 211,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.06, "p_env_punch": 0.10, "p_env_decay": 0.13, "p_base_freq": 0.34, "p_freq_ramp": -0.18, "p_duty": 0.40, "p_lpf_freq": 0.85, "sound_vol": 0.26 }
+    },
+    {
+      "id": "se_i04",
+      "spec": "SE-I04 리스핀 발동 — D11 §2.3 \"SE-R01과 계열 통일·변형\"",
+      "intent": "`se_r01` 에서 **파형·듀티·듀티램프·주파수램프·LPF·포락선을 그대로 물려받고 기음만 0.34→0.40** 올렸다. 계열 통일이 규격이므로 음색을 만드는 값은 건드리지 않고 음역만 옮긴다 — 리스핀은 '다시 그 레버'다",
+      "seed": 212,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.06, "p_env_punch": 0.28, "p_env_decay": 0.18, "p_base_freq": 0.40, "p_freq_ramp": -0.22, "p_duty": 0.35, "p_duty_ramp": 0.10, "p_lpf_freq": 0.90, "sound_vol": 0.33 }
+    },
+    {
+      "id": "se_i05",
+      "spec": "SE-I05 스킬 발동 — **홀드 타입** (D11 §2.3 · D05 §6.1 열거 순서 — 대장 §5.1 주의 ③ 확정 매핑)",
+      "intent": "스킬 4타입 = **한 계열**로 묶는다: `wave_type 2`(사인) · 동일 포락선 · **피크 정렬(−3.8dB 실측)** · 차이는 피치 운동뿐. 4타입은 같은 층위의 형제이므로 음색이 갈리면 위계가 생긴다. 볼륨 값은 같지 않다 — 펀치가 있는 증폭(i07)이 같은 값에서 2.4dB 더 커서 **선언값을 맞추는 대신 피크를 맞췄다**(형제의 조건은 값의 일치가 아니라 크기의 일치다). 홀드 = 고정이므로 램프·아르페지오 전부 0 — 움직이지 않는 것이 이 타입의 표지다",
+      "seed": 213,
+      "params": { "wave_type": 2, "p_env_attack": 0.0, "p_env_sustain": 0.05, "p_env_punch": 0.0, "p_env_decay": 0.16, "p_base_freq": 0.38, "p_lpf_freq": 0.85, "sound_vol": 0.28 }
+    },
+    {
+      "id": "se_i06",
+      "spec": "SE-I06 스킬 발동 — **변환 타입**",
+      "intent": "변환 = 값이 다른 것으로 바뀜. 램프(연속 이동) 대신 **아르페지오(불연속 도약)** 를 쓴다 — 연속 이동은 증폭의 문법이고 도약이 변환의 문법이다. 부호 −는 도약 하강. **초판 `p_arp_speed 0.55` 는 발화 시점(4081샘플)이 소리 길이(2810샘플) 밖이라 아르페지오가 울리지 않았다** — `se_i05` 와 바이트까지 같아져서 드러났다. 0.76 으로 올려 소리 중반에 발화시켰다",
+      "seed": 214,
+      "params": { "wave_type": 2, "p_env_attack": 0.0, "p_env_sustain": 0.05, "p_env_punch": 0.0, "p_env_decay": 0.16, "p_base_freq": 0.38, "p_arp_mod": -0.35, "p_arp_speed": 0.76, "p_lpf_freq": 0.85, "sound_vol": 0.28 }
+    },
+    {
+      "id": "se_i07",
+      "spec": "SE-I07 스킬 발동 — **증폭 타입**",
+      "intent": "증폭 = 커짐. 상향 연속 램프 + 펀치. 계열 값(파형·포락선 길이)은 고정이고 볼륨만 0.28→0.219 로 내려 형제들과 피크를 맞췄다(펀치가 만든 2.4dB 초과분)",
+      "seed": 215,
+      "params": { "wave_type": 2, "p_env_attack": 0.0, "p_env_sustain": 0.05, "p_env_punch": 0.18, "p_env_decay": 0.16, "p_base_freq": 0.34, "p_freq_ramp": 0.26, "p_lpf_freq": 0.85, "sound_vol": 0.219 }
+    },
+    {
+      "id": "se_i08",
+      "spec": "SE-I08 스킬 발동 — **보험 타입**",
+      "intent": "보험 = 감싸기. 유일하게 어택을 두고(치는 소리가 아니라 덮는 소리) LPF 를 내려 둔다. 미세 하강 램프는 '가라앉힘'",
+      "seed": 216,
+      "params": { "wave_type": 2, "p_env_attack": 0.03, "p_env_sustain": 0.05, "p_env_punch": 0.0, "p_env_decay": 0.16, "p_base_freq": 0.30, "p_freq_ramp": -0.06, "p_lpf_freq": 0.45, "sound_vol": 0.28 }
+    },
+    {
+      "id": "se_i09",
+      "spec": "SE-I09 차지 개입 — D11 §2.3 \"펄스 계열 음색(§2.7 SE-D03과 계열 공유)\"",
+      "intent": "**펄스 계열의 원형**이다. `p_repeat_speed 0.70`(주기 41.5ms)로 맥동을 만들고 포락선을 102ms 로 잡아 **2.5회 맥동**이 들어가게 했다 — 1회면 맥동이 아니라 단음이다. `se_d03`(부스트)·`se_i13`(차지 획득)이 이 값을 공유하고 기음·길이만 올린다. 세 항목이 **같은 자원(펄스 차지)** 을 다루므로 계열 공유가 §2.7 의 요구다",
+      "seed": 217,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.14, "p_env_punch": 0.0, "p_env_decay": 0.16, "p_base_freq": 0.28, "p_duty": 0.50, "p_repeat_speed": 0.70, "p_lpf_freq": 0.70, "sound_vol": 0.30 }
+    },
+    {
+      "id": "se_i11",
+      "spec": "SE-I11 모멘텀 보너스 — D11 §2.3 \"상향 짧은 반짝임\" · §6.5 \"계기 클릭·전자 톤 계열\"(게이지 섬광 동기)",
+      "intent": "계기 계열 = `wave_type 0` + `p_duty 0.50` + LPF 개방(`se_t01`·`se_d01` 과 공유하는 톤). 반짝임은 상향 아르페지오 1회 · 48ms",
+      "seed": 218,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.04, "p_env_punch": 0.12, "p_env_decay": 0.14, "p_base_freq": 0.55, "p_arp_mod": 0.34, "p_arp_speed": 0.70, "p_duty": 0.50, "p_lpf_freq": 0.90, "sound_vol": 0.26 }
+    },
+    {
+      "id": "se_i12",
+      "spec": "SE-I12 타임아웃 — D11 §2.3 \"**건조한 단음 1식** — 스팅·페널티 음향 없음(이중 처벌 금지 D05 §7.3)\"",
+      "intent": "**넣지 않은 것이 규격이다** — 펀치 0·램프 0·아르페지오 0·LPF 를 눌러 꼬리 없음. 30ms. 아래로 떨어지는 음정을 주면 그것만으로 처벌음이 되므로 기음도 고정했다",
+      "seed": 219,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.07, "p_env_punch": 0.0, "p_env_decay": 0.09, "p_base_freq": 0.30, "p_duty": 0.25, "p_lpf_freq": 0.55, "sound_vol": 0.24 }
+    },
+    {
+      "id": "se_i13",
+      "spec": "SE-I13 펄스 차지 획득 — D11 §2.3 \"◆ 스택 +1 동기 (심볼·안정 완주·듀얼 승리 보너스 공용)\"",
+      "intent": "**펄스 계열**(`se_i09` 의 듀티·LPF 공유)에 상향 아르페지오를 얹은 짧은 획득음. 계열을 i09 로 잡은 근거는 D11 이 아니라 **자원 동일성**이다 — 같은 ◆ 를 쓰는 소리가 다른 음색이면 자원이 두 개로 읽힌다. 맥동은 뺐다(획득은 순간이다). 초판 `p_arp_speed 0.66` 은 미발화(발화 2343 > 길이 1690) — 0.81 로 교정",
+      "seed": 220,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.05, "p_env_punch": 0.0, "p_env_decay": 0.12, "p_base_freq": 0.42, "p_arp_mod": 0.28, "p_arp_speed": 0.81, "p_duty": 0.50, "p_lpf_freq": 0.70, "sound_vol": 0.27 }
+    },
+    {
+      "id": "se_i14",
+      "spec": "SE-I14 입력 거부 — D11 §2.3 \"잔량 부족·비활성 버튼 입력 시 **저음 단발**\"",
+      "intent": "기음 0.16 = 8식 중 최저 음역. 짧고 눌린 소리(LPF 0.40)로 '아무 일도 일어나지 않았음'을 알린다 — 거부는 사건이 아니다",
+      "seed": 221,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.06, "p_env_punch": 0.0, "p_env_decay": 0.10, "p_base_freq": 0.16, "p_freq_ramp": -0.05, "p_duty": 0.50, "p_lpf_freq": 0.40, "sound_vol": 0.28 }
+    },
+    {
+      "id": "se_t01",
+      "spec": "SE-T01 여유→경고 전환 — D11 §2.4 \"경고음 계열 1타\" · §6.5 계기 톤 계열 · **우선도 P1(정보성)**",
+      "intent": "계기 계열 톤(`p_duty 0.50`·LPF 개방)에 펀치를 세운 1타. P1 정보음이라 U군보다 확실히 위에 둔다(볼륨 0.30). 링 게이지 삼중 부호화의 청각 축이므로 음역을 UI 대역과 겹치지 않게 0.50 으로 띄웠다",
+      "seed": 310,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.05, "p_env_punch": 0.16, "p_env_decay": 0.13, "p_base_freq": 0.50, "p_duty": 0.50, "p_lpf_freq": 0.85, "sound_vol": 0.30 }
+    },
+    {
+      "id": "se_t02",
+      "spec": "SE-T02 경고→임박 전환 — D11 §2.4 \"SE-T01의 **상위 변형 — 고음·2타** (확정)\"",
+      "intent": "T01 의 전 파라미터를 물려받고 **기음만 0.50→0.62(고음)**, 타수는 `compose` 로 2타(간격 60ms). sfxr 포락선은 1벌뿐이라 한 번의 합성으로 2타가 안 나온다 — `p_repeat_speed` 는 주파수만 되돌리고 진폭은 되돌리지 않는다. **확정 규격이 타수를 지정했으므로 생성기 층에서 이어붙인다**",
+      "seed": 320,
+      "compose": { "gap_ms": 60, "steps": [ {}, {} ] },
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.05, "p_env_punch": 0.16, "p_env_decay": 0.13, "p_base_freq": 0.62, "p_duty": 0.50, "p_lpf_freq": 0.85, "sound_vol": 0.31 }
+    },
+    {
+      "id": "se_t03",
+      "spec": "SE-T03 임박 틱 루프 — D11 §2.4 \"저레벨 틱 반복(고속 점멸 동기) — 초읽기 수치화가 아닌 아날로그 압박\" · 루프 6식 중 1",
+      "intent": "틱은 `p_repeat_speed 0.426`(주기 **6621샘플 = 150.1ms**)이 매 주기 주파수를 되돌리고 하강 램프가 그때마다 새로 떨어지면서 만들어진다. **포락선 길이를 주기의 정확히 4배(26484샘플)로 맞췄다** — 배수가 아니면 루프 이음매에서 틱 간격이 한 번 어긋난다. `p_env_decay 0` 은 끝 진폭을 시작 진폭과 같게 두려는 것이다(루프 항목에서 감쇠 꼬리는 이음매 단절을 만든다). 압박은 저레벨로 — 볼륨 0.20",
+      "loop": true,
+      "seed": 330,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.514626, "p_env_punch": 0.0, "p_env_decay": 0.0, "p_base_freq": 0.40, "p_freq_ramp": -0.30, "p_duty": 0.35, "p_repeat_speed": 0.426, "p_lpf_freq": 0.62, "sound_vol": 0.20 }
+    },
+    {
+      "id": "se_e01",
+      "spec": "SE-E01 전진(추월·순위 상승) — D11 §2.5 ① \"**슬립스트림 계열 효과의 번역**\"",
+      "intent": "슬립스트림 = 공기가 스쳐 지나가는 소리 → **`wave_type 3`(잡음)** 이 유일하게 맞는 파형이다. LPF 를 낮게 시작해 `p_lpf_ramp` 로 열면서 스쳐 지나감을 만든다. **E군의 잡음 채택이 seed 보험의 첫 실작동 구간이다**(발주문은 AMB 를 첫 구간으로 적었으나 잡음은 여기서 먼저 들어온다 — 회신 §3 부기)",
+      "seed": 410,
+      "params": { "wave_type": 3, "p_env_attack": 0.0, "p_env_sustain": 0.10, "p_env_punch": 0.0, "p_env_decay": 0.20, "p_base_freq": 0.30, "p_freq_ramp": 0.12, "p_lpf_freq": 0.35, "p_lpf_ramp": 0.25, "p_hpf_freq": 0.10, "sound_vol": 0.209 }
+    },
+    {
+      "id": "se_e02",
+      "spec": "SE-E02 방어(피추월 방어·라인 폐쇄) — D11 §2.5 ① \"**브레이킹 계열**\"",
+      "intent": "브레이킹 = 마찰. 같은 잡음 파형이되 **HPF 를 올려 긁히는 대역**을 남기고 램프를 하강으로 둔다 — E01(열림)과 E02(닫힘)가 방향으로 갈린다",
+      "seed": 411,
+      "params": { "wave_type": 3, "p_env_attack": 0.0, "p_env_sustain": 0.12, "p_env_punch": 0.0, "p_env_decay": 0.16, "p_base_freq": 0.42, "p_freq_ramp": -0.10, "p_lpf_freq": 0.75, "p_hpf_freq": 0.30, "sound_vol": 0.236 }
+    },
+    {
+      "id": "se_e03",
+      "spec": "SE-E03 안정(라인 확보·무사 통과) — D11 §2.5 ① \"라인 계열 — **최저 존재감** (확정)\"",
+      "intent": "최저 존재감이 규격이므로 **E군 최소 볼륨(0.16)·최단(28ms)·LPF 최저(0.28)**. 통과의 확인일 뿐 사건이 아니다",
+      "seed": 412,
+      "params": { "wave_type": 3, "p_env_attack": 0.0, "p_env_sustain": 0.05, "p_env_punch": 0.0, "p_env_decay": 0.10, "p_base_freq": 0.24, "p_lpf_freq": 0.28, "sound_vol": 0.16 }
+    },
+    {
+      "id": "se_e04",
+      "spec": "SE-E04 트러블(소) — D11 §2.5 ① \"접촉·머신 이상 소규모\" · 강햅틱 동반(§3.1) · 씬 컷 SC-06 결속(§2.8)",
+      "intent": "접촉 = 낮고 둔한 충격. 펀치를 세우고 기음을 낮추고 LPF 로 덮는다. **'소'규모가 규격이므로 길이·볼륨을 `se_d07`(리타이어) 아래로 묶었다** — 같은 계열의 대규모가 D07 이다",
+      "seed": 413,
+      "params": { "wave_type": 3, "p_env_attack": 0.0, "p_env_sustain": 0.06, "p_env_punch": 0.30, "p_env_decay": 0.18, "p_base_freq": 0.20, "p_freq_ramp": -0.12, "p_lpf_freq": 0.32, "sound_vol": 0.172 }
+    },
+    {
+      "id": "se_e06",
+      "spec": "SE-E06 찬스 개화 — D11 §2.5 ① \"희귀 조합의 강효과 발동\" · 발주 §3 \"고양 계열도 **음색 계열 유지·상위 변형**\"(r04/r05 전례)",
+      "intent": "**`se_e01` 의 상위 변형**으로 뽑았다 — 파형·LPF 개방 문법·HPF 를 그대로 두고 길이 0.11→0.32s · 상승폭 · 볼륨만 올렸다. 개화를 아르페지오 같은 음악 어휘로 만들면 E군에서 혼자 이질적이 되고, 등급 스팅(§2.5 ②)이 이미 '온도'를 담당하므로 결과음이 그 역할을 겹쳐 가질 이유가 없다",
+      "seed": 416,
+      "params": { "wave_type": 3, "p_env_attack": 0.0, "p_env_sustain": 0.16, "p_env_punch": 0.0, "p_env_decay": 0.34, "p_base_freq": 0.34, "p_freq_ramp": 0.18, "p_lpf_freq": 0.30, "p_lpf_ramp": 0.40, "p_hpf_freq": 0.08, "sound_vol": 0.214 }
+    },
+    {
+      "id": "se_l1",
+      "spec": "SE-L1 등급 스팅 L1 — D11 §2.5 ② \"짧은 강조 스팅\" · **길이 상한 0.8초(D13 확정 기준값)**",
+      "intent": "스팅 3식 = **`wave_type 1`(톱니) 한 계열**. 결과음(E군 = 잡음)과 파형 자체로 갈라 놓는다 — 2층 구조(사건의 정보 / 사건의 온도)가 청각에서도 두 층으로 들려야 한다. L1 은 1타·0.23s",
+      "seed": 510,
+      "max_sec": 0.8,
+      "params": { "wave_type": 1, "p_env_attack": 0.0, "p_env_sustain": 0.10, "p_env_punch": 0.20, "p_env_decay": 0.30, "p_base_freq": 0.42, "p_arp_mod": 0.30, "p_arp_speed": 0.60, "p_lpf_freq": 0.80, "sound_vol": 0.191 }
+    },
+    {
+      "id": "se_l2",
+      "spec": "SE-L2 등급 스팅 L2 — D11 §2.5 ② \"하이라이트 스팅\" · **길이 상한 1.5초** · §6.5 \"L2 화면 플래시 = 어택 프레임과 동기(오프셋 0)\"",
+      "intent": "L1 계열 유지 + **2단 상향**(compose 2단계 · 기음 0.46→0.56). 등급 상승을 볼륨이 아니라 **단수**로 표현했다 — 볼륨만 올리면 L3 에서 헤드룸이 남지 않는다",
+      "seed": 520,
+      "max_sec": 1.5,
+      "compose": { "gap_ms": 90, "steps": [ {}, { "p_base_freq": 0.56 } ] },
+      "params": { "wave_type": 1, "p_env_attack": 0.0, "p_env_sustain": 0.14, "p_env_punch": 0.20, "p_env_decay": 0.40, "p_base_freq": 0.46, "p_arp_mod": 0.30, "p_arp_speed": 0.60, "p_lpf_freq": 0.80, "sound_vol": 0.212 }
+    },
+    {
+      "id": "se_l3",
+      "spec": "SE-L3 등급 스팅 L3 — D11 §2.5 ② \"시그니처 스팅\" · **길이 상한 2.5초** · §6.5 \"컷인 지속 ≤ 스팅 길이\"",
+      "intent": "3단 상향(0.44→0.52→0.62) · 마지막 단만 감쇠를 늘려 여운을 준다. **상한 2.5s 는 생성기가 `max_sec` 로 지킨다** — 컷인 연출이 스팅 길이에 결속돼 있어 길이를 넘기면 연출 규격이 함께 깨진다",
+      "seed": 530,
+      "max_sec": 2.5,
+      "compose": { "gap_ms": 80, "steps": [ {}, { "p_base_freq": 0.52 }, { "p_base_freq": 0.62, "p_env_decay": 0.56 } ] },
+      "params": { "wave_type": 1, "p_env_attack": 0.0, "p_env_sustain": 0.16, "p_env_punch": 0.20, "p_env_decay": 0.46, "p_base_freq": 0.44, "p_arp_mod": 0.30, "p_arp_speed": 0.60, "p_lpf_freq": 0.80, "sound_vol": 0.234 }
+    },
+    {
+      "id": "se_rs1",
+      "spec": "SE-RS1 레조넌스 공표음 — D11 §2.6 \"진입 시점(T1) 공표 배너 동기 — 개시의 고지음\" · **사전 예고 전면 금지(구속)** · 우선도 P1",
+      "intent": "**상승 램프를 0 으로 둔 것이 규격 이행이다** — 올라가는 음정은 '무언가 온다'의 청각 문법이고, 이 소리는 이미 도착한 사실의 고지다. 짧은 단발(145ms)·펀치 후 평탄 감쇠. 아르페지오·비브라토도 뺐다(둘 다 기대를 만든다)",
+      "seed": 610,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.08, "p_env_punch": 0.22, "p_env_decay": 0.24, "p_base_freq": 0.48, "p_duty": 0.50, "p_lpf_freq": 0.90, "sound_vol": 0.32 }
+    },
+    {
+      "id": "se_d01",
+      "spec": "SE-D01 듀얼 예고 — D11 §2.7 \"게이지 만충 임박 점멸 동기 — **저레벨 경보**\" · 우선도 P1 · 소거 시 만충 아이콘이 정보 보존",
+      "intent": "계기 톤 계열(`se_t01`·`se_i11` 과 공유) · **볼륨 0.20 = 계기 계열 최저**. 예고는 반복 발화되므로 크면 소음이 된다. `se_d02`(진입)가 이 소리의 상위 변형이다",
+      "seed": 710,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.06, "p_env_punch": 0.0, "p_env_decay": 0.14, "p_base_freq": 0.46, "p_duty": 0.50, "p_lpf_freq": 0.80, "sound_vol": 0.257 }
+    },
+    {
+      "id": "se_d02",
+      "spec": "SE-D02 듀얼 진입 — D11 §2.7 \"감광 + 프레임 인 동기 — **대치 개시 스팅**\" · 발주 §3 고양 계열 원칙",
+      "intent": "**`se_d01` 의 상위 변형** — 파형·듀티·LPF 문법 유지, 기음 0.46→0.52 · 길이 0.048→0.41s · 펀치·아르페지오 가산. 예고와 진입이 한 계열이면 '그것이 왔다'가 읽힌다",
+      "seed": 711,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.14, "p_env_punch": 0.24, "p_env_decay": 0.40, "p_base_freq": 0.52, "p_arp_mod": 0.22, "p_arp_speed": 0.60, "p_duty": 0.50, "p_lpf_freq": 0.85, "sound_vol": 0.34 }
+    },
+    {
+      "id": "se_d03",
+      "spec": "SE-D03 부스트 투입 — D11 §2.7 \"펄스 차지 소비 계열 — **SE-I09와 음색 공유·상위 변형**\"",
+      "intent": "`se_i09` 의 **듀티·맥동 주기(`p_repeat_speed 0.70`)·LPF 를 그대로** 물려받고 기음 0.28→0.34 · 길이 0.102→0.15s · 볼륨만 올렸다. 음색 공유가 문면 확정이므로 맥동 주기를 바꾸지 않는 것이 핵심이다",
+      "seed": 712,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.16, "p_env_punch": 0.0, "p_env_decay": 0.20, "p_base_freq": 0.34, "p_duty": 0.50, "p_repeat_speed": 0.70, "p_lpf_freq": 0.75, "sound_vol": 0.33 }
+    },
+    {
+      "id": "se_d04",
+      "spec": "SE-D04 결판 승 — D11 §2.7 \"**승은 상향 해방감** (확정)\" · 스팅은 §2.5 가 가산 담당",
+      "intent": "승/패 = `se_i02`/`i03` 과 같은 **방향 반전 쌍**이되, 절제 규격 때문에 대칭이 아니다(패가 더 짧고 작다). 승 = 상향 아르페지오 · 0.30s. **스팅을 겸하지 않는다** — 네임드 결판의 온도는 L2 가 가산한다",
+      "seed": 713,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.12, "p_env_punch": 0.18, "p_env_decay": 0.34, "p_base_freq": 0.40, "p_arp_mod": 0.30, "p_arp_speed": 0.62, "p_duty": 0.50, "p_lpf_freq": 0.85, "sound_vol": 0.34 }
+    },
+    {
+      "id": "se_d05",
+      "spec": "SE-D05 결판 패 — D11 §2.7 \"**패는 하향 절제**(신파 금지 — D04 §8.3)\"",
+      "intent": "D04 §8.3 이 신파를 금지하므로 **패가 승보다 크거나 길면 규격 위반이다** — 아르페지오 부호를 뒤집고 길이 0.30→0.18s · 볼륨 0.34→0.28 로 함께 내렸다. 절제는 방향이 아니라 크기에서 나온다",
+      "seed": 714,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.10, "p_env_punch": 0.10, "p_env_decay": 0.26, "p_base_freq": 0.40, "p_arp_mod": -0.25, "p_arp_speed": 0.62, "p_duty": 0.50, "p_lpf_freq": 0.85, "sound_vol": 0.28 }
+    },
+    {
+      "id": "se_d06",
+      "spec": "SE-D06 섀시 경고 — D11 §2.7 \"위험 임계 경고색·**저속 점멸 동기** — 반복 경보 아닌 진입 시 1회 + 저레벨\" · D09 §5.2 임계 25%",
+      "intent": "**1식이 반복 재생된다**(점멸 동기는 런타임 소관)이므로 파일 자체에 반복을 넣지 않는다 — 넣으면 반복의 반복이 된다. 반복 내성 = 짧고(41ms) 건조하고 낮게. 듀티 0.30 으로 계기 계열과 음역을 갈라 경고임을 구분",
+      "seed": 715,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.06, "p_env_punch": 0.0, "p_env_decay": 0.12, "p_base_freq": 0.26, "p_freq_ramp": -0.05, "p_duty": 0.30, "p_lpf_freq": 0.55, "sound_vol": 0.26 }
+    },
+    {
+      "id": "se_d07",
+      "spec": "SE-D07 리타이어 — D11 §2.7 \"대형 트러블 확정 — BGM 즉시 정지 + JG-03 연계(§4.3)\"",
+      "intent": "`se_e04`(트러블 소)의 대규모 대응. 파형은 톱니로 갈랐다 — 잡음 충격은 '접촉'이고 리타이어는 **주행의 종료**라 음정이 무너지는 소리가 맞다(하강 램프 −0.30 · 0.64s). BGM 이 즉시 멈추므로 이 소리가 그 정적의 입구가 된다",
+      "seed": 716,
+      "params": { "wave_type": 1, "p_env_attack": 0.0, "p_env_sustain": 0.18, "p_env_punch": 0.20, "p_env_decay": 0.50, "p_base_freq": 0.34, "p_freq_ramp": -0.30, "p_lpf_freq": 0.60, "sound_vol": 0.227 }
+    },
+    {
+      "id": "se_u02",
+      "spec": "SE-U02 결정 — D11 §2.9 · 규칙 V-a \"선택 결정은 SE-U02 재사용\"(§2.10)",
+      "intent": "U군 = `se_u01` 이 세운 계열(`wave_type 0`·`p_duty 0.50`·짧은 감쇠)을 전원 승계한다. 결정/취소는 **방향 반전 쌍** — 아르페지오 부호만 갈린다. 커서(0.18)보다 한 단 위(0.22). 초판 `p_arp_speed 0.66` 은 미발화(발화 2343 > 길이 1642)라 **u02·u03 이 서로 바이트까지 같았다** — 방향 반전 쌍이 같은 파일이 되는 사고였고 0.82 로 교정",
+      "seed": 810,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.045, "p_env_punch": 0.12, "p_env_decay": 0.12, "p_base_freq": 0.52, "p_arp_mod": 0.24, "p_arp_speed": 0.82, "p_duty": 0.50, "sound_vol": 0.22 }
+    },
+    {
+      "id": "se_u03",
+      "spec": "SE-U03 취소·닫기 — D11 §2.9",
+      "intent": "`se_u02` 와 전 파라미터 동일, 아르페지오 +0.24 → −0.22. 쌍의 규격을 I02/I03 과 같은 방식으로 지킨다",
+      "seed": 811,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.045, "p_env_punch": 0.12, "p_env_decay": 0.12, "p_base_freq": 0.52, "p_arp_mod": -0.22, "p_arp_speed": 0.82, "p_duty": 0.50, "sound_vol": 0.22 }
+    },
+    {
+      "id": "se_u04",
+      "spec": "SE-U04 탭·페이지 전환 — D11 §2.9",
+      "intent": "이동 계열(커서와 같은 층) — 아르페지오 없는 중성 클릭. 듀티 0.35 로 결정/취소와 음색을 갈라 '전환은 결정이 아니다'를 만든다. 21ms",
+      "seed": 812,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.035, "p_env_punch": 0.08, "p_env_decay": 0.09, "p_base_freq": 0.46, "p_duty": 0.35, "sound_vol": 0.19 }
+    },
+    {
+      "id": "se_u05",
+      "spec": "SE-U05 토글·슬라이더 — D11 §2.9 · **슬라이더 드래그 중 연속 발화 가능 = 최고 빈도군**",
+      "intent": "커서와 함께 최저 볼륨(0.18)·최단(13ms). 슬라이더는 한 번 끄는 동안 수십 번 울릴 수 있어 반복 내성이 U01 보다도 중요하다",
+      "seed": 813,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.03, "p_env_punch": 0.06, "p_env_decay": 0.07, "p_base_freq": 0.58, "p_duty": 0.50, "sound_vol": 0.18 }
+    },
+    {
+      "id": "se_u06",
+      "spec": "SE-U06 스테이션 진입 (개러지 앵커) — D11 §2.9",
+      "intent": "진입 = 열림. 유일하게 어택을 두고 상향 램프를 얹었다(클릭이 아니라 이동). LPF 를 내려 개러지의 실내감에 붙인다 — `amb_04` 룸톤과 같은 공간에서 울리는 소리다",
+      "seed": 814,
+      "params": { "wave_type": 0, "p_env_attack": 0.03, "p_env_sustain": 0.07, "p_env_punch": 0.0, "p_env_decay": 0.18, "p_base_freq": 0.28, "p_freq_ramp": 0.14, "p_duty": 0.50, "p_lpf_freq": 0.55, "sound_vol": 0.24 }
+    },
+    {
+      "id": "se_u07",
+      "spec": "SE-U07 구매 성사 — D11 §2.9",
+      "intent": "**거래 쌍의 상향 측** — `se_u08`(판매)과 아르페지오 부호만 갈린다. 성사 계열(U07·U11·U12·U13·U17)은 전부 상향 아르페지오 한 문법으로 묶고 **크기로만 위계를 준다**(구매 0.26 < 영입 0.28 < 해금 0.29 < 게이트 0.31 = 업적 0.30·2단)",
+      "seed": 815,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.05, "p_env_punch": 0.14, "p_env_decay": 0.18, "p_base_freq": 0.50, "p_arp_mod": 0.30, "p_arp_speed": 0.66, "p_duty": 0.50, "sound_vol": 0.26 }
+    },
+    {
+      "id": "se_u08",
+      "spec": "SE-U08 판매 — D11 §2.9",
+      "intent": "`se_u07` 과 전 파라미터 동일, 아르페지오 +0.30 → −0.26. 재화가 나가는 방향이 소리의 방향이다",
+      "seed": 816,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.05, "p_env_punch": 0.14, "p_env_decay": 0.18, "p_base_freq": 0.50, "p_arp_mod": -0.26, "p_arp_speed": 0.66, "p_duty": 0.50, "sound_vol": 0.24 }
+    },
+    {
+      "id": "se_u09",
+      "spec": "SE-U09 튜닝 장착 — D11 §2.9",
+      "intent": "**설비 계열의 원형**(U09·U10·U14 공유): 낮은 기음(0.18)·좁은 듀티(0.25)·LPF 0.42 = 금속 체결의 둔한 타격. 성사 계열(아르페지오 상향)과 파형은 같아도 **음역과 듀티로 갈라** 놓는다 — 손으로 하는 일과 성취는 다른 소리다",
+      "seed": 817,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.05, "p_env_punch": 0.34, "p_env_decay": 0.12, "p_base_freq": 0.18, "p_duty": 0.25, "p_lpf_freq": 0.42, "sound_vol": 0.202 }
+    },
+    {
+      "id": "se_u10",
+      "spec": "SE-U10 정비 실행 — D11 §2.9",
+      "intent": "설비 계열 + **작동 시간**. `p_repeat_speed 0.55`(주기 92.6ms)로 공구가 두 번 돌게 하고 길이를 0.164s 로 잡아 1.8주기가 들어가게 했다 — 장착(단발 체결)과 정비(작업)의 차이가 여기다",
+      "seed": 818,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.20, "p_env_punch": 0.0, "p_env_decay": 0.18, "p_base_freq": 0.18, "p_duty": 0.25, "p_repeat_speed": 0.55, "p_lpf_freq": 0.42, "sound_vol": 0.28 }
+    },
+    {
+      "id": "se_u11",
+      "spec": "SE-U11 크루 영입 성사 — D11 §2.9",
+      "intent": "성사 계열 · 구매 위. 아르페지오 폭 0.30→0.34 · 길이 0.079→0.168s",
+      "seed": 819,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.08, "p_env_punch": 0.14, "p_env_decay": 0.26, "p_base_freq": 0.46, "p_arp_mod": 0.34, "p_arp_speed": 0.60, "p_duty": 0.50, "sound_vol": 0.28 }
+    },
+    {
+      "id": "se_u12",
+      "spec": "SE-U12 스킬 해금 — D11 §2.9",
+      "intent": "성사 계열 · 영입 위. **`se_i05`~`i08`(스킬 발동)과 다른 계열인 것이 의도다** — 해금은 아웃게임의 성취이고 발동은 레이스의 조작이다(D11 이 U군과 I군을 나눈 층위)",
+      "seed": 820,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.09, "p_env_punch": 0.16, "p_env_decay": 0.30, "p_base_freq": 0.50, "p_arp_mod": 0.36, "p_arp_speed": 0.60, "p_duty": 0.50, "sound_vol": 0.29 }
+    },
+    {
+      "id": "se_u13",
+      "spec": "SE-U13 성장 게이트 개방 — D11 §2.9",
+      "intent": "성사 계열 최상단(단발) — 아르페지오 0.38 · 0.36s · 볼륨 0.31. 게이트 개방은 회차에 몇 번 없는 사건이라 U군 안에서 가장 크게 두어도 반복 내성 문제가 없다",
+      "seed": 821,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.12, "p_env_punch": 0.18, "p_env_decay": 0.38, "p_base_freq": 0.42, "p_arp_mod": 0.38, "p_arp_speed": 0.58, "p_duty": 0.50, "sound_vol": 0.31 }
+    },
+    {
+      "id": "se_u14",
+      "spec": "SE-U14 시즌 오버홀 적용 — D11 §2.9",
+      "intent": "**설비 계열 최상**(U09/U10 음색 유지 · 기음 0.16 · 듀티 0.25 · 맥동 주기 동일). 오버홀은 정비의 대규모이므로 성사 계열로 옮기지 않았다 — 계열은 사건의 크기가 아니라 **일의 종류**로 정한다",
+      "seed": 822,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.22, "p_env_punch": 0.20, "p_env_decay": 0.30, "p_base_freq": 0.16, "p_duty": 0.25, "p_repeat_speed": 0.55, "p_lpf_freq": 0.45, "sound_vol": 0.265 }
+    },
+    {
+      "id": "se_u15",
+      "spec": "SE-U15 결산 포인트 롤업 (루프) — D11 §2.9 · 루프 6식 중 1",
+      "intent": "`se_t03` 과 같은 틱 루프 구조이되 **역할이 반대다** — 압박이 아니라 계수의 진행이라 더 빠르고(주기 98.8ms) 높고(기음 0.56) 하강 램프를 얕게(−0.12) 두어 재촉하지 않는다. **포락선 = 주기 × 6 = 26136샘플 정확히**(이음매에서 박이 어긋나지 않게) · `p_env_decay 0`",
+      "loop": true,
+      "seed": 823,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.511234, "p_env_punch": 0.0, "p_env_decay": 0.0, "p_base_freq": 0.56, "p_freq_ramp": -0.12, "p_duty": 0.50, "p_repeat_speed": 0.535, "p_lpf_freq": 0.80, "sound_vol": 0.178 }
+    },
+    {
+      "id": "se_u16",
+      "spec": "SE-U16 순위 확정 스탬프 — D11 §2.9 · 우선도 P2",
+      "intent": "도장 = 펀치가 전부인 소리(펀치 0.40 = 전 68식 최대). 꼬리 없이 끊고(0.048s) 음역은 설비 계열 근처로 낮춰 '찍혔다'의 물리감을 준다. 아르페지오·램프 없음 — 확정에는 방향이 없다",
+      "seed": 824,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.04, "p_env_punch": 0.40, "p_env_decay": 0.14, "p_base_freq": 0.22, "p_duty": 0.20, "p_lpf_freq": 0.50, "sound_vol": 0.248 }
+    },
+    {
+      "id": "se_u17",
+      "spec": "SE-U17 업적·칭호 획득 — D11 §2.9 · **규칙 U-b: 히든 전용 변형 불채택(공용)**",
+      "intent": "성사 계열 + **2단**(compose · 0.48→0.60). 히든 업적도 이 소리를 그대로 쓴다(U-b) — 히든 여부로 소리를 갈면 달성 전 비노출 규격이 소리로 새는 경로가 생긴다",
+      "seed": 830,
+      "compose": { "gap_ms": 80, "steps": [ {}, { "p_base_freq": 0.60 } ] },
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.09, "p_env_punch": 0.16, "p_env_decay": 0.28, "p_base_freq": 0.48, "p_arp_mod": 0.30, "p_arp_speed": 0.60, "p_duty": 0.50, "sound_vol": 0.30 }
+    },
+    {
+      "id": "se_u18",
+      "spec": "SE-U18 스타트 시그널 — D11 §2.9 규칙 U-c \"**당대 레이싱 문법의 시그널 시퀀스(적→소등 계열의 음정렬)** (확정 방향)\" · 씬 컷 SC-08 결속(컷 부재·정지 폴백 시에도 발화)",
+      "intent": "**시퀀스가 규격이므로 4단 compose** — 동일 저음 3타(적색등 점등)를 260ms 간격으로 두고 마지막에 상향 개시음(소등 = 출발)을 얹는다. 총 1.15초. 3단계까지는 동일 저음이고 4단계만 상향이다. 초판은 4단계 덮어쓰기에 `p_arp_speed` 를 빼서 기본값 0(발화 20032샘플)이 되어 상향이 울리지 않았다 — 0.72 로 교정. **타수 3+1 은 [가안]** — D11 은 '시퀀스'와 '음정렬'만 확정하고 개수를 두지 않았고 D09/D13 에도 GP 개시 연출 시간 값이 없다. 3 을 고른 이유는 4 이상이면 개시 대기가 1.5초를 넘어 D01 의 템포 보장과 부딪치기 때문",
+      "seed": 840,
+      "compose": { "gap_ms": 260, "steps": [ {}, {}, {}, { "p_base_freq": 0.46, "p_env_sustain": 0.10, "p_env_decay": 0.30, "p_arp_mod": 0.28, "p_arp_speed": 0.72, "sound_vol": 0.34 } ] },
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.06, "p_env_punch": 0.16, "p_env_decay": 0.14, "p_base_freq": 0.30, "p_duty": 0.50, "p_lpf_freq": 0.85, "sound_vol": 0.30 }
+    },
+    {
+      "id": "se_u19",
+      "spec": "SE-U19 피니시 — D11 §2.9 · 씬 컷 SC-09 결속 · **AMB-03 함성 동기**",
+      "intent": "성사 계열의 문법(상향 아르페지오)에 U군 최대 길이(0.445s)·볼륨(0.34). `amb_03` 함성이 겹쳐 울리므로 **음역을 0.44 로 두어 함성(잡음 저역)과 대역이 부딪치지 않게** 했다",
+      "seed": 850,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.14, "p_env_punch": 0.18, "p_env_decay": 0.42, "p_base_freq": 0.44, "p_arp_mod": 0.32, "p_arp_speed": 0.58, "p_duty": 0.50, "sound_vol": 0.34 }
+    },
+    {
+      "id": "se_v01a",
+      "spec": "SE-V01a 베인 큐음 **1단계** — D11 §2.10 \"음색을 인격 3단계(D03 §1.4)에 연동 — 1단계: **불규칙·노이즈 섞인 신호음**\"",
+      "intent": "**한 계열의 3변형이 규격**이므로 3식 전부 `wave_type 0` · 같은 포락선 · 같은 볼륨(0.20)이고 **듀티와 LPF 만 단계에 따라 연다**: 0.15/0.60 → 0.35/0.75 → 0.50/개방. 기계 한계 1건 — sfxr 은 한 번의 합성에서 두 파형을 섞지 못한다. 잡음 파형으로 바꾸면 계열이 깨지므로 **비브라토(0.35)와 재트리거(0.85)로 불규칙을 낸다** — '노이즈 섞임'의 문면 그대로가 아니라 근사다(회신 §3 부기)",
+      "seed": 910,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.035, "p_env_punch": 0.0, "p_env_decay": 0.09, "p_base_freq": 0.54, "p_duty": 0.15, "p_vib_strength": 0.35, "p_vib_speed": 0.55, "p_repeat_speed": 0.85, "p_lpf_freq": 0.60, "sound_vol": 0.20 }
+    },
+    {
+      "id": "se_v01b",
+      "spec": "SE-V01b 베인 큐음 **2단계** — D11 §2.10 \"정돈된 톤\"",
+      "intent": "1단계에서 **비브라토와 재트리거를 뺀 것**이 정돈이다(값을 더한 것이 아니다). 듀티 0.35 · LPF 0.75",
+      "seed": 911,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.035, "p_env_punch": 0.0, "p_env_decay": 0.09, "p_base_freq": 0.54, "p_duty": 0.35, "p_lpf_freq": 0.75, "sound_vol": 0.20 }
+    },
+    {
+      "id": "se_v01c",
+      "spec": "SE-V01c 베인 큐음 **3단계** — D11 §2.10 \"완숙·따뜻한 배음\"",
+      "intent": "듀티 0.50(대칭 구형파 = 배음 균형) · **`p_lpf_freq 1.0` = 저역 통과 필터 자체가 꺼진다**(상류 `enableLowPassFilter = p_lpf_freq != 1`) — '배음 개방'을 인상이 아니라 기계 거동으로 얻었다. 기음을 0.48 로 내리고 감쇠를 늘려 온기 쪽으로",
+      "seed": 912,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.045, "p_env_punch": 0.0, "p_env_decay": 0.13, "p_base_freq": 0.48, "p_duty": 0.50, "p_lpf_freq": 1.0, "sound_vol": 0.20 }
+    },
+    {
+      "id": "se_v02",
+      "spec": "SE-V02 일반 화자 큐음 (공용) — D11 §2.10 \"베인 외 화자 공용 — 캐릭터별 개별음 불채택\" · 발주 §3 \"v01 계열과 **구분되되 이질감 없는** 중립 큐음\"",
+      "intent": "구분은 **음역으로만** 준다(기음 0.54→0.38) — 파형·듀티·포락선·볼륨은 V01 계열 그대로. 음색을 바꾸면 화자가 바뀔 때 세계가 바뀐 것처럼 들린다",
+      "seed": 913,
+      "params": { "wave_type": 0, "p_env_attack": 0.0, "p_env_sustain": 0.035, "p_env_punch": 0.0, "p_env_decay": 0.09, "p_base_freq": 0.38, "p_duty": 0.50, "p_lpf_freq": 0.70, "sound_vol": 0.19 }
+    },
+    {
+      "id": "se_v03",
+      "spec": "SE-V03 선택지 표시 — D11 §2.10 \"선택지 오버레이 등장 1회. **선택 결정은 SE-U02 재사용**\" · §6.4 \"AD-02 오퍼 다이얼로그 = SE-V03 계열 공용 재사용\"",
+      "intent": "V 계열 + 등장의 어택(0.02)·상향 램프. 선택 자체의 소리는 만들지 않는다(U02 재사용이 규격)",
+      "seed": 914,
+      "params": { "wave_type": 0, "p_env_attack": 0.02, "p_env_sustain": 0.04, "p_env_punch": 0.0, "p_env_decay": 0.12, "p_base_freq": 0.44, "p_freq_ramp": 0.12, "p_duty": 0.50, "p_lpf_freq": 0.80, "sound_vol": 0.21 }
+    },
+    {
+      "id": "amb_01",
+      "spec": "AMB-01 관중 베드 (레이스 공용 루프) — D11 §5 \"저레벨 루프 — 무대 5종 공용 확정\" · 다이제틱 층 · **릴·인터페이스 이벤트에 반응 금지**",
+      "intent": "군중 = 광대역 잡음을 LPF 로 덮은 지속음. **`p_env_decay 0` 이 루프의 규격이다** — 감쇠 꼬리가 있으면 끝에서 소리가 사라져 이음매가 들린다(진폭 불연속). 0.99초 루프 · 볼륨 0.16(무대 개성은 BGM 소관이므로 앰비언스는 뒤에 있어야 한다)",
+      "loop": true,
+      "seed": 1010,
+      "params": { "wave_type": 3, "p_env_attack": 0.0, "p_env_sustain": 0.66, "p_env_punch": 0.0, "p_env_decay": 0.0, "p_base_freq": 0.30, "p_lpf_freq": 0.30, "p_hpf_freq": 0.05, "sound_vol": 0.105 }
+    },
+    {
+      "id": "amb_02",
+      "spec": "AMB-02 함성 스팅 (전진·상위 진입) — D11 §5 \"SE-E01 계열 이벤트에 확률적 가산(빈도는 D13)\" · **트랙 위 사건에만 결속**(봉인 규칙 — 관중은 릴을 모른다)",
+      "intent": "함성 = 부풀었다 빠지는 잡음. 어택(0.06)을 둔 것이 스팅 3식 중 유일한 특징 — 군중은 즉발하지 않는다. `se_e01` 과 동시에 울리므로 LPF 를 0.26 으로 눌러 결과음 위에 겹치지 않게 했다",
+      "seed": 1011,
+      "params": { "wave_type": 3, "p_env_attack": 0.06, "p_env_sustain": 0.10, "p_env_punch": 0.0, "p_env_decay": 0.30, "p_base_freq": 0.26, "p_lpf_freq": 0.26, "p_lpf_ramp": 0.20, "sound_vol": 0.187 }
+    },
+    {
+      "id": "amb_03",
+      "spec": "AMB-03 함성 스팅 (피니시) — D11 §5 \"GP_FINISH·SE-U19 동기\"",
+      "intent": "**`amb_02` 의 상위 변형** — 파형·LPF 문법 유지, 어택 0.06→0.08 · 길이 0.235→0.568s · 볼륨 0.22→0.28. 피니시는 회차의 종점이라 전진 함성보다 길게 남는다",
+      "seed": 1012,
+      "params": { "wave_type": 3, "p_env_attack": 0.08, "p_env_sustain": 0.18, "p_env_punch": 0.0, "p_env_decay": 0.46, "p_base_freq": 0.28, "p_lpf_freq": 0.26, "p_lpf_ramp": 0.20, "sound_vol": 0.197 }
+    },
+    {
+      "id": "amb_04",
+      "spec": "AMB-04 개러지 룸톤 (루프) — D11 §5 \"HUB 저레벨 — 공구·머신 대기음의 온기\" · 루프 6식 중 1",
+      "intent": "룸톤 = 거의 들리지 않아야 하는 소리. **68식 최저 볼륨(0.12)** · 기음 0.14 · LPF 0.16 으로 저역만 남긴다. `bgm_02`(개러지)와 공존하므로 대역이 겹치면 BGM 이 탁해진다. `p_env_decay 0`(루프 규격)",
+      "loop": true,
+      "seed": 1013,
+      "params": { "wave_type": 3, "p_env_attack": 0.0, "p_env_sustain": 0.70, "p_env_punch": 0.0, "p_env_decay": 0.0, "p_base_freq": 0.14, "p_lpf_freq": 0.16, "sound_vol": 0.12 }
+    },
+    {
+      "id": "amb_05",
+      "spec": "AMB-05 결전 베드 (펄스 돔) — D11 §5 \"**AMB-01의 상위 밀도 변형 1식** (확정)\" · 루프 6식 중 1",
+      "intent": "확정 문면이 '상위 밀도 변형'이므로 **`amb_01` 과 포락선 길이를 같게 두고**(0.66 — 두 베드가 같은 호흡이어야 교체가 자연스럽다) 기음 0.30→0.34 · LPF 0.30→0.34 · 볼륨 0.16→0.20 만 올렸다. 밀도는 길이가 아니라 대역과 크기다",
+      "loop": true,
+      "seed": 1014,
+      "params": { "wave_type": 3, "p_env_attack": 0.0, "p_env_sustain": 0.66, "p_env_punch": 0.0, "p_env_decay": 0.0, "p_base_freq": 0.34, "p_lpf_freq": 0.34, "p_hpf_freq": 0.05, "sound_vol": 0.13 }
+    },
+    {
+      "id": "se_e05",
+      "spec": "SE-E05 중립(무사건·혼합 상쇄) — D11 §2.5 ① \"통과음 수준\" · **미발화 확정**(IMPL-157 · P-2 ㉚ — 목록 유지·발주 최후순위)",
+      "intent": "**전 68식 중 마지막에 생성했다**(발주 §1 최후순위). 현행 정산이 중립 결과를 내지 않으므로 이 파일은 울리지 않는다 — 그래도 만드는 이유는 D11 계수 68 이 확정 기준값이고 목록 유지가 판정이기 때문이다. `se_e03`(안정)보다 더 작고 짧게 두어 '통과음 수준'을 지킨다 — E군 최소",
+      "seed": 415,
+      "params": { "wave_type": 3, "p_env_attack": 0.0, "p_env_sustain": 0.04, "p_env_punch": 0.0, "p_env_decay": 0.08, "p_base_freq": 0.22, "p_lpf_freq": 0.26, "sound_vol": 0.14 }
     }
   ]
 }
