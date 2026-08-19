@@ -5,7 +5,7 @@
 # 무가드로 읽으면, 커리어를 연 경로에서는 멀쩡하고 **타이틀 직행 경로에서만** 죽는다.
 # 실제로 SYS-04 가 그렇게 샜다(총괄 판정 IMPL-176 ① — 타이틀 첫 진입 100% 재현).
 #
-# 검사 축 12종:
+# 검사 축 13종:
 #   ① 무커리어 문맥 성립 — SYS-01 → SYS-04 직행(D09 본문 145행·§A-1 규격 진입)
 #   ② 패드 순회 폐쇄 — 초기 포커스 보유 (D09 §1.3 · 총괄 판정 IMPL-176 ②)
 #   ③ 단독 경로 옵션 정합 — 라우터를 안 거치는 경로가 O9 를 적용하는가 (동 ③)
@@ -18,6 +18,7 @@
 #   ⑩ 필러 대상 로그 문면 — 발행 층이 표기 매개를 짝으로 넘기는가 (IMPL-209 ⑧)
 #   ⑪ 저장 표시 — 라우터 결선·값 창구·성공/실패 분기·전환 생존 (IMPL-219 ②)
 #   ⑫ 코드 생성 Control 배치 — `set_anchors_preset` 순서 함정 전수 (IMPL-229 ⑥)
+#   ⑬ ANCH 검사 실재 — 경고형 검사가 조용히 사라지지 않는가 (IMPL-233 ②)
 #   ⑫ 도상 치수 2규격 공존 — 릴 32 무배율 ↔ 섹터 속성 16 (IMPL-226)
 #
 # **첫 프레임(`_process`)에서 돈다.** `_init()` 시점에는 `root` 가 없어 `add_child` 자체가
@@ -84,10 +85,11 @@ func _process(_delta: float) -> bool:
 	_save_indicator_wiring(data)
 	_anchor_preset_placement(data)
 	_icon_size_regimes(data)
+	_anch_check_present()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 153:
-		print("UI_SCREENS_FAIL checks=%d < 하한 153 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 157:
+		print("UI_SCREENS_FAIL checks=%d < 하한 157 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1118,3 +1120,27 @@ func _anchor_preset_placement(data: GameData) -> void:
 	if tip != null:
 		_ok_centered_h("온보딩 팁", tip)
 	_unmount(garage)
+
+
+# ── ⑬ ANCH 검사 실재 (총괄 판정 IMPL-233 ② 부대) ──
+#
+# **경고형 검사는 스스로 죽어도 빌드를 멈추지 않는다.** 실측: 결함을 재주입해 관측 가능한
+# 바닥을 만든 뒤 ⓐ면제 목록에 그 프리셋을 더하거나 ⓑ등록 한 줄을 지우면 **둘 다 무신호로
+# 통과**한다(경고가 사라질 뿐 종료코드는 0). PAL 이 죽은 조달로 절반이 빈 채 통과했던 것과
+# 같은 형태다 — 그래서 **판정은 경고형으로 두되 검사의 실재는 차단형으로** 받친다.
+# 위반 자체는 여전히 경고다(총괄 판정의 성격을 넘지 않는다).
+const VALIDATOR_SOURCE := "res://../tools/validators/run_validators.gd"
+# 면제 목록은 **조용히 넓어지는 상수**다 — 넓히려면 이 단언을 함께 고쳐야 한다
+# (검사 수 하한과 같은 축: 의도적 완화만 통과시킨다).
+const ANCH_EXEMPT_EXPECTED := 'const ANCH_EXEMPT_PRESETS := ["PRESET_FULL_RECT"]'
+
+
+func _anch_check_present() -> void:
+	var source := FileAccess.get_file_as_string(VALIDATOR_SOURCE)
+	_ok("검증기 원본 적재", not source.is_empty())
+	if source.is_empty():
+		return
+	_ok("ANCH 검사 정의 실재", source.contains("func _run_anchor_scan("))
+	# 정의만 있고 부르지 않으면 검사는 없는 것과 같다 — 등록까지 본다.
+	_ok("ANCH 검사 등록(호출) 실재", source.contains("\t_run_anchor_scan()"))
+	_ok("ANCH 면제 목록 = FULL_RECT 전속", source.contains(ANCH_EXEMPT_EXPECTED))

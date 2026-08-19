@@ -38,6 +38,7 @@ func _init() -> void:
 	_run_architecture_scan()
 	_run_font_scan()
 	_run_palette_scan()
+	_run_anchor_scan()
 	print("")
 	if _fail_count == 0:
 		print("VALIDATORS_PASS warnings=%d" % _warn_count)
@@ -1267,3 +1268,116 @@ func _palette_is_allowed(literal: String, allowed: Array) -> bool:
 		if match_all:
 			return true
 	return false
+
+
+# ── ANCH 앵커 프리셋 배치 정적 검사 (총괄 판정 IMPL-233 ② — **경고형 신설**) ──
+#
+# **왜 기계인가.** `set_anchors_preset()` 은 앵커만 세우고 **배치를 완성하지 않는다.**
+# 그래서 프리셋 이름이 뜻하는 자리와 실제로 놓이는 자리가 갈리는데, 화면은 정상적으로
+# 뜨므로 눈으로는 "왜 저기 있지" 정도로만 보인다. 두 레인이 각각 한 번씩 밟았다 —
+# 저장 표시(IMPL-228 · 우상단 → 좌상단) · 툴팁/모달(IMPL-231 · 하단중앙·중앙 → 좌상단·우하단).
+#
+# 실패 형태 2종(전수 실측 IMPL-231):
+#   ⓐ 트리 안·크기 미정 호출 → 오프셋을 rect(0,0,0,0) 보존으로 **역산** → 좌상단 고정
+#   ⓑ 트리 밖 호출 → 오프셋 0 → 배치가 **성장 방향**에 맡겨진다(기본 END = 앵커에서 우하향)
+#
+# **규칙 = 비-FULL_RECT 프리셋에 명시적 `grow_*` 또는 명시적 오프셋이 함께 있어야 한다.**
+# FULL_RECT 는 ⓑ 경로에서 오프셋 0 이 곧 정답이라 면제다 — 추정이 아니라 4지점 실측분이다.
+#
+# **성격 = 경고형** (총괄 판정 IMPL-233 ② — 신설 검사의 성격은 구현이 정하지 않는다).
+# 차단형 전환은 오검출 표본 수집 후 별도 판정이다 — FONT(IMPL-147→148)·PAL(209→219) 절차.
+#
+# **층 분담.** 이 검사는 *새 호출 지점의 조기 경보*이고, 실배치 확증은 UISCR ⑫축(부모 폭
+# 기준 실 rect)이 한다. 정적 검사는 "짝이 있는가"만 보지 그 값이 옳은지는 모른다.
+const ANCH_CALL := ".set_anchors_preset("
+# 오프셋 0 이 곧 정답인 프리셋 — 면제. (앵커가 전부 0/1 이고 그 배치가 오프셋 0 과 일치)
+const ANCH_EXEMPT_PRESETS := ["PRESET_FULL_RECT"]
+# 짝의 증거로 인정하는 속성. `position` 은 인정하지 않는다 — 앵커가 걸린 컨트롤에서
+# `position` 대입은 오프셋으로 환산돼 **한 축만** 고정하므로 짝의 증거가 되지 못한다.
+const ANCH_PAIR_PROPERTIES := [
+	"grow_horizontal", "grow_vertical",
+	"offset_left", "offset_right", "offset_top", "offset_bottom",
+]
+
+
+func _run_anchor_scan() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	for entry in _code_files:
+		var path := String(entry["path"])
+		if not path.begins_with("godot/ui"):
+			continue
+		var lines: Array = String(entry["source"]).split("\n")
+		var paired := _anchor_paired_names(lines)
+		for line_index in range(lines.size()):
+			var code_line := _strip_comment(String(lines[line_index]))
+			var call := _anchor_preset_call(code_line)
+			if call.is_empty():
+				continue
+			checked += 1
+			var preset := String(call["preset"])
+			if ANCH_EXEMPT_PRESETS.has(preset):
+				continue
+			var target := String(call["target"])
+			if paired.has(target):
+				continue
+			_warn("ANCH", "%s:%d: %s 에 성장 방향·오프셋 지정이 없다 — 프리셋만으로는 배치가 서지 않는다 (대상 '%s')"
+				% [path, line_index + 1, preset, target])
+	_report("ANCH", "anchor preset placement", checked, before_fail, before_warn)
+
+
+# `x.set_anchors_preset(Control.PRESET_CENTER)` → {target: "x", preset: "PRESET_CENTER"}
+# 수신자 없는 호출(`set_anchors_preset(...)`)은 자기 자신이므로 target = "self".
+func _anchor_preset_call(code_line: String) -> Dictionary:
+	var trimmed := code_line.strip_edges()
+	var target := "self"
+	var call_at := trimmed.find(ANCH_CALL)
+	if call_at >= 0:
+		var head := trimmed.substr(0, call_at)
+		var start := head.length() - 1
+		while start >= 0 and (head[start] == "_" or head[start].is_valid_identifier()):
+			start -= 1
+		target = head.substr(start + 1)
+		if target == "":
+			return {}
+		call_at += ANCH_CALL.length()
+	elif trimmed.begins_with("set_anchors_preset("):
+		call_at = "set_anchors_preset(".length()
+	else:
+		return {}
+	var args := trimmed.substr(call_at)
+	var close_at := args.find(")")
+	if close_at >= 0:
+		args = args.substr(0, close_at)
+	# `keep_offsets` 를 명시적으로 넘긴 호출은 배치를 스스로 책임진 것으로 본다.
+	var comma_at := args.find(",")
+	if comma_at >= 0:
+		return {}
+	var preset := args.strip_edges()
+	var dot_at := preset.rfind(".")
+	if dot_at >= 0:
+		preset = preset.substr(dot_at + 1)
+	return {"target": target, "preset": preset.strip_edges()}
+
+
+# 파일 안에서 성장 방향·오프셋을 명시로 받은 대상 이름 집합.
+# **함수 단위가 아니라 파일 단위로 본다** — 생성과 배치가 헬퍼로 갈리는 형태가 흔하고,
+# 함수 경계로 좁히면 그 형태가 전부 오검출된다(FONT 전례의 같은 판단).
+# 되돌림: 같은 이름의 다른 지역 변수가 짝을 갖고 있으면 그것이 이쪽을 가려 준다 —
+# **경고형에서는 미검출이 오검출보다 싸다**는 쪽으로 기울인 결과이며, 실배치 확증은
+# UISCR ⑫축이 별도로 진다.
+func _anchor_paired_names(lines: Array) -> Dictionary:
+	var names: Dictionary = {}
+	for line in lines:
+		var code_line := _strip_comment(String(line)).strip_edges()
+		var assign_at := code_line.find("=")
+		if assign_at < 0:
+			continue
+		var lhs := code_line.substr(0, assign_at).strip_edges()
+		for property_name in ANCH_PAIR_PROPERTIES:
+			if lhs == String(property_name):
+				names["self"] = true
+			elif lhs.ends_with("." + String(property_name)):
+				names[lhs.substr(0, lhs.length() - String(property_name).length() - 1)] = true
+	return names
