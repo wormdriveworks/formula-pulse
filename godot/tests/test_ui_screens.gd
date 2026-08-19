@@ -88,8 +88,8 @@ func _process(_delta: float) -> bool:
 	_anch_check_present()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 157:
-		print("UI_SCREENS_FAIL checks=%d < 하한 157 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 160:
+		print("UI_SCREENS_FAIL checks=%d < 하한 160 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1124,15 +1124,25 @@ func _anchor_preset_placement(data: GameData) -> void:
 
 # ── ⑬ ANCH 검사 실재 (총괄 판정 IMPL-233 ② 부대) ──
 #
-# **경고형 검사는 스스로 죽어도 빌드를 멈추지 않는다.** 실측: 결함을 재주입해 관측 가능한
-# 바닥을 만든 뒤 ⓐ면제 목록에 그 프리셋을 더하거나 ⓑ등록 한 줄을 지우면 **둘 다 무신호로
-# 통과**한다(경고가 사라질 뿐 종료코드는 0). PAL 이 죽은 조달로 절반이 빈 채 통과했던 것과
-# 같은 형태다 — 그래서 **판정은 경고형으로 두되 검사의 실재는 차단형으로** 받친다.
-# 위반 자체는 여전히 경고다(총괄 판정의 성격을 넘지 않는다).
+# **검사는 스스로 죽어도 자기를 신고하지 못한다.** 경고형이던 시절 실측: 결함을 재주입해
+# 관측 가능한 바닥을 만든 뒤 ⓐ면제 목록에 그 프리셋을 더하거나 ⓑ등록 한 줄을 지우면
+# **둘 다 무신호로 통과**했다. ANCH 는 차단형이 됐지만(IMPL-237) **그 둘 중 어느 쪽도
+# 차단형이 막지 못한다** — 위반이 없는 것과 검사가 없는 것을 종료코드는 구분하지 않는다.
+# PAL 이 죽은 조달로 대장 절반이 빈 채 통과했던 것과 같은 형태다(IMPL-198·201).
 const VALIDATOR_SOURCE := "res://../tools/validators/run_validators.gd"
 # 면제 목록은 **조용히 넓어지는 상수**다 — 넓히려면 이 단언을 함께 고쳐야 한다
 # (검사 수 하한과 같은 축: 의도적 완화만 통과시킨다).
 const ANCH_EXEMPT_EXPECTED := 'const ANCH_EXEMPT_PRESETS := ["PRESET_FULL_RECT"]'
+# 규칙의 **적용 범위**를 정하는 상수들. 비우거나 좁히면 검사는 살아 있는 채로 아무것도
+# 보지 않는다 — 실측: `ANCH_ANCHOR_PROPERTIES` 를 비우면 B1 경로가 통째로 죽고도
+# `ANCH ... PASS (5 checks)` 로 통과했다(돌연변이 M5). 면제 목록과 같은 축으로 고정한다.
+const ANCH_ANCHORS_EXPECTED := 'const ANCH_ANCHOR_PROPERTIES := ["anchor_left", "anchor_right", "anchor_top", "anchor_bottom"]'
+# 짝 목록은 **넓어지는 쪽**이 위험하다 — `position` 을 도로 넣으면 한 축만 고정한 코드가
+# 짝을 갖춘 것으로 통과한다(신설 시 판정 ②로 배제한 형태).
+# **부분 일치로는 추가를 못 본다** — 목록 뒤에 한 항목을 덧붙이면 기존 조각은 그대로
+# 남아 `contains()` 가 통과한다(돌연변이 M6 실측). 그래서 목록을 통째로 떼어내 대조한다.
+const ANCH_PAIR_HEAD := 'const ANCH_PAIR_PROPERTIES := ['
+const ANCH_PAIR_EXACT := '"grow_horizontal","grow_vertical","offset_left","offset_right","offset_top","offset_bottom",'
 
 
 func _anch_check_present() -> void:
@@ -1144,3 +1154,21 @@ func _anch_check_present() -> void:
 	# 정의만 있고 부르지 않으면 검사는 없는 것과 같다 — 등록까지 본다.
 	_ok("ANCH 검사 등록(호출) 실재", source.contains("\t_run_anchor_scan()"))
 	_ok("ANCH 면제 목록 = FULL_RECT 전속", source.contains(ANCH_EXEMPT_EXPECTED))
+	_ok("ANCH 앵커 속성 4종 전량 감시", source.contains(ANCH_ANCHORS_EXPECTED))
+	_ok("ANCH 짝 목록 = grow 2 + 오프셋 4 (추가·삭제 0)",
+		_anch_pair_list(source) == ANCH_PAIR_EXACT, _anch_pair_list(source))
+	# 차단형 전환분(IMPL-237) — 경고로 되돌리면 위반이 빌드를 멈추지 않는다.
+	_ok("ANCH = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("ANCH"'))
+
+
+# `ANCH_PAIR_PROPERTIES` 목록 본문만 떼어 공백을 지운 형태. 항목이 하나라도 늘거나
+# 줄면 문자열이 달라진다 — `position` 재편입 같은 **완화**를 잡는 것이 목적이다.
+func _anch_pair_list(source: String) -> String:
+	var at := source.find(ANCH_PAIR_HEAD)
+	if at < 0:
+		return ""
+	var rest := source.substr(at + ANCH_PAIR_HEAD.length())
+	var close_at := rest.find("]")
+	if close_at < 0:
+		return ""
+	return rest.substr(0, close_at).replace("\n", "").replace("\t", "").replace(" ", "")

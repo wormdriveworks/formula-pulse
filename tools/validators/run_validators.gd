@@ -4,8 +4,9 @@
 #   godot --headless --path . --script tools/validators/run_validators.gd
 #
 # 차단 규칙: V1~V6·V8 + 혼입 0 스캔 = 위반 1건이면 실패(exit 1).
-# 구현 층 신설 검사 **MIX0·ARCH·FONT·PAL 도 차단형**이다
-#   (FONT = 총괄 판정 IMPL-148 · PAL = 조건부 기승인 IMPL-209 → 발동 IMPL-219 · 불변규칙 7).
+# 구현 층 신설 검사 **MIX0·ARCH·FONT·PAL·ANCH 도 차단형**이다 (불변규칙 7 —
+#   FONT = 총괄 판정 IMPL-148 · PAL = 조건부 기승인 IMPL-209 → 발동 IMPL-219 ·
+#   ANCH = 경고형 신설 IMPL-233 → 규칙 확대 + 차단형 전환 IMPL-237).
 # V7(금칙 어휘)은 경고 전용 — 빌드를 차단하지 않는다 (D12 §4.2 V7 행 · D14 TL-1 명문).
 # V6 내부: ID 중복·접두 위반 = 차단 / 고아 데이터 = 경고 (D12 §4.2 V6 행 "고아 데이터 … 경고").
 #
@@ -1270,7 +1271,7 @@ func _palette_is_allowed(literal: String, allowed: Array) -> bool:
 	return false
 
 
-# ── ANCH 앵커 프리셋 배치 정적 검사 (총괄 판정 IMPL-233 ② — **경고형 신설**) ──
+# ── ANCH 앵커 배치 정적 검사 (IMPL-233 ② 경고형 신설 → **차단형** IMPL-237) ──
 #
 # **왜 기계인가.** `set_anchors_preset()` 은 앵커만 세우고 **배치를 완성하지 않는다.**
 # 그래서 프리셋 이름이 뜻하는 자리와 실제로 놓이는 자리가 갈리는데, 화면은 정상적으로
@@ -1281,11 +1282,15 @@ func _palette_is_allowed(literal: String, allowed: Array) -> bool:
 #   ⓐ 트리 안·크기 미정 호출 → 오프셋을 rect(0,0,0,0) 보존으로 **역산** → 좌상단 고정
 #   ⓑ 트리 밖 호출 → 오프셋 0 → 배치가 **성장 방향**에 맡겨진다(기본 END = 앵커에서 우하향)
 #
-# **규칙 = 비-FULL_RECT 프리셋에 명시적 `grow_*` 또는 명시적 오프셋이 함께 있어야 한다.**
-# FULL_RECT 는 ⓑ 경로에서 오프셋 0 이 곧 정답이라 면제다 — 추정이 아니라 4지점 실측분이다.
+# **규칙 = 앵커를 세운 컨트롤에는 명시적 `grow_*` 또는 명시적 오프셋이 함께 있어야 한다.**
+# 두 경로를 같은 요건으로 본다 — ①비-FULL_RECT 프리셋 호출 ②앵커 직접 대입(B1 확대 —
+# IMPL-237). 앵커 0·FULL_RECT 는 **오프셋 0 이 곧 정답인 자리**라 면제이며, 추정이 아니라
+# 4지점 실측분(IMPL-231)이 근거다.
 #
-# **성격 = 경고형** (총괄 판정 IMPL-233 ② — 신설 검사의 성격은 구현이 정하지 않는다).
-# 차단형 전환은 오검출 표본 수집 후 별도 판정이다 — FONT(IMPL-147→148)·PAL(209→219) 절차.
+# **성격 = 차단형** (경고형 신설 IMPL-233 ② → 오검출 0 실측 확보 후 전환 IMPL-237).
+# 근거는 FONT 와 같다 — **문법 수준 기계 판정**이라 V7(작법 판단 = D04 소관)의 사유가
+# 적용되지 않고, 오검출 0(표본 23종)·눈 검증 곤란(화면은 정상적으로 뜬다)이 실측분이다.
+# FONT(IMPL-147→148)·PAL(209→219)과 같은 절차를 밟았다. **V7 무접촉.**
 #
 # **층 분담.** 이 검사는 *새 호출 지점의 조기 경보*이고, 실배치 확증은 UISCR ⑫축(부모 폭
 # 기준 실 rect)이 한다. 정적 검사는 "짝이 있는가"만 보지 그 값이 옳은지는 모른다.
@@ -1298,6 +1303,10 @@ const ANCH_PAIR_PROPERTIES := [
 	"grow_horizontal", "grow_vertical",
 	"offset_left", "offset_right", "offset_top", "offset_bottom",
 ]
+# 앵커 직접 대입 형태 (B1 확대 — 총괄 판정 IMPL-237). 프리셋을 안 쓰고 앵커를 손으로 적는
+# 것이 **교정의 표준형**이 됐다(저장 표시 IMPL-228 · 툴팁·모달 IMPL-231). 그 형태를 규칙 밖에
+# 두면 사각이 곧 주 경로가 된다 — 프리셋 경로와 같은 짝 요건을 건다.
+const ANCH_ANCHOR_PROPERTIES := ["anchor_left", "anchor_right", "anchor_top", "anchor_bottom"]
 
 
 func _run_anchor_scan() -> void:
@@ -1322,9 +1331,61 @@ func _run_anchor_scan() -> void:
 			var target := String(call["target"])
 			if paired.has(target):
 				continue
-			_warn("ANCH", "%s:%d: %s 에 성장 방향·오프셋 지정이 없다 — 프리셋만으로는 배치가 서지 않는다 (대상 '%s')"
+			_fail("ANCH", "%s:%d: %s 에 성장 방향·오프셋 지정이 없다 — 프리셋만으로는 배치가 서지 않는다 (대상 '%s')"
 				% [path, line_index + 1, preset, target])
-	_report("ANCH", "anchor preset placement", checked, before_fail, before_warn)
+		# ── B1 — 앵커 직접 대입 (총괄 판정 IMPL-237 확대분) ──
+		# **대상마다 한 번만 짖는다** — 앵커는 보통 2~4줄이 붙어 나오므로 줄마다 경고하면
+		# 결함 하나가 네 건으로 불어나 계수가 사실을 왜곡한다.
+		var reported: Dictionary = {}
+		for line_index in range(lines.size()):
+			var code_line := _strip_comment(String(lines[line_index]))
+			var anchored := _anchor_direct_assignment(code_line)
+			if anchored.is_empty():
+				continue
+			checked += 1
+			var target := String(anchored["target"])
+			if paired.has(target) or reported.has(target):
+				continue
+			reported[target] = true
+			_fail("ANCH", "%s:%d: 앵커 직접 대입(%s)에 성장 방향·오프셋 지정이 없다 — 앵커만으로는 배치가 서지 않는다 (대상 '%s')"
+				% [path, line_index + 1, String(anchored["property"]), target])
+	_report("ANCH", "anchor placement", checked, before_fail, before_warn)
+
+
+# `x.anchor_left = 0.5` / 자기 자신의 `anchor_top = 1.0` → {target, property}
+#
+# **0 대입은 보지 않는다.** 앵커 0 은 부모 좌상단 기준이라 오프셋 0 과 배치가 일치한다 —
+# FULL_RECT 를 면제한 것과 같은 사유다(오프셋 0 이 곧 정답인 자리).
+# **리터럴이 아닌 우변은 짝을 요구한다** — 값을 모르면 0 이라고 볼 근거가 없다.
+func _anchor_direct_assignment(code_line: String) -> Dictionary:
+	var trimmed := code_line.strip_edges()
+	var assign_at := trimmed.find("=")
+	if assign_at < 0 or trimmed.substr(assign_at, 2) == "==":
+		return {}
+	var lhs := trimmed.substr(0, assign_at).strip_edges()
+	# 복합 대입(`+=` 등)도 앵커를 손으로 옮기는 선언이다 — 연산자만 떼고 같이 본다.
+	# 다만 그 결과값은 알 수 없으므로 **0 면제를 적용하지 않는다**(아래 `compound`).
+	var compound := false
+	while lhs.ends_with("+") or lhs.ends_with("-") or lhs.ends_with("*") or lhs.ends_with("/"):
+		lhs = lhs.substr(0, lhs.length() - 1).strip_edges()
+		compound = true
+	var property_name := ""
+	var target := ""
+	for candidate in ANCH_ANCHOR_PROPERTIES:
+		if lhs == String(candidate):
+			property_name = String(candidate)
+			target = "self"
+			break
+		if lhs.ends_with("." + String(candidate)):
+			property_name = String(candidate)
+			target = lhs.substr(0, lhs.length() - String(candidate).length() - 1)
+			break
+	if property_name == "" or target == "":
+		return {}
+	var rhs := trimmed.substr(assign_at + 1).strip_edges()
+	if not compound and (rhs.is_valid_float() or rhs.is_valid_int()) and rhs.to_float() == 0.0:
+		return {}
+	return {"target": target, "property": property_name}
 
 
 # `x.set_anchors_preset(Control.PRESET_CENTER)` → {target: "x", preset: "PRESET_CENTER"}
