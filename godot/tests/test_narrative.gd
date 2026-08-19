@@ -3,7 +3,7 @@
 # 실행: godot --headless --path godot --script tests/test_narrative.gd
 extends SceneTree
 
-const MIN_CHECKS := 68
+const MIN_CHECKS := 120
 
 var _failures := 0
 var _checked := 0
@@ -15,6 +15,12 @@ func _init() -> void:
 	_vane_stage_filter()
 	_tc_c8_soft_time_limit()
 	_serialization()
+	_t7_act_vn_data()
+	_t7_act_latch()
+	_t7_relation_triggers()
+	_t7_cg02_branch()
+	_t7_session_triggers()
+	_t7_line_speakers()
 	print("")
 	if _checked < MIN_CHECKS:
 		print("NARRATIVE_TEST_FAIL checks=%d < 하한 %d (스위트 축소·로드 실패 의심)" % [_checked, MIN_CHECKS])
@@ -249,3 +255,211 @@ func _serialization() -> void:
 	_ok("멱등 플래그 복원 — 재로드 후에도 전이 미발화", String(again["relation"]) == "", str(again))
 	var broken := _new_service()
 	_ok("결손 payload 거부", not broken.restore({"vn_seen": {}}))
+
+
+# ── T7 편입 회차 (총괄 발주 IMPL-249) ──
+
+func _t7_data() -> GameData:
+	var data := GameData.new()
+	data.load_all()
+	return data
+
+
+# ③ 막 VN 인스턴스 데이터 무결성 — 문면이 데이터로 내려왔는지 **키 실재까지** 본다.
+# 키가 표에 없으면 화면은 키 원문을 그대로 그린다(StringTable 폴백) — 그것은 "떴다"가 아니다.
+func _t7_act_vn_data() -> void:
+	var data := _t7_data()
+	var entries := data.act_vn_entries()
+	_ok("막 VN 인스턴스 6건", entries.size() == 6, str(entries.size()))
+	var total := 0
+	var missing_text := 0
+	var missing_speaker := 0
+	var bad_tone := 0
+	for entry in entries:
+		var row: Dictionary = entry
+		if not ["calm", "tense"].has(String(row.get("tone", ""))):
+			bad_tone += 1
+		for line in Array(row.get("lines", [])):
+			var item: Dictionary = line
+			total += 1
+			if not data.strings.has_key(String(item.get("text_key", ""))):
+				missing_text += 1
+			if not data.strings.has_key(String(item.get("speaker_key", ""))):
+				missing_speaker += 1
+	_ok("막 VN 총 라인 75", total == 75, str(total))
+	_ok("전 라인 문면 키 실재", missing_text == 0, "missing=%d" % missing_text)
+	_ok("전 라인 화자 키 실재", missing_speaker == 0, "missing=%d" % missing_speaker)
+	_ok("정조 값 도메인 = calm|tense", bad_tone == 0, "bad=%d" % bad_tone)
+	# 지문 화자는 **값이 공란**인 것이 납품 규격이다 — 키는 있고 값이 비어야 라벨이 빈다.
+	_ok("지문 화자 = 키 실재·값 공란",
+		data.strings.has_key("ui.vn.speakerNarration")
+			and data.strings.text("ui.vn.speakerNarration") == "")
+
+
+# ③ 막 래치 — **투어 경계 전속 · 단조 증가 · 건너뜀 수용** (D08 §8.1 · 총괄 수용 ⑤)
+func _t7_act_latch() -> void:
+	var data := _t7_data()
+	var state := OutgameState.new()
+	state.setup(data)
+	_ok("초기 막 = 1", state.narrative_act == 1)
+	var first := state.latch_narrative_act()
+	_ok("첫 경계 = 1막 VN 발생", first == ["vn_act1"], str(first))
+	_ok("재호출은 재발생하지 않는다", state.latch_narrative_act().is_empty())
+
+	# **건너뜀 경로** — 첫 포디움·첫 투어 우승 없이 로렌츠 격파만 성립한 상태.
+	var skipper := OutgameState.new()
+	skipper.setup(data)
+	skipper.latch_narrative_act()
+	skipper.milestones["milestone_lorentz_beat"] = true
+	var jumped := skipper.latch_narrative_act()
+	_ok("건너뜀 — 4막 VN 발생", jumped.has("vn_act4"), str(jumped))
+	_ok("건너뜀 — 2·3막 VN 미발생",
+		not jumped.has("vn_act2") and not jumped.has("vn_act3"), str(jumped))
+	_ok("건너뜀 — 막 번호 = 최대값 4", skipper.narrative_act == 4, str(skipper.narrative_act))
+	# 단조 증가: 뒤늦게 하위 마일스톤이 서도 막이 내려가지 않는다.
+	skipper.milestones["milestone_first_podium"] = true
+	skipper.latch_narrative_act()
+	_ok("단조 증가 — 하위 마일스톤 추가에도 4 유지", skipper.narrative_act == 4,
+		str(skipper.narrative_act))
+	# 직렬화 — 래치는 세이브 대상이다(재로드 후 VN 이 다시 뜨면 안 된다).
+	var restored := OutgameState.new()
+	restored.setup(data)
+	_ok("직렬화 왕복", restored.restore(skipper.serialize()))
+	_ok("복원 후 막 번호 유지", restored.narrative_act == 4)
+	_ok("복원 후 재발생 없음", restored.latch_narrative_act().is_empty())
+
+
+# ⑤⑥ 관계 축 트리거 — **행과 트리거가 같은 회차에 섰는가**
+func _t7_relation_triggers() -> void:
+	var data := _t7_data()
+	for axis_id in ["relation_reunion", "relation_succession_maro"]:
+		_ok("관계 축 행 실재: %s" % axis_id, data.relation_axes.has(axis_id))
+		var row: Dictionary = data.relation_axes[axis_id]
+		_ok("%s name_key 실재" % axis_id, data.strings.has_key(String(row["name_key"])))
+		var t1 := CsvTable.to_int(String(row["threshold1"]))
+		var t2 := CsvTable.to_int(String(row["threshold2"]))
+		var t3 := CsvTable.to_int(String(row["threshold3"]))
+		_ok("%s 임계 오름차순" % axis_id, t1 < t2 and t2 < t3, "%d/%d/%d" % [t1, t2, t3])
+	# D13 v1.10 결정 #19 — 재회 임계 2/3/4 (값 창구 대조)
+	var reunion: Dictionary = data.relation_axes["relation_reunion"]
+	_ok("재회 임계 = 2/3/4 (D13 v1.10)",
+		String(reunion["threshold1"]) == "2" and String(reunion["threshold2"]) == "3"
+			and String(reunion["threshold3"]) == "4", str(reunion))
+	# 카운터 → 단계는 **공표 전까지 오르지 않는다** (D07 §5.5 대회 경계 스냅).
+	var state := OutgameState.new()
+	state.setup(data)
+	state.add_relation("relation_reunion", 2)
+	_ok("공표 전 단계 0", state.relation_stage("relation_reunion") == 0)
+	state.commit_relation_transitions()
+	_ok("공표 후 단계 1 = '대면'", state.relation_stage("relation_reunion") == 1)
+	# 계승 2축도 같은 2단 구조를 탄다.
+	state.add_relation("relation_succession_maro", 3)
+	_ok("계승(셀린) 공표 전 단계 0", state.relation_stage("relation_succession_maro") == 0)
+	state.commit_relation_transitions()
+	_ok("계승(셀린) 공표 후 단계 1", state.relation_stage("relation_succession_maro") == 1)
+	# 트리거가 지목하는 데이터가 실재하는가 — 코드가 짚는 id 는 데이터에 있어야 한다.
+	_ok("보조 이벤트 실재: event_number_two_check",
+		data.events.has("event_number_two_check"))
+	_ok("보조 이벤트 = C3 관계·조우",
+		String(data.events["event_number_two_check"]["category_id"]) == "category_c3")
+	_ok("알타 리지 벽 = 카이",
+		String(data.stages["stage_alta_ridge"].get("wall_rival", "")) == "ai_sherwood")
+
+
+# ⑦ CG-02 갈래 — 순수 static 이라 화면 없이 전수로 본다
+func _t7_cg02_branch() -> void:
+	# 화면 클래스는 `class_name` 이 없어 스크립트 리소스로 짚는다 (TC-C 전례).
+	var race_screen_script := load("res://ui/race/race_screen.gd")
+	_ok("CG-02 성립 — 카이 · 대면 도달 · 듀얼 결판",
+		race_screen_script.l3_reunion_for("ai_sherwood", 1, true) == "cg_02_reunion")
+	_ok("CG-02 불성립 — 단계 0 (대면 미도달)",
+		race_screen_script.l3_reunion_for("ai_sherwood", 0, true) == "")
+	_ok("CG-02 불성립 — 상대 불일치",
+		race_screen_script.l3_reunion_for("ai_jude", 3, true) == "")
+	_ok("CG-02 불성립 — 듀얼 미결판",
+		race_screen_script.l3_reunion_for("ai_sherwood", 3, false) == "")
+	_ok("CG-02 성립 — 상위 단계에서도 유지",
+		race_screen_script.l3_reunion_for("ai_sherwood", 3, true) == "cg_02_reunion")
+
+
+# ⑤⑥ 세션 층 트리거 거동 — 무대 결속·투어 상한·듀얼 축을 실호출로 본다.
+# **캘린더를 직접 세워 무대를 고정한다** — 실주행으로 알타 리지에 도달하려면 셔플을 타야 해서
+# 검사가 확률에 걸린다. 여기서 보는 것은 배선이지 셔플이 아니다.
+func _t7_session_triggers() -> void:
+	var session := RunSession.new()
+	var data := _t7_data()
+	session.setup(data)
+	session.begin_career(2)
+	var alta := "stage_alta_ridge"
+	var other := ""
+	for stage_id in data.stages:
+		if String(stage_id) != alta:
+			other = String(stage_id)
+			break
+	session.season.calendar = [alta, other]
+
+	# ⓐ 알타 리지 결속 — 그 무대의 투어에서만 오른다
+	session.season.tour_slot = 1
+	var before: int = session.outgame.relation_counters.get("relation_reunion", 0)
+	_ok("알타 리지 투어 = 비트 계수", session.record_reunion_beat("probe"))
+	_ok("카운터 +1", int(session.outgame.relation_counters["relation_reunion"]) == before + 1)
+	session.season.tour_slot = 2
+	_ok("타 무대 투어 = 불계수", not session.record_reunion_beat("probe"))
+	_ok("타 무대에서 카운터 불변",
+		int(session.outgame.relation_counters["relation_reunion"]) == before + 1)
+
+	# ⓑ 투어당 상한 2 (D08 §8.7-3 — threshold1=2 도출의 전제)
+	session.season.tour_slot = 1
+	session._reunion_beats_this_tour = 0
+	_ok("1비트", session.record_reunion_beat("probe"))
+	_ok("2비트", session.record_reunion_beat("probe"))
+	_ok("3비트 = 상한 차단", not session.record_reunion_beat("probe"))
+	_ok("상한 상수 = 2", RunSession.REUNION_BEATS_PER_TOUR == 2)
+
+	# ⓒ 계승 2축 — 선착·듀얼 두 갈래가 **각각** 오른다
+	var probe := RunSession.new()
+	probe.setup(data)
+	probe.begin_career(2)
+	var engine := RaceEngine.new()
+	engine.setup(data, probe.rng)
+	probe.last_gp_result = {"beaten_rivals": ["ai_maro"]}
+	probe._advance_succession_maro(engine)
+	_ok("선착 = +1", int(probe.outgame.relation_counters.get("relation_succession_maro", 0)) == 1)
+	probe.last_gp_result = {"beaten_rivals": []}
+	engine.duel_opponents = ["ai_maro", "ai_jude", "ai_maro"]
+	probe._advance_succession_maro(engine)
+	_ok("듀얼 수행 2회 = +2 (타 상대 불계수)",
+		int(probe.outgame.relation_counters["relation_succession_maro"]) == 3,
+		str(probe.outgame.relation_counters["relation_succession_maro"]))
+	probe.last_gp_result = {"beaten_rivals": []}
+	engine.duel_opponents = []
+	probe._advance_succession_maro(engine)
+	_ok("사건 없음 = 불변", int(probe.outgame.relation_counters["relation_succession_maro"]) == 3)
+
+
+# ② 라인 단위 화자 — 정규화와 큐음 갈림을 화면을 세우지 않고 본다.
+# `_normalize_lines` 는 화면 상태를 타지 않으므로 스크립트 인스턴스로 직접 부른다.
+func _t7_line_speakers() -> void:
+	var screen = load("res://ui/nar/vn_screen.gd").new()
+	screen._default_speaker_key = "ui.vn.speakerVane"
+	# 구 계약 — 문자열 배열 (하위 호환)
+	var legacy: Array = screen._normalize_lines(["vn.act1.beat01"])
+	_ok("구 계약 문자열 항목 수용", legacy.size() == 1)
+	_ok("구 계약 = 페이로드 기본 화자 승계",
+		String(legacy[0]["speaker_key"]) == "ui.vn.speakerVane", str(legacy[0]))
+	_ok("구 계약 텍스트 키 보존", String(legacy[0]["text_key"]) == "vn.act1.beat01")
+	# 신 계약 — 사전 항목이 라인마다 화자를 갈아낀다
+	var mixed: Array = screen._normalize_lines([
+		{"speaker_key": "ui.vn.speakerMarta", "text_key": "vn.act1.beat02"},
+		{"text_key": "vn.act1.beat07"},
+	])
+	_ok("신 계약 화자 지정 반영", String(mixed[0]["speaker_key"]) == "ui.vn.speakerMarta")
+	_ok("신 계약 화자 생략 = 기본값", String(mixed[1]["speaker_key"]) == "ui.vn.speakerVane")
+	# 납품 1막은 화자가 실제로 교대한다 — 이벤트 단위 화자로는 표현 불가라는 발동 조건.
+	var data := _t7_data()
+	var act1 := data.act_vn_entry("vn_act1")
+	var speakers: Dictionary = {}
+	for line in Array(act1.get("lines", [])):
+		speakers[String(line["speaker_key"])] = true
+	_ok("1막 화자 2인 이상 교대", speakers.size() >= 2, str(speakers.keys()))
+	screen.free()

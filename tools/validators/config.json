@@ -308,7 +308,8 @@
     "slot_kind": "enum:season_boundary,tour_open,tour_close",
     "per_season": "int:0,9",
     "cap_per_season": "int:0,20",
-    "trigger": "enum:season_start,season_end,tour_start,milestone"
+    "trigger": "enum:season_start,season_end,tour_start,milestone",
+    "tone": "enum:calm,tense"
    }
   },
   "vane_lines.csv": {
@@ -328,7 +329,8 @@
     "id": "id",
     "name_key": "string_key",
     "priority": "int:1,9",
-    "relation_transition": "fk_optional:relation_axes.csv"
+    "relation_transition": "fk_optional:relation_axes.csv",
+    "tone": "enum:calm,tense"
    }
   },
   "tour_slot_mods.csv": {
@@ -541,6 +543,12 @@
   "stage_pulse_dome.json": {
    "root": true,
    "template": "stage"
+  },
+  "act_vn.json": {
+   "root": true,
+   "required": {
+    "id": "string"
+   }
   }
  },
  "structure_templates": {

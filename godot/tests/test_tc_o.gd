@@ -547,13 +547,29 @@ func _milestones_and_achievements() -> void:
 	_ok("발견형 미통지 = 미달성", not finder.achievements.has("achievement_l3_throne"))
 	finder.record_discovery("cg_01_throne")
 	_ok("발견형 통지 = 달성", finder.evaluate_achievements().has("achievement_l3_throne"))
-	# 판정 소스 미결선 계수 — 관계 축 2종(재회·계승 셀린)이 데이터에 없다 (T7 서사 유입 의존).
-	# 조용한 영구 미달성이 아니라 명시적 계수로 드러낸다.
+	# 판정 소스 미결선 계수 — **T7 서사 유입으로 0 이 됐다** (관계 축 2종 편입 · IMPL-249 ⑤⑥).
+	# 계수가 0 인 것과 계수 기능이 죽은 것은 다르다 — 아래 두 축이 그 둘을 가른다.
 	var pending := state.pending_achievements()
-	_ok("판정 소스 미결선 = 관계 2종", pending.size() == 2, str(pending))
-	_ok("미결선 = 재회·계승(셀린) 축",
-		pending.has("achievement_relation_reunion") and pending.has("achievement_relation_succession_maro"),
-		str(pending))
+	_ok("판정 소스 미결선 = 0 (관계 축 전량 편입)", pending.is_empty(), str(pending))
+	# 축 행이 실재하는가를 직접 본다. `pending` 이 비는 것만 보면 **표가 통째로 안 읽혀도**
+	# 통과한다(그때도 미결선 계수는 0 이다) — 죽은 쪽 단언 회피.
+	for axis_id in ["relation_reunion", "relation_succession_maro"]:
+		_ok("관계 축 실재: %s" % axis_id, state.data.relation_axes.has(axis_id))
+	# 계수 기능 자체가 살아 있는가 — 없는 소스를 가진 업적은 여전히 잡혀야 한다.
+	# **`GameData` 는 검사 간 공유 인스턴스다** — 행을 지우면 뒤 검사가 오염된다(실측:
+	# 직렬화 검사가 함께 무너졌다). 지운 뒤 반드시 되돌린다.
+	var probe := _new_state()
+	var saved_axis: Dictionary = probe.data.relation_axes["relation_reunion"]
+	probe.data.relation_axes.erase("relation_reunion")
+	var probed := probe.pending_achievements()
+	var probed_progress: Dictionary = probe.achievement_progress("achievement_relation_reunion")
+	probe.data.relation_axes["relation_reunion"] = saved_axis
+	_ok("계수 기능 생존 — 축이 사라지면 다시 잡힌다",
+		probed.has("achievement_relation_reunion"), str(probed))
+	# pending 표식(SYS-04 히든 슬롯 가림)도 같은 조건에서만 선다 — 표시 축의 생존 확인.
+	_ok("미결선 축 = pending 표식 (SYS-04 는 히든 슬롯으로 가린다)",
+		bool(probed_progress["pending"]), str(probed_progress))
+	_ok("복원 확인 — 공유 GameData 무오염", probe.data.relation_axes.has("relation_reunion"))
 	# ── SYS-04 조건 진척 조회 (표시 전용) ──
 	# 표시가 판정과 다른 계산을 쓰면 화면이 거짓을 그린다 — 같은 소스를 보는지 전수로 못박는다
 	# (IMPL-100 `field_repair_preview` 패리티 검사와 같은 구조).
@@ -571,8 +587,6 @@ func _milestones_and_achievements() -> void:
 	viewer.evaluate_achievements()
 	var found: Dictionary = viewer.achievement_progress("achievement_l3_throne")
 	_ok("발견형 통지 진척 1 · 달성", int(found["current"]) == 1 and bool(found["met"]), str(found))
-	_ok("미결선 축 = pending 표식 (SYS-04 는 히든 슬롯으로 가린다)",
-		bool(viewer.achievement_progress("achievement_relation_reunion")["pending"]))
 	_ok("미지 업적 id = 빈 진척 가드",
 		int(viewer.achievement_progress("achievement_nope")["threshold"]) == 0)
 	beater.evaluate_achievements()
@@ -719,6 +733,7 @@ func _tc_o6_exchange_guards() -> void:
 		"recruit_crew",
 		"sponsor_slots", "sponsor_candidate_count", "sign_sponsor", "settle_sponsors",
 		"add_relation", "pending_relation_transitions", "commit_relation_transitions",
+		"latch_narrative_act",
 		"relation_stage",
 		"unlock_facility", "archive_available", "buy_consumable",
 		"gp_prize", "finish_bonus", "settlement_reward", "vane_stage",

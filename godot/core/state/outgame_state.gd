@@ -40,6 +40,11 @@ var field_repair_count: int = 0          # 투어 내 정비 회차 (체증 카�
 # GP 중에는 엔진이 쥐고, GP 밖에서는 여기가 정본이다 — 세션이 GP 경계에서 양방향 복사한다.
 var chassis: float = 0.0
 var milestones: Dictionary = {}          # milestone id -> true
+# 서사 층 막 번호 (D08 §8.1 이층 처리 — 시스템 층은 즉시, **서사 층은 투어 경계 래치**).
+# 단조 증가한다: 마일스톤을 건너뛰어 달성해도 뒤로 가지 않는다 (D04 §1.1 선형 · §4.2 전진형).
+var narrative_act: int = 1
+# 이미 발생시킨 막 VN — 재발생 금지 (아카이브 재열람은 서사 층 소관이라 여기 안 든다).
+var act_vn_fired: Dictionary = {}
 # 통산 지표 (D07 §6.2 확정 6종 + 업적 판정 소재). 감소하지 않는다 — 전진형 카운터.
 var career_stats: Dictionary = {}        # 지표 키 -> 수치
 var achievements: Dictionary = {}        # achievement id -> true (무보상 명예형 — D07 §7.1)
@@ -639,6 +644,38 @@ func evaluate_achievements(season: int = 0) -> Array:
 	return newly
 
 
+# ── 서사 층 막 래치 (D08 §8.1 — 확정 "이층 처리 규칙") ──
+#
+# **시스템 층은 달성 즉시, 서사 층은 달성 후 최초의 투어 경계에서 발효한다.** 그래서 이 함수는
+# 투어 경계에서만 불린다 — 레이스 도중에 막이 바뀌면 D08 §8.1 이 막으려 한 것(막 결속 이벤트 풀이
+# 주행 중 갈리는 것)이 그대로 일어난다.
+#
+# **막 번호 = 래치된 마일스톤이 지정하는 막의 최대값** (총괄 수용 확정 IMPL-249 ⑤).
+# 마일스톤은 건너뛸 수 있다 — 로렌츠 첫 격파는 단일 GP 선착이라 첫 포디움 없이도 성립한다.
+# 그 경우 건너뛴 막의 전이 VN 은 발생하지 않는다(그 마일스톤이 미달성이므로) — 극단 상위 플레이의
+# 예외 경로로 수용된 귀결이며 MS-5 관측 대장 등재분이다.
+#
+# 반환 = 이번 경계에 **새로 발생시킬 막 VN id 목록** (발행 순서 = 데이터의 `order`).
+func latch_narrative_act() -> Array:
+	var fired: Array = []
+	var entries := data.act_vn_entries()
+	var ordered: Array = entries.duplicate()
+	ordered.sort_custom(func(a, b): return int(a.get("order", 0)) < int(b.get("order", 0)))
+	for entry in ordered:
+		var row: Dictionary = entry
+		var vn_id := String(row.get("id", ""))
+		if vn_id.is_empty() or act_vn_fired.has(vn_id):
+			continue
+		var milestone := String(row.get("milestone", "")).strip_edges()
+		# 진입 마일스톤이 빈 행(1막 = 게임 시작)은 커리어 개시로 이미 성립한 것으로 본다.
+		if not milestone.is_empty() and not milestones.has(milestone):
+			continue
+		act_vn_fired[vn_id] = true
+		narrative_act = maxi(narrative_act, int(row.get("act", 1)))
+		fired.append(vn_id)
+	return fired
+
+
 # 판정 소스가 데이터에 없는 업적 — 결선 대기분의 명시적 계수 (조용한 미달성 방지)
 func pending_achievements() -> Array:
 	var pending: Array = []
@@ -765,6 +802,8 @@ func serialize() -> Dictionary:
 		"consumables": consumables.duplicate(),
 		"field_repair_count": field_repair_count,
 		"milestones": milestones.duplicate(),
+		"narrative_act": narrative_act,
+		"act_vn_fired": act_vn_fired.duplicate(),
 		"career_stats": career_stats.duplicate(),
 		"achievements": achievements.duplicate(),
 		"achievement_seasons": achievement_seasons.duplicate(),
@@ -801,6 +840,8 @@ func restore(payload: Dictionary) -> bool:
 	consumables = payload.get("consumables", {})
 	field_repair_count = int(payload.get("field_repair_count", 0))
 	milestones = payload.get("milestones", {})
+	narrative_act = int(payload.get("narrative_act", 1))
+	act_vn_fired = payload.get("act_vn_fired", {})
 	# 통산·업적 도입(T4) 전 세이브에는 없다 — 빈 상태가 충실값 (그 세계는 집계가 없었다).
 	# 업적은 재로드 후 evaluate_achievements()가 현 상태로 재판정하므로 소급 달성이 성립한다.
 	career_stats = payload.get("career_stats", {})

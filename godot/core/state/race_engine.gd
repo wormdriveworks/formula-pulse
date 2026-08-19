@@ -28,6 +28,9 @@ var lap: int = 0
 var sector: int = 0
 var turn_number: int = 0
 var duel_count: int = 0
+# 이 GP 에서 듀얼을 벌인 상대 id 순차 기록 (관계 축 '듀얼 수행' 카운터의 판정 소재 —
+# D13 별첨A §5.2 계승 행). 같은 상대와 두 번 붙으면 두 번 들어간다 — 회수가 곧 카운터다.
+var duel_opponents: Array = []
 # GP 요약 카운터 (D07 §6.2 통산 지표 · D08 §8.11 드라이빙 업적의 판정 소재).
 # 엔진은 세기만 하고 판정·보존은 아웃게임 층이 한다 — 업적 규칙이 엔진에 들어오지 않는다.
 var duel_wins: int = 0
@@ -116,6 +119,7 @@ func start_gp() -> Array:
 	sector = 0
 	turn_number = 0
 	duel_count = 0
+	duel_opponents.clear()
 	duel_wins = 0
 	trouble_turns = 0
 	hold_uses = 0
@@ -566,6 +570,7 @@ func _settle_sector(momentum: bool) -> Array:
 				if _armed_duel != RaceTypes.DuelType.NONE:
 					pending_duel = _armed_duel
 					duel_opponent = front_target if _armed_duel == RaceTypes.DuelType.OVERTAKE else rear_target
+					duel_opponents.append(duel_opponent)
 					var log_key := "raceLog.duelStartOvertake01" if _armed_duel == RaceTypes.DuelType.OVERTAKE else "raceLog.duelStartDefense01"
 					events.append(_ev("T5", log_key, _entrant_params(duel_opponent)))
 			RaceTypes.SettleStage.STAGE_7_RANK_UPDATE:
@@ -1011,6 +1016,7 @@ func serialize() -> Dictionary:
 		"turn_phase": turn_phase,
 		"lap": lap, "sector": sector,
 		"turn_number": turn_number, "duel_count": duel_count,
+		"duel_opponents": duel_opponents.duplicate(),
 		"duel_wins": duel_wins, "trouble_turns": trouble_turns, "hold_uses": hold_uses,
 		"chance_three_matches": chance_three_matches, "final_lap_entry_rank": final_lap_entry_rank,
 		"ai_retire_count": ai_retire_count, "retire_order_counter": _retire_order,
@@ -1046,6 +1052,8 @@ func restore(payload: Dictionary) -> bool:
 	sector = int(payload["sector"])
 	turn_number = int(payload["turn_number"])
 	duel_count = int(payload["duel_count"])
+	# 구세이브 관용 — 없으면 빈 목록 (IMPL-090 전례)
+	duel_opponents = payload.get("duel_opponents", [])
 	# GP 요약 도입(T4) 전 스냅샷에는 없다 — 0 = "그 GP에서 아직 세지 않았다"가 충실값
 	duel_wins = int(payload.get("duel_wins", 0))
 	trouble_turns = int(payload.get("trouble_turns", 0))

@@ -14,6 +14,15 @@ extends RefCounted
 # 사정이 코어로 올라간다(혼입 0). 저장을 요청하는 곳이 세션 하나뿐이라 여기가 유일 관문이다.
 signal progress_saved(ok: bool)
 
+# 관계 축 트리거가 지목하는 고유 id — 데이터의 실키를 코드가 짚는 지점이라 한 곳에 모은다.
+const MARO_ID := "ai_maro"
+const KAI_ID := "ai_sherwood"
+const ALTA_RIDGE_ID := "stage_alta_ridge"
+# 계승 2축 보조 A — D08 §8.8 "지정 이벤트 1건(풀 태그)" 의 마로 축 지목분 (납품서 §6.2).
+const MARO_EVENT_ID := "event_number_two_check"
+# C3 = 관계·조우 카테고리 (`event_categories.csv` reward_type=relation)
+const RELATION_CATEGORY := "category_c3"
+
 var data: GameData
 var rng: RngService
 var season: SeasonState
@@ -35,6 +44,15 @@ var newly_achieved: Array = []
 # 개방 자체는 마일스톤 파생이라 상태가 아니고, "방금 열렸다"는 **경계에서만** 알 수 있다.
 # `newly_achieved` 와 같은 성격의 래치이며 세이브 대상이 아니다(경계 1회성 표시 신호).
 var newly_opened_tiers: Array = []
+
+# 투어 경계에서 발생시킬 막 VN id 목록 — 화면 층이 소비한다 (세이브 비대상: 경계 1회성).
+var pending_act_vn: Array = []
+# 같은 경계에서 공표된 관계 전이 축 id 목록 (D07 §5.5 대회 경계 스냅).
+var committed_relations: Array = []
+# 재회 축 체인의 투어당 전진량 상한 = 2비트 (D08 §8.7-3 "1~2비트씩 전진" · 납품서 §6.2).
+# threshold1=2 도출의 전제이므로 상한이 풀리면 "시즌 1 내 대면 도달" 보장이 함께 흔들린다.
+const REUNION_BEATS_PER_TOUR := 2
+var _reunion_beats_this_tour := 0
 # 플랫폼 서비스 — **인터페이스 타입으로만 쥔다**(혼입 0). 합성은 `PlatformServices.create()`
 # 단일 지점이며, 미주입(null)도 정상 상태다: 헤드리스 테스트·러너는 플랫폼 없이 돈다.
 var platform: PlatformServices
@@ -88,15 +106,23 @@ func judge_event() -> Dictionary:
 	# (IMPL-095 "미지 필드 = 오류" 처리 덕에 TL-5 러너가 vane_stage·jude_rank_delta 누락을 적발).
 	var context := {
 		"player_rank": int(last_gp_result.get("player_rank", 16)),
-		# [가안] 막(act) 고정 1 — 막 전이는 마일스톤 래치 층(D08 §8.1 서사 층)이며 미결선.
-		# 서사 트랙(T7) 유입 시 narrative 층에서 받아 채운다.
-		"act": 1,
+		# 서사 층 막 번호 — 투어 경계에서 래치된 값이다 (D08 §8.1 이층 처리).
+		# 주행 중에는 바뀌지 않으므로 이벤트 변형이 한 투어 안에서 갈리지 않는다.
+		"act": outgame.narrative_act,
 		"season": season.season,
 		"tour_slot": season.tour_slot,
 		"vane_stage": outgame.vane_stage(),
 		"jude_rank_delta": jude_rank_delta(),
 	}
-	return events.judge(stage_id, context)
+	var outcome := events.judge(stage_id, context)
+	var event_id := String(outcome.get("event_id", ""))
+	if event_id == MARO_EVENT_ID:
+		# 보조 A — 지정 이벤트 발생 1건 (D08 §8.8 계승 행)
+		outgame.add_relation("relation_succession_maro", 1)
+	if event_id != "" and String(data.event(event_id).get("category_id", "")) == RELATION_CATEGORY:
+		# 관계·조우(C3) 이벤트 = 재회 체인 비트 (알타 리지 투어 안에서만 — 함수가 가른다)
+		record_reunion_beat("relation_event")
+	return outcome
 
 
 # 주드 인접 판정 (D13 별첨A §6.5): |플레이어 챔피언십 순위 − 주드 순위|.
@@ -174,6 +200,52 @@ func close_gp() -> void:
 	# R5 이월 회수 — 미사용분은 소멸하지 않는다 (D06 §3.5). 상한 가드는 구매 지점(K4) 전속:
 	# 사용은 수량을 늘리지 못하므로 회수분이 상한을 넘을 경로가 없다.
 	outgame.consumables = engine.consumables_held.duplicate()
+	_advance_succession_maro(engine)
+	# 카이 벽 조우 = 재회 체인 비트 (D08 §8.7-3 "브리핑·이벤트·벽 조우"의 세 번째 축).
+	if engine.duel_opponents.has(KAI_ID):
+		record_reunion_beat("wall_encounter")
+
+
+# ── 관계 축 카운터 트리거 (총괄 발주 IMPL-249 ⑤⑥ · 납품서 §6.2 확정 문장) ──
+#
+# **행과 트리거는 같은 회차에 들어간다.** 행만 먼저 넣으면 `_achievement_source_missing()` 이
+# 축 행의 실재만 보므로 두 업적이 `pending_achievements()` 계수에서 빠지는데, 트리거가 없으니
+# 여전히 영원히 안 켜진다 — "안 켜지는 업적을 계수로 드러낸다"는 설계가 무력화된다(납품서 §3.4).
+#
+# 공표는 여기서 하지 않는다 — `add_relation()` 은 `_relation_pending` 에만 쌓고
+# `commit_relation_transitions()`(투어 경계)이 공표한다. D07 §5.5 대회 경계 스냅.
+
+# 계승 2축(마로) 주축 B — **선착 1회 또는 마로와의 듀얼 수행 1회마다 +1**
+# (D13 별첨A §5.2 계승 행 카운터 = "선착 + 듀얼 수행" · `counter_source=beat_and_duel`).
+func _advance_succession_maro(source: RaceEngine) -> void:
+	var gained := 0
+	if Array(last_gp_result.get("beaten_rivals", [])).has(MARO_ID):
+		gained += 1
+	for opponent in source.duel_opponents:
+		if String(opponent) == MARO_ID:
+			gained += 1
+	if gained > 0:
+		outgame.add_relation("relation_succession_maro", gained)
+
+
+# 재회 축(카이) 형식 A — **알타 리지 투어 안에서 체인 비트가 발생할 때마다 +1.**
+#
+# **발생 = 도달**이다 — 열람했는지 스킵했는지 보지 않는다(D08 §10.3 R-D07-VN: 스킵이
+# 페널티가 되면 비강제성이 역전된다). **아카이브 재열람은 올리지 않는다** — 재열람 경로는
+# 이 함수를 부르지 않는다(전진형 정합).
+func record_reunion_beat(source: String) -> bool:
+	if not _is_alta_ridge_tour():
+		return false
+	if _reunion_beats_this_tour >= REUNION_BEATS_PER_TOUR:
+		return false
+	_reunion_beats_this_tour += 1
+	outgame.add_relation("relation_reunion", 1)
+	return true
+
+
+# 알타 리지 결속 — 체인은 그 무대의 투어 안에서만 전진한다 (D08 §8.7-2 구조 가드 3).
+func _is_alta_ridge_tour() -> bool:
+	return season.current_stage_id() == ALTA_RIDGE_ID
 
 
 # 스킬 티어 개방 = 마일스톤 연동이라 별도 반환값이 없다 (D07 §4.3). 경계 전후를 대조해
@@ -286,6 +358,12 @@ func close_tour() -> Dictionary:
 	_latch_opened_tiers(tiers_before)
 	newly_achieved = outgame.evaluate_achievements(season.season)
 	_publish_achievements()
+	# ── 투어 경계 = 서사 층 발효 지점 (D08 §8.1 · D07 §5.5) ──
+	# 막 래치와 관계 전이 공표가 **같은 경계**에 선다. 둘을 갈라 두면 "막은 넘어갔는데
+	# 관계 단계는 다음 경계에 공표되는" 어긋남이 생긴다.
+	pending_act_vn = outgame.latch_narrative_act()
+	committed_relations = outgame.commit_relation_transitions()
+	_reunion_beats_this_tour = 0
 	if not season.season_finished():
 		# 다음 투어 개시 — 체증 카운터 리셋 + 무상 복원선 (D06 §3.3 · D13 별첨A §3.4 R2).
 		# 시즌 마지막 투어면 다음 투어가 없다 — 개시 처리는 begin_next_season()이 한다.

@@ -1,0 +1,360 @@
+{
+	"schema_version": 1,
+	"id": "act_vn",
+	"entries": [
+		{
+			"id": "vn_act1",
+			"act": 1,
+			"milestone": "",
+			"tone": "calm",
+			"order": 1,
+			"lines": [
+				{
+					"speaker_key": "ui.vn.speakerNarration",
+					"text_key": "vn.act1.beat01"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act1.beat02"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.act1.beat03"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act1.beat04"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act1.beat05"
+				},
+				{
+					"speaker_key": "ui.vn.speakerNarration",
+					"text_key": "vn.act1.beat06"
+				},
+				{
+					"speaker_key": "ui.vn.speakerVane",
+					"text_key": "vn.act1.beat07"
+				},
+				{
+					"speaker_key": "ui.vn.speakerVane",
+					"text_key": "vn.act1.beat08"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.act1.beat09"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act1.beat10"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act1.beat11"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act1.beat12"
+				}
+			]
+		},
+		{
+			"id": "vn_act2",
+			"act": 2,
+			"milestone": "milestone_first_podium",
+			"tone": "calm",
+			"order": 2,
+			"lines": [
+				{
+					"speaker_key": "ui.vn.speakerNarration",
+					"text_key": "vn.act2.beat01"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.act2.beat02"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.act2.beat03"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act2.beat04"
+				},
+				{
+					"speaker_key": "ui.vn.speakerNarration",
+					"text_key": "vn.act2.beat05"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act2.beat06"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.act2.beat07"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.act2.beat08"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act2.beat09"
+				},
+				{
+					"speaker_key": "ui.vn.speakerVane",
+					"text_key": "vn.act2.beat10"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.act2.beat11"
+				},
+				{
+					"speaker_key": "ui.vn.speakerVane",
+					"text_key": "vn.act2.beat12"
+				}
+			]
+		},
+		{
+			"id": "vn_act3",
+			"act": 3,
+			"milestone": "milestone_first_tour_win",
+			"tone": "tense",
+			"order": 3,
+			"lines": [
+				{
+					"speaker_key": "ui.vn.speakerNarration",
+					"text_key": "vn.act3.beat01"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act3.beat02"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.act3.beat03"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act3.beat04"
+				},
+				{
+					"speaker_key": "ui.vn.speakerVane",
+					"text_key": "vn.act3.beat05"
+				},
+				{
+					"speaker_key": "ui.vn.speakerVane",
+					"text_key": "vn.act3.beat06"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act3.beat07"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act3.beat08"
+				},
+				{
+					"speaker_key": "ui.vn.speakerNarration",
+					"text_key": "vn.act3.beat09"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act3.beat10"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act3.beat11"
+				},
+				{
+					"speaker_key": "ui.vn.speakerVane",
+					"text_key": "vn.act3.beat12"
+				}
+			]
+		},
+		{
+			"id": "vn_act4",
+			"act": 4,
+			"milestone": "milestone_lorentz_beat",
+			"tone": "tense",
+			"order": 4,
+			"lines": [
+				{
+					"speaker_key": "ui.vn.speakerNarration",
+					"text_key": "vn.act4.beat01"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.act4.beat02"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act4.beat03"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.act4.beat04"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act4.beat05"
+				},
+				{
+					"speaker_key": "ui.vn.speakerVane",
+					"text_key": "vn.act4.beat06"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act4.beat07"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act4.beat08"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.act4.beat09"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.act4.beat10"
+				},
+				{
+					"speaker_key": "ui.vn.speakerVane",
+					"text_key": "vn.act4.beat11"
+				}
+			]
+		},
+		{
+			"id": "vn_origin",
+			"act": 4,
+			"milestone": "milestone_lorentz_beat",
+			"tone": "tense",
+			"order": 5,
+			"lines": [
+				{
+					"speaker_key": "ui.vn.speakerNarration",
+					"text_key": "vn.origin.beat01"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.origin.beat02"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.origin.beat03"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.origin.beat04"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.origin.beat05"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.origin.beat06"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.origin.beat07"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.origin.beat08"
+				},
+				{
+					"speaker_key": "ui.vn.speakerVane",
+					"text_key": "vn.origin.beat09"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.origin.beat10"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.origin.beat11"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.origin.beat12"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.origin.beat13"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.origin.beat14"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.origin.beat15"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.origin.beat16"
+				}
+			]
+		},
+		{
+			"id": "vn_epilogue",
+			"act": 4,
+			"milestone": "milestone_season_champion",
+			"tone": "calm",
+			"order": 6,
+			"lines": [
+				{
+					"speaker_key": "ui.vn.speakerNarration",
+					"text_key": "vn.epilogue.beat01"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.epilogue.beat02"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.epilogue.beat03"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.epilogue.beat04"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.epilogue.beat05"
+				},
+				{
+					"speaker_key": "ui.vn.speakerNarration",
+					"text_key": "vn.epilogue.beat06"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.epilogue.beat07"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.epilogue.beat08"
+				},
+				{
+					"speaker_key": "ui.vn.speakerTheo",
+					"text_key": "vn.epilogue.beat09"
+				},
+				{
+					"speaker_key": "ui.vn.speakerMarta",
+					"text_key": "vn.epilogue.beat10"
+				},
+				{
+					"speaker_key": "ui.vn.speakerVane",
+					"text_key": "vn.epilogue.beat11"
+				},
+				{
+					"speaker_key": "ui.vn.speakerVane",
+					"text_key": "vn.epilogue.beat12"
+				}
+			]
+		}
+	]
+}

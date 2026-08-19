@@ -5,7 +5,7 @@
 # 무가드로 읽으면, 커리어를 연 경로에서는 멀쩡하고 **타이틀 직행 경로에서만** 죽는다.
 # 실제로 SYS-04 가 그렇게 샜다(총괄 판정 IMPL-176 ① — 타이틀 첫 진입 100% 재현).
 #
-# 검사 축 13종:
+# 검사 축 14종:
 #   ① 무커리어 문맥 성립 — SYS-01 → SYS-04 직행(D09 본문 145행·§A-1 규격 진입)
 #   ② 패드 순회 폐쇄 — 초기 포커스 보유 (D09 §1.3 · 총괄 판정 IMPL-176 ②)
 #   ③ 단독 경로 옵션 정합 — 라우터를 안 거치는 경로가 O9 를 적용하는가 (동 ③)
@@ -18,7 +18,8 @@
 #   ⑩ 필러 대상 로그 문면 — 발행 층이 표기 매개를 짝으로 넘기는가 (IMPL-209 ⑧)
 #   ⑪ 저장 표시 — 라우터 결선·값 창구·성공/실패 분기·전환 생존 (IMPL-219 ②)
 #   ⑫ 코드 생성 Control 배치 — `set_anchors_preset` 순서 함정 전수 (IMPL-229 ⑥)
-#   ⑬ ANCH 검사 실재 — 경고형 검사가 조용히 사라지지 않는가 (IMPL-233 ②)
+#   ⑬ ANCH·STRF 검사 실재 — 검사가 조용히 사라지지 않는가 (IMPL-233 ② · IMPL-249 ③)
+#   ⑭ VN 라인 단위 화자 — 큐음이 화자를 따라가는가 (IMPL-249 ②)
 #   ⑫ 도상 치수 2규격 공존 — 릴 32 무배율 ↔ 섹터 속성 16 (IMPL-226)
 #
 # **첫 프레임(`_process`)에서 돈다.** `_init()` 시점에는 `root` 가 없어 `add_child` 자체가
@@ -86,10 +87,11 @@ func _process(_delta: float) -> bool:
 	_anchor_preset_placement(data)
 	_icon_size_regimes(data)
 	_anch_check_present()
+	_vn_line_speakers(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 160:
-		print("UI_SCREENS_FAIL checks=%d < 하한 160 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 172:
+		print("UI_SCREENS_FAIL checks=%d < 하한 172 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1159,6 +1161,14 @@ func _anch_check_present() -> void:
 		_anch_pair_list(source) == ANCH_PAIR_EXACT, _anch_pair_list(source))
 	# 차단형 전환분(IMPL-237) — 경고로 되돌리면 위반이 빌드를 멈추지 않는다.
 	_ok("ANCH = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("ANCH"'))
+	# ── STRF (총괄 판정 IMPL-249 ③ — 차단형 즉시 신설) ──
+	# ANCH 와 같은 이유로 실재를 건다: **위반이 없는 것과 검사가 없는 것을 종료코드는
+	# 구분하지 않는다.** STRF 는 위반 0 인 상태로 상주하는 검사라 특히 그렇다.
+	_ok("STRF 검사 정의 실재", source.contains("func _run_string_field_scan("))
+	_ok("STRF 검사 등록(호출) 실재", source.contains("\t_run_string_field_scan()"))
+	_ok("STRF = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("STRF"'))
+	# 인용 인식이 규칙의 본체다 — 산술 비교로 되돌리면 정상 데이터 2건이 오검출된다(실측).
+	_ok("STRF 인용 인식 보유", source.contains("func _strf_records("))
 
 
 # `ANCH_PAIR_PROPERTIES` 목록 본문만 떼어 공백을 지운 형태. 항목이 하나라도 늘거나
@@ -1172,3 +1182,64 @@ func _anch_pair_list(source: String) -> String:
 	if close_at < 0:
 		return ""
 	return rest.substr(0, close_at).replace("\n", "").replace("\t", "").replace(" ", "")
+
+
+# ── ⑭ VN 라인 단위 화자 (총괄 판정 IMPL-249 ② — 신설안 C) ──
+#
+# **관측 지점 = 큐음 발화 기록.** 화자가 라인마다 갈리는지는 라벨만 봐서는 절반만 보는 것이다 —
+# D11 §2.10 이 규정한 것은 **음색이 화자를 따라간다**는 쪽이고, 실제 결함(마르타 대사에 베인
+# 3단계 큐음)이 거기서 났다. 그래서 실화면을 세워 라인을 넘기며 무엇이 울렸는지 센다.
+const VN_SCENE := "res://ui/nar/vn_screen.tscn"
+
+
+func _vn_line_speakers(data: GameData) -> void:
+	var session := _fresh_session(data)
+	var packed := load(VN_SCENE) as PackedScene
+	if packed == null:
+		_ok("VN 씬 로드", false)
+		return
+	var screen := packed.instantiate() as Control
+	screen.session = session
+	root.add_child(screen)
+	# 베인 → 마르타 → 지문 순으로 화자가 갈리는 3라인. 납품 문안의 실제 형태다.
+	screen.bind(session, {
+		"vn_id": "", "slot_id": "",
+		"line_keys": [
+			{"speaker_key": "ui.vn.speakerVane", "text_key": "vn.act1.beat07"},
+			{"speaker_key": "ui.vn.speakerMarta", "text_key": "vn.act1.beat02"},
+			{"speaker_key": "ui.vn.speakerNarration", "text_key": "vn.act1.beat01"},
+		],
+	})
+	var vane_first := _cue_count(session, "SE-V01")
+	var common_first := _cue_count(session, "SE-V02")
+	_ok("1라인(베인) = 베인 큐음", vane_first == 1, "vane=%d" % vane_first)
+	_ok("1라인(베인) = 공용음 미발화", common_first == 0, "common=%d" % common_first)
+	_ok("1라인 화자 라벨 = 베인",
+		(screen.get_node("%SpeakerLabel") as Label).text == data.strings.text("ui.vn.speakerVane"))
+	screen._advance()
+	_ok("2라인(마르타) = 공용음", _cue_count(session, "SE-V02") == 1)
+	_ok("2라인(마르타) = 베인 큐음 불추가",
+		_cue_count(session, "SE-V01") == vane_first,
+		"vane=%d" % _cue_count(session, "SE-V01"))
+	_ok("2라인 화자 라벨 = 마르타",
+		(screen.get_node("%SpeakerLabel") as Label).text == data.strings.text("ui.vn.speakerMarta"))
+	screen._advance()
+	# 지문은 값이 공란이라 라벨이 빈다 — 그것이 지문 표기다(별도 분기 없음).
+	_ok("3라인(지문) 라벨 공란",
+		(screen.get_node("%SpeakerLabel") as Label).text == "")
+	# **연속 동일 큐음은 재트리거 게이트가 막는다**(D11 §6.3 0.05초 — 같은 프레임 2발 실측).
+	# 그래서 공용음 '추가'가 아니라 **베인 큐음이 안 늘었는가**로 본다 — 계약은 그쪽이다.
+	_ok("3라인(지문) = 베인 큐음 불추가", _cue_count(session, "SE-V01") == vane_first,
+		"vane=%d" % _cue_count(session, "SE-V01"))
+	root.remove_child(screen)
+	screen.free()
+
+
+# **발화 기록은 event_id 가 아니라 sfx_id 다** (디스패처가 `sound_map` 을 거쳐 변환한다).
+# 베인 큐음은 인격 3단계로 갈리므로 SE-V01a/b/c 를 한 축으로 센다 — 단계는 여기 관심사가 아니다.
+func _cue_count(session: RunSession, prefix: String) -> int:
+	var total := 0
+	for sfx_id in session.audio.fired:
+		if String(sfx_id).begins_with(prefix):
+			total += 1
+	return total

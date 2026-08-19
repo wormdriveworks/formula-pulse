@@ -173,6 +173,8 @@ ui.sponsor.sp4,명성 계약
 ui.relation.kinship,동기
 ui.relation.succession,계승
 ui.relation.throne,왕좌
+ui.relation.reunion,재회
+ui.relation.successionMaro,계승 — 셀린
 ui.consumable.p1,리페어 키트
 ui.consumable.p2,이머전시 실런트
 ui.consumable.p3,쿨런트 차지
@@ -359,6 +361,9 @@ ui.eventNode.rewardChassisFormat,섀시 +{amount}
 ui.eventNode.rare,희귀
 ui.vn.skip,스킵 ▶▶
 ui.vn.speakerVane,베인
+ui.vn.speakerMarta,마르타
+ui.vn.speakerTheo,테오
+ui.vn.speakerNarration,
 ui.vn.placeholderLine01,…통신 채널 연결. 브리핑을 시작한다.
 ui.vn.calendarTitle,리그 공식 발표 — 시즌 캘린더
 ui.vn.calendarRowFormat,투어 {tour} — {stage}
@@ -609,3 +614,78 @@ ui.tutorial.charge,차지 2 소모. 트러블 변수 소거. 권장 — 없음.
 ui.tutorial.confirm,잠정 결과 = 전개 후보. 확정 시 사건화.
 ui.tutorial.skip,건너뛰기
 ui.tutorial.stepFormat,{current}/{total}
+vn.act1.beat01,개러지. 차고 한 칸과 머신 한 대.
+vn.act1.beat02,노스윈드 개러지에 남은 건 이게 전부다.
+vn.act1.beat03,그래도 굴러갑니다. 어제 밤새 확인했어요.
+vn.act1.beat04,섀시 코드 NW-01. 이름은 보레아스.
+vn.act1.beat05,채권 정리 과정에서 헐값에 건졌다.
+vn.act1.beat06,관제 유닛에 신호가 들어온다.
+vn.act1.beat07,본 유닛 기동. 식별자 = 베인.
+vn.act1.beat08,주행 이력 조회 실패. 참조 데이터 없음.
+vn.act1.beat09,…방금 뭐라고 한 거예요?
+vn.act1.beat10,이 팀처럼 아무것도 없다는 뜻이지.
+vn.act1.beat11,카 넘버 13. 아무도 달지 않는 번호다.
+vn.act1.beat12,그러니 아무도 우리를 보지 않는다.
+vn.act2.beat01,포디움에서 내려온 뒤의 피트.
+vn.act2.beat02,표시판에 우리 팀 이름이 떴어요.
+vn.act2.beat03,노스윈드. 세 번째 자리에.
+vn.act2.beat04,그 표시판에 오랜만에 올랐다.
+vn.act2.beat05,패독의 시선이 이쪽을 향한다.
+vn.act2.beat06,이제 저쪽도 이 번호를 적어둘 거다.
+vn.act2.beat07,보레아스가 무슨 뜻인지 아세요?
+vn.act2.beat08,북풍의 신이래요. 찾아봤습니다.
+vn.act2.beat09,…누가 그런 이름을 붙였을까.
+vn.act2.beat10,명명 기록 조회 실패. 접근 권한 없음.
+vn.act2.beat11,그런 것도 막혀 있어요?
+vn.act2.beat12,해당 영역은 조회 대상 밖입니다.
+vn.act3.beat01,투어 종합 1위. 트로피는 없다.
+vn.act3.beat02,투어 하나를 가져왔다.
+vn.act3.beat03,팩토리 팀들 사이에서요.
+vn.act3.beat04,저쪽 계산에는 없던 결과다.
+vn.act3.beat05,대회 4전 누적 = 예측 분포 이탈.
+vn.act3.beat06,이탈 원인 미상. 재현 조건 불명.
+vn.act3.beat07,재현될 필요는 없다.
+vn.act3.beat08,한 코너면 된다.
+vn.act3.beat09,마르타가 화이트보드에 코너 하나를 그린다.
+vn.act3.beat10,저쪽은 랩 전체를 계산한다.
+vn.act3.beat11,우리는 그중 한 순간만 가져오면 된다.
+vn.act3.beat12,해당 접근의 성립 조건 산출 중.
+vn.act4.beat01,로렌츠보다 앞서 체커를 받은 날의 개러지.
+vn.act4.beat02,1번보다 먼저 들어왔어요. 진짜로요.
+vn.act4.beat03,한 대회다. 챔피언십은 저쪽이 위다.
+vn.act4.beat04,그래도 나란히 달렸어요. 마지막 랩까지.
+vn.act4.beat05,…그래. 나란히 달렸다.
+vn.act4.beat06,최종 랩 전 구간 접촉 거리 유지 확인.
+vn.act4.beat07,20년 전에 이 팀이 원한 게 그거다.
+vn.act4.beat08,왕을 밟는 게 아니라 옆에 서는 것.
+vn.act4.beat09,이제 섰는데요.
+vn.act4.beat10,미완성인 채로 섰다. 그게 더 낫다.
+vn.act4.beat11,정의 불명 항목. 학습 대상으로 등록합니다.
+vn.origin.beat01,개러지의 문이 닫힌다.
+vn.origin.beat02,보레아스를 어디서 건졌는지 말했지.
+vn.origin.beat03,누가 만들었는지는 말하지 않았다.
+vn.origin.beat04,악시온 다이내믹스다.
+vn.origin.beat05,…저쪽이 이걸 만들었다고요?
+vn.origin.beat06,만들었다. 그리고 버렸다.
+vn.origin.beat07,같은 입력에 같은 출력 — 저쪽 신조다.
+vn.origin.beat08,이 관제 유닛은 그 신조를 못 지켰다.
+vn.origin.beat09,미승인 출력 기록 확인. 재현 검증 실패.
+vn.origin.beat10,검증을 맡은 테스트 드라이버가 있었다.
+vn.origin.beat11,빅터 로렌츠다.
+vn.origin.beat12,…그 사람이요?
+vn.origin.beat13,완전한 제어로는 열리지 않았다.
+vn.origin.beat14,결함으로 보고했고 저쪽은 폐기했다.
+vn.origin.beat15,그 판단은 저쪽 세계에서는 옳았다.
+vn.origin.beat16,우리는 제어하지 않았다. 그게 전부다.
+vn.epilogue.beat01,두 번째 시즌의 결산이 끝난 개러지.
+vn.epilogue.beat02,연속 두 번이에요. 기록실에 남았어요.
+vn.epilogue.beat03,더블 챔피언. 이제 둘이다.
+vn.epilogue.beat04,로렌츠 쪽은요?
+vn.epilogue.beat05,그대로다. 빼앗는 칭호가 아니다.
+vn.epilogue.beat06,벽에는 20년 전 팀 사진이 걸려 있다.
+vn.epilogue.beat07,이 팀은 한 번 죽었다가 여기까지 왔다.
+vn.epilogue.beat08,다음은 네 차례겠지.
+vn.epilogue.beat09,제가요?
+vn.epilogue.beat10,언젠가는 그렇게 된다.
+vn.epilogue.beat11,다음 시즌 참조 데이터 = 두 시즌분.
+vn.epilogue.beat12,이번에는 조회에 실패하지 않습니다.

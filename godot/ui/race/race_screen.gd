@@ -16,6 +16,9 @@ extends FlowScreen
 
 const REEL_COUNT := 3
 # 라이벌 id — 데이터 행 키 참조이며 표시 문자열이 아니다(불변규칙 6의 테이블 ID 체계).
+# CG-02 판정 상수 — '대면' = 관계 단계 1 (총괄 판정 IMPL-249 Q1 확정)
+const KAI_ID := "ai_sherwood"
+const REUNION_MEETING_STAGE := 1
 const JUDE_ID := "ai_jude"
 # TUT-01 이 기다릴 수 있는 행동 전량 — **이 화면이 실제로 발화하는 것만** 여기 든다.
 # 단계 표(`tutorial_steps.csv`)가 이 집합 밖의 행동을 지목하면 그 단계는 영원히 넘어가지 않고
@@ -1003,8 +1006,9 @@ func _collect_triggers(events: Array) -> Array:
 
 # L3 조우 판정 (D10 §7 결정 #6 — CG-01~03은 D08 §8.11 발견형 히든 업적과 1:1).
 # 세 행이 같은 문형(**[상대] ([조건] 듀얼)**)이라 판정도 같은 구조다: 조건 성립 + 그 상대와의 듀얼.
-# **CG-02(재회 — 카이)만 미결선** — '대면' 도달 축이 `relation_axes` 에 부재하다
-# (T7 서사 유입 의존 — IMPL-113 §5). 축이 들어오면 여기 한 갈래가 는다.
+# **CG-02(재회 — 카이) 결선분** — T7 서사 유입으로 `relation_reunion` 축이 서면서
+# 닫혔다(총괄 판정 IMPL-249 Q1: '대면' = 관계 단계 1 · D04 §4.2 4단계 "회피→대면→응어리→
+# 화해/결착" 의 양단 고정 + `achievements.csv` threshold=3 실독으로 도출).
 #
 # 조건 판정은 화면 상태를 타지 않는 순수 함수로 둔다 — 화면을 세우지 않고 검사할 수 있어야
 # 조건이 조용히 어긋나는 일을 막는다(무대 5·시즌 중반은 실기로 밟기 어려운 경로다).
@@ -1030,6 +1034,16 @@ static func l3_kinship_for(opponent: String, overtaken: bool, rank_delta: int,
 	return "cg_03_kinship"
 
 
+# CG-02(재회 — 카이): **'대면' 도달 후의 카이 듀얼 결판**.
+# 세 CG 가 같은 문형(**[상대] ([조건] 듀얼)**)이라 판정도 같은 구조다 — 조건 성립 + 그 상대.
+# 여기서 조건은 관계 단계이며, 단계는 **투어 경계에서 공표된 값**을 읽는다(D07 §5.5) —
+# 주행 중 카운터가 올라도 그 GP 안에서 조건이 켜지지 않는다. 그것이 스냅의 취지다.
+static func l3_reunion_for(opponent: String, reunion_stage: int, duel_decided: bool) -> String:
+	if not duel_decided or opponent != KAI_ID or reunion_stage < REUNION_MEETING_STAGE:
+		return ""
+	return "cg_02_reunion"
+
+
 func _l3_encounter_id(events: Array) -> String:
 	var decided := false
 	for event in events:
@@ -1045,11 +1059,17 @@ func _l3_encounter_id(events: Array) -> String:
 		true)
 	if not throne.is_empty():
 		return throne
-	return l3_kinship_for(
+	var kinship := l3_kinship_for(
 		engine.duel_opponent,
 		session.outgame.jude_overtaken,
 		session.jude_rank_delta(),
 		int(data.param("param_jude_adjacent_max")))
+	if not kinship.is_empty():
+		return kinship
+	return l3_reunion_for(
+		engine.duel_opponent,
+		session.outgame.relation_stage("relation_reunion"),
+		true)
 
 
 func _run_presentation(events: Array) -> void:

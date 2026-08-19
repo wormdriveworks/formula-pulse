@@ -4,9 +4,10 @@
 #   godot --headless --path . --script tools/validators/run_validators.gd
 #
 # 차단 규칙: V1~V6·V8 + 혼입 0 스캔 = 위반 1건이면 실패(exit 1).
-# 구현 층 신설 검사 **MIX0·ARCH·FONT·PAL·ANCH 도 차단형**이다 (불변규칙 7 —
+# 구현 층 신설 검사 **MIX0·ARCH·FONT·PAL·ANCH·STRF 도 차단형**이다 (불변규칙 7 —
 #   FONT = 총괄 판정 IMPL-148 · PAL = 조건부 기승인 IMPL-209 → 발동 IMPL-219 ·
-#   ANCH = 경고형 신설 IMPL-233 → 규칙 확대 + 차단형 전환 IMPL-237).
+#   ANCH = 경고형 신설 IMPL-233 → 규칙 확대 + 차단형 전환 IMPL-237 ·
+#   STRF = 차단형 즉시 신설 IMPL-249 ③).
 # V7(금칙 어휘)은 경고 전용 — 빌드를 차단하지 않는다 (D12 §4.2 V7 행 · D14 TL-1 명문).
 # V6 내부: ID 중복·접두 위반 = 차단 / 고아 데이터 = 경고 (D12 §4.2 V6 행 "고아 데이터 … 경고").
 #
@@ -40,6 +41,7 @@ func _init() -> void:
 	_run_font_scan()
 	_run_palette_scan()
 	_run_anchor_scan()
+	_run_string_field_scan()
 	print("")
 	if _fail_count == 0:
 		print("VALIDATORS_PASS warnings=%d" % _warn_count)
@@ -1442,3 +1444,94 @@ func _anchor_paired_names(lines: Array) -> Dictionary:
 			elif lhs.ends_with("." + String(property_name)):
 				names[lhs.substr(0, lhs.length() - String(property_name).length() - 1)] = true
 	return names
+
+
+# ── STRF 스트링 표 필드 수 검사 (총괄 판정 IMPL-249 ③ — **차단형 즉시 신설**) ──
+#
+# **왜 기계인가.** `strings.csv` 는 값에 콤마가 들어가는 순간 필드가 하나 늘어난다.
+# 그러면 값이 **조용히 잘리고** 화면에는 앞토막만 뜬다 — 문면이 그럴듯하게 남아 있어서
+# 눈으로는 "문장이 좀 짧네" 정도로 보인다. T7 납품 회차에 실제로 1건이 그 형태였다
+# (`vane.brief.resonance03` — 인용부의 콤마).
+#
+# **인용을 존중한다 — 산술 비교만으로는 오검출이 난다(실측).** 판정 문면은 "필드 수 = 헤더 수
+# 산술 비교"였으나, 그대로 구현하니 **정상 데이터 2건이 걸렸다**: `resonance03` 의 RFC4180
+# 인용 복원분과 `ui.save.cardFormat` 의 **인용 안 줄바꿈**(레코드 1개가 물리 2줄)이다.
+# 런타임 되읽기로 둘 다 값이 온전함을 확인했다(`StringTable` = Godot `get_csv_line` 경유 —
+# 인용 인식). 그래서 이 검사도 **같은 규칙으로 레코드를 자른다** — 검사가 파서보다 엄하면
+# 그 차이가 곧 오검출이고, 느슨하면 잘림을 놓친다. 파서와 같은 문법을 보는 것이 요건이다.
+const STRF_TARGET := "strings_csv"
+
+
+func _run_string_field_scan() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	var path := String(_config[STRF_TARGET])
+	var text := _read_text(path)
+	if text == "":
+		_fail("STRF", "스트링 표를 읽지 못했다: %s" % path)
+		_report("STRF", "string table fields", checked, before_fail, before_warn)
+		return
+	var records := _strf_records(text)
+	var expected := -1
+	for record in records:
+		var row: Dictionary = record
+		var fields := int(row["fields"])
+		if expected < 0:
+			expected = fields   # 헤더가 기준이다 — 기대 수를 코드에 적지 않는다
+			continue
+		checked += 1
+		if fields != expected:
+			_fail("STRF", "%s:%d: 필드 %d개 (헤더 %d개) — 인용하지 않은 콤마는 값을 자른다: '%s'"
+				% [path, int(row["line"]), fields, expected, String(row["head"])])
+	_report("STRF", "string table fields", checked, before_fail, before_warn)
+
+
+# RFC4180 레코드 분해 — 인용 안의 콤마·줄바꿈은 구분자가 아니다(`""` = 리터럴 따옴표).
+# 반환 = [{line: 1-기준 시작 줄, fields: 필드 수, head: 첫 필드}]
+func _strf_records(text: String) -> Array:
+	var records: Array = []
+	var in_quotes := false
+	var fields := 1
+	var line := 1
+	var start_line := 1
+	var head := ""
+	var cell := ""
+	var first_cell := true
+	var index := 0
+	while index < text.length():
+		var ch := text[index]
+		if in_quotes:
+			if ch == '"':
+				if index + 1 < text.length() and text[index + 1] == '"':
+					index += 1          # 이스케이프된 따옴표
+				else:
+					in_quotes = false
+			elif ch == "\n":
+				line += 1               # 인용 안 줄바꿈 — 레코드는 계속된다
+		elif ch == '"':
+			in_quotes = true
+		elif ch == ",":
+			fields += 1
+			if first_cell:
+				head = cell
+				first_cell = false
+		elif ch == "\n":
+			if not (fields == 1 and cell.strip_edges() == "" and first_cell):
+				records.append({"line": start_line, "fields": fields,
+					"head": head if not first_cell else cell})
+			line += 1
+			start_line = line
+			fields = 1
+			cell = ""
+			head = ""
+			first_cell = true
+			index += 1
+			continue
+		if not in_quotes and ch != "," and ch != "\n" and first_cell:
+			cell += ch
+		index += 1
+	if not (fields == 1 and cell.strip_edges() == "" and first_cell):
+		records.append({"line": start_line, "fields": fields,
+			"head": head if not first_cell else cell})
+	return records

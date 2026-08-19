@@ -1,5 +1,5 @@
-id,name_key,priority,relation_transition
-mvn_act_transition,ui.milestoneVn.actTransition,1,
-mvn_crew_join,ui.milestoneVn.crewJoin,2,relation_kinship
-mvn_origin_clue,ui.milestoneVn.originClue,3,
-mvn_general_feat,ui.milestoneVn.generalFeat,4,
+id,name_key,priority,relation_transition,tone
+mvn_act_transition,ui.milestoneVn.actTransition,1,,calm
+mvn_crew_join,ui.milestoneVn.crewJoin,2,relation_kinship,calm
+mvn_origin_clue,ui.milestoneVn.originClue,3,,calm
+mvn_general_feat,ui.milestoneVn.generalFeat,4,,calm

@@ -2,3 +2,5 @@ id,name_key,rival_id,counter_source,threshold1,threshold2,threshold3
 relation_kinship,ui.relation.kinship,ai_jude,adjacent_finish_and_duel,4,9,15
 relation_succession,ui.relation.succession,ai_bianca,beat_and_duel,3,8,14
 relation_throne,ui.relation.throne,ai_lorentz,duel_with_lorentz,2,6,12
+relation_succession_maro,ui.relation.successionMaro,ai_maro,beat_and_duel,3,8,14
+relation_reunion,ui.relation.reunion,ai_sherwood,alta_ridge_vn_chain,2,3,4

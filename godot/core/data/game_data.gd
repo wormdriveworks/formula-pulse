@@ -38,6 +38,9 @@ var skills: Dictionary = {}            # skill_* id -> 행 (D07 §4.2)
 var crew: Dictionary = {}              # crew_* id -> 행 (D07 §5.1 · D13 별첨A §5.1)
 var sponsors: Dictionary = {}          # sponsor_* id -> 행 (D13 별첨A §5.3)
 var relation_axes: Dictionary = {}     # relation_* id -> 행 (D13 별첨A §5.2)
+# 막 VN 인스턴스 (T7 납품 6건 — D04 §1.2 진입 마일스톤 · D08 §8.1 서사 층 래치).
+# **슬롯 종류 표(`milestone_vn`)와 별개다** — 그쪽은 경합 우선순위 축이고 이쪽은 실인스턴스다.
+var act_vn: Dictionary = {}
 var consumables: Dictionary = {}       # consumable_* id -> 행 (D13 별첨A §3.6)
 var settlement_rewards: Dictionary = {}  # reward_* id -> 행 (D13 별첨A §3.2)
 var vn_slots: Dictionary = {}          # vnslot_* id -> 행 (D08 §8.4)
@@ -99,6 +102,7 @@ func _load_content() -> void:
 	stages.clear()
 	scripted_losses.clear()
 	manifest = _load_json(STRUCTURES_DIR + "content_manifest.json")
+	act_vn = _load_json(STRUCTURES_DIR + "act_vn.json")
 	for stage_id in _manifest_array("stages"):
 		stages[stage_id] = _load_json("%s%s.json" % [STRUCTURES_DIR, stage_id])
 	for circuit_id in _manifest_array("circuits"):
@@ -400,6 +404,19 @@ func consumable(row_id: String) -> Dictionary:
 		_load_ok = false
 		return {}
 	return consumables[row_id]
+
+
+# 막 VN 인스턴스 전량 (발행 순서 = `order`). 값 창구 경유 — 코드에 막 번호·라인을 적지 않는다.
+func act_vn_entries() -> Array:
+	var value: Variant = act_vn.get("entries", [])
+	return value if typeof(value) == TYPE_ARRAY else []
+
+
+func act_vn_entry(vn_id: String) -> Dictionary:
+	for entry in act_vn_entries():
+		if typeof(entry) == TYPE_DICTIONARY and String(entry.get("id", "")) == vn_id:
+			return entry
+	return {}
 
 
 func relation_axis(relation_id: String) -> Dictionary:

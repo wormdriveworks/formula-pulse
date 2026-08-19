@@ -15,10 +15,14 @@ extends FlowScreen
 
 # 베인 화자 판별용 — 큐음이 갈린다 (SE-V01 베인 3단계 / SE-V02 그 외 공용, D11 §2.10).
 const VANE_SPEAKER_KEY := "ui.vn.speakerVane"
+# 투어 브리핑 슬롯 — 재회 체인 비트 3축 중 하나의 발생 지점 (`vn_slots.csv`)
+const TOUR_BRIEF_SLOT := "vnslot_tour_brief"
 
+# 라인 = `{"speaker_key": String, "text_key": String}` 로 정규화해 둔다.
+# 문자열 항목도 그대로 받는다 — 골격·아카이브 재열람 등 기존 호출부가 문자열 배열을 넘긴다.
 var _lines: Array = []
 var _line_index := 0
-var _speaker_is_vane := true
+var _default_speaker_key := VANE_SPEAKER_KEY
 var _calendar_pending := false
 var _next_route := ""
 var _next_payload: Dictionary = {}
@@ -39,23 +43,25 @@ func _on_bound(payload: Dictionary) -> void:
 		session.narrative.replay_from_archive(vn_id)
 	elif not vn_id.is_empty():
 		var outcome: Dictionary = session.narrative.trigger_vn(vn_id, slot_id, false)
+		if bool(outcome.get("occurred", false)) and slot_id == TOUR_BRIEF_SLOT:
+			# 재회 체인 비트 — 투어 브리핑 VN 축 (D08 §8.7-3). **발생 시점에 센다**:
+			# 열람·스킵을 가르지 않는 것이 형식 A 의 계약이고(§10.3 R-D07-VN),
+			# 재열람 경로(`_replay`)는 이 갈래에 들어오지 않으므로 불계수가 구조로 선다.
+			session.record_reunion_beat("tour_brief")
 		if not bool(outcome.get("occurred", false)):
 			# 상한 도달 등으로 미발생 — 화면을 세우지 않고 다음으로 직행
 			go(_next_route, _next_payload)
 			return
 
-	# VN 트랙 2종 (BGM-09 일상 / BGM-10 긴장). **D11 §4.1 은 "트랙 선택 = 이벤트 데이터 태그
-	# (스키마 D12)"로 확정했으나 `vn_slots`·`milestone_vn` 어느 표에도 그 열이 없다** —
-	# 태그가 유입될 때까지 페이로드로 받고 미지정은 일상으로 둔다. [가안] · 총괄 보고분.
-	sfx("vn_enter_%s" % String(payload.get("tone", "calm")))
+	# VN 트랙 2종 (BGM-09 일상 / BGM-10 긴장) — D12 v1.3 §5.4 `tone` 열 결선분.
+	sfx("vn_enter_%s" % _resolve_tone(payload, slot_id, vn_id))
 	(%SkipButton as Button).text = s.text("ui.vn.skip")
 	(%SkipButton as Button).set_meta(AUDIO_EVENT_META, "ui_cancel")   # 스킵 = 닫기 축
 	(%SkipButton as Button).pressed.connect(_on_skip.bind(vn_id, slot_id))
-	var speaker_key := String(payload.get("speaker_key", "ui.vn.speakerVane"))
-	var speaker_text := s.text(speaker_key)
-	(%SpeakerLabel as Label).text = speaker_text
-	_speaker_is_vane = speaker_key == VANE_SPEAKER_KEY
-	_lines = payload.get("line_keys", ["ui.vn.placeholderLine01"])
+	# 화자는 **라인 단위**다 (총괄 판정 IMPL-249 ② — 신설안 C 승인).
+	# 페이로드의 `speaker_key` 는 라인이 화자를 지정하지 않았을 때의 기본값으로만 남는다.
+	_default_speaker_key = String(payload.get("speaker_key", VANE_SPEAKER_KEY))
+	_lines = _normalize_lines(payload.get("line_keys", ["ui.vn.placeholderLine01"]))
 	_line_index = 0
 	_show_line()
 	(%AdvanceButton as Button).grab_focus()
@@ -72,12 +78,59 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+# 정조 해석 (D12 v1.3 §5.4) — **미지정 = `calm`.** 값 도메인은 표시 문면(일상/긴장)이 아니라
+# `sound_map` 의 event_id 조립 문자열이다(`vn_enter_calm`/`vn_enter_tense`).
+#
+# 우선순위 = **인스턴스 > `milestone_vn` > `vn_slots` > `calm`.**
+# D12 는 정조 열을 **VN 발생 단위 표** 2종에 두었는데 그 두 표는 *슬롯 종류* 축이다
+# (막 전이/크루 합류/기원 단서/일반 성취). T7 납품 6건은 같은 '막 전이' 종류 안에서
+# 정조가 갈리므로(1·2막·에필로그 = calm / 3·4막·기원 공개 = tense) 종류 행 하나로는
+# 표현되지 않는다 — 그래서 인스턴스가 정조를 들고 오면 그것이 이긴다. **[가안]**:
+# 표 열이 인스턴스별 정조를 담을 자리를 얻으면 이 우선순위 한 줄이 사라진다.
+func _resolve_tone(payload: Dictionary, slot_id: String, vn_id: String) -> String:
+	var tone := String(payload.get("tone", ""))
+	if tone.is_empty():
+		tone = String(session.data.milestone_vn_row(vn_id).get("tone", ""))
+	if tone.is_empty():
+		tone = String(session.data.vn_slot(slot_id).get("tone", ""))
+	return tone if tone == "calm" or tone == "tense" else "calm"
+
+
+# 페이로드 라인 목록 정규화 — 문자열 항목과 사전 항목을 함께 받는다(하위 호환).
+#
+# **왜 사전이 필요한가.** 정본 3개소가 한 VN 안의 복수 화자를 전제한다: D04 §5.2 지문·
+# D09 별첨A §A-19 좌/우 2인·D11 §2.10 베인 전용 큐음. 이벤트 단위 화자로는 그 셋을
+# 동시에 만족하는 표현이 없다 — 실제로 T7 납품 6건이 **전건** 화자 교대를 쓴다.
+func _normalize_lines(raw: Variant) -> Array:
+	var normalized: Array = []
+	if typeof(raw) != TYPE_ARRAY:
+		return normalized
+	for item in raw:
+		if typeof(item) == TYPE_DICTIONARY:
+			var entry: Dictionary = item
+			normalized.append({
+				"speaker_key": String(entry.get("speaker_key", _default_speaker_key)),
+				"text_key": String(entry.get("text_key", "")),
+			})
+		else:
+			# 구 계약 — 문자열 1개 = 텍스트 키. 화자는 페이로드 기본값을 승계한다.
+			normalized.append({"speaker_key": _default_speaker_key, "text_key": String(item)})
+	return normalized
+
+
 func _show_line() -> void:
 	var s := session.data.strings
-	(%BodyLabel as Label).text = s.text(String(_lines[_line_index]))
+	var line: Dictionary = _lines[_line_index]
+	var speaker_key := String(line["speaker_key"])
+	(%BodyLabel as Label).text = s.text(String(line["text_key"]))
+	# 화자 라벨도 라인마다 바뀐다. 지문 화자(`ui.vn.speakerNarration`)는 값이 공란이라
+	# 라벨이 비는 것이 곧 지문 표기다 — 별도 분기를 두지 않는다.
+	(%SpeakerLabel as Label).text = s.text(speaker_key)
 	# 대사창 갱신 1회당 큐음 1발 (D11 §2.10). 베인만 인격 3단계로 음색이 갈리고
 	# 나머지 화자는 공용음이다 — 캐릭터별 개별음은 불채택 확정.
-	if _speaker_is_vane:
+	# **판정을 라인 단위로 옮겼다** — 이벤트 단위로 두면 마르타 대사에 베인 3단계 큐음이
+	# 실린다(D11 §2.10 위반). 총괄 판정 IMPL-249 ② 교정분.
+	if speaker_key == VANE_SPEAKER_KEY:
 		sfx("vane_cue_stage%d" % session.outgame.vane_stage())
 	else:
 		sfx("speaker_cue")
