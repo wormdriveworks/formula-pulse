@@ -182,7 +182,7 @@ vane.brief.duel02,결판 국면입니다. 갑니다.
 vane.brief.duel03,결판. 제가 맞추겠습니다.
 vane.brief.resonance01,방금 출력은… 제 제어가 아닙니다.
 vane.brief.resonance02,또 그 출력입니다. 원인 미상.
-vane.brief.resonance03,그 출력, 이제 읽힙니다.
+vane.brief.resonance03,"그 출력, 이제 읽힙니다."
 ui.vnSlot.seasonOpen,시즌 개막
 ui.vnSlot.seasonClose,시즌 결산
 ui.vnSlot.tourBrief,투어 브리핑
@@ -602,10 +602,10 @@ ui.achievement.seasonUnknown,—
 ui.achievement.serviceUnlinked,도전과제 미연동 — 게임 내 달성 기록은 그대로 유지됩니다.
 ui.achievement.close,닫기
 ui.title.achievements,업적
-ui.tutorial.spin,[문안 미유입]
-ui.tutorial.hold,[문안 미유입]
-ui.tutorial.respin,[문안 미유입]
-ui.tutorial.charge,[문안 미유입]
-ui.tutorial.confirm,[문안 미유입]
+ui.tutorial.spin,본 유닛 대기. 전개 후보 산출 — 개시 입력 요청.
+ui.tutorial.hold,후보 고정 가능. 유지 항목을 지목하십시오.
+ui.tutorial.respin,잔여 항목 재연산. 턴당 1회. 비용 차지 1.
+ui.tutorial.charge,차지 2 소모. 트러블 변수 소거. 권장 — 없음.
+ui.tutorial.confirm,잠정 결과 = 전개 후보. 확정 시 사건화.
 ui.tutorial.skip,건너뛰기
 ui.tutorial.stepFormat,{current}/{total}
