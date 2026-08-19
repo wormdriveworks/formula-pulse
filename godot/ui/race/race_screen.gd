@@ -207,7 +207,13 @@ func _boot() -> void:
 	_apply_static_strings()
 	# TUT-01 — 첫 그랑프리 실주행 위 오버레이(§6 "별도 튜토리얼 스테이지 불신설").
 	# 1회성 판정은 온보딩 기록이 쥔다(옵션 초기화로 재활성 — §A-25 확정).
-	_tutorial.setup(session, self)
+	#
+	# 세 번째 인자 = 콜아웃이 덮으면 안 되는 상시 표시 영역(IMPL-258). **Zone A 만 넘긴다** —
+	# 순위·랩·게이지는 튜토리얼 중에도 계속 읽어야 하는 상태다. Zone D 는 넘기지 않는다:
+	# 5단계 중 3단계가 Zone D 를 *지목*하므로 예약해 버리면 반대편 배치가 성립하지 않는다
+	# (하이라이트 회피는 `_place_callout` 의 겹침 비교가 따로 본다).
+	var tut_reserved: Array[Control] = [%ZoneA as Control]
+	_tutorial.setup(session, self, tut_reserved)
 	# 레이스 HUD 의 버튼은 하나하나가 고유 게임 행동이라 일반 조작음을 붙이지 않는다
 	# (핸들러가 자기 이벤트를 울린다 — 키보드 입력도 같은 핸들러를 타므로 경로가 하나다).
 	# 정지 오버레이만 메뉴 성격이라 조작음을 결속한다.

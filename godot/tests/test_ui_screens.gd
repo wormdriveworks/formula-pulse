@@ -5,7 +5,7 @@
 # 무가드로 읽으면, 커리어를 연 경로에서는 멀쩡하고 **타이틀 직행 경로에서만** 죽는다.
 # 실제로 SYS-04 가 그렇게 샜다(총괄 판정 IMPL-176 ① — 타이틀 첫 진입 100% 재현).
 #
-# 검사 축 14종:
+# 검사 축 16종:
 #   ① 무커리어 문맥 성립 — SYS-01 → SYS-04 직행(D09 본문 145행·§A-1 규격 진입)
 #   ② 패드 순회 폐쇄 — 초기 포커스 보유 (D09 §1.3 · 총괄 판정 IMPL-176 ②)
 #   ③ 단독 경로 옵션 정합 — 라우터를 안 거치는 경로가 O9 를 적용하는가 (동 ③)
@@ -20,7 +20,8 @@
 #   ⑫ 코드 생성 Control 배치 — `set_anchors_preset` 순서 함정 전수 (IMPL-229 ⑥)
 #   ⑬ ANCH·STRF 검사 실재 — 검사가 조용히 사라지지 않는가 (IMPL-233 ② · IMPL-249 ③)
 #   ⑭ VN 라인 단위 화자 — 큐음이 화자를 따라가는가 (IMPL-249 ②)
-#   ⑫ 도상 치수 2규격 공존 — 릴 32 무배율 ↔ 섹터 속성 16 (IMPL-226)
+#   ⑮ 도상 치수 2규격 공존 — 릴 32 무배율 ↔ 섹터 속성 16 (IMPL-226)
+#   ⑯ 튜토리얼 콜아웃 배치 — 지목 요소·상시 표시 스트립 양쪽 불침범 (IMPL-258)
 #
 # **첫 프레임(`_process`)에서 돈다.** `_init()` 시점에는 `root` 가 없어 `add_child` 자체가
 # 불가능하고, `_initialize()` 시점에는 `root` 가 있어도 **아직 트리 안이 아니다** — 그래서
@@ -53,6 +54,7 @@ const LAYOUT_SETTLE_FRAMES := 4
 
 var _frame := 0
 var _settle_probe: Control
+var _settle_race: Control
 
 
 func _process(_delta: float) -> bool:
@@ -65,6 +67,9 @@ func _process(_delta: float) -> bool:
 	if _frame < LAYOUT_SETTLE_FRAMES:
 		if _frame == 1:
 			_settle_probe = _mount(ACHIEVEMENT_SCENE, _fresh_session(data))
+			# 튜토리얼 콜아웃 축(⑯)도 정렬이 끝난 부모를 요구한다 — 예약 영역(Zone A)의
+			# 실 rect 를 읽어 배치하므로, 스트립이 0 크기면 "불침범"이 0==0 으로 성립한다.
+			_settle_race = _mount(RACE_SCENE, _fresh_session(data))
 		return false
 	_achievement_without_career(data)
 	_achievement_with_career(data)
@@ -88,10 +93,11 @@ func _process(_delta: float) -> bool:
 	_icon_size_regimes(data)
 	_anch_check_present()
 	_vn_line_speakers(data)
+	_tutorial_callout_placement()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 172:
-		print("UI_SCREENS_FAIL checks=%d < 하한 172 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 190:
+		print("UI_SCREENS_FAIL checks=%d < 하한 190 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1243,3 +1249,47 @@ func _cue_count(session: RunSession, prefix: String) -> int:
 		if String(sfx_id).begins_with(prefix):
 			total += 1
 	return total
+
+
+# ── ⑯ 튜토리얼 콜아웃 배치 (총괄 배정 IMPL-253 ① · 교정 IMPL-258) ──
+#
+# 축은 **두 개를 동시에 만족하는가**다. 콜아웃은 ⓐ지목한 요소를 가리면 안 되고(IMPL-138 이
+# 세운 규칙) ⓑ상시 표시 스트립(Zone A)도 가리면 안 된다. 하나만 보면 통과한다 —
+# 실측된 결함이 정확히 그 형태였다: 지목 요소는 비켜 갔지만 스트립 30px 중 22px 을 덮었다.
+#
+# **앵커가 아니라 실 rect 교집합으로 본다.** 예약 영역은 노드 rect 에서 읽어 배치하므로
+# 앵커·오프셋 값을 단언하면 배치 규칙이 바뀔 때마다 검사를 고쳐야 하고, 정작 "겹쳤는가"는
+# 보지 못한다. 겹침 면적 0 이 계약이다.
+func _tutorial_callout_placement() -> void:
+	var screen := _settle_race
+	if screen == null:
+		_ok("전제: 배치 측정용 레이스 화면 실재", false)
+		return
+	var strip := screen.get_node("Root/ZoneA") as Control
+	var panel := screen.get_node("%CalloutPanel") as Control
+	var overlay := screen.get_node("%TutorialOverlay") as Control
+	# 0 크기 부모에서는 교집합이 늘 0 이라 단언 전체가 공회전한다.
+	_ok("전제: 상단 스트립이 실 크기를 가진다", strip.size.x > 0.0 and strip.size.y > 0.0,
+		str(strip.size))
+	overlay.begin()
+	_ok("전제: 콜아웃 패널이 크기를 가진다", panel.size.x > 0.0 and panel.size.y > 0.0,
+		str(panel.size))
+	var steps: Array = screen.session.data.tutorial_steps
+	_ok("전제: 단계 표 실재", steps.size() > 0, "steps=%d" % steps.size())
+	for i in range(steps.size()):
+		var step: Dictionary = steps[i]
+		var anchor := screen.find_child(String(step["anchor_node"]), true, false) as Control
+		var p_rect := panel.get_global_rect()
+		var strip_hit := p_rect.intersection(strip.get_global_rect()).get_area()
+		_ok("%d단계 — 상단 스트립 불침범" % (i + 1), strip_hit <= 0.0,
+			"겹침=%.1fpx²" % strip_hit)
+		if anchor != null:
+			var anchor_hit := p_rect.intersection(anchor.get_global_rect()).get_area()
+			_ok("%d단계 — 지목 요소 불가림" % (i + 1), anchor_hit <= 0.0,
+				"겹침=%.1fpx² 대상=%s" % [anchor_hit, step["anchor_node"]])
+		_ok("%d단계 — 콜아웃이 화면 안" % (i + 1),
+			p_rect.position.y >= -0.5 and p_rect.end.y <= CANVAS.y + 0.5,
+			str(p_rect))
+		overlay.notify_action(String(step["advance_on"]))
+	_unmount(screen)
+	_settle_race = null
