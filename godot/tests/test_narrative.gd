@@ -3,7 +3,7 @@
 # 실행: godot --headless --path godot --script tests/test_narrative.gd
 extends SceneTree
 
-const MIN_CHECKS := 120
+const MIN_CHECKS := 136
 
 var _failures := 0
 var _checked := 0
@@ -21,6 +21,7 @@ func _init() -> void:
 	_t7_cg02_branch()
 	_t7_session_triggers()
 	_t7_line_speakers()
+	_t7_choice_data()
 	print("")
 	if _checked < MIN_CHECKS:
 		print("NARRATIVE_TEST_FAIL checks=%d < 하한 %d (스위트 축소·로드 실패 의심)" % [_checked, MIN_CHECKS])
@@ -463,3 +464,68 @@ func _t7_line_speakers() -> void:
 		speakers[String(line["speaker_key"])] = true
 	_ok("1막 화자 2인 이상 교대", speakers.size() >= 2, str(speakers.keys()))
 	screen.free()
+
+
+# ⑦ 선택 지점 데이터 (D04 §5.3 · 총괄 판정 IMPL-257 ①).
+#
+# **기계가 못 보는 열이 하나 있다.** `vn_id` 는 `act_vn.json` 의 `entries[].id` 를 가리키는데
+# `_structure_ids()` 는 구조 파일의 **루트 id 만** 모으므로 FK 로 걸 수 없다 — V2 가 원리적으로
+# 닿지 않는 자리다. 그 공백을 적재 층 가드가 닫고, 그 가드가 실제로 도는지는 여기서 본다.
+func _t7_choice_data() -> void:
+	var data := _t7_data()
+	_ok("선택 지점 4건", data.vn_choices.size() == 4, str(data.vn_choices.size()))
+	_ok("앵커 대조 생략 0", Array(data.vn_choice_omitted).is_empty(), str(data.vn_choice_omitted))
+	var total_options := 0
+	var count_mismatch := 0
+	var order_broken := 0
+	var missing_key := 0
+	var anchor_missing := 0
+	var speaker_off := 0
+	var allowed_speakers := ["ui.vn.speakerMarta", "ui.vn.speakerTheo", "ui.vn.speakerVane"]
+	for choice_id in data.vn_choices:
+		var row: Dictionary = data.vn_choices[choice_id]
+		var options := data.vn_choice_options_for(String(choice_id))
+		total_options += options.size()
+		if options.size() != CsvTable.to_int(String(row["option_count"])):
+			count_mismatch += 1
+		# 앵커는 **그 VN 안의 라인**이어야 한다 — 검사가 적재 층 판정을 그대로 믿지 않고
+		# 원본 구조에서 독립으로 다시 찾는다(자기 정합 함정 회피).
+		var found := false
+		for line in Array(data.act_vn_entry(String(row["vn_id"])).get("lines", [])):
+			if String(Dictionary(line).get("text_key", "")) == String(row["after_text_key"]):
+				found = true
+		if not found:
+			anchor_missing += 1
+		for index in range(options.size()):
+			var option: Dictionary = options[index]
+			if CsvTable.to_int(String(option["option_order"])) != index + 1:
+				order_broken += 1
+			for column in ["text_key", "reaction_text_key", "reaction_speaker_key"]:
+				if not data.strings.has_key(String(option[column])):
+					missing_key += 1
+			if not allowed_speakers.has(String(option["reaction_speaker_key"])):
+				speaker_off += 1
+	_ok("선택지 10건", total_options == 10, str(total_options))
+	_ok("지점별 수 = option_count", count_mismatch == 0, "mismatch=%d" % count_mismatch)
+	_ok("option_order = 1..n 오름차순", order_broken == 0, "broken=%d" % order_broken)
+	_ok("전 텍스트·화자 키 실재", missing_key == 0, "missing=%d" % missing_key)
+	_ok("앵커가 해당 VN 라인에 실재", anchor_missing == 0, "missing=%d" % anchor_missing)
+	_ok("반응 화자 = 3자 전속", speaker_off == 0, "off=%d" % speaker_off)
+	# 대괄호는 데이터 값에 들어 있다 — 화면이 조립하면 언어별 괄호 관례를 흡수할 수 없다.
+	var bracket_off := 0
+	for choice_id in data.vn_choices:
+		for option in data.vn_choice_options_for(String(choice_id)):
+			var body := data.strings.text(String(option["text_key"]))
+			if not (body.begins_with("[") and body.ends_with("]")):
+				bracket_off += 1
+	_ok("선택지 문면 = 대괄호 포함", bracket_off == 0, "off=%d" % bracket_off)
+	# 조회는 **짝이 맞을 때만** 성립한다 — vn_id 만 같고 앵커가 다르면 지점이 아니다.
+	_ok("정상 조회", String(data.vn_choice_at("vn_act3", "vn.act3.beat11").get("id", "")) == "vnchoice_act3_corner")
+	_ok("앵커 불일치 = 미조회", data.vn_choice_at("vn_act3", "vn.act3.beat01").is_empty())
+	_ok("VN 불일치 = 미조회", data.vn_choice_at("vn_act1", "vn.act3.beat11").is_empty())
+	_ok("미등재 지점 옵션 = 빈 배열", data.vn_choice_options_for("vnchoice_none").is_empty())
+	# 가드의 음성 갈래 — 없는 키·빈 키는 앵커로 성립하지 않는다.
+	var act3 := data.act_vn_entry("vn_act3")
+	_ok("가드: 실재 라인 = true", data._vn_has_line(act3, "vn.act3.beat11"))
+	_ok("가드: 부재 라인 = false", not data._vn_has_line(act3, "vn.act1.beat01"))
+	_ok("가드: 빈 키 = false", not data._vn_has_line(act3, ""))

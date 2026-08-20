@@ -626,6 +626,9 @@ vn.act1.beat09,…방금 뭐라고 한 거예요?
 vn.act1.beat10,이 팀처럼 아무것도 없다는 뜻이지.
 vn.act1.beat11,카 넘버 13. 아무도 달지 않는 번호다.
 vn.act1.beat12,그러니 아무도 우리를 보지 않는다.
+vn.act1.react1,좋다. 그 손으로 몰아라.
+vn.act1.react2,저는 그 번호 마음에 들어요.
+vn.act1.react3,묻지 마라. 답은 트랙에 있다.
 vn.act2.beat01,포디움에서 내려온 뒤의 피트.
 vn.act2.beat02,표시판에 우리 팀 이름이 떴어요.
 vn.act2.beat03,노스윈드. 세 번째 자리에.
@@ -650,6 +653,9 @@ vn.act3.beat09,마르타가 화이트보드에 코너 하나를 그린다.
 vn.act3.beat10,저쪽은 랩 전체를 계산한다.
 vn.act3.beat11,우리는 그중 한 순간만 가져오면 된다.
 vn.act3.beat12,해당 접근의 성립 조건 산출 중.
+vn.act3.react1,그 얼굴이면 됐다.
+vn.act3.react2,여기냐. 눈은 나쁘지 않군.
+vn.act3.react3,시선 방향 기록. 우선순위 갱신합니다.
 vn.act4.beat01,로렌츠보다 앞서 체커를 받은 날의 개러지.
 vn.act4.beat02,1번보다 먼저 들어왔어요. 진짜로요.
 vn.act4.beat03,한 대회다. 챔피언십은 저쪽이 위다.
@@ -661,6 +667,8 @@ vn.act4.beat08,왕을 밟는 게 아니라 옆에 서는 것.
 vn.act4.beat09,이제 섰는데요.
 vn.act4.beat10,미완성인 채로 섰다. 그게 더 낫다.
 vn.act4.beat11,정의 불명 항목. 학습 대상으로 등록합니다.
+vn.act4.react1,오늘은 그걸로 됐다.
+vn.act4.react2,저도 봤어요. 전부 다요.
 vn.origin.beat01,개러지의 문이 닫힌다.
 vn.origin.beat02,보레아스를 어디서 건졌는지 말했지.
 vn.origin.beat03,누가 만들었는지는 말하지 않았다.
@@ -689,3 +697,15 @@ vn.epilogue.beat09,제가요?
 vn.epilogue.beat10,언젠가는 그렇게 된다.
 vn.epilogue.beat11,다음 시즌 참조 데이터 = 두 시즌분.
 vn.epilogue.beat12,이번에는 조회에 실패하지 않습니다.
+vn.epilogue.react1,이거 지금 받으라는 거예요?
+vn.epilogue.react2,그 사진에 없는 얼굴이 둘이다.
+vnChoice.act1.opt1,[스티어링을 고쳐 쥔다]
+vnChoice.act1.opt2,[13번을 손으로 덮는다]
+vnChoice.act1.opt3,[마르타를 본다]
+vnChoice.act3.opt1,[고개를 끄덕인다]
+vnChoice.act3.opt2,[코너 하나를 짚는다]
+vnChoice.act3.opt3,[베인의 파형을 본다]
+vnChoice.act4.opt1,[헬멧을 내려놓는다]
+vnChoice.act4.opt2,[테오의 어깨를 친다]
+vnChoice.epilogue.opt1,[테오에게 공구를 건넨다]
+vnChoice.epilogue.opt2,[벽의 사진을 본다]

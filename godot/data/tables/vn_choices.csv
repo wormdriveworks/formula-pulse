@@ -1,0 +1,5 @@
+id,vn_id,after_text_key,option_count
+vnchoice_act1_number,vn_act1,vn.act1.beat12,3
+vnchoice_act3_corner,vn_act3,vn.act3.beat11,3
+vnchoice_act4_standing,vn_act4,vn.act4.beat10,2
+vnchoice_epilogue_succession,vn_epilogue,vn.epilogue.beat10,2

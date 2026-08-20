@@ -1,0 +1,11 @@
+id,choice_id,option_order,text_key,reaction_speaker_key,reaction_text_key
+vnopt_act1_opt1,vnchoice_act1_number,1,vnChoice.act1.opt1,ui.vn.speakerMarta,vn.act1.react1
+vnopt_act1_opt2,vnchoice_act1_number,2,vnChoice.act1.opt2,ui.vn.speakerTheo,vn.act1.react2
+vnopt_act1_opt3,vnchoice_act1_number,3,vnChoice.act1.opt3,ui.vn.speakerMarta,vn.act1.react3
+vnopt_act3_opt1,vnchoice_act3_corner,1,vnChoice.act3.opt1,ui.vn.speakerMarta,vn.act3.react1
+vnopt_act3_opt2,vnchoice_act3_corner,2,vnChoice.act3.opt2,ui.vn.speakerMarta,vn.act3.react2
+vnopt_act3_opt3,vnchoice_act3_corner,3,vnChoice.act3.opt3,ui.vn.speakerVane,vn.act3.react3
+vnopt_act4_opt1,vnchoice_act4_standing,1,vnChoice.act4.opt1,ui.vn.speakerMarta,vn.act4.react1
+vnopt_act4_opt2,vnchoice_act4_standing,2,vnChoice.act4.opt2,ui.vn.speakerTheo,vn.act4.react2
+vnopt_epilogue_opt1,vnchoice_epilogue_succession,1,vnChoice.epilogue.opt1,ui.vn.speakerTheo,vn.epilogue.react1
+vnopt_epilogue_opt2,vnchoice_epilogue_succession,2,vnChoice.epilogue.opt2,ui.vn.speakerMarta,vn.epilogue.react2

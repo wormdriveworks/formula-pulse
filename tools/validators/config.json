@@ -333,6 +333,28 @@
     "tone": "enum:calm,tense"
    }
   },
+  "vn_choices.csv": {
+   "id_prefix": "vnchoice_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "vn_id": "string",
+    "after_text_key": "string_key",
+    "option_count": "int:2,3"
+   }
+  },
+  "vn_choice_options.csv": {
+   "id_prefix": "vnopt_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "choice_id": "fk:vn_choices.csv",
+    "option_order": "int:1,3",
+    "text_key": "string_key",
+    "reaction_speaker_key": "string_key",
+    "reaction_text_key": "string_key"
+   }
+  },
   "tour_slot_mods.csv": {
    "id_prefix": "slotmod_",
    "root": true,
@@ -548,6 +570,16 @@
    "root": true,
    "required": {
     "id": "string"
+   },
+   "arrays": {
+    "entries": {
+     "required": {
+      "id": "string",
+      "act": "int:1,4",
+      "tone": "enum:calm,tense",
+      "order": "int:1,9"
+     }
+    }
    }
   }
  },
@@ -617,6 +649,13 @@
   },
   {
    "domain_prefixes": [
+    "vnChoice."
+   ],
+   "max_lines": 1,
+   "max_chars_full": 14
+  },
+  {
+   "domain_prefixes": [
     "vn."
    ],
    "max_lines": 2,
@@ -627,6 +666,7 @@
   "raceLog.",
   "relay.",
   "vane.",
+  "vnChoice.",
   "vn."
  ],
  "v7_terms": [

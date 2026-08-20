@@ -5,7 +5,7 @@
 # 무가드로 읽으면, 커리어를 연 경로에서는 멀쩡하고 **타이틀 직행 경로에서만** 죽는다.
 # 실제로 SYS-04 가 그렇게 샜다(총괄 판정 IMPL-176 ① — 타이틀 첫 진입 100% 재현).
 #
-# 검사 축 16종:
+# 검사 축 17종:
 #   ① 무커리어 문맥 성립 — SYS-01 → SYS-04 직행(D09 본문 145행·§A-1 규격 진입)
 #   ② 패드 순회 폐쇄 — 초기 포커스 보유 (D09 §1.3 · 총괄 판정 IMPL-176 ②)
 #   ③ 단독 경로 옵션 정합 — 라우터를 안 거치는 경로가 O9 를 적용하는가 (동 ③)
@@ -22,6 +22,7 @@
 #   ⑭ VN 라인 단위 화자 — 큐음이 화자를 따라가는가 (IMPL-249 ②)
 #   ⑮ 도상 치수 2규격 공존 — 릴 32 무배율 ↔ 섹터 속성 16 (IMPL-226)
 #   ⑯ 튜토리얼 콜아웃 배치 — 지목 요소·상시 표시 스트립 양쪽 불침범 (IMPL-258)
+#   ⑰ VN 선택 지점 — 노드 부재 생략 ↔ 실재 발동·합류·스킵 생존 (IMPL-257)
 #
 # **첫 프레임(`_process`)에서 돈다.** `_init()` 시점에는 `root` 가 없어 `add_child` 자체가
 # 불가능하고, `_initialize()` 시점에는 `root` 가 있어도 **아직 트리 안이 아니다** — 그래서
@@ -93,11 +94,12 @@ func _process(_delta: float) -> bool:
 	_icon_size_regimes(data)
 	_anch_check_present()
 	_vn_line_speakers(data)
+	_vn_choice_point(data)
 	_tutorial_callout_placement()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 190:
-		print("UI_SCREENS_FAIL checks=%d < 하한 190 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 218:
+		print("UI_SCREENS_FAIL checks=%d < 하한 218 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1138,6 +1140,8 @@ func _anchor_preset_placement(data: GameData) -> void:
 # 차단형이 막지 못한다** — 위반이 없는 것과 검사가 없는 것을 종료코드는 구분하지 않는다.
 # PAL 이 죽은 조달로 대장 절반이 빈 채 통과했던 것과 같은 형태다(IMPL-198·201).
 const VALIDATOR_SOURCE := "res://../tools/validators/run_validators.gd"
+const VALIDATOR_CONFIG := "res://../tools/validators/config.json"
+const CHOICE_DOMAIN := "vnChoice."
 # 면제 목록은 **조용히 넓어지는 상수**다 — 넓히려면 이 단언을 함께 고쳐야 한다
 # (검사 수 하한과 같은 축: 의도적 완화만 통과시킨다).
 const ANCH_EXEMPT_EXPECTED := 'const ANCH_EXEMPT_PRESETS := ["PRESET_FULL_RECT"]'
@@ -1175,6 +1179,33 @@ func _anch_check_present() -> void:
 	_ok("STRF = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("STRF"'))
 	# 인용 인식이 규칙의 본체다 — 산술 비교로 되돌리면 정상 데이터 2건이 오검출된다(실측).
 	_ok("STRF 인용 인식 보유", source.contains("func _strf_records("))
+	# ── 선택지 자수 규칙 (총괄 판정 IMPL-257 ②) ──
+	# **검사가 아니라 규칙 행이다.** V3·V7 은 그대로 살아 있으므로 행이 지워져도 검사는 죽지
+	# 않고 **그 도메인만 조용히 규율 밖으로 나간다** — 종료코드가 구분하지 못하는 자리가
+	# ANCH·STRF 와 같아 같은 방식으로 실재를 건다(1차 `resonance03` 이 그 상태에서 샜다).
+	var config: Variant = JSON.parse_string(FileAccess.get_file_as_string(VALIDATOR_CONFIG))
+	_ok("검사 설정 적재", typeof(config) == TYPE_DICTIONARY)
+	if typeof(config) != TYPE_DICTIONARY:
+		return
+	var choice_rule: Dictionary = {}
+	for rule in Array(Dictionary(config).get("string_write_rules", [])):
+		if Array(Dictionary(rule).get("domain_prefixes", [])).has(CHOICE_DOMAIN):
+			choice_rule = rule
+	_ok("vnChoice. 자수 규칙 행 실재", not choice_rule.is_empty())
+	_ok("vnChoice. = 1줄", int(choice_rule.get("max_lines", -1)) == 1, str(choice_rule))
+	_ok("vnChoice. = 전각 14", int(choice_rule.get("max_chars_full", -1)) == 14, str(choice_rule))
+	_ok("vnChoice. V7 도메인 편입",
+		Array(Dictionary(config).get("v7_domains", [])).has(CHOICE_DOMAIN))
+	# ── `act_vn.json` 배열 스펙 (총괄 판정 IMPL-257 ① 부속) ──
+	# 스펙을 지우면 V1 은 **그대로 통과한다** — 검사가 죽는 게 아니라 볼 것이 없어질 뿐이다
+	# (돌연변이 M18 미검출로 실측). 같은 값 도메인이 표에서는 차단되고 구조에서는 새던
+	# 비대칭을 닫은 것이 이 스펙이므로, 스펙의 실재를 검사가 대신 지킨다.
+	var act_spec: Dictionary = Dictionary(Dictionary(config).get("structures", {})) \
+		.get("act_vn.json", {}).get("arrays", {}).get("entries", {}).get("required", {})
+	_ok("act_vn entries 스펙 실재", not act_spec.is_empty())
+	_ok("act_vn act 범위 강제", String(act_spec.get("act", "")) == "int:1,4", str(act_spec))
+	_ok("act_vn tone 도메인 강제", String(act_spec.get("tone", "")) == "enum:calm,tense", str(act_spec))
+	_ok("act_vn order 범위 강제", String(act_spec.get("order", "")) == "int:1,9", str(act_spec))
 
 
 # `ANCH_PAIR_PROPERTIES` 목록 본문만 떼어 공백을 지운 형태. 항목이 하나라도 늘거나
@@ -1237,6 +1268,135 @@ func _vn_line_speakers(data: GameData) -> void:
 	# 그래서 공용음 '추가'가 아니라 **베인 큐음이 안 늘었는가**로 본다 — 계약은 그쪽이다.
 	_ok("3라인(지문) = 베인 큐음 불추가", _cue_count(session, "SE-V01") == vane_first,
 		"vane=%d" % _cue_count(session, "SE-V01"))
+	root.remove_child(screen)
+	screen.free()
+
+
+# ── ⑰ VN 선택 지점 (D04 §5.3 · 총괄 판정 IMPL-257) ──
+#
+# 축이 **두 상태 모두**인 것이 요점이다. 오버레이 씬 노드는 주력 몫이라 지금은 없고,
+# 없는 상태에서 지점에 닿으면 화면이 멈추면 안 된다(생략). 노드가 선 뒤에는 지점이 실제로
+# 떠야 한다. 한쪽만 검사하면 **다른 쪽이 조용히 죽는다** — 특히 "지금 없다"는 이유로 부재
+# 경로만 보면, 주력이 노드를 세운 날 결선이 끊긴 것을 아무도 모른다.
+const CHOICE_VN_ID := "vn_act3"
+const CHOICE_ID := "vnchoice_act3_corner"
+
+
+func _vn_choice_point(data: GameData) -> void:
+	var lines: Array = [
+		{"speaker_key": "ui.vn.speakerMarta", "text_key": "vn.act3.beat10"},
+		{"speaker_key": "ui.vn.speakerMarta", "text_key": "vn.act3.beat11"},
+		{"speaker_key": "ui.vn.speakerVane", "text_key": "vn.act3.beat12"},
+	]
+	# ── ⓐ 노드 부재 = 지점 생략 · 진행 계속 (현행 씬 실물) ──
+	var absent := _mount_vn(data, lines, false)
+	if absent == null:
+		return
+	absent._advance()
+	absent._advance()
+	_ok("노드 부재 = 지점 생략 관측", Array(absent.choice_omissions) == [CHOICE_ID],
+		str(absent.choice_omissions))
+	_ok("노드 부재 = 진행 잠기지 않음",
+		(absent.get_node("%BodyLabel") as Label).text == data.strings.text("vn.act3.beat12"),
+		(absent.get_node("%BodyLabel") as Label).text)
+	_release_vn(absent)
+
+	# ── ⓑ 노드 실재 = 지점 발동 · 반응 삽입 · 합류 ──
+	var screen := _mount_vn(data, lines, true)
+	if screen == null:
+		return
+	var overlay := screen.find_child("ChoiceOverlay", true, false) as Control
+	var list := screen.find_child("ChoiceList", true, false) as Container
+	_ok("지점 전에는 오버레이 비표시", not overlay.visible)
+	screen._advance()
+	screen._advance()
+	_ok("앵커 라인 뒤에서 지점 발동", overlay.visible)
+	_ok("생략 0", Array(screen.choice_omissions).is_empty(), str(screen.choice_omissions))
+	# 버튼 수는 데이터가 정한다 — `option_count` 는 V1 이 2~3 으로 강제하는 열이다.
+	var declared := CsvTable.to_int(String(data.vn_choices[CHOICE_ID]["option_count"]))
+	_ok("선택지 수 = option_count", list.get_child_count() == declared,
+		"%d vs %d" % [list.get_child_count(), declared])
+	var options := data.vn_choice_options_for(CHOICE_ID)
+	var text_ok := true
+	for index in range(options.size()):
+		var expected := data.strings.text(String(options[index]["text_key"]))
+		if (list.get_child(index) as Button).text != expected:
+			text_ok = false
+	_ok("버튼 문면 = 데이터 값(대괄호 포함)", text_ok)
+	_ok("대괄호가 데이터에 있다 — 화면 조립 아님",
+		(list.get_child(0) as Button).text.begins_with("["))
+	# 선택 대기 중 진행 입력은 소비되지 않는다 — 임의 선택도, 건너뜀도 아니다.
+	var body_before := (screen.get_node("%BodyLabel") as Label).text
+	screen._advance()
+	_ok("선택 대기 = 진행 입력 무소비", overlay.visible
+		and (screen.get_node("%BodyLabel") as Label).text == body_before)
+	# 스킵은 지점 위에서도 살아 있어야 한다(G2 조건 2) — 막다른 길이 되지 않는 근거다.
+	_ok("지점 위 스킵 생존", (screen.get_node("%SkipButton") as Button).visible
+		and not (screen.get_node("%SkipButton") as Button).disabled)
+	(list.get_child(1) as Button).pressed.emit()
+	var picked: Dictionary = options[1]
+	_ok("선택 후 오버레이 닫힘", not overlay.visible)
+	_ok("선택 후 버튼 잔존 0", list.get_child_count() == 0)
+	_ok("반응 라인 재생",
+		(screen.get_node("%BodyLabel") as Label).text
+			== data.strings.text(String(picked["reaction_text_key"])),
+		(screen.get_node("%BodyLabel") as Label).text)
+	_ok("반응 화자 = 데이터 지정",
+		(screen.get_node("%SpeakerLabel") as Label).text
+			== data.strings.text(String(picked["reaction_speaker_key"])))
+	screen._advance()
+	_ok("반응 뒤 합류 라인 복귀",
+		(screen.get_node("%BodyLabel") as Label).text == data.strings.text("vn.act3.beat12"),
+		(screen.get_node("%BodyLabel") as Label).text)
+	_release_vn(screen)
+
+	# ── ⓒ 지점 위 스킵 = 선택 없이 종료 · 반응 미재생 ──
+	var skipped := _mount_vn(data, lines, true)
+	if skipped == null:
+		return
+	var routed: Array = []
+	skipped.navigate.connect(func(target: String, _payload: Dictionary): routed.append(target))
+	var skip_overlay := skipped.find_child("ChoiceOverlay", true, false) as Control
+	skipped._advance()
+	skipped._advance()
+	_ok("스킵 전 지점 표시", skip_overlay.visible)
+	var before_skip := (skipped.get_node("%BodyLabel") as Label).text
+	(skipped.get_node("%SkipButton") as Button).pressed.emit()
+	_ok("지점 위 스킵 = 화면 이탈", routed.size() == 1, str(routed))
+	_ok("지점 위 스킵 = 오버레이 닫힘", not skip_overlay.visible)
+	_ok("지점 위 스킵 = 반응 미재생",
+		(skipped.get_node("%BodyLabel") as Label).text == before_skip)
+	_release_vn(skipped)
+
+
+# 오버레이 노드는 **주력 씬 몫**이라 이 검사가 세운다 — 계약(이름·형)만 재현한다.
+func _mount_vn(data: GameData, lines: Array, with_overlay: bool) -> Control:
+	var packed := load(VN_SCENE) as PackedScene
+	if packed == null:
+		_ok("VN 씬 로드", false)
+		return null
+	var screen := packed.instantiate() as Control
+	var session := _fresh_session(data)
+	screen.session = session
+	root.add_child(screen)
+	if with_overlay:
+		var overlay := Control.new()
+		overlay.name = "ChoiceOverlay"
+		overlay.visible = false
+		var list := VBoxContainer.new()
+		list.name = "ChoiceList"
+		overlay.add_child(list)
+		screen.add_child(overlay)
+	# 재열람 경로로 세운다 — 슬롯 발생 판정을 거치지 않으므로 지점 축만 남는다.
+	# (§3.2 — 재열람에서도 지점은 다시 선다: 다른 선택의 반응이 회수 경로다.)
+	screen.bind(session, {
+		"replay": true, "vn_id": CHOICE_VN_ID, "slot_id": "vnslot_tour_brief",
+		"line_keys": lines,
+	})
+	return screen
+
+
+func _release_vn(screen: Control) -> void:
 	root.remove_child(screen)
 	screen.free()
 

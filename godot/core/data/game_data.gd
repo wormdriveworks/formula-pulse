@@ -46,6 +46,13 @@ var settlement_rewards: Dictionary = {}  # reward_* id -> 행 (D13 별첨A §3.2
 var vn_slots: Dictionary = {}          # vnslot_* id -> 행 (D08 §8.4)
 var vane_lines: Dictionary = {}        # vane_* id -> 행 (D12 §5.7 — stage 필드)
 var milestone_vn: Dictionary = {}      # mvn_* id -> 행 (형식 A 전이 매핑)
+# VN 선택 지점 (D04 §5.3 — 분기 없는 표현 선택). **평탄한 두 표**다: 지점은 어느 라인 뒤에
+# 서는지를, 옵션은 그 지점에 매달린 선택지·반응을 나른다. 중첩 JSON 으로 두면 텍스트 키
+# 20건이 전부 무검사가 된다(현행 검사기는 2단 배열에 닿지 않는다 — 총괄 판정 IMPL-257 ①).
+var vn_choices: Dictionary = {}        # vnchoice_* id -> 행
+var vn_choice_options: Dictionary = {} # choice_id -> Array[행] (option_order 오름차순)
+# 앵커 대조에서 떨어져 나간 지점 id — 조용한 생략을 관측 가능하게 남긴다(테스트 축이 읽는다).
+var vn_choice_omitted: Array = []
 # 이벤트-사운드 매핑 (D12 §5.10 · D11 §8.1) — **한 이벤트에 여러 사운드가 걸린다**
 # (GP_FINISH = SE-U19 + AMB-03 등). 그래서 값이 행이 아니라 행의 배열이다.
 var sound_map: Dictionary = {}         # event_id -> Array[행] (sound_* 행)
@@ -88,6 +95,9 @@ func load_all() -> bool:
 	_load_narrative()
 	_load_sound_map()
 	_load_content()
+	# **`_load_content()` 뒤여야 한다** — 선택 지점의 앵커 대조가 `act_vn` 의 라인 열을 읽는다.
+	# 순서가 뒤집히면 대조 대상이 비어 전 지점이 생략되고, 그것이 조용히 성립한다.
+	_load_vn_choices()
 	grid = _load_json(STRUCTURES_DIR + "grid_debug.json")
 	season_calendar = _load_json(STRUCTURES_DIR + "season_calendar.json")
 	if not strings.load_file(STRINGS_PATH):
@@ -475,6 +485,69 @@ func vn_slot(slot_id: String) -> Dictionary:
 # 미등재를 오류로 보지 않는다 (값 누락과 매핑 부재는 다른 사안이다).
 func milestone_vn_row(vn_id: String) -> Dictionary:
 	return milestone_vn.get(vn_id, {})
+
+
+# VN 선택 지점 적재 (D04 §5.3 · 총괄 판정 IMPL-257 ①).
+#
+# **`vn_id` 는 기계가 보지 못한다.** `_structure_ids()` 가 구조 파일의 **루트 id 만** 모으므로
+# `act_vn.json` 의 `entries[].id` 는 FK 후보에 없다 — V2 가 닿지 않는 유일한 열이다.
+# 그 공백을 여기서 닫는다: 지점이 가리키는 VN 과 그 안의 앵커 라인을 실제로 찾아 보고,
+# 없으면 **시끄럽게 버린다.** 조용히 통과시키면 지점은 영원히 뜨지 않으면서 데이터는 멀쩡해
+# 보인다(IMPL-244·248 계열 — "안 되는 것을 안 된다고 말하게 한다").
+func _load_vn_choices() -> void:
+	vn_choices.clear()
+	vn_choice_options.clear()
+	vn_choice_omitted.clear()
+	for row in CsvTable.load_rows(_table_path("vn_choices.csv")):
+		var choice_id := String(row["id"])
+		var vn_id := String(row.get("vn_id", ""))
+		var entry := act_vn_entry(vn_id)
+		if entry.is_empty():
+			push_error("GameData: vn choice '%s' references unknown vn '%s'" % [choice_id, vn_id])
+			vn_choice_omitted.append(choice_id)
+			continue
+		if not _vn_has_line(entry, String(row.get("after_text_key", ""))):
+			push_error("GameData: vn choice '%s' anchor '%s' not in vn '%s'"
+				% [choice_id, row.get("after_text_key", ""), vn_id])
+			vn_choice_omitted.append(choice_id)
+			continue
+		vn_choices[choice_id] = row
+	for row in CsvTable.load_rows(_table_path("vn_choice_options.csv")):
+		var parent := String(row.get("choice_id", ""))
+		# 버려진 지점의 옵션은 함께 사라진다 — 부모 없는 옵션을 들고 있을 이유가 없다.
+		if not vn_choices.has(parent):
+			continue
+		if not vn_choice_options.has(parent):
+			vn_choice_options[parent] = []
+		vn_choice_options[parent].append(row)
+	# 표시 순서는 데이터가 정한다 — 화면이 정렬을 다시 하지 않도록 여기서 한 번만 맞춘다
+	# (`tutorial_steps` 와 같은 규약 · CSV 행 순서에 의존하지 않는다).
+	for parent in vn_choice_options:
+		vn_choice_options[parent].sort_custom(func(a, b):
+			return CsvTable.to_int(String(a["option_order"])) < CsvTable.to_int(String(b["option_order"])))
+
+
+func _vn_has_line(entry: Dictionary, text_key: String) -> bool:
+	if text_key.is_empty():
+		return false
+	for line in Array(entry.get("lines", [])):
+		if typeof(line) == TYPE_DICTIONARY and String(Dictionary(line).get("text_key", "")) == text_key:
+			return true
+	return false
+
+
+# 이 VN 의 이 라인 뒤에 서는 선택 지점 — 없으면 빈 사전. **없는 것이 정상이다**
+# (75라인 중 지점이 서는 자리는 4곳뿐이므로 미등재를 오류로 보지 않는다).
+func vn_choice_at(vn_id: String, after_text_key: String) -> Dictionary:
+	for choice_id in vn_choices:
+		var row: Dictionary = vn_choices[choice_id]
+		if String(row.get("vn_id", "")) == vn_id and String(row.get("after_text_key", "")) == after_text_key:
+			return row
+	return {}
+
+
+func vn_choice_options_for(choice_id: String) -> Array:
+	return vn_choice_options.get(choice_id, [])
 
 
 func _load_points() -> void:
