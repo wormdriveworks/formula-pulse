@@ -37,3 +37,7 @@ Thumbs.db
 #   export_presets.cfg   포함/제외 규칙·피처 태그가 곧 혼입 0의 이행 장치(D12 §2.3).
 #                        제외하면 두 머신 preset이 갈리고 CI(TL-1)가 빌드를 재현하지 못한다.
 #                        서명 자격증명은 위 export_credentials 로 분리 — 평문 유출 없음
+
+# BGM PCM 마스터 (진단용 — `bgm_gen.js --keep-wav`). 실물은 OGG 이고 마스터는 파라미터에서
+# 언제든 재생성되므로 커밋 대상이 아니다 (IMPL-274).
+tools/audio/build/

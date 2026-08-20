@@ -17,9 +17,15 @@ extends SceneTree
 #   jingle 5 는 D11 §4.1 결정 #5 로 **트랙 계상 외 별도 소계**이므로 68 에 합산하지 않는다.
 #   bgm 은 미유입(파일럿 대기)이라 표에 없다 — 표에 없는 채널은 무대상이고, 유입 회차에 행을 넣는다.
 const CHANNELS := {
-	"sfx": {"dir": "res://assets/audio/sfx/", "total": 68},
-	"jingle": {"dir": "res://assets/audio/jingle/", "total": 5},
+	"sfx": {"dir": "res://assets/audio/sfx/", "total": 68, "ext": "wav"},
+	"jingle": {"dir": "res://assets/audio/jingle/", "total": 5, "ext": "wav"},
+	# BGM 은 13행 중 파일럿 1트랙만 유입됐다 — `intake` 밖 id 는 무대상이다(검증기 AUD 와 같은 규약).
+	"bgm": {"dir": "res://assets/audio/bgm/", "total": 13, "ext": "ogg", "intake": ["bgm_02"]},
 }
+
+# BGM 길이 기준값 90~150초 (D11 §4.4 확정 기준값)
+const BGM_LEN_MIN := 90.0
+const BGM_LEN_MAX := 150.0
 
 # 루프 6식 (대장 §5.1 명시) — 이 목록 밖은 전부 LOOP_DISABLED 여야 한다.
 # "루프여야 하는데 아닌 것"과 "루프면 안 되는데 루프인 것"을 같은 검사가 본다.
@@ -41,8 +47,16 @@ func _init() -> void:
 	var fmt_name := {0: "PCM8", 1: "PCM16", 2: "IMA_ADPCM", 3: "QOA"}
 	var loop_name := {0: "DISABLED", 1: "FORWARD", 2: "PINGPONG", 3: "BACKWARD"}
 	for channel in CHANNELS:
+		var intake: Array = Array(CHANNELS[channel].get("intake", []))
+		var ext: String = String(CHANNELS[channel].get("ext", "wav"))
 		for id in Array(by_channel.get(channel, [])):
-			var stream := load(String(CHANNELS[channel]["dir"]) + id + ".wav") as AudioStreamWAV
+			if not (intake.is_empty() or intake.has(id)):
+				continue                     # 미유입 선언분 — 무대상
+			var res: Resource = load(String(CHANNELS[channel]["dir"]) + id + "." + ext)
+			if ext == "ogg":
+				_check_ogg(id, res)
+				continue
+			var stream := res as AudioStreamWAV
 			if stream == null:
 				_fail("%s: AudioStreamWAV 적재 실패 (파일 부재·임포트 실패·타입 불일치)" % id)
 				continue
@@ -74,9 +88,9 @@ func _init() -> void:
 			# ④ 무음 아님 — 임포트가 성공해도 데이터가 비면 소리가 없다.
 			_ok("%s 데이터 비지 않음 (%d B)" % [id, stream.data.size()], stream.data.size() > 0)
 	print("")
-	# 검사 수 하한 — 73식(SFX 68 + 징글 5) × 5축 + 루프 6 + 길이 3 + 채널 2 = 376.
-	if _checked < 370:
-		print("AUDIO_ASSET_FAIL checks=%d < 하한 370 (목록 축소·적재 실패 의심)" % _checked)
+	# 검사 수 하한 — 73식 × 5축 + 루프 6 + 길이 3 + 채널 3 + BGM 파일럿 6축 = 383.
+	if _checked < 378:
+		print("AUDIO_ASSET_FAIL checks=%d < 하한 378 (목록 축소·적재 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -116,6 +130,31 @@ func _expected_ids() -> Dictionary:
 		var found: int = Array(out.get(channel, [])).size()
 		_ok("sound_map channel=%s 행 %d = 정본 확정 %d식" % [channel, found, declared], found == declared)
 	return out
+
+
+# BGM = OGG Vorbis. `.import` 문면은 증거가 아니므로 **적재된 리소스에서 되읽는다**.
+# WAV 의 `edit/loop_mode` 는 열거가 런타임 상수와 한 칸 어긋나는 함정이 있었는데(IMPL-245),
+# OGG 는 불리언 `loop` 이라 그 함정이 없다 — **없다는 것도 실측으로 확인한 결과다**(IMPL-274).
+func _check_ogg(id: String, res: Resource) -> void:
+	var stream := res as AudioStreamOggVorbis
+	if stream == null:
+		_fail("%s: AudioStreamOggVorbis 적재 실패 (파일 부재·임포트 실패·타입 불일치)" % id)
+		return
+	# 전 트랙 심리스 루프 필수 (D11 §4.4) — 루프가 꺼져 있으면 트랙이 한 번 울리고 침묵한다.
+	_ok("%s loop=%s" % [id, str(stream.loop)], stream.loop)
+	_ok("%s loop_offset=%.3f (0 = 트랙 처음으로 되감김)" % [id, stream.loop_offset],
+		is_equal_approx(stream.loop_offset, 0.0))
+	var length: float = stream.get_length()
+	_ok("%s 길이 %.3fs ∈ [%.0f, %.0f] (D11 §4.4)" % [id, length, BGM_LEN_MIN, BGM_LEN_MAX],
+		length >= BGM_LEN_MIN and length <= BGM_LEN_MAX)
+	# 박 정보 — 그리드 정수배의 런타임 측 증거다. bpm 이 0 이면 임포터가 박을 모른다.
+	_ok("%s bpm=%.1f > 0" % [id, stream.bpm], stream.bpm > 0.0)
+	_ok("%s beat_count=%d > 0" % [id, stream.beat_count], stream.beat_count > 0)
+	# 길이 ⇔ 박 정합: beat_count / bpm × 60 = 길이. 어긋나면 그리드와 실물이 갈렸다.
+	var from_beats: float = float(stream.beat_count) / stream.bpm * 60.0 if stream.bpm > 0.0 else -1.0
+	_ok("%s 박 산술 %.3fs = 길이 %.3fs" % [id, from_beats, length], absf(from_beats - length) < 0.02)
+	print("  [BGM] %s loop=%s bpm=%.1f beats=%d bars=%d len=%.4fs" % [id, str(stream.loop),
+		stream.bpm, stream.beat_count, stream.bar_beats, length])
 
 
 func _ok(label: String, condition: bool) -> void:

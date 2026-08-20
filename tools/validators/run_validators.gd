@@ -23,6 +23,7 @@ var _tables: Dictionary = {}        # 파일명 -> Array[Dictionary]
 var _structures: Dictionary = {}    # 파일명 -> Dictionary
 var _strings: Dictionary = {}       # key -> {언어: 값}
 var _code_files: Array = []         # {path, source}
+var _aud_completed := false         # AUD 스캔 완주 표시 — 아래 관문의 근거
 
 
 func _init() -> void:
@@ -45,6 +46,12 @@ func _init() -> void:
 	_run_anchor_scan()
 	_run_string_field_scan()
 	_run_audio_asset_scan()
+	# **완주 관문** — 스캔이 중도 이탈하면 실패 0·보고 0 으로 통과가 찍힌다(2026-08-20 실측:
+	# OGG 헤더의 없는 키를 `header["x"]` 로 읽자 함수가 이탈하고 게이트가 `VALIDATORS_PASS` 를 냈다).
+	# `run_tests.sh` 가 "성공 토큰의 부재 자체를 실패로 본다"고 한 것과 같은 축이다 —
+	# **검사는 자기 자신을 검사하지 못한다.**
+	if not _aud_completed:
+		_fail("AUD", "스캔이 완주하지 못했다 — 검사 없음이 위반 없음으로 통과할 수 없다")
 	print("")
 	if _fail_count == 0:
 		print("VALIDATORS_PASS warnings=%d" % _warn_count)
@@ -1574,12 +1581,23 @@ func _strf_records(text: String) -> Array:
 #   bgm    = 미유입(파일럿 대기) — 아래 표에 없으므로 검사 대상 밖이고, 유입 회차에 행을 추가한다.
 #     ⚠ 표에 없는 채널은 **조용히 통과한다**(부재가 아니라 무대상). BGM 유입 시 행 추가를 잊으면
 #       파일이 들어와도 아무도 보지 않는다 — 그 자리가 이 검사의 사각이다.
+#   `intake` = **유입 선언**이다. 파일이 한 번에 다 들어오지 않는 축(BGM 13트랙 = 파일럿 1 → 확대)에서
+#     "행은 있고 파일은 아직 없다"와 "행도 파일도 없다"를 갈라야 한다. 목록 밖 id 는 **미유입이므로 무대상**이고,
+#     반대로 **파일이 실재하는데 목록에 없으면 실패**다 — 대장이 실물을 모르는 상태가 그것이다.
+#     생략하면 그 채널은 전량 유입으로 본다(sfx·jingle).
+#   `params` = 재현 계약의 원장. **파이프라인이 갈렸으므로 원장도 갈린다**(SFX·징글 = jsfxr / BGM = 자작 신시사이저).
 const AUD_CHANNELS := {
-	"sfx": {"dir": "godot/assets/audio/sfx", "total": 68},
-	"jingle": {"dir": "godot/assets/audio/jingle", "total": 5},
+	"sfx": {"dir": "godot/assets/audio/sfx", "total": 68, "ext": "wav",
+		"params": "tools/audio/sfx_params.json", "params_key": "sounds"},
+	"jingle": {"dir": "godot/assets/audio/jingle", "total": 5, "ext": "wav",
+		"params": "tools/audio/sfx_params.json", "params_key": "sounds"},
+	"bgm": {"dir": "godot/assets/audio/bgm", "total": 13, "ext": "ogg", "intake": ["bgm_02"],
+		"params": "tools/audio/bgm_params.json", "params_key": "tracks"},
 }
 const AUD_LOOP_IDS := ["se_r02", "se_t03", "se_u15", "amb_01", "amb_04", "amb_05"]
 const AUD_LENGTH_CAP := {"se_l1": 0.8, "se_l2": 1.5, "se_l3": 2.5}
+const AUD_BGM_LEN_MIN := 90.0     # D11 §4.4 확정 기준값
+const AUD_BGM_LEN_MAX := 150.0
 
 
 func _run_audio_asset_scan() -> void:
@@ -1602,51 +1620,82 @@ func _run_audio_asset_scan() -> void:
 		if found != declared:
 			_fail("AUD", "sound_map channel=%s 행 %d != 정본 확정 %d식" % [channel, found, declared])
 
-	# 파라미터 등재 목록 (⑤)
+	# 파라미터 등재 목록 (⑤) — 채널마다 원장이 다르다. 한 파일만 뒤지면 BGM 이 전건 미등재로 잡힌다.
 	var params_ids: Dictionary = {}
-	var params_raw: Variant = JSON.parse_string(_read_text("tools/audio/sfx_params.json"))
-	if typeof(params_raw) == TYPE_DICTIONARY:
-		for entry in params_raw.get("sounds", []):
+	for channel in AUD_CHANNELS:
+		var pf := String(AUD_CHANNELS[channel].get("params", ""))
+		var pk := String(AUD_CHANNELS[channel].get("params_key", "sounds"))
+		if pf == "":
+			continue
+		var params_raw: Variant = JSON.parse_string(_read_text(pf))
+		checked += 1
+		if typeof(params_raw) != TYPE_DICTIONARY:
+			_fail("AUD", "%s 를 읽지 못했다 — 재현 계약 축이 성립하지 않는다" % pf)
+			continue
+		var listed := 0
+		for entry in params_raw.get(pk, []):
 			if typeof(entry) == TYPE_DICTIONARY:
 				params_ids[String(entry.get("id", ""))] = true
-	checked += 1
-	if params_ids.is_empty():
-		_fail("AUD", "sfx_params.json 을 읽지 못했다 — 재현 계약 축이 성립하지 않는다")
+				listed += 1
+		if listed == 0:
+			_fail("AUD", "%s 의 '%s' 목록이 비었다" % [pf, pk])
 
 	for channel in AUD_CHANNELS:
 		var ids: Array = Array(by_channel.get(channel, []))
+		var spec_ch: Dictionary = AUD_CHANNELS[channel]
+		var ext: String = String(spec_ch.get("ext", "wav"))
+		var intake: Array = Array(spec_ch.get("intake", []))
 		for id in ids:
-			var wav_path: String = "%s/%s.wav" % [String(AUD_CHANNELS[channel]["dir"]), id]
+			var wav_path: String = "%s/%s.%s" % [String(spec_ch["dir"]), id, ext]
+			var declared_intake: bool = intake.is_empty() or intake.has(id)
+			var exists: bool = FileAccess.file_exists(wav_path)
 			checked += 1
-			if not FileAccess.file_exists(wav_path):
+			if not declared_intake:
+				# 미유입 선언분 — 파일이 없는 것이 정상이다. 있으면 대장이 실물을 모르는 상태다.
+				if exists:
+					_fail("AUD", "%s: 실물이 있는데 유입 선언(intake)에 없다 — 대장이 실물을 모른다" % id)
+				continue
+			if not exists:
 				_fail("AUD", "%s: 실물 부재 (표에 행이 있고 파일이 없다 — 발화 지점이 조용해진다)" % id)
 				continue
 			checked += 1
 			if not params_ids.has(id):
-				_fail("AUD", "%s: sfx_params.json 미등재 — 재생성 불가(재현 계약 위반)" % id)
-			var header: Dictionary = _aud_wav_header(wav_path)
+				_fail("AUD", "%s: 파라미터 원장 미등재 — 재생성 불가(재현 계약 위반)" % id)
+			var header: Dictionary = _aud_ogg_header(wav_path) if ext == "ogg" else _aud_wav_header(wav_path)
 			checked += 1
 			if header.has("error"):
 				_fail("AUD", "%s: %s" % [id, String(header["error"])])
 				continue
-			checked += 4
-			if int(header["format"]) != 1:
-				_fail("AUD", "%s: audioFormat %d != 1(PCM) — D12 §10.1" % [id, int(header["format"])])
-			if int(header["rate"]) != 44100:
-				_fail("AUD", "%s: sampleRate %d != 44100 — D12 §10.1" % [id, int(header["rate"])])
-			if int(header["bits"]) != 16:
-				_fail("AUD", "%s: bitsPerSample %d != 16 — D12 §10.1" % [id, int(header["bits"])])
-			if int(header["channels"]) != 1:
-				_fail("AUD", "%s: numChannels %d != 1(모노)" % [id, int(header["channels"])])
-			checked += 1
-			if int(header["data_size"]) <= 0:
-				_fail("AUD", "%s: data 청크가 비었다" % id)
-			if AUD_LENGTH_CAP.has(id):
+			# 공통 축 = 샘플레이트·채널·데이터 유무. **비트 심도는 WAV 전속이다** — Vorbis 는 컨테이너에
+			# 비트 심도가 없고(내부 부동소수) D12 §10.1 도 BGM 에는 품질 q 만 둔다.
+			# ⚠ 없는 키를 `header["x"]` 로 읽으면 **스캔이 중도 이탈하고 게이트가 PASS 를 낸다**
+			#    (2026-08-20 실측 — 그래서 전부 `get(기본값)` 이고 위에 완주 관문을 뒀다).
+			checked += 3
+			if int(header.get("rate", 0)) != 44100:
+				_fail("AUD", "%s: sampleRate %d != 44100 — D12 §10.1" % [id, int(header.get("rate", 0))])
+			if int(header.get("channels", 0)) != 1:
+				_fail("AUD", "%s: numChannels %d != 1(모노)" % [id, int(header.get("channels", 0))])
+			if int(header.get("data_size", 0)) <= 0:
+				_fail("AUD", "%s: 오디오 데이터가 비었다" % id)
+			if ext == "ogg":
+				# BGM 길이 기준값 90~150초 (D11 §4.4). granulepos 산출 — 잘린 파일도 여기 걸린다.
 				checked += 1
-				var seconds: float = float(header["seconds"])
-				var cap: float = float(AUD_LENGTH_CAP[id])
-				if seconds > cap:
-					_fail("AUD", "%s: 길이 %.3fs > 상한 %.1fs (D13 확정 기준값)" % [id, seconds, cap])
+				var bgm_sec: float = float(header.get("seconds", 0.0))
+				if bgm_sec < AUD_BGM_LEN_MIN or bgm_sec > AUD_BGM_LEN_MAX:
+					_fail("AUD", "%s: 길이 %.1fs 가 %.0f~%.0f초 밖이다 (D11 §4.4)"
+						% [id, bgm_sec, AUD_BGM_LEN_MIN, AUD_BGM_LEN_MAX])
+			else:
+				checked += 2
+				if int(header.get("format", 0)) != 1:
+					_fail("AUD", "%s: audioFormat %d != 1(PCM) — D12 §10.1" % [id, int(header.get("format", 0))])
+				if int(header.get("bits", 0)) != 16:
+					_fail("AUD", "%s: bitsPerSample %d != 16 — D12 §10.1" % [id, int(header.get("bits", 0))])
+				if AUD_LENGTH_CAP.has(id):
+					checked += 1
+					var seconds: float = float(header.get("seconds", 0.0))
+					var cap: float = float(AUD_LENGTH_CAP[id])
+					if seconds > cap:
+						_fail("AUD", "%s: 길이 %.3fs > 상한 %.1fs (D13 확정 기준값)" % [id, seconds, cap])
 			# ③ `.import` 선언
 			var import_path: String = wav_path + ".import"
 			checked += 1
@@ -1655,6 +1704,15 @@ func _run_audio_asset_scan() -> void:
 				continue
 			var import_text: String = _read_text(import_path)
 			checked += 2
+			if ext == "ogg":
+				# BGM = 전 트랙 심리스 루프 필수 (D11 §4.4). OGG 임포터는 열거가 아니라 **불리언**이라
+				# WAV 의 한 칸 어긋남 함정이 없다 — **없다는 것도 실측으로 확인한 결과다**(IMPL-274).
+				# 그래도 선언은 증거가 아니므로 실효는 AUDIO-A 가 런타임에서 되읽는다.
+				if not import_text.contains("loop=true"):
+					_fail("AUD", "%s: loop 선언이 true 가 아니다 — BGM 은 전 트랙 심리스 루프 필수(D11 §4.4)" % id)
+				if not import_text.contains("bpm="):
+					_fail("AUD", "%s: bpm 선언 부재 — 박 정보가 없으면 그리드 정합을 되읽을 수 없다" % id)
+				continue
 			if not import_text.contains("compress/mode=0"):
 				_fail("AUD", "%s: compress/mode 가 0(무압축)이 아니다 — 손실 코덱은 16비트 베이크를 흔든다" % id)
 			var want_loop: int = 2 if id in AUD_LOOP_IDS else 1
@@ -1673,13 +1731,14 @@ func _run_audio_asset_scan() -> void:
 		dir.list_dir_begin()
 		var entry := dir.get_next()
 		while entry != "":
-			if entry.ends_with(".wav"):
+			if entry.ends_with("." + String(AUD_CHANNELS[channel].get("ext", "wav"))):
 				checked += 1
 				if not known.has(entry.get_basename()):
 					_fail("AUD", "%s/%s: 표 밖 파일 (sound_map 에 행이 없다 — 아무도 부르지 않는다)"
 						% [channel, entry])
 			entry = dir.get_next()
 		dir.list_dir_end()
+	_aud_completed = true
 	_report("AUD", "audio assets", checked, before_fail, before_warn)
 
 
@@ -1723,3 +1782,38 @@ func _aud_wav_header(path: String) -> Dictionary:
 			return result
 		offset += 8 + int(chunk_size) + (int(chunk_size) & 1)
 	return {"error": "data 청크 없음"}
+
+# OGG Vorbis 헤더를 바이트에서 읽는다 — RIFF 가 아니라 Ogg 페이지 + Vorbis 식별 헤더다.
+# 길이는 **마지막 페이지의 granulepos**(총 샘플 수)로 얻는다 — 컨테이너에 길이 필드가 없다.
+func _aud_ogg_header(path: String) -> Dictionary:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {"error": "열 수 없다"}
+	var size := file.get_length()
+	var head := file.get_buffer(128)
+	if head.size() < 58 or head.slice(0, 4).get_string_from_ascii() != "OggS":
+		file.close()
+		return {"error": "OggS 시그니처 없음"}
+	var segments := head.decode_u8(26)
+	var packet := 27 + segments
+	# Vorbis 식별 패킷 = 0x01 + "vorbis" + version(4) + channels(1) + rate(4)
+	if head.size() < packet + 16 or head.decode_u8(packet) != 1 \
+			or head.slice(packet + 1, packet + 7).get_string_from_ascii() != "vorbis":
+		file.close()
+		return {"error": "Vorbis 식별 헤더 아님"}
+	var channels := head.decode_u8(packet + 11)
+	var rate := head.decode_u32(packet + 12)
+	# 마지막 OggS 페이지의 granulepos — 꼬리 64KB 안에서 뒤에서부터 찾는다.
+	var tail_size: int = mini(65536, int(size))
+	file.seek(size - tail_size)
+	var tail := file.get_buffer(tail_size)
+	file.close()
+	var granule: int = -1
+	for i in range(tail.size() - 27, -1, -1):
+		if tail.slice(i, i + 4).get_string_from_ascii() == "OggS":
+			granule = tail.decode_s64(i + 6)
+			break
+	if granule < 0:
+		return {"error": "마지막 Ogg 페이지를 찾지 못했다 — granulepos 부재"}
+	return {"channels": channels, "rate": rate, "align": 2,
+		"data_size": granule * 2, "seconds": float(granule) / float(maxi(int(rate), 1))}
