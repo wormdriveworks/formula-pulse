@@ -1568,8 +1568,16 @@ func _strf_records(text: String) -> Array:
 # 미적 판단이 없다(파일 실재·헤더 값·선언 문면·길이 산술) — V7 과 성격이 다르다.
 # AUDIO-A 스위트(차단형 · 검사 수 하한 340)가 ②③④를 **런타임 경로로** 함께 본다 —
 # 이제 둘 다 차단형이라 받침이 아니라 이중 경로다. ①⑤⑥은 이 검사에 전속이다.
-const AUD_SFX_DIR := "godot/assets/audio/sfx"
-const AUD_TOTAL := 68                    # D11 §2.11 확정 기준값 (SFX 63 + AMB 5)
+# 채널별 대장 — `sound_map.csv` 의 channel 열이 곧 배치 경로다. 계수는 정본 확정값을 상수로 둔다.
+#   sfx    = 68 (D11 §2.11 — SFX 63 + AMB 5)
+#   jingle =  5 (D11 §4.1 결정 #5 — **트랙 계상 13+1 외 별도 소계**. 68 에 더하지 않는다)
+#   bgm    = 미유입(파일럿 대기) — 아래 표에 없으므로 검사 대상 밖이고, 유입 회차에 행을 추가한다.
+#     ⚠ 표에 없는 채널은 **조용히 통과한다**(부재가 아니라 무대상). BGM 유입 시 행 추가를 잊으면
+#       파일이 들어와도 아무도 보지 않는다 — 그 자리가 이 검사의 사각이다.
+const AUD_CHANNELS := {
+	"sfx": {"dir": "godot/assets/audio/sfx", "total": 68},
+	"jingle": {"dir": "godot/assets/audio/jingle", "total": 5},
+}
 const AUD_LOOP_IDS := ["se_r02", "se_t03", "se_u15", "amb_01", "amb_04", "amb_05"]
 const AUD_LENGTH_CAP := {"se_l1": 0.8, "se_l2": 1.5, "se_l3": 2.5}
 
@@ -1579,87 +1587,97 @@ func _run_audio_asset_scan() -> void:
 	var before_warn := _warn_count
 	var checked := 0
 
-	var ids: Array = []
+	var by_channel: Dictionary = {}
 	for row in _tables.get("sound_map.csv", []):
-		if String(row.get("channel", "")) != "sfx":
+		var channel := String(row.get("channel", ""))
+		if not AUD_CHANNELS.has(channel):
 			continue
-		ids.append(String(row.get("sfx_id", "")).to_lower().replace("-", "_"))
-	checked += 1
-	if ids.size() != AUD_TOTAL:
-		_fail("AUD", "sound_map channel=sfx 행 %d != D11 §2.11 확정 %d식" % [ids.size(), AUD_TOTAL])
+		if not by_channel.has(channel):
+			by_channel[channel] = []
+		by_channel[channel].append(String(row.get("sfx_id", "")).to_lower().replace("-", "_"))
+	for channel in AUD_CHANNELS:
+		checked += 1
+		var declared: int = int(AUD_CHANNELS[channel]["total"])
+		var found: int = Array(by_channel.get(channel, [])).size()
+		if found != declared:
+			_fail("AUD", "sound_map channel=%s 행 %d != 정본 확정 %d식" % [channel, found, declared])
 
 	# 파라미터 등재 목록 (⑤)
-	var declared: Dictionary = {}
+	var params_ids: Dictionary = {}
 	var params_raw: Variant = JSON.parse_string(_read_text("tools/audio/sfx_params.json"))
 	if typeof(params_raw) == TYPE_DICTIONARY:
 		for entry in params_raw.get("sounds", []):
 			if typeof(entry) == TYPE_DICTIONARY:
-				declared[String(entry.get("id", ""))] = true
+				params_ids[String(entry.get("id", ""))] = true
 	checked += 1
-	if declared.is_empty():
+	if params_ids.is_empty():
 		_fail("AUD", "sfx_params.json 을 읽지 못했다 — 재현 계약 축이 성립하지 않는다")
 
-	for id in ids:
-		var wav_path: String = "%s/%s.wav" % [AUD_SFX_DIR, id]
-		checked += 1
-		if not FileAccess.file_exists(wav_path):
-			_fail("AUD", "%s: 실물 부재 (표에 행이 있고 파일이 없다 — 발화 지점이 조용해진다)" % id)
-			continue
-		checked += 1
-		if not declared.has(id):
-			_fail("AUD", "%s: sfx_params.json 미등재 — 재생성 불가(재현 계약 위반)" % id)
-		var header: Dictionary = _aud_wav_header(wav_path)
-		checked += 1
-		if header.has("error"):
-			_fail("AUD", "%s: %s" % [id, String(header["error"])])
-			continue
-		checked += 4
-		if int(header["format"]) != 1:
-			_fail("AUD", "%s: audioFormat %d != 1(PCM) — D12 §10.1" % [id, int(header["format"])])
-		if int(header["rate"]) != 44100:
-			_fail("AUD", "%s: sampleRate %d != 44100 — D12 §10.1" % [id, int(header["rate"])])
-		if int(header["bits"]) != 16:
-			_fail("AUD", "%s: bitsPerSample %d != 16 — D12 §10.1" % [id, int(header["bits"])])
-		if int(header["channels"]) != 1:
-			_fail("AUD", "%s: numChannels %d != 1(모노)" % [id, int(header["channels"])])
-		checked += 1
-		if int(header["data_size"]) <= 0:
-			_fail("AUD", "%s: data 청크가 비었다" % id)
-		if AUD_LENGTH_CAP.has(id):
+	for channel in AUD_CHANNELS:
+		var ids: Array = Array(by_channel.get(channel, []))
+		for id in ids:
+			var wav_path: String = "%s/%s.wav" % [String(AUD_CHANNELS[channel]["dir"]), id]
 			checked += 1
-			var seconds: float = float(header["seconds"])
-			var cap: float = float(AUD_LENGTH_CAP[id])
-			if seconds > cap:
-				_fail("AUD", "%s: 길이 %.3fs > 상한 %.1fs (D13 확정 기준값)" % [id, seconds, cap])
-		# ③ `.import` 선언
-		var import_path: String = wav_path + ".import"
-		checked += 1
-		if not FileAccess.file_exists(import_path):
-			_fail("AUD", "%s: `.import` 부재 — 반대편 머신이 기본값으로 재임포트한다(IMPL-003)" % id)
-			continue
-		var import_text: String = _read_text(import_path)
-		checked += 2
-		if not import_text.contains("compress/mode=0"):
-			_fail("AUD", "%s: compress/mode 가 0(무압축)이 아니다 — 손실 코덱은 16비트 베이크를 흔든다" % id)
-		var want_loop: int = 2 if id in AUD_LOOP_IDS else 1
-		if not import_text.contains("edit/loop_mode=%d" % want_loop):
-			_fail("AUD", "%s: edit/loop_mode 선언이 %d 이 아니다 (임포터 열거 = 1 Disabled · 2 Forward)"
-				% [id, want_loop])
+			if not FileAccess.file_exists(wav_path):
+				_fail("AUD", "%s: 실물 부재 (표에 행이 있고 파일이 없다 — 발화 지점이 조용해진다)" % id)
+				continue
+			checked += 1
+			if not params_ids.has(id):
+				_fail("AUD", "%s: sfx_params.json 미등재 — 재생성 불가(재현 계약 위반)" % id)
+			var header: Dictionary = _aud_wav_header(wav_path)
+			checked += 1
+			if header.has("error"):
+				_fail("AUD", "%s: %s" % [id, String(header["error"])])
+				continue
+			checked += 4
+			if int(header["format"]) != 1:
+				_fail("AUD", "%s: audioFormat %d != 1(PCM) — D12 §10.1" % [id, int(header["format"])])
+			if int(header["rate"]) != 44100:
+				_fail("AUD", "%s: sampleRate %d != 44100 — D12 §10.1" % [id, int(header["rate"])])
+			if int(header["bits"]) != 16:
+				_fail("AUD", "%s: bitsPerSample %d != 16 — D12 §10.1" % [id, int(header["bits"])])
+			if int(header["channels"]) != 1:
+				_fail("AUD", "%s: numChannels %d != 1(모노)" % [id, int(header["channels"])])
+			checked += 1
+			if int(header["data_size"]) <= 0:
+				_fail("AUD", "%s: data 청크가 비었다" % id)
+			if AUD_LENGTH_CAP.has(id):
+				checked += 1
+				var seconds: float = float(header["seconds"])
+				var cap: float = float(AUD_LENGTH_CAP[id])
+				if seconds > cap:
+					_fail("AUD", "%s: 길이 %.3fs > 상한 %.1fs (D13 확정 기준값)" % [id, seconds, cap])
+			# ③ `.import` 선언
+			var import_path: String = wav_path + ".import"
+			checked += 1
+			if not FileAccess.file_exists(import_path):
+				_fail("AUD", "%s: `.import` 부재 — 반대편 머신이 기본값으로 재임포트한다(IMPL-003)" % id)
+				continue
+			var import_text: String = _read_text(import_path)
+			checked += 2
+			if not import_text.contains("compress/mode=0"):
+				_fail("AUD", "%s: compress/mode 가 0(무압축)이 아니다 — 손실 코덱은 16비트 베이크를 흔든다" % id)
+			var want_loop: int = 2 if id in AUD_LOOP_IDS else 1
+			if not import_text.contains("edit/loop_mode=%d" % want_loop):
+				_fail("AUD", "%s: edit/loop_mode 선언이 %d 이 아니다 (임포터 열거 = 1 Disabled · 2 Forward)"
+					% [id, want_loop])
 
-	# ⑥ 잉여 파일
-	var known: Dictionary = {}
-	for id in ids:
-		known[String(id)] = true
-	var dir := DirAccess.open(AUD_SFX_DIR)
-	if dir != null:
+	# ⑥ 잉여 파일 — 채널별로 본다. ①이 부족을 보고 여기가 과잉을 본다.
+	for channel in AUD_CHANNELS:
+		var known: Dictionary = {}
+		for id in Array(by_channel.get(channel, [])):
+			known[String(id)] = true
+		var dir := DirAccess.open(String(AUD_CHANNELS[channel]["dir"]))
+		if dir == null:
+			continue
 		dir.list_dir_begin()
 		var entry := dir.get_next()
 		while entry != "":
 			if entry.ends_with(".wav"):
 				checked += 1
-				var stem := entry.get_basename()
-				if not known.has(stem):
-					_fail("AUD", "%s: 표 밖 파일 (sound_map 에 행이 없다 — 아무도 부르지 않는다)" % entry)
+				if not known.has(entry.get_basename()):
+					_fail("AUD", "%s/%s: 표 밖 파일 (sound_map 에 행이 없다 — 아무도 부르지 않는다)"
+						% [channel, entry])
 			entry = dir.get_next()
 		dir.list_dir_end()
 	_report("AUD", "audio assets", checked, before_fail, before_warn)

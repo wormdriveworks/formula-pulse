@@ -39,6 +39,11 @@
  *    루프 항목의 `seam` 은 **첫·끝 샘플 진폭 차**일 뿐이다 — 위상 불연속·잡음 질감의 이음매는
  *    이 수치가 0 이어도 들릴 수 있다. 수치는 단서이고 판정이 아니다.
  *
+ * ── 소관 (2026-08-20 확장).
+ *    SFX 68식(`audio/sfx/`) + **징글 5식(`audio/jingle/` — 항목이 `dir` 로 선언한다)**.
+ *    징글은 SFX 버스 귀속·덕킹 주체라 SFX 포맷을 준용한다(대장 §9-② [가안] 유지).
+ *    `jg_04` 는 **메인 모티프를 인용**하며 원장은 `motif.json` 이다 — `checkMotif` 가 대조한다.
+ *
  * 사용:  node tools/audio/sfx_gen.js           (생성 — WAV 를 쓴다)
  *        node tools/audio/sfx_gen.js --check   (대조만 — 쓰지 않는다. 불일치 시 exit 1)
  *        node tools/audio/sfx_gen.js --twice   (2회 합성 해시 대조 — 디스크 무관)
@@ -51,8 +56,10 @@ const crypto = require('crypto');
 const sfxr = require('./vendor/sfxr.js');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const OUT_DIR = path.join(ROOT, 'godot', 'assets', 'audio', 'sfx');
+const AUDIO_ROOT = path.join(ROOT, 'godot', 'assets', 'audio');
+const outDirFor = (e) => path.join(AUDIO_ROOT, e.dir || 'sfx');   // 항목이 dir 을 선언하면 그 하위 (징글 = 'jingle')
 const PARAMS = path.join(__dirname, 'sfx_params.json');
+const MOTIF = path.join(__dirname, 'motif.json');
 const CHECK_ONLY = process.argv.includes('--check');
 const TWICE = process.argv.includes('--twice');
 const ONLY = (() => {
@@ -169,6 +176,47 @@ function deadParams(id, p) {
   for (const m of out) fail(`${id}: ${m} — 선언이 출력에 도달하지 않는다`);
 }
 
+
+// 메인 모티프 대조 (2026-08-20 신설 · 총괄 기안 §2.1 "모티프의 원장은 한 곳").
+// `motif.json` 이 원장이고 `jg_04` 가 그것을 인용한다 — 두 곳에 값이 있으므로 대조한다
+// (대장 §9-⑬ *"대조는 값이 두 곳에 있을 때만 성립한다"* 의 반전 적용 · `icon_draw.js` 와 같은 계약).
+// BGM-01·BGM-12 도 이 원장을 승계하므로 여기서 갈리면 세 곳이 조용히 어긋난다.
+function checkMotif(sounds) {
+  if (!fs.existsSync(MOTIF)) { fail('motif.json 부재 — 모티프 원장이 없다'); return; }
+  const motif = JSON.parse(fs.readFileSync(MOTIF, 'utf8')).main;
+  const notes = ((motif.rendered_in_jingle || {}).notes) || [];
+  const deg = motif.degrees_semitones_from_root || [];
+  if (notes.length !== deg.length) {
+    fail(`motif.json: 음 ${notes.length}개 != 오프셋 ${deg.length}개`);
+    return;
+  }
+  // 오프셋 → 헤르츠가 실제로 맞는가 (원장 자체의 자기 정합 — 반음비 2^(1/12))
+  const rootHz = ((motif.root_reference || {}).hz) || 0;
+  notes.forEach((n, i) => {
+    const want = rootHz * Math.pow(2, deg[i] / 12);
+    if (Math.abs(1200 * Math.log2(n.hz / want)) > 1) {
+      fail(`motif.json[${i}] ${n.name}: ${n.hz}Hz 가 오프셋 ${deg[i]} 반음(${want.toFixed(2)}Hz)과 어긋난다`);
+    }
+  });
+  const jg = sounds.find((s) => s.id === 'jg_04');
+  if (!jg) {
+    // 부분 주행이면 대상 밖이다. 전량 주행에서 없으면 **원장만 있고 인용부가 없는 상태**이므로 실패다.
+    if (!ONLY) fail('jg_04 미등재 — 모티프 원장이 있는데 인용부가 없다');
+    return;
+  }
+  const steps = (jg.compose || {}).steps || [];
+  if (steps.length !== notes.length) {
+    fail(`jg_04: compose 단계 ${steps.length} != 모티프 음 ${notes.length}개`);
+    return;
+  }
+  steps.forEach((s, i) => {
+    const got = s.p_base_freq !== undefined ? s.p_base_freq : jg.params.p_base_freq;
+    if (got !== notes[i].p_base_freq) {
+      fail(`jg_04 단계 ${i}: p_base_freq ${got} != 모티프 원장 ${notes[i].p_base_freq} (${notes[i].name}) — 한쪽만 고쳐졌다`);
+    }
+  });
+}
+
 // 헤더는 **파일 바이트에서** 읽는다. 합성기가 돌려준 header 객체를 쓰면 대조가 아니다.
 function readWavHeader(buf, label) {
   if (buf.length < 44) return { err: `${label}: 44바이트 미만 — WAV 가 아니다` };
@@ -221,7 +269,8 @@ for (const e of sounds) {
   if (seen.has(e.id)) die(`중복 항목: ${e.id}`);
   seen.add(e.id);
 }
-if (!CHECK_ONLY && !TWICE) fs.mkdirSync(OUT_DIR, { recursive: true });
+
+checkMotif(sounds);
 
 const mode = TWICE ? '결정성 대조' : (CHECK_ONLY ? '대조' : '');
 console.log(`SFX 절차 생성 ${mode} — ${sounds.length}식 · jsfxr 1.4.1(vendor)\n`);
@@ -229,7 +278,9 @@ const rows = [];
 
 for (const e of sounds) {
   if (!/^[a-z0-9_]+$/.test(e.id)) die(`파일명 규약 위반: ${e.id}`);
-  const file = path.join(OUT_DIR, e.id + '.wav');
+  const dir = outDirFor(e);
+  if (!CHECK_ONLY && !TWICE) fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, e.id + '.wav');
   const { wav, clipping } = synth(e);
   if (e.compose) e.compose.steps.forEach((o, i) => deadParams(`${e.id}[${i}]`, Object.assign({}, e.params, o)));
   else deadParams(e.id, e.params);
