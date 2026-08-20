@@ -4,12 +4,12 @@
 #   godot --headless --path . --script tools/validators/run_validators.gd
 #
 # 차단 규칙: V1~V6·V8 + 혼입 0 스캔 = 위반 1건이면 실패(exit 1).
-# 구현 층 신설 검사 **MIX0·ARCH·FONT·PAL·ANCH·STRF 도 차단형**이다 (불변규칙 7 —
+# 구현 층 신설 검사 **MIX0·ARCH·FONT·PAL·ANCH·STRF·AUD 도 차단형**이다 (불변규칙 7 —
 #   FONT = 총괄 판정 IMPL-148 · PAL = 조건부 기승인 IMPL-209 → 발동 IMPL-219 ·
 #   ANCH = 경고형 신설 IMPL-233 → 규칙 확대 + 차단형 전환 IMPL-237 ·
 #   STRF = 차단형 즉시 신설 IMPL-249 ③).
-# **AUD(오디오 실물)는 경고형 신설이다** (2026-08-19 · 에셋 발주 §4 — 차단/경고는 총괄 판정 경유).
-#   받침 = `tests/test_audio_assets.gd`(AUDIO-A · 차단형 스위트)가 헤더·루프·길이를 런타임 경로로 함께 본다.
+#   (AUD = 경고형 신설 IMPL-260 → **차단형 전환 IMPL-262** — 실측 깨끗(위반 0·오검출 0·돌연변이 10종) 후
+#    총괄 판정 승인. FONT·PAL·ANCH·STRF 와 같은 절차다.)
 # V7(금칙 어휘)은 경고 전용 — 빌드를 차단하지 않는다 (D12 §4.2 V7 행 · D14 TL-1 명문).
 # V6 내부: ID 중복·접두 위반 = 차단 / 고아 데이터 = 경고 (D12 §4.2 V6 행 "고아 데이터 … 경고").
 #
@@ -1563,10 +1563,11 @@ func _strf_records(text: String) -> Array:
 #   ⑥ **[가산] 잉여 파일** — `audio/sfx/` 안에 표 밖 WAV 가 있으면 열거한다. ①이 부족을 보고
 #      ⑥이 과잉을 본다 — 파일만 늘어나는 오염은 어느 게이트도 보지 않았다.
 #
-# **성격: 경고형으로 신설한다.** 차단/경고는 구현이 정하지 않고 총괄 판정을 경유한다(불변규칙 7).
-# 차단형 전환은 `_warn` → `_fail` 1줄이며 FONT(IMPL-148)·PAL(IMPL-219)·ANCH(IMPL-237) 전례 그대로다.
-# 경고형이 스스로 죽는 것을 막는 받침 = AUDIO-A 스위트(차단형 · 검사 수 하한 340)가 ②③④를
-# 다른 경로로 함께 본다. ①⑤⑥만 이 검사에 전속이다.
+# **성격: 차단형** (경고형 신설 IMPL-260 → 전환 IMPL-262 — 총괄 판정 승인분. FONT·PAL·ANCH·STRF 전례).
+# 전환 근거 = 위반 0 · 오검출 0 · 돌연변이 10종 전건 검출 실측. 판정은 전부 기계 판정이고
+# 미적 판단이 없다(파일 실재·헤더 값·선언 문면·길이 산술) — V7 과 성격이 다르다.
+# AUDIO-A 스위트(차단형 · 검사 수 하한 340)가 ②③④를 **런타임 경로로** 함께 본다 —
+# 이제 둘 다 차단형이라 받침이 아니라 이중 경로다. ①⑤⑥은 이 검사에 전속이다.
 const AUD_SFX_DIR := "godot/assets/audio/sfx"
 const AUD_TOTAL := 68                    # D11 §2.11 확정 기준값 (SFX 63 + AMB 5)
 const AUD_LOOP_IDS := ["se_r02", "se_t03", "se_u15", "amb_01", "amb_04", "amb_05"]
@@ -1585,7 +1586,7 @@ func _run_audio_asset_scan() -> void:
 		ids.append(String(row.get("sfx_id", "")).to_lower().replace("-", "_"))
 	checked += 1
 	if ids.size() != AUD_TOTAL:
-		_warn("AUD", "sound_map channel=sfx 행 %d != D11 §2.11 확정 %d식" % [ids.size(), AUD_TOTAL])
+		_fail("AUD", "sound_map channel=sfx 행 %d != D11 §2.11 확정 %d식" % [ids.size(), AUD_TOTAL])
 
 	# 파라미터 등재 목록 (⑤)
 	var declared: Dictionary = {}
@@ -1596,53 +1597,53 @@ func _run_audio_asset_scan() -> void:
 				declared[String(entry.get("id", ""))] = true
 	checked += 1
 	if declared.is_empty():
-		_warn("AUD", "sfx_params.json 을 읽지 못했다 — 재현 계약 축이 성립하지 않는다")
+		_fail("AUD", "sfx_params.json 을 읽지 못했다 — 재현 계약 축이 성립하지 않는다")
 
 	for id in ids:
 		var wav_path: String = "%s/%s.wav" % [AUD_SFX_DIR, id]
 		checked += 1
 		if not FileAccess.file_exists(wav_path):
-			_warn("AUD", "%s: 실물 부재 (표에 행이 있고 파일이 없다 — 발화 지점이 조용해진다)" % id)
+			_fail("AUD", "%s: 실물 부재 (표에 행이 있고 파일이 없다 — 발화 지점이 조용해진다)" % id)
 			continue
 		checked += 1
 		if not declared.has(id):
-			_warn("AUD", "%s: sfx_params.json 미등재 — 재생성 불가(재현 계약 위반)" % id)
+			_fail("AUD", "%s: sfx_params.json 미등재 — 재생성 불가(재현 계약 위반)" % id)
 		var header: Dictionary = _aud_wav_header(wav_path)
 		checked += 1
 		if header.has("error"):
-			_warn("AUD", "%s: %s" % [id, String(header["error"])])
+			_fail("AUD", "%s: %s" % [id, String(header["error"])])
 			continue
 		checked += 4
 		if int(header["format"]) != 1:
-			_warn("AUD", "%s: audioFormat %d != 1(PCM) — D12 §10.1" % [id, int(header["format"])])
+			_fail("AUD", "%s: audioFormat %d != 1(PCM) — D12 §10.1" % [id, int(header["format"])])
 		if int(header["rate"]) != 44100:
-			_warn("AUD", "%s: sampleRate %d != 44100 — D12 §10.1" % [id, int(header["rate"])])
+			_fail("AUD", "%s: sampleRate %d != 44100 — D12 §10.1" % [id, int(header["rate"])])
 		if int(header["bits"]) != 16:
-			_warn("AUD", "%s: bitsPerSample %d != 16 — D12 §10.1" % [id, int(header["bits"])])
+			_fail("AUD", "%s: bitsPerSample %d != 16 — D12 §10.1" % [id, int(header["bits"])])
 		if int(header["channels"]) != 1:
-			_warn("AUD", "%s: numChannels %d != 1(모노)" % [id, int(header["channels"])])
+			_fail("AUD", "%s: numChannels %d != 1(모노)" % [id, int(header["channels"])])
 		checked += 1
 		if int(header["data_size"]) <= 0:
-			_warn("AUD", "%s: data 청크가 비었다" % id)
+			_fail("AUD", "%s: data 청크가 비었다" % id)
 		if AUD_LENGTH_CAP.has(id):
 			checked += 1
 			var seconds: float = float(header["seconds"])
 			var cap: float = float(AUD_LENGTH_CAP[id])
 			if seconds > cap:
-				_warn("AUD", "%s: 길이 %.3fs > 상한 %.1fs (D13 확정 기준값)" % [id, seconds, cap])
+				_fail("AUD", "%s: 길이 %.3fs > 상한 %.1fs (D13 확정 기준값)" % [id, seconds, cap])
 		# ③ `.import` 선언
 		var import_path: String = wav_path + ".import"
 		checked += 1
 		if not FileAccess.file_exists(import_path):
-			_warn("AUD", "%s: `.import` 부재 — 반대편 머신이 기본값으로 재임포트한다(IMPL-003)" % id)
+			_fail("AUD", "%s: `.import` 부재 — 반대편 머신이 기본값으로 재임포트한다(IMPL-003)" % id)
 			continue
 		var import_text: String = _read_text(import_path)
 		checked += 2
 		if not import_text.contains("compress/mode=0"):
-			_warn("AUD", "%s: compress/mode 가 0(무압축)이 아니다 — 손실 코덱은 16비트 베이크를 흔든다" % id)
+			_fail("AUD", "%s: compress/mode 가 0(무압축)이 아니다 — 손실 코덱은 16비트 베이크를 흔든다" % id)
 		var want_loop: int = 2 if id in AUD_LOOP_IDS else 1
 		if not import_text.contains("edit/loop_mode=%d" % want_loop):
-			_warn("AUD", "%s: edit/loop_mode 선언이 %d 이 아니다 (임포터 열거 = 1 Disabled · 2 Forward)"
+			_fail("AUD", "%s: edit/loop_mode 선언이 %d 이 아니다 (임포터 열거 = 1 Disabled · 2 Forward)"
 				% [id, want_loop])
 
 	# ⑥ 잉여 파일
@@ -1658,7 +1659,7 @@ func _run_audio_asset_scan() -> void:
 				checked += 1
 				var stem := entry.get_basename()
 				if not known.has(stem):
-					_warn("AUD", "%s: 표 밖 파일 (sound_map 에 행이 없다 — 아무도 부르지 않는다)" % entry)
+					_fail("AUD", "%s: 표 밖 파일 (sound_map 에 행이 없다 — 아무도 부르지 않는다)" % entry)
 			entry = dir.get_next()
 		dir.list_dir_end()
 	_report("AUD", "audio assets", checked, before_fail, before_warn)
