@@ -157,8 +157,15 @@ func _fill_archive() -> void:
 
 
 # [가안] VN 인스턴스 id → 표제: 실문안 대장(D04 트랙) 유입 전까지 슬롯 유형으로 표기
+#
+# 막 VN 6건은 T7 로 실문안이 내려왔는데 **표제 키는 납품에 없다** — 그래서 여기서도 슬롯 유형
+# ('투어 브리핑')으로 접힌다. 아카이브 6행이 같은 표제로 서는 것은 알고 있는 결함이고,
+# 6개 표제 문안은 내러티브 몫이다(구현이 만들 자리가 아니다 — 불변규칙 2). 다만 **원문 id 가
+# 화면에 그려지는 것은 막는다**: 그건 표제 부재가 아니라 표제 오류다.
 func _vn_title(vn_id: String) -> String:
 	var s := session.data.strings
+	if not session.data.act_vn_entry(vn_id).is_empty():
+		return s.text("ui.vnSlot.tourBrief")
 	if vn_id.begins_with("vn_season_open"):
 		return s.text("ui.vnSlot.seasonOpen")
 	if vn_id.begins_with("vn_season_close"):

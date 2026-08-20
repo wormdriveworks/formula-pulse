@@ -576,7 +576,7 @@
      "required": {
       "id": "string",
       "act": "int:1,4",
-      "tone": "enum:calm,tense",
+      "tone": "enum_optional:calm,tense",
       "order": "int:1,9"
      }
     }

@@ -45,6 +45,11 @@ var milestones: Dictionary = {}          # milestone id -> true
 var narrative_act: int = 1
 # 이미 발생시킨 막 VN — 재발생 금지 (아카이브 재열람은 서사 층 소관이라 여기 안 든다).
 var act_vn_fired: Dictionary = {}
+# 발화했으나 아직 화면에 서지 않은 막 VN — **세이브 대상이다.**
+# 발화(투어 경계·커리어 개시)와 표시(브리핑 슬롯) 사이에 저장 지점이 있으므로(SET-01 = D09 §2.4
+# 투어 경계 저장), 직렬화하지 않으면 그 사이에 끊은 플레이어에게 `act_vn_fired` 만 남아
+# **그 막이 영구 미도달**이 된다 — 발화 기록과 표시 대기가 갈라지는 자리다.
+var act_vn_pending: Array = []
 # 통산 지표 (D07 §6.2 확정 6종 + 업적 판정 소재). 감소하지 않는다 — 전진형 카운터.
 var career_stats: Dictionary = {}        # 지표 키 -> 수치
 var achievements: Dictionary = {}        # achievement id -> true (무보상 명예형 — D07 §7.1)
@@ -656,23 +661,36 @@ func evaluate_achievements(season: int = 0) -> Array:
 # 예외 경로로 수용된 귀결이며 MS-5 관측 대장 등재분이다.
 #
 # 반환 = 이번 경계에 **새로 발생시킬 막 VN id 목록** (발행 순서 = 데이터의 `order`).
+# **달성형 전속** — 진입 마일스톤이 실재하는 막(2~4막)만 투어 경계에서 래치한다.
+# 마일스톤이 빈 행(1막)은 `open_narrative_act()` 가 커리어 개시에서 가져간다:
+# D08 §8.1 의 래치는 "달성 후 최초의 투어 경계"라는 규칙이고 **1막에는 달성이 없다**
+# (D04 §1.2 "1막 = 게임 시작" · 총괄 판정 IMPL-263 ②).
 func latch_narrative_act() -> Array:
+	return _fire_act_vn(func(milestone: String): return not milestone.is_empty() and milestones.has(milestone))
+
+
+# **개시형 전속** — 진입 마일스톤이 없는 막. 커리어 개시의 최초 브리핑 슬롯에서 한 번 발화한다.
+# 래치와 같은 몸통을 쓰되 조건만 뒤집는다 — 두 갈래가 갈라지면 `narrative_act` 갱신·중복 발화
+# 방지 같은 공통 계약이 한쪽에서만 지켜지는 일이 생긴다.
+func open_narrative_act() -> Array:
+	return _fire_act_vn(func(milestone: String): return milestone.is_empty())
+
+
+func _fire_act_vn(accepts: Callable) -> Array:
 	var fired: Array = []
-	var entries := data.act_vn_entries()
-	var ordered: Array = entries.duplicate()
+	var ordered: Array = data.act_vn_entries().duplicate()
 	ordered.sort_custom(func(a, b): return int(a.get("order", 0)) < int(b.get("order", 0)))
 	for entry in ordered:
 		var row: Dictionary = entry
 		var vn_id := String(row.get("id", ""))
 		if vn_id.is_empty() or act_vn_fired.has(vn_id):
 			continue
-		var milestone := String(row.get("milestone", "")).strip_edges()
-		# 진입 마일스톤이 빈 행(1막 = 게임 시작)은 커리어 개시로 이미 성립한 것으로 본다.
-		if not milestone.is_empty() and not milestones.has(milestone):
+		if not bool(accepts.call(String(row.get("milestone", "")).strip_edges())):
 			continue
 		act_vn_fired[vn_id] = true
 		narrative_act = maxi(narrative_act, int(row.get("act", 1)))
 		fired.append(vn_id)
+	act_vn_pending.append_array(fired)
 	return fired
 
 
@@ -804,6 +822,7 @@ func serialize() -> Dictionary:
 		"milestones": milestones.duplicate(),
 		"narrative_act": narrative_act,
 		"act_vn_fired": act_vn_fired.duplicate(),
+		"act_vn_pending": act_vn_pending.duplicate(),
 		"career_stats": career_stats.duplicate(),
 		"achievements": achievements.duplicate(),
 		"achievement_seasons": achievement_seasons.duplicate(),
@@ -842,6 +861,8 @@ func restore(payload: Dictionary) -> bool:
 	milestones = payload.get("milestones", {})
 	narrative_act = int(payload.get("narrative_act", 1))
 	act_vn_fired = payload.get("act_vn_fired", {})
+	# 구세이브 관용 — 이 열이 없던 시절의 세이브는 대기 0 으로 복원된다.
+	act_vn_pending = payload.get("act_vn_pending", [])
 	# 통산·업적 도입(T4) 전 세이브에는 없다 — 빈 상태가 충실값 (그 세계는 집계가 없었다).
 	# 업적은 재로드 후 evaluate_achievements()가 현 상태로 재판정하므로 소급 달성이 성립한다.
 	career_stats = payload.get("career_stats", {})

@@ -3,7 +3,7 @@
 # 실행: godot --headless --path godot --script tests/test_narrative.gd
 extends SceneTree
 
-const MIN_CHECKS := 136
+const MIN_CHECKS := 143
 
 var _failures := 0
 var _checked := 0
@@ -303,14 +303,25 @@ func _t7_act_latch() -> void:
 	var state := OutgameState.new()
 	state.setup(data)
 	_ok("초기 막 = 1", state.narrative_act == 1)
-	var first := state.latch_narrative_act()
-	_ok("첫 경계 = 1막 VN 발생", first == ["vn_act1"], str(first))
-	_ok("재호출은 재발생하지 않는다", state.latch_narrative_act().is_empty())
+	# **1막은 래치가 가져가지 않는다** — 래치는 "달성 후 최초의 투어 경계"이고 1막에는 달성이
+	# 없다(D04 §1.2 "게임 시작" · 총괄 판정 IMPL-263 ②). 개시형 창구가 따로 있다.
+	_ok("첫 경계 래치 = 1막 미포함", state.latch_narrative_act().is_empty(),
+		str(state.act_vn_pending))
+	var opened := state.open_narrative_act()
+	_ok("커리어 개시 = 1막 VN 발생", opened == ["vn_act1"], str(opened))
+	_ok("개시 재호출은 재발생하지 않는다", state.open_narrative_act().is_empty())
+	_ok("개시분이 표시 대기에 들어간다", state.act_vn_pending == ["vn_act1"],
+		str(state.act_vn_pending))
+	# 개시형과 달성형이 **같은 발화 대장**을 쓰는가 — 갈라지면 한쪽만 중복 발화를 막는다.
+	state.milestones["milestone_first_podium"] = true
+	_ok("달성형은 래치가 가져간다", state.latch_narrative_act() == ["vn_act2"])
+	_ok("대기가 누적된다", state.act_vn_pending == ["vn_act1", "vn_act2"],
+		str(state.act_vn_pending))
 
 	# **건너뜀 경로** — 첫 포디움·첫 투어 우승 없이 로렌츠 격파만 성립한 상태.
 	var skipper := OutgameState.new()
 	skipper.setup(data)
-	skipper.latch_narrative_act()
+	skipper.open_narrative_act()
 	skipper.milestones["milestone_lorentz_beat"] = true
 	var jumped := skipper.latch_narrative_act()
 	_ok("건너뜀 — 4막 VN 발생", jumped.has("vn_act4"), str(jumped))
@@ -328,6 +339,12 @@ func _t7_act_latch() -> void:
 	_ok("직렬화 왕복", restored.restore(skipper.serialize()))
 	_ok("복원 후 막 번호 유지", restored.narrative_act == 4)
 	_ok("복원 후 재발생 없음", restored.latch_narrative_act().is_empty())
+	_ok("복원 후 개시형 재발생 없음", restored.open_narrative_act().is_empty())
+	# **표시 대기가 세이브를 건넌다.** 발화(투어 경계)와 표시(브리핑 슬롯) 사이에 저장 지점이
+	# 있어(SET-01), 이 열이 안 넘어가면 `act_vn_fired` 만 남아 그 막이 영구 미도달이 된다.
+	_ok("표시 대기 직렬화 왕복", restored.act_vn_pending == skipper.act_vn_pending,
+		"%s vs %s" % [restored.act_vn_pending, skipper.act_vn_pending])
+	_ok("표시 대기 비어 있지 않음", not restored.act_vn_pending.is_empty())
 
 
 # ⑤⑥ 관계 축 트리거 — **행과 트리거가 같은 회차에 섰는가**

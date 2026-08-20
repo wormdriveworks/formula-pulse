@@ -734,6 +734,7 @@ func _tc_o6_exchange_guards() -> void:
 		"sponsor_slots", "sponsor_candidate_count", "sign_sponsor", "settle_sponsors",
 		"add_relation", "pending_relation_transitions", "commit_relation_transitions",
 		"latch_narrative_act",
+		"open_narrative_act",
 		"relation_stage",
 		"unlock_facility", "archive_available", "buy_consumable",
 		"gp_prize", "finish_bonus", "settlement_reward", "vane_stage",

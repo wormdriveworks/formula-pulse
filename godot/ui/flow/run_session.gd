@@ -45,8 +45,6 @@ var newly_achieved: Array = []
 # `newly_achieved` 와 같은 성격의 래치이며 세이브 대상이 아니다(경계 1회성 표시 신호).
 var newly_opened_tiers: Array = []
 
-# 투어 경계에서 발생시킬 막 VN id 목록 — 화면 층이 소비한다 (세이브 비대상: 경계 1회성).
-var pending_act_vn: Array = []
 # 같은 경계에서 공표된 관계 전이 축 id 목록 (D07 §5.5 대회 경계 스냅).
 var committed_relations: Array = []
 # 재회 축 체인의 투어당 전진량 상한 = 2비트 (D08 §8.7-3 "1~2비트씩 전진" · 납품서 §6.2).
@@ -96,6 +94,50 @@ func begin_career(profile: int) -> void:
 	narrative.begin_season()
 	presentation = PresentationGrade.new()
 	presentation.setup(data)
+	# 개시형 막 VN(1막) — 커리어 개시의 최초 브리핑 슬롯에서 선다 (D04 §1.2 · 총괄 판정 IMPL-263 ②).
+	outgame.open_narrative_act()
+
+
+# 막 VN 발행 슬롯 — 공표 위치는 **투어 브리핑 슬롯**이다
+# (D08 §8.1 "투어 종료 결산~차기 투어 브리핑 슬롯에서 공표").
+const ACT_VN_SLOT := "vnslot_tour_brief"
+
+
+# 대기 중인 막 VN 을 NAR-01 페이로드로 꺼낸다 — 없으면 **빈 사전**(화면은 그대로 다음으로 간다).
+#
+# **여기 한 곳에서만 만든다.** 발행 지점이 둘(커리어 개시·투어 경계)이라 화면마다 페이로드를
+# 조립하면 한쪽만 `tone` 을 빠뜨리는 형태로 샌다 — 그리고 그 누락은 **조용하다**: 정조 미전달은
+# 화면이 죽는 게 아니라 tense 3건이 BGM-09(일상)로 떨어지는 것으로만 나타난다(D12 v1.4 §5.4).
+#
+# 2건 이상 대기하면 **사슬로 잇는다**(마일스톤 2개가 한 투어에서 달성될 수 있다) — 앞 VN 의
+# `next` 가 뒤 VN 이고, 마지막 VN 의 `next` 가 원래 목적지다.
+func take_act_vn_payload(next_route: String, next_payload: Dictionary = {}) -> Dictionary:
+	if outgame == null or outgame.act_vn_pending.is_empty():
+		return {}
+	var queued: Array = outgame.act_vn_pending.duplicate()
+	outgame.act_vn_pending.clear()
+	var payload: Dictionary = next_payload
+	var route := next_route
+	# 뒤에서부터 감는다 — 앞 VN 의 `next_payload` 가 이미 완성돼 있어야 하기 때문이다.
+	queued.reverse()
+	for vn_id in queued:
+		payload = _act_vn_payload(String(vn_id), route, payload)
+		route = "NAR-01"
+	return payload
+
+
+func _act_vn_payload(vn_id: String, next_route: String, next_payload: Dictionary) -> Dictionary:
+	var entry := data.act_vn_entry(vn_id)
+	return {
+		"vn_id": vn_id,
+		"slot_id": ACT_VN_SLOT,
+		# 라인별 화자 사전을 **그대로** 넘긴다 — 화면이 `_normalize_lines()` 로 받는 형태다.
+		"line_keys": entry.get("lines", []),
+		# 정조는 인스턴스가 정본이다(D12 v1.4 §5.4). 공란이면 화면의 폴백 사슬이 받는다.
+		"tone": String(entry.get("tone", "")),
+		"next": next_route,
+		"next_payload": next_payload,
+	}
 
 
 # 이벤트 노드 판정 (D08 §7 — RACE-03 → RUN-01 사이 삽입 지점의 발생 판정)
@@ -361,7 +403,7 @@ func close_tour() -> Dictionary:
 	# ── 투어 경계 = 서사 층 발효 지점 (D08 §8.1 · D07 §5.5) ──
 	# 막 래치와 관계 전이 공표가 **같은 경계**에 선다. 둘을 갈라 두면 "막은 넘어갔는데
 	# 관계 단계는 다음 경계에 공표되는" 어긋남이 생긴다.
-	pending_act_vn = outgame.latch_narrative_act()
+	outgame.latch_narrative_act()
 	committed_relations = outgame.commit_relation_transitions()
 	_reunion_beats_this_tour = 0
 	if not season.season_finished():

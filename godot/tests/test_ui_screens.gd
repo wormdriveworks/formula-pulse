@@ -5,7 +5,7 @@
 # 무가드로 읽으면, 커리어를 연 경로에서는 멀쩡하고 **타이틀 직행 경로에서만** 죽는다.
 # 실제로 SYS-04 가 그렇게 샜다(총괄 판정 IMPL-176 ① — 타이틀 첫 진입 100% 재현).
 #
-# 검사 축 17종:
+# 검사 축 18종:
 #   ① 무커리어 문맥 성립 — SYS-01 → SYS-04 직행(D09 본문 145행·§A-1 규격 진입)
 #   ② 패드 순회 폐쇄 — 초기 포커스 보유 (D09 §1.3 · 총괄 판정 IMPL-176 ②)
 #   ③ 단독 경로 옵션 정합 — 라우터를 안 거치는 경로가 O9 를 적용하는가 (동 ③)
@@ -23,6 +23,7 @@
 #   ⑮ 도상 치수 2규격 공존 — 릴 32 무배율 ↔ 섹터 속성 16 (IMPL-226)
 #   ⑯ 튜토리얼 콜아웃 배치 — 지목 요소·상시 표시 스트립 양쪽 불침범 (IMPL-258)
 #   ⑰ VN 선택 지점 — 노드 부재 생략 ↔ 실재 발동·합류·스킵 생존 (IMPL-257)
+#   ⑱ 막 VN 소비부 — 발화→페이로드→실화면→도달 · 정조 BGM 분기 (IMPL-263 ①②)
 #
 # **첫 프레임(`_process`)에서 돈다.** `_init()` 시점에는 `root` 가 없어 `add_child` 자체가
 # 불가능하고, `_initialize()` 시점에는 `root` 가 있어도 **아직 트리 안이 아니다** — 그래서
@@ -95,11 +96,12 @@ func _process(_delta: float) -> bool:
 	_anch_check_present()
 	_vn_line_speakers(data)
 	_vn_choice_point(data)
+	_act_vn_consumption(data)
 	_tutorial_callout_placement()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 218:
-		print("UI_SCREENS_FAIL checks=%d < 하한 218 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 249:
+		print("UI_SCREENS_FAIL checks=%d < 하한 249 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1204,7 +1206,11 @@ func _anch_check_present() -> void:
 		.get("act_vn.json", {}).get("arrays", {}).get("entries", {}).get("required", {})
 	_ok("act_vn entries 스펙 실재", not act_spec.is_empty())
 	_ok("act_vn act 범위 강제", String(act_spec.get("act", "")) == "int:1,4", str(act_spec))
-	_ok("act_vn tone 도메인 강제", String(act_spec.get("tone", "")) == "enum:calm,tense", str(act_spec))
+	# **`enum_optional` 이 정본의 이행이다** — D12 v1.4 §5.4 가 "미지정 = calm"과 폴백 사슬을
+	# 명문하므로 인스턴스 공란은 빌드 실패가 아니라 폴백 개시다(총괄 판정 IMPL-269 ①).
+	# `enum` 으로 되돌리면 기계가 정본보다 엄해진다.
+	_ok("act_vn tone 도메인 강제(공란 허용)",
+		String(act_spec.get("tone", "")) == "enum_optional:calm,tense", str(act_spec))
 	_ok("act_vn order 범위 강제", String(act_spec.get("order", "")) == "int:1,9", str(act_spec))
 
 
@@ -1270,6 +1276,157 @@ func _vn_line_speakers(data: GameData) -> void:
 		"vane=%d" % _cue_count(session, "SE-V01"))
 	root.remove_child(screen)
 	screen.free()
+	# **공란 슬롯 가드** (총괄 판정 IMPL-263 ⑤). 슬롯 없이 세우는 경로가 정상인데
+	# `vn_slot("")` 은 미상 슬롯으로 보고 `_load_ok` 를 내린다 — 데이터가 멀쩡한데 적재 실패로
+	# 표시되는 것이 그 결함의 모습이다. **깨끗한 대장으로 따로 잰다**(앞선 축의 오염 배제).
+	var fresh := GameData.new()
+	_ok("가드 전제: 깨끗한 적재", fresh.load_all())
+	var guard_screen := packed.instantiate() as Control
+	var guard_session := _fresh_session(fresh)
+	guard_screen.session = guard_session
+	root.add_child(guard_screen)
+	guard_screen.bind(guard_session, {
+		"vn_id": "", "slot_id": "", "line_keys": ["vn.act1.beat01"],
+	})
+	_ok("공란 슬롯으로 세워도 적재 상태 불변", fresh.is_ok())
+	root.remove_child(guard_screen)
+	guard_screen.free()
+
+
+# ── ⑱ 막 VN 표시 소비부 (총괄 판정 IMPL-263 ① — 차단급 결선) ──
+#
+# **결함의 성격이 축의 형태를 정한다.** 데이터는 완전하고 화면도 멀쩡했는데 **아무도 넘기지
+# 않아서** 75라인이 게임에서 도달 불가였다. 그런 결함은 데이터 검사·화면 검사가 각자 통과하는
+# 사이로 빠져나가므로, 축은 **발화 → 페이로드 → 실화면 → 도달**을 한 줄로 꿰어야 한다.
+#
+# 그리고 `tone` 미전달은 **조용하다** — 화면이 죽는 게 아니라 tense 3건이 BGM-09(일상)로
+# 떨어질 뿐이다. 그래서 관측 지점을 라벨이 아니라 **BGM 발화 기록**에 둔다.
+func _act_vn_consumption(data: GameData) -> void:
+	# ── ⓐ 커리어 개시 = 1막 발화 · 페이로드 실체 ──
+	var session := RunSession.new()
+	session.setup(data)
+	session.begin_career(2)
+	_ok("커리어 개시 = 1막 표시 대기", Array(session.outgame.act_vn_pending) == ["vn_act1"],
+		str(session.outgame.act_vn_pending))
+	var payload := session.take_act_vn_payload("RACE-01")
+	_ok("페이로드 발행", not payload.is_empty())
+	_ok("발행 슬롯 = 투어 브리핑", String(payload.get("slot_id", "")) == "vnslot_tour_brief")
+	var lines: Array = payload.get("line_keys", [])
+	_ok("1막 12라인 동반", lines.size() == 12, str(lines.size()))
+	# 라인별 화자 사전이어야 한다 — 문자열 배열로 넘기면 화자가 전건 기본값으로 접힌다.
+	var dict_lines := 0
+	for line in lines:
+		if typeof(line) == TYPE_DICTIONARY and Dictionary(line).has("speaker_key"):
+			dict_lines += 1
+	_ok("전 라인 = 화자 사전", dict_lines == lines.size(), "%d/%d" % [dict_lines, lines.size()])
+	_ok("정조 동반", String(payload.get("tone", "")) == "calm", str(payload.get("tone", "")))
+	_ok("소비 후 대기 0", Array(session.outgame.act_vn_pending).is_empty())
+	_ok("재호출 = 빈 사전", session.take_act_vn_payload("RACE-01").is_empty())
+
+	# ── ⓑ 실화면 도달 — 75라인 중 1막 12라인이 실제로 그려지는가 ──
+	var screen := _mount_payload(data, session, payload)
+	_ok("실화면 1라인 = 데이터 문면",
+		(screen.get_node("%BodyLabel") as Label).text == data.strings.text("vn.act1.beat01"),
+		(screen.get_node("%BodyLabel") as Label).text)
+	_ok("calm = BGM-09", _cue_count(session, "BGM-09") == 1, str(session.audio.fired))
+	_ok("calm ≠ BGM-10", _cue_count(session, "BGM-10") == 0)
+	var drawn := 1
+	for step in range(11):
+		screen._advance()
+		if (screen.get_node("%BodyLabel") as Label).text != "":
+			drawn += 1
+	_ok("12라인 전건 문면 실재", drawn == 12, str(drawn))
+	_ok("마지막 라인 = beat12",
+		(screen.get_node("%BodyLabel") as Label).text == data.strings.text("vn.act1.beat12"))
+	# 선택 4지점은 페이로드가 vn_id·라인 열을 넘기는 순간 자동 도달한다 — 그 자동성을 본다.
+	screen._advance()
+	_ok("선택 지점 자동 도달", Array(screen.choice_omissions) == ["vnchoice_act1_number"],
+		str(screen.choice_omissions))
+	_ok("아카이브 등재", session.narrative.vn_seen.has("vn_act1"))
+	_release_vn(screen)
+
+	# ── ⓒ tense 막 = BGM-10 (정조 미전달의 조용한 실패를 잡는 자리) ──
+	var tense_session := RunSession.new()
+	tense_session.setup(data)
+	tense_session.begin_career(2)
+	tense_session.outgame.act_vn_pending.clear()
+	tense_session.outgame.milestones["milestone_first_tour_win"] = true
+	tense_session.outgame.latch_narrative_act()
+	var tense_payload := tense_session.take_act_vn_payload("RACE-01")
+	_ok("3막 정조 = tense", String(tense_payload.get("tone", "")) == "tense")
+	var tense_screen := _mount_payload(data, tense_session, tense_payload)
+	_ok("tense = BGM-10", _cue_count(tense_session, "BGM-10") == 1, str(tense_session.audio.fired))
+	_ok("tense ≠ BGM-09", _cue_count(tense_session, "BGM-09") == 0)
+	_release_vn(tense_screen)
+
+	# ── ⓓ 정조 공란 = 폴백 사슬 (enum_optional 전환의 실동작) ──
+	var blank_session := RunSession.new()
+	blank_session.setup(data)
+	blank_session.begin_career(2)
+	var blank_payload := blank_session.take_act_vn_payload("RACE-01")
+	blank_payload["tone"] = ""
+	var blank_screen := _mount_payload(data, blank_session, blank_payload)
+	# `vnslot_tour_brief` 행의 tone = calm 이므로 폴백이 거기서 잡힌다.
+	_ok("공란 = 슬롯 폴백(BGM-09)", _cue_count(blank_session, "BGM-09") == 1,
+		str(blank_session.audio.fired))
+	_release_vn(blank_screen)
+
+	# ── ⓔ 2건 동시 래치 = 사슬 (앞 VN 의 next 가 뒤 VN) ──
+	var chain_session := RunSession.new()
+	chain_session.setup(data)
+	chain_session.begin_career(2)
+	chain_session.outgame.act_vn_pending.clear()
+	chain_session.outgame.milestones["milestone_first_podium"] = true
+	chain_session.outgame.milestones["milestone_first_tour_win"] = true
+	chain_session.outgame.latch_narrative_act()
+	var chain := chain_session.take_act_vn_payload("RACE-01")
+	_ok("사슬 첫 VN = 2막", String(chain.get("vn_id", "")) == "vn_act2", str(chain.get("vn_id", "")))
+	_ok("사슬 첫 VN 의 next = NAR-01", String(chain.get("next", "")) == "NAR-01")
+	var tail: Dictionary = chain.get("next_payload", {})
+	_ok("사슬 둘째 VN = 3막", String(tail.get("vn_id", "")) == "vn_act3", str(tail.get("vn_id", "")))
+	_ok("사슬 끝 = 원래 목적지", String(tail.get("next", "")) == "RACE-01")
+
+	# ── ⓕ 실 라우팅 — 개러지 출발이 막 VN 을 경유하는가 ──
+	SaveManager.configure(data)
+	var depart_session := RunSession.new()
+	depart_session.setup(data)
+	depart_session.begin_career(2)
+	var garage := _mount(GARAGE_SCENE, depart_session)
+	var routed: Array = []
+	garage.navigate.connect(func(target: String, route_payload: Dictionary): routed.append([target, route_payload]))
+	garage._on_depart()
+	_ok("대기 有 → NAR-01 경유", routed.size() == 1 and String(routed[0][0]) == "NAR-01", str(routed))
+	_ok("경유 페이로드 = 막 VN",
+		routed.size() == 1 and String(Dictionary(routed[0][1]).get("vn_id", "")) == "vn_act1")
+	# 대기가 없으면 사슬이 접혀 그대로 출발한다 — 분기를 두지 않은 것이 계약이다.
+	routed.clear()
+	garage._on_depart()
+	_ok("대기 無 → RACE-01 직행", routed.size() == 1 and String(routed[0][0]) == "RACE-01", str(routed))
+	_release_vn(garage)
+
+	# ── ⓖ 재회 축 오염 없음 (IMPL-252 자기 결함 교정 실측) ──
+	var alta := RunSession.new()
+	alta.setup(data)
+	alta.begin_career(2)
+	var slot := Array(alta.season.calendar).find("stage_alta_ridge")
+	_ok("알타 리지 캘린더 실재", slot >= 0, str(alta.season.calendar))
+	if slot >= 0:
+		alta.season.tour_slot = slot + 1
+		_ok("알타 리지 투어 성립", alta._is_alta_ridge_tour())
+		var alta_screen := _mount_payload(data, alta, alta.take_act_vn_payload("RACE-01"))
+		_ok("막 VN 은 재회 비트가 아니다",
+			int(alta.outgame.relation_counters.get("relation_reunion", 0)) == 0,
+			str(alta.outgame.relation_counters))
+		_release_vn(alta_screen)
+
+
+func _mount_payload(data: GameData, session: RunSession, payload: Dictionary) -> Control:
+	var packed := load(VN_SCENE) as PackedScene
+	var screen := packed.instantiate() as Control
+	screen.session = session
+	root.add_child(screen)
+	screen.bind(session, payload)
+	return screen
 
 
 # ── ⑰ VN 선택 지점 (D04 §5.3 · 총괄 판정 IMPL-257) ──

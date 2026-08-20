@@ -62,7 +62,7 @@ func _on_bound(payload: Dictionary) -> void:
 		session.narrative.replay_from_archive(vn_id)
 	elif not vn_id.is_empty():
 		var outcome: Dictionary = session.narrative.trigger_vn(vn_id, slot_id, false)
-		if bool(outcome.get("occurred", false)) and slot_id == TOUR_BRIEF_SLOT:
+		if bool(outcome.get("occurred", false)) and _is_reunion_chain_beat(vn_id, slot_id):
 			# 재회 체인 비트 — 투어 브리핑 VN 축 (D08 §8.7-3). **발생 시점에 센다**:
 			# 열람·스킵을 가르지 않는 것이 형식 A 의 계약이고(§10.3 R-D07-VN),
 			# 재열람 경로(`_replay`)는 이 갈래에 들어오지 않으므로 불계수가 구조로 선다.
@@ -97,6 +97,24 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+# 브리핑 슬롯의 VN 이 **재회 체인 비트인가** — 승인 문면은 "알타 리지 투어 내 **체인 비트** 발생"이고
+# 막 전이 VN 은 그 체인의 비트가 아니다.
+#
+# **IMPL-252 의 자기 결함 교정이다.** 그때는 브리핑 슬롯에 production 산출이 하나도 없어
+# "브리핑 슬롯 VN = 체인 비트"로 동일시해도 차이가 관측되지 않았다. 16차가 막 VN 을 이 슬롯으로
+# 발행하자 동일시가 즉시 새는 것이 실측됐다 — 알타 리지 투어에서 막 VN 2건 사슬만으로
+# `relation_reunion` 이 **0 → 2**(threshold1 = 대면)에 도달했다. 재회 서사가 하나도 없는데
+# 재회 축이 대면까지 간다.
+#
+# 가름은 데이터가 한다 — `act_vn.json` 인스턴스면 막 전이다. 그래서 지금 이 축의 브리핑 다리는
+# **다시 잠잠해진다**: 재회 체인 브리핑 VN 은 아직 문안이 없다(T7 납품분 = 막 VN). 나머지 두 다리
+# (C3 관계 이벤트·카이 벽 조우)는 그대로 살아 있으므로 축 자체는 전진한다.
+func _is_reunion_chain_beat(vn_id: String, slot_id: String) -> bool:
+	if slot_id != TOUR_BRIEF_SLOT:
+		return false
+	return session.data.act_vn_entry(vn_id).is_empty()
+
+
 # 정조 해석 — **D12 v1.4 §5.4 확정 문면의 이행**(총괄 판정 IMPL-253 ① · [가안] 해제).
 # 정본 거처 = **VN 인스턴스 정의**(문안 판단이 실리는 단위)이고 슬롯 종류 표
 # (`milestone_vn`·`vn_slots`)의 `tone` 열은 **종류 기본값 폴백**으로 존치한다.
@@ -109,7 +127,10 @@ func _resolve_tone(payload: Dictionary, slot_id: String, vn_id: String) -> Strin
 	var tone := String(payload.get("tone", ""))
 	if tone.is_empty():
 		tone = String(session.data.milestone_vn_row(vn_id).get("tone", ""))
-	if tone.is_empty():
+	# **공란 슬롯은 묻지 않는다** — `vn_slot("")` 은 미상 슬롯으로 보고 `push_error` +
+	# `_load_ok` 를 내린다. 슬롯 없이 세우는 경로(아카이브 재열람·막 VN 등)가 정상이므로
+	# 여기서 데이터를 조회할 이유가 없다 (총괄 판정 IMPL-263 ⑤).
+	if tone.is_empty() and not slot_id.is_empty():
 		tone = String(session.data.vn_slot(slot_id).get("tone", ""))
 	return tone if tone == "calm" or tone == "tense" else "calm"
 

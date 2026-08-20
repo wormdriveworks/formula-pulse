@@ -80,11 +80,17 @@ func _on_slot_pressed(profile: int, has_save: bool) -> void:
 		session.begin_career(profile)
 		# 시즌 오프닝 VN + 캘린더 공개 비트 (D09 §2.3 — 신규 진입 경로).
 		# [가안] vn 인스턴스 id 는 시즌 단위 발급 — 실문안 트랙 유입 시 대장으로 교체
+		#
+		# **그 뒤에 개시형 막 VN(1막)이 붙는다** — 플로우맵이 시즌 오프닝 VN 과 투어 시작 VN 을
+		# 연속 슬롯으로 두고(D09 §2.3), D08 §8.1 의 공표 위치가 브리핑 슬롯이다.
+		# 대기분이 없으면 사슬이 그대로 `RACE-01` 로 접힌다 — 분기를 두지 않는다.
+		var after_open := session.take_act_vn_payload("RACE-01")
 		go("NAR-01", {
 			"vn_id": "vn_season_open_s%d" % session.season.season,
 			"slot_id": "vnslot_season_open",
 			"calendar": true,
-			"next": "RACE-01",
+			"next": "NAR-01" if not after_open.is_empty() else "RACE-01",
+			"next_payload": after_open,
 		})
 		return
 	go("RACE-01", {})
