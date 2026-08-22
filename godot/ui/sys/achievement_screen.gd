@@ -98,12 +98,12 @@ func _focus_initial() -> void:
 # 닫기 버튼까지 포커스를 옮겨야만 나갈 수 있으면 그것도 순회 폐쇄 위반이다.
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("tab_prev"):
-		_cycle_tab(-1)
 		get_viewport().set_input_as_handled()
+		_cycle_tab(-1)
 		return
 	if event.is_action_pressed("tab_next"):
-		_cycle_tab(1)
 		get_viewport().set_input_as_handled()
+		_cycle_tab(1)
 		return
 	if not event.is_action_pressed("ui_cancel"):
 		return

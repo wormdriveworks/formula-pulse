@@ -107,12 +107,13 @@ func _process(_delta: float) -> bool:
 	_vn_choice_point(data)
 	_vn_choice_geometry(data)
 	_vn_last_line_input(data)
+	_input_handled_ordering()
 	_act_vn_consumption(data)
 	_tutorial_callout_placement()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 297:
-		print("UI_SCREENS_FAIL checks=%d < 하한 297 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 301:
+		print("UI_SCREENS_FAIL checks=%d < 하한 301 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1895,3 +1896,88 @@ func _vn_last_line_input(data: GameData) -> void:
 	if screen.get_parent() != null:
 		root.remove_child(screen)
 	screen.queue_free()
+
+
+# ── ⑲ 입력 소비 표시의 위치 — `godot/ui` 전역 (실기 크래시 재발 교정 · IMPL-299) ──
+#
+# **한 지점만 고치면 재발한다.** 같은 형태를 VN 에서 먼저 잡았는데(IMPL-292) 훑지 않아
+# RACE-01 에 남았고, 사용자 실기에서 그대로 터졌다(`race_screen.gd:364` ·
+# `Cannot call method 'set_input_as_handled' on a null value`). 그래서 축을 파일 하나가
+# 아니라 **입력 핸들러 전역**으로 둔다.
+#
+# 규칙 = **소비 표시가 분기의 첫 동작이어야 한다.** 처리 여부는 분기 조건이 정하지 동작의
+# 결과가 정하지 않는다. 앞에 호출이 오면 그 호출이 화면을 이탈시킨 순간 `get_viewport()` 가
+# null 이 되고, 이 함수는 거기서 죽는다(라우팅은 이미 끝난 뒤라 겉으로는 멀쩡해 보인다).
+#
+# 관측점이 원문인 이유는 IMPL-292 와 같다 — 엔진 오류는 GDScript 에서 잡히지 않고
+# `is_input_handled()` 는 리셋 창구가 없어 항진명제다.
+const INPUT_HANDLERS := ["_input", "_unhandled_input", "_unhandled_key_input",
+	"_shortcut_input", "_gui_input"]
+const HANDLE_MARK := "get_viewport().set_input_as_handled()"
+
+
+func _input_handled_ordering() -> void:
+	var files: Array[String] = []
+	_collect_gd("res://ui", files)
+	_ok("전제: UI 스크립트 수집", files.size() > 10, "files=%d" % files.size())
+	var scanned := 0
+	var marks := 0
+	var offenders: Array[String] = []
+	for path in files:
+		var source := FileAccess.get_file_as_string(path)
+		if not source.contains(HANDLE_MARK):
+			continue
+		scanned += 1
+		var lines := source.split("\n")
+		var in_handler := false
+		var prev_code := ""
+		for raw in lines:
+			var line := String(raw)
+			var body := line.strip_edges()
+			if line.begins_with("func "):
+				in_handler = false
+				for name in INPUT_HANDLERS:
+					if line.begins_with("func %s(" % name):
+						in_handler = true
+				prev_code = ""
+				continue
+			if body.is_empty() or body.begins_with("#"):
+				continue
+			if in_handler and body == HANDLE_MARK:
+				marks += 1
+				if _is_call_statement(prev_code):
+					offenders.append("%s: %s → 소비표시" % [path.get_file(), prev_code])
+			prev_code = body
+	_ok("전제: 소비 표시 지점 실재", marks > 0, "marks=%d" % marks)
+	_ok("전제: 스캔 대상 파일 실재", scanned > 0, "scanned=%d" % scanned)
+	_ok("소비 표시가 호출보다 앞선다 (godot/ui 전역)", offenders.is_empty(),
+		"위반 %d건: %s" % [offenders.size(), ", ".join(offenders)])
+
+
+# 호출문인가 — 대입(` = `)·제어문·선언은 아니다. 이 판별이 좁으면 위반을 놓치고,
+# 넓으면 대입까지 잡아 규칙이 과해진다.
+func _is_call_statement(body: String) -> bool:
+	if body.is_empty() or not body.ends_with(")"):
+		return false
+	for head in ["if ", "elif ", "while ", "for ", "return", "var ", "await ", "assert("]:
+		if body.begins_with(head):
+			return false
+	if body.contains(" = "):
+		return false
+	return true
+
+
+func _collect_gd(dir_path: String, out: Array[String]) -> void:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var entry := dir.get_next()
+	while entry != "":
+		var full := "%s/%s" % [dir_path, entry]
+		if dir.current_is_dir():
+			_collect_gd(full, out)
+		elif entry.ends_with(".gd"):
+			out.append(full)
+		entry = dir.get_next()
+	dir.list_dir_end()

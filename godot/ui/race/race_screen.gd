@@ -350,18 +350,27 @@ func _shortcut_input(event: InputEvent) -> void:
 #
 # 바뀌는 것은 **입력 판독 층뿐**이다 — 위 순환 설계(확정 = 스핀과 같은 물리 동작)는 불변이며,
 # 오히려 패드에서도 A 하나로 같은 순환이 성립하게 된다.
+#
+# **소비 표시는 분기의 첫 줄이다 (IMPL-299 — 실기 크래시 교정).** 처리 여부는 분기 조건이
+# 정하지, 동작의 결과가 정하지 않는다. 순서를 뒤집으면 **동작이 화면을 이탈시킨 뒤**
+# `get_viewport()` 를 부르게 되고 그 값은 null 이다 — `_on_primary_action()` 이 GP 를 끝내
+# RACE-03 으로 라우팅한 프레임에 사용자 실기에서 그대로 터졌다
+# (`Cannot call method 'set_input_as_handled' on a null value` · `race_screen.gd:364`).
+# 같은 형태를 VN 에서 먼저 고쳤는데(IMPL-292) 그때 **한 지점만 고치고 훑지 않은 것**이
+# 이 재발의 원인이다. 지금은 이 파일의 전 분기를 같은 규칙으로 맞췄고 UISCR ⑲가
+# `godot/ui` 전역을 훑는다.
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause_menu"):
-		_open_pause()
 		get_viewport().set_input_as_handled()
+		_open_pause()
 		return
 	if _paused:
 		return  # 정지 중 레이스 입력 차단 — 오버레이가 자체 포커스를 갖는다
 	if _handle_pad_context(event):
 		return
 	if event.is_action_pressed("ui_accept"):
-		_on_primary_action()
 		get_viewport().set_input_as_handled()
+		_on_primary_action()
 
 
 # 컨텍스트 층 조합 판독. **`ui_accept` 보다 먼저 본다** — 층위 우선 규칙상 X·RB 홀드 중의
@@ -379,16 +388,16 @@ func _handle_pad_context(event: InputEvent) -> bool:
 	# ── X 홀드 + D패드 좌우 → A : 릴 홀드 토글 ──
 	if pad.pressed and _pad_is_held(PAD_X):
 		if pad.button_index == PAD_DPAD_LEFT or pad.button_index == PAD_DPAD_RIGHT:
+			get_viewport().set_input_as_handled()
 			var step := -1 if pad.button_index == PAD_DPAD_LEFT else 1
 			_hold_cursor = wrapi(_hold_cursor + step, 0, REEL_COUNT)
 			_refresh_reel_frames()
 			_pad_combo_used[PAD_X] = true
-			get_viewport().set_input_as_handled()
 			return true
 		if pad.button_index == PAD_A:
+			get_viewport().set_input_as_handled()
 			_toggle_hold(_hold_cursor)
 			_pad_combo_used[PAD_X] = true
-			get_viewport().set_input_as_handled()
 			return true
 	# ── RB 홀드 + D패드/A : 스킬 슬롯 ──
 	# **활성화 경로가 아직 없다** — 스킬 버튼에 소비부가 없고 키보드 F1~F5 도 미결선이다
@@ -405,8 +414,8 @@ func _handle_pad_context(event: InputEvent) -> bool:
 		var used: bool = bool(_pad_combo_used.get(PAD_X, false))
 		_pad_combo_used[PAD_X] = false
 		if not used:
-			_on_respin()
 			get_viewport().set_input_as_handled()
+			_on_respin()
 			return true
 	return false
 
@@ -420,17 +429,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if _paused:
 		return
 	if key.keycode == KEY_R:
-		_on_respin()
 		get_viewport().set_input_as_handled()
+		_on_respin()
 		return
 	if key.keycode == KEY_C:
-		_on_charge_intervene()
 		get_viewport().set_input_as_handled()
+		_on_charge_intervene()
 		return
 	var hold_index := HOLD_KEYS.find(key.keycode)
 	if hold_index >= 0:
-		_toggle_hold(hold_index)
 		get_viewport().set_input_as_handled()
+		_toggle_hold(hold_index)
 
 
 # ── 노드 수집 ──

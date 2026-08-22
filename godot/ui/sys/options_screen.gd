@@ -68,12 +68,12 @@ func _first_focusable(node: Control) -> Control:
 # 취소 / 뒤로 = Esc · 우클릭 · **패드 B** (D09 §1.3 공통 층 매핑표 — 정본 명시).
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("tab_prev"):
-		_cycle_tab(-1)
 		get_viewport().set_input_as_handled()
+		_cycle_tab(-1)
 		return
 	if event.is_action_pressed("tab_next"):
-		_cycle_tab(1)
 		get_viewport().set_input_as_handled()
+		_cycle_tab(1)
 		return
 	if not event.is_action_pressed("ui_cancel"):
 		return

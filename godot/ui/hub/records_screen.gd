@@ -50,12 +50,12 @@ func _select_tab(tab_name: String) -> void:
 # 탭 순서는 `_tabs` 의 삽입 순서 = 화면의 탭 배치 순서다(별도 순서 배열을 두지 않는다).
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("tab_prev"):
-		_cycle_tab(-1)
 		get_viewport().set_input_as_handled()
+		_cycle_tab(-1)
 		return
 	if event.is_action_pressed("tab_next"):
-		_cycle_tab(1)
 		get_viewport().set_input_as_handled()
+		_cycle_tab(1)
 
 
 func _cycle_tab(step: int) -> void:
