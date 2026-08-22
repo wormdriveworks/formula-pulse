@@ -72,16 +72,36 @@ func setup(game_data: GameData, services: PlatformServices = null, audio_host: N
 	options.setup(data)  # 기기별 구성 — 프로필·커리어와 무관하게 세션 개시 시 적재
 	# 재생기 주입 = 합성 지점. 디스패처·호출부는 어느 구현이 들어왔는지 모른다.
 	audio = AudioDispatcher.new()
+	# 햅틱 어댑터는 **플랫폼 묶음에서 그대로 온다** — 합성 지점이 하나이므로(D12 §2.2)
+	# 여기서 고를 것이 없다. 묶음이 없으면 `null` = 무햅틱(구조적 폴백).
+	var haptics_out: IHaptics = platform.haptics if platform != null else null
 	if audio_host != null:
 		var player := GameAudioOutput.new()
 		player.setup(data, audio_host)
-		audio.setup(data, player)
+		audio.setup(data, player, haptics_out)
 		player.bind_dispatcher(audio)
 	else:
 		var sink := SilentAudioOutput.new()
-		audio.setup(data, sink)
+		audio.setup(data, sink, haptics_out)
 		sink.bind_dispatcher(audio)
 	apply_volume_options()
+	apply_haptic_options()
+
+
+# O3 진동 감쇠 → 디스패처. **볼륨과 같은 자리다** — 코어는 옵션 저장소(화면 층)를 읽을 수 없다.
+#
+# 3단 문법은 D11 §3.1 확정(표준 100% / 감소 50% / 끔 0%)이고 **가운데 값만 창구 경유**다:
+# 100%·0% 는 문면 그대로의 정의라 코드에 1.0·0.0 이 오는 것이 값 기입이 아니다.
+func apply_haptic_options() -> void:
+	if audio == null or options == null:
+		return
+	var step := options.index_of("o3")
+	if step <= 0:
+		audio.haptic_damping = 1.0
+	elif step == 1:
+		audio.haptic_damping = data.param("param_haptic_damp_ratio")
+	else:
+		audio.haptic_damping = 0.0
 
 
 # 볼륨 옵션 → 버스. **소비 시점에 스스로 읽지 못하는 층**이라 옵션이 바뀌는 지점마다 밀어야
@@ -123,27 +143,67 @@ func begin_career(profile: int) -> void:
 const ACT_VN_SLOT := "vnslot_tour_brief"
 
 
-# 대기 중인 막 VN 을 NAR-01 페이로드로 꺼낸다 — 없으면 **빈 사전**(화면은 그대로 다음으로 간다).
+# 브리핑 슬롯에서 세울 VN 사슬을 NAR-01 페이로드로 꺼낸다 — 없으면 **빈 사전**(화면은 그대로
+# 다음으로 간다). 사슬에 실리는 것은 두 종류다:
+#   ①대기 중인 **막 VN**(달성형 래치 + 개시형)
+#   ②이 투어에 서는 **축 결속 브리핑 비트**(재회 체인 — 총괄 판정 IMPL-289 ②)
+#
+# **순서가 판정이다** — 막 VN 다음에 재회 브리핑이다. 이월이 아니라 연속 재생을 택한 근거는
+# 재회 축이 **투어당 상한 2만 받으면 되므로** 달성 보장이 이월보다 안정적이라는 것이다.
+# 발생 건수는 늘지 않는다(같은 경계에서 이어 붙일 뿐 — 밀도 상한 15 계상 무영향).
 #
 # **여기 한 곳에서만 만든다.** 발행 지점이 둘(커리어 개시·투어 경계)이라 화면마다 페이로드를
 # 조립하면 한쪽만 `tone` 을 빠뜨리는 형태로 샌다 — 그리고 그 누락은 **조용하다**: 정조 미전달은
 # 화면이 죽는 게 아니라 tense 3건이 BGM-09(일상)로 떨어지는 것으로만 나타난다(D12 v1.4 §5.4).
 #
-# 2건 이상 대기하면 **사슬로 잇는다**(마일스톤 2개가 한 투어에서 달성될 수 있다) — 앞 VN 의
-# `next` 가 뒤 VN 이고, 마지막 VN 의 `next` 가 원래 목적지다.
-func take_act_vn_payload(next_route: String, next_payload: Dictionary = {}) -> Dictionary:
-	if outgame == null or outgame.act_vn_pending.is_empty():
+# 2건 이상이면 **사슬로 잇는다** — 앞 VN 의 `next` 가 뒤 VN 이고 마지막의 `next` 가 원래 목적지다.
+func take_brief_payload(next_route: String, next_payload: Dictionary = {}) -> Dictionary:
+	var queued: Array = []
+	if outgame != null:
+		for vn_id in outgame.act_vn_pending:
+			queued.append({"kind": "act", "id": String(vn_id)})
+		outgame.act_vn_pending.clear()
+	for beat in _pending_brief_beats():
+		queued.append({"kind": "beat", "id": String(Dictionary(beat)["id"])})
+	if queued.is_empty():
 		return {}
-	var queued: Array = outgame.act_vn_pending.duplicate()
-	outgame.act_vn_pending.clear()
 	var payload: Dictionary = next_payload
 	var route := next_route
 	# 뒤에서부터 감는다 — 앞 VN 의 `next_payload` 가 이미 완성돼 있어야 하기 때문이다.
 	queued.reverse()
-	for vn_id in queued:
-		payload = _act_vn_payload(String(vn_id), route, payload)
+	for entry in queued:
+		var row: Dictionary = entry
+		payload = _act_vn_payload(String(row["id"]), route, payload) if String(row["kind"]) == "act" \
+			else _beat_payload(String(row["id"]), route, payload)
 		route = "NAR-01"
 	return payload
+
+
+# 이 투어의 브리핑 슬롯에 서는 비트 — 조건은 **데이터의 열 3개**가 정한다(무대·단계 구간).
+# 관계 단계 조회를 넘겨 주는 것은 코어 표가 아웃게임 상태를 모르기 때문이다.
+func _pending_brief_beats() -> Array:
+	if outgame == null or season == null:
+		return []
+	return data.vn_beats_for(ACT_VN_SLOT, season.current_stage_id(),
+		func(axis_id: String): return outgame.relation_stage(axis_id))
+
+
+func _beat_payload(beat_id: String, next_route: String, next_payload: Dictionary) -> Dictionary:
+	var lines: Array = []
+	for line in data.vn_beat_lines_for(beat_id):
+		var row: Dictionary = line
+		lines.append({
+			"speaker_key": String(row["speaker_key"]),
+			"text_key": String(row["text_key"]),
+		})
+	return {
+		"vn_id": beat_id,
+		"slot_id": ACT_VN_SLOT,
+		"line_keys": lines,
+		"tone": String(data.vn_beat(beat_id).get("tone", "")),
+		"next": next_route,
+		"next_payload": next_payload,
+	}
 
 
 func _act_vn_payload(vn_id: String, next_route: String, next_payload: Dictionary) -> Dictionary:

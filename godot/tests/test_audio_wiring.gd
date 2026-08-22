@@ -105,23 +105,23 @@ func _initialize() -> void:
 
 # ── ⑤ 햅틱 값 창구 대장 (총괄 발주 IMPL-285 §2 — 결선 중단 사유의 기계화) ──
 #
-# `sound_map.haptic` 은 5등급을 적어 두고 **아무도 읽지 않는다**(`vibrate()` 호출 0건 실측).
-# 결선이 막힌 이유는 코드가 아니라 값이다: D11 §3.1 이 등급을 **정성으로만** 확정하고
-# (미세/약/중/강) D13 별첨A §8.3 에 실린 햅틱 값은 3항(감쇠 50% · L1 0.1초 · L2 0.25초)뿐이다.
-# 강도(0~1 진폭) 4항과 micro·mid 지속 2항이 **대장에 없다** — 불변규칙 2 에 따라 발명하지 않는다.
+# **대장이 만료를 요구했고 만료했다.** 18차에 미충전 6항(강도 4 + micro·mid 지속 2)을 대장에
+# 적어 두었고 D13 v1.11 §8.3(결정 #20)이 값을 충전했다 — 이 축은 그때 "충전되면 실패한다"로
+# 세워졌고 실제로 그렇게 만료를 강제했다(미충전 계수 6 → 0).
 #
-# **그 공백을 대장으로 못박는다.** 이 축은 두 방향을 다 잡는다:
-#   · 표에 새 등급이 생기면 → 창구도 미충전 대장도 없으므로 실패
-#   · D13 이 값을 채우면 → 미충전 대장이 낡아 실패(대장을 줄이라고 요구한다)
-# "값이 없어서 못 했다"가 회신문 문장으로만 남으면 다음 회차에 잊힌다.
+# 여전히 두 방향을 잡는다:
+#   · 표에 새 등급이 생기면 → 창구도 대장도 없으므로 실패
+#   · 선언한 창구가 사라지면 → 실재 검사 실패
+#
+# `weak`·`strong` 지속이 `param_haptic_l1_sec`·`l2_sec` 인 것은 정본 명문이다
+# ("weak·strong 지속은 위 L1/L2 항과 동일 값" — D13 v1.11). 값을 복제하지 않고 창구를 하나로 뒀다.
 const HAPTIC_GRADES := ["none", "micro", "weak", "mid", "strong"]
-# 등급별 (강도 창구, 지속 창구). "" = **대장 미충전**(D13 부재 — 충전 시 이 표가 먼저 바뀐다).
 const HAPTIC_PARAMS := {
 	"none": {"strength": "-", "duration": "-"},      # 정의상 무진동 — 값이 필요 없다
-	"micro": {"strength": "", "duration": ""},
-	"weak": {"strength": "", "duration": "param_haptic_l1_sec"},
-	"mid": {"strength": "", "duration": ""},
-	"strong": {"strength": "", "duration": "param_haptic_l2_sec"},
+	"micro": {"strength": "param_haptic_micro_amp", "duration": "param_haptic_micro_sec"},
+	"weak": {"strength": "param_haptic_weak_amp", "duration": "param_haptic_l1_sec"},
+	"mid": {"strength": "param_haptic_mid_amp", "duration": "param_haptic_mid_sec"},
+	"strong": {"strength": "param_haptic_strong_amp", "duration": "param_haptic_l2_sec"},
 }
 
 
@@ -149,8 +149,9 @@ func _haptic_ledger() -> void:
 			_ok("창구 '%s' 실재 (%s.%s)" % [key, grade, axis], _data.params.has(key), key)
 	# **미충전 수가 계약이다.** 줄면 D13 이 충전된 것이므로 대장을 갱신해야 하고,
 	# 늘면 창구가 사라진 것이므로 둘 다 여기서 걸린다.
-	_ok("미충전 항 = 6 (강도 4 + micro·mid 지속 2)", unfilled == 6, str(unfilled))
-	_ok("충전 항 = 2 (L1·L2 지속)", declared == 2, str(declared))
+	# **미충전 0 이 계약이다** — 되돌아가면(공란이 생기면) 결선이 부분적으로 죽는다.
+	_ok("미충전 항 = 0 (D13 v1.11 충전 완료)", unfilled == 0, str(unfilled))
+	_ok("충전 항 = 8 (등급 4 × 강도·지속)", declared == 8, str(declared))
 	# 감쇠 배율은 실재한다 — O3 소비부가 서는 날 곱해질 값이다(D12 §10.4 곱 순서).
 	_ok("감쇠 배율 창구 실재", _data.params.has("param_haptic_damp_ratio"))
 	# **봉인 이해관계 실측** — 진동도 출력 경로이므로(불변규칙 5) 봉인 행에 실린 등급이

@@ -36,8 +36,13 @@ const ICON := "res://assets/ui/icons/sys_save_spin.png"
 # (`log_feed.gd` 의 UNCONFIGURED 와 같은 축 — 총괄 판정 IMPL-176 ④).
 const UNCONFIGURED := -1.0
 
+# 회전 스텝 수 = 4 (90°). **값 창구 밖인 것이 맞다** — D13 이 주는 것은 주기(초)이고
+# 스텝 수는 도상의 대칭 차수다(고리가 90° 대칭이라 4이지 밸런스 수치가 아니다).
+const ROTATION_STEPS := 4
+
 var _hold_sec := UNCONFIGURED
 var _spin_sec := UNCONFIGURED
+var _elapsed := 0.0
 var _left := 0.0
 var _reported := false
 
@@ -88,6 +93,7 @@ func flash() -> void:
 			push_error("SaveIndicator: unconfigured - D13 has no hold/spin duration row")
 		return
 	_left = _hold_sec
+	_elapsed = 0.0
 	rotation = 0.0
 	visible = true
 	set_process(true)
@@ -99,5 +105,19 @@ func _process(delta: float) -> void:
 		visible = false
 		set_process(false)
 		return
-	# 등속 회전 — 주기는 값 창구가 준다. 프레임 수가 아니라 초로 도는 것이 규격이다.
-	rotation += TAU * (delta / _spin_sec)
+	_elapsed += delta
+	rotation = _quantized_rotation(_elapsed)
+
+
+# **90° 계단 양자화** (총괄 판정 IMPL-294 ② · 사용자 승인). 주기는 값 창구가 그대로 주고
+# (D13 값 무변경) 그 안을 4스텝으로 끊는다 — 도트 세계에서 서브픽셀 회전은 이질적이고
+# (D10 §2.2 믹셀 금지의 연출 층 귀결) 회전 대칭 고리는 90° 마다 자기 자신과 겹치므로
+# **계단이 손실을 만들지 않는다**(그 대칭이 IMPL-291 이 이 도상을 택한 근거였다).
+#
+# 누적이 아니라 **경과 시간에서 매번 계산한다**. `rotation += ...` 로 누적하면 프레임마다
+# 부동소수 오차가 쌓여 스텝 경계가 서서히 밀리고, 그것은 긴 표시에서만 드러난다.
+func _quantized_rotation(elapsed: float) -> float:
+	if _spin_sec <= 0.0:
+		return 0.0
+	var step := floori(elapsed / (_spin_sec / float(ROTATION_STEPS)))
+	return float(step % ROTATION_STEPS) * (TAU / float(ROTATION_STEPS))

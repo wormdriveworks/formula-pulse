@@ -1,0 +1,6 @@
+id,beat_id,line_order,speaker_key,text_key
+vnbline_reunion_alta_1,vnbeat_reunion_alta,1,ui.vn.speakerNarration,vn.reunion.beat01
+vnbline_reunion_alta_2,vnbeat_reunion_alta,2,ui.vn.speakerTheo,vn.reunion.beat02
+vnbline_reunion_alta_3,vnbeat_reunion_alta,3,ui.vn.speakerMarta,vn.reunion.beat03
+vnbline_reunion_alta_4,vnbeat_reunion_alta,4,ui.vn.speakerTheo,vn.reunion.beat04
+vnbline_reunion_alta_5,vnbeat_reunion_alta,5,ui.vn.speakerMarta,vn.reunion.beat05

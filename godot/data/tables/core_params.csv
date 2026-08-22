@@ -116,6 +116,12 @@ param_sting_l3_sec,2.5
 param_haptic_damp_ratio,0.5
 param_haptic_l1_sec,0.1
 param_haptic_l2_sec,0.25
+param_haptic_micro_amp,0.15
+param_haptic_micro_sec,0.05
+param_haptic_weak_amp,0.30
+param_haptic_mid_amp,0.55
+param_haptic_mid_sec,0.15
+param_haptic_strong_amp,0.80
 param_cheer_retrigger_sec,4
 param_audio_virtual_channels,12
 param_audio_retrigger_gate_sec,0.05

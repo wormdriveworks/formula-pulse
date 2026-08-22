@@ -84,7 +84,7 @@ func _on_slot_pressed(profile: int, has_save: bool) -> void:
 		# **그 뒤에 개시형 막 VN(1막)이 붙는다** — 플로우맵이 시즌 오프닝 VN 과 투어 시작 VN 을
 		# 연속 슬롯으로 두고(D09 §2.3), D08 §8.1 의 공표 위치가 브리핑 슬롯이다.
 		# 대기분이 없으면 사슬이 그대로 `RACE-01` 로 접힌다 — 분기를 두지 않는다.
-		var after_open := session.take_act_vn_payload("RACE-01")
+		var after_open := session.take_brief_payload("RACE-01")
 		go("NAR-01", {
 			"vn_id": "vn_season_open_s%d" % session.season.season,
 			"slot_id": "vnslot_season_open",

@@ -3,7 +3,7 @@
 # 실행: godot --headless --path godot --script tests/test_narrative.gd
 extends SceneTree
 
-const MIN_CHECKS := 143
+const MIN_CHECKS := 156
 
 var _failures := 0
 var _checked := 0
@@ -22,6 +22,7 @@ func _init() -> void:
 	_t7_session_triggers()
 	_t7_line_speakers()
 	_t7_choice_data()
+	_beat_data()
 	print("")
 	if _checked < MIN_CHECKS:
 		print("NARRATIVE_TEST_FAIL checks=%d < 하한 %d (스위트 축소·로드 실패 의심)" % [_checked, MIN_CHECKS])
@@ -546,3 +547,62 @@ func _t7_choice_data() -> void:
 	_ok("가드: 실재 라인 = true", data._vn_has_line(act3, "vn.act3.beat11"))
 	_ok("가드: 부재 라인 = false", not data._vn_has_line(act3, "vn.act1.beat01"))
 	_ok("가드: 빈 키 = false", not data._vn_has_line(act3, ""))
+
+
+# ⑧ 축 결속 브리핑 비트 데이터 (총괄 판정 IMPL-289 ③ · 19차 결선).
+#
+# **조건이 데이터에 있다는 것이 이 표의 요점**이므로 축도 데이터를 본다 — 무대·단계 구간이
+# 코드로 새면 여기서는 통과하고 화면에서만 어긋난다.
+func _beat_data() -> void:
+	var data := _t7_data()
+	_ok("브리핑 비트 실재", data.vn_beats.size() >= 1, str(data.vn_beats.size()))
+	_ok("라인 수 대조 생략 0", Array(data.vn_beat_omitted).is_empty(), str(data.vn_beat_omitted))
+	var missing_key := 0
+	var order_broken := 0
+	var count_mismatch := 0
+	var bad_range := 0
+	var allowed := ["ui.vn.speakerMarta", "ui.vn.speakerTheo", "ui.vn.speakerVane",
+		"ui.vn.speakerNarration"]
+	var speaker_off := 0
+	for beat_id in data.vn_beats:
+		var row: Dictionary = data.vn_beats[beat_id]
+		var lines := data.vn_beat_lines_for(String(beat_id))
+		if lines.size() != CsvTable.to_int(String(row["line_count"])):
+			count_mismatch += 1
+		# 구간이 뒤집히면 조건이 영구 미성립이다 — 조용한 미발동의 전형이다.
+		if CsvTable.to_int(String(row["min_stage"])) > CsvTable.to_int(String(row["max_stage"])):
+			bad_range += 1
+		for index in range(lines.size()):
+			var line: Dictionary = lines[index]
+			if CsvTable.to_int(String(line["line_order"])) != index + 1:
+				order_broken += 1
+			for column in ["speaker_key", "text_key"]:
+				if not data.strings.has_key(String(line[column])):
+					missing_key += 1
+			if not allowed.has(String(line["speaker_key"])):
+				speaker_off += 1
+	_ok("선언 라인 수 = 실제", count_mismatch == 0, "mismatch=%d" % count_mismatch)
+	_ok("단계 구간 정상(min ≤ max)", bad_range == 0, "bad=%d" % bad_range)
+	_ok("line_order = 1..n 오름차순", order_broken == 0, "broken=%d" % order_broken)
+	_ok("전 문면·화자 키 실재", missing_key == 0, "missing=%d" % missing_key)
+	_ok("화자 = 3자 + 지문 전속", speaker_off == 0, "off=%d" % speaker_off)
+	# 조건 조회 — 무대·단계 양쪽이 무는지 데이터 층에서 확인한다.
+	var stage_zero := func(_axis: String): return 0
+	var stage_one := func(_axis: String): return 1
+	_ok("무대 일치 + 단계 0 = 조회 성립",
+		data.vn_beats_for("vnslot_tour_brief", "stage_alta_ridge", stage_zero).size() == 1)
+	_ok("무대 불일치 = 미조회",
+		data.vn_beats_for("vnslot_tour_brief", "stage_metro_night", stage_zero).is_empty())
+	_ok("단계 이탈 = 미조회",
+		data.vn_beats_for("vnslot_tour_brief", "stage_alta_ridge", stage_one).is_empty())
+	_ok("슬롯 불일치 = 미조회",
+		data.vn_beats_for("vnslot_season_open", "stage_alta_ridge", stage_zero).is_empty())
+	# **반복 노출 상한이 데이터로 정해진다** — 단계 0 구간이므로 카운터가 2에 닿으면(threshold1)
+	# 더 이상 서지 않는다. 내러티브 3차 §5.2 가 이월한 "반복 피로"의 현행 상한이 그것이다.
+	var beat: Dictionary = data.vn_beats["vnbeat_reunion_alta"]
+	_ok("현행 비트 단계 구간 = 0~0",
+		String(beat["min_stage"]) == "0" and String(beat["max_stage"]) == "0",
+		"%s~%s" % [beat["min_stage"], beat["max_stage"]])
+	var axis := data.relation_axis(String(beat["axis_id"]))
+	_ok("축 = 재회 (threshold1 = 2)", CsvTable.to_int(String(axis["threshold1"])) == 2,
+		String(axis["threshold1"]))

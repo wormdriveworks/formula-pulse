@@ -111,8 +111,8 @@ func _process(_delta: float) -> bool:
 	_tutorial_callout_placement()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 274:
-		print("UI_SCREENS_FAIL checks=%d < 하한 274 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 297:
+		print("UI_SCREENS_FAIL checks=%d < 하한 297 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -978,8 +978,43 @@ func _save_indicator_wiring(data: GameData) -> void:
 	app.session.progress_saved.emit(true)
 	app._show("SYS-02", {})
 	_ok("화면 전환 후에도 표시 생존", indicator.visible and indicator.is_inside_tree())
+	# ⓔ **90° 계단 양자화** (총괄 판정 IMPL-294 ② · 19차 집행).
+	# 등속이면 서브픽셀 각도가 나오고, 그것은 도트 세계에서 이질적이다(D10 §2.2 귀결).
+	# 축은 **각도 집합**으로 본다 — "회전한다"만 보면 등속과 계단이 구분되지 않는다.
+	var spin: float = data.param("param_fx_save_spin_sec")
+	var steps: int = indicator.ROTATION_STEPS
+	_ok("회전 스텝 = 4 (90°)", steps == 4, str(steps))
+	var angles: Dictionary = {}
+	var samples := 40
+	for index in range(samples):
+		# 주기 1바퀴를 촘촘히 훑는다 — 계단이면 값이 4종뿐이다.
+		var degrees := snappedf(rad_to_deg(indicator._quantized_rotation(
+			spin * float(index) / float(samples))), 0.001)
+		angles[degrees] = true
+	_ok("한 주기 각도 = 4종뿐(계단)", angles.size() == steps, str(angles.keys()))
+	var expected: Array = [0.0, 90.0, 180.0, 270.0]
+	var off := 0
+	for degrees in angles:
+		if not expected.has(float(degrees)):
+			off += 1
+	_ok("각도 = 90° 격자 전건", off == 0, str(angles.keys()))
+	# 주기 경계에서 되돌아온다 — 누적 오차가 쌓이면 여기서 어긋난다.
+	_eq_deg("주기 경계 = 0°", indicator._quantized_rotation(spin), 0.0)
+	_eq_deg("2주기 경계 = 0°", indicator._quantized_rotation(spin * 2.0), 0.0)
+	_eq_deg("주기 절반 = 180°", indicator._quantized_rotation(spin * 0.5), 180.0)
+	# **스텝 순서**가 규격이다 — 각도 집합만 보면 뒤섞인 매핑도 통과한다(0→270→90→180).
+	var quarter := spin / float(steps)
+	for index in range(steps):
+		_eq_deg("스텝 %d = %d°" % [index, index * 90],
+			indicator._quantized_rotation(quarter * float(index) + quarter * 0.5),
+			float(index) * 90.0)
 	root.remove_child(app)
 	app.queue_free()
+
+
+func _eq_deg(label: String, actual_rad: float, expected_deg: float) -> void:
+	_ok(label, absf(rad_to_deg(actual_rad) - expected_deg) <= 0.001,
+		"actual=%.3f expected=%.3f" % [rad_to_deg(actual_rad), expected_deg])
 
 
 # ── ⑫ 도상 치수 2규격 공존 (IMPL-226) ──
@@ -1358,7 +1393,7 @@ func _act_vn_consumption(data: GameData) -> void:
 	session.begin_career(2)
 	_ok("커리어 개시 = 1막 표시 대기", Array(session.outgame.act_vn_pending) == ["vn_act1"],
 		str(session.outgame.act_vn_pending))
-	var payload := session.take_act_vn_payload("RACE-01")
+	var payload := session.take_brief_payload("RACE-01")
 	_ok("페이로드 발행", not payload.is_empty())
 	_ok("발행 슬롯 = 투어 브리핑", String(payload.get("slot_id", "")) == "vnslot_tour_brief")
 	var lines: Array = payload.get("line_keys", [])
@@ -1371,7 +1406,7 @@ func _act_vn_consumption(data: GameData) -> void:
 	_ok("전 라인 = 화자 사전", dict_lines == lines.size(), "%d/%d" % [dict_lines, lines.size()])
 	_ok("정조 동반", String(payload.get("tone", "")) == "calm", str(payload.get("tone", "")))
 	_ok("소비 후 대기 0", Array(session.outgame.act_vn_pending).is_empty())
-	_ok("재호출 = 빈 사전", session.take_act_vn_payload("RACE-01").is_empty())
+	_ok("재호출 = 빈 사전", session.take_brief_payload("RACE-01").is_empty())
 
 	# ── ⓑ 실화면 도달 — 75라인 중 1막 12라인이 실제로 그려지는가 ──
 	var screen := _mount_payload(data, session, payload)
@@ -1422,7 +1457,7 @@ func _act_vn_consumption(data: GameData) -> void:
 	tense_session.outgame.act_vn_pending.clear()
 	tense_session.outgame.milestones["milestone_first_tour_win"] = true
 	tense_session.outgame.latch_narrative_act()
-	var tense_payload := tense_session.take_act_vn_payload("RACE-01")
+	var tense_payload := tense_session.take_brief_payload("RACE-01")
 	_ok("3막 정조 = tense", String(tense_payload.get("tone", "")) == "tense")
 	var tense_screen := _mount_payload(data, tense_session, tense_payload)
 	_ok("tense = BGM-10", _cue_count(tense_session, "BGM-10") == 1, str(tense_session.audio.fired))
@@ -1433,7 +1468,7 @@ func _act_vn_consumption(data: GameData) -> void:
 	var blank_session := RunSession.new()
 	blank_session.setup(data)
 	blank_session.begin_career(2)
-	var blank_payload := blank_session.take_act_vn_payload("RACE-01")
+	var blank_payload := blank_session.take_brief_payload("RACE-01")
 	blank_payload["tone"] = ""
 	var blank_screen := _mount_payload(data, blank_session, blank_payload)
 	# `vnslot_tour_brief` 행의 tone = calm 이므로 폴백이 거기서 잡힌다.
@@ -1449,7 +1484,7 @@ func _act_vn_consumption(data: GameData) -> void:
 	chain_session.outgame.milestones["milestone_first_podium"] = true
 	chain_session.outgame.milestones["milestone_first_tour_win"] = true
 	chain_session.outgame.latch_narrative_act()
-	var chain := chain_session.take_act_vn_payload("RACE-01")
+	var chain := chain_session.take_brief_payload("RACE-01")
 	_ok("사슬 첫 VN = 2막", String(chain.get("vn_id", "")) == "vn_act2", str(chain.get("vn_id", "")))
 	_ok("사슬 첫 VN 의 next = NAR-01", String(chain.get("next", "")) == "NAR-01")
 	var tail: Dictionary = chain.get("next_payload", {})
@@ -1474,6 +1509,70 @@ func _act_vn_consumption(data: GameData) -> void:
 	_ok("대기 無 → RACE-01 직행", routed.size() == 1 and String(routed[0][0]) == "RACE-01", str(routed))
 	_release_vn(garage)
 
+	# ── ⓗ 브리핑 사슬 = 막 VN → 재회 브리핑 (총괄 판정 IMPL-289 ② 사슬 연속 재생) ──
+	var brief := RunSession.new()
+	brief.setup(data)
+	brief.begin_career(2)
+	var alta_slot := Array(brief.season.calendar).find("stage_alta_ridge")
+	_ok("알타 리지 캘린더 실재(사슬 축)", alta_slot >= 0, str(brief.season.calendar))
+	if alta_slot >= 0:
+		brief.season.tour_slot = alta_slot + 1
+		brief.outgame.act_vn_pending.clear()
+		brief.outgame.milestones["milestone_first_podium"] = true
+		brief.outgame.latch_narrative_act()
+		var head := brief.take_brief_payload("RACE-01")
+		# **순서가 판정이다** — 막 VN 이 먼저다(이월 대신 연속 재생을 택한 판정의 실체).
+		_ok("사슬 머리 = 막 VN", String(head.get("vn_id", "")) == "vn_act2",
+			String(head.get("vn_id", "")))
+		_ok("사슬 머리의 next = NAR-01", String(head.get("next", "")) == "NAR-01")
+		var beat: Dictionary = head.get("next_payload", {})
+		_ok("사슬 꼬리 = 재회 비트",
+			String(beat.get("vn_id", "")) == "vnbeat_reunion_alta", String(beat.get("vn_id", "")))
+		_ok("사슬 꼬리의 next = 원래 목적지", String(beat.get("next", "")) == "RACE-01")
+		_ok("비트 발행 슬롯 = 투어 브리핑",
+			String(beat.get("slot_id", "")) == "vnslot_tour_brief")
+		_ok("비트 5라인 동반", Array(beat.get("line_keys", [])).size() == 5,
+			str(Array(beat.get("line_keys", [])).size()))
+		# 정조 공란 = 슬롯 폴백(브리핑 = calm). 납품 판단을 데이터가 그대로 이고 있다.
+		_ok("비트 정조 = 공란(슬롯 폴백)", String(beat.get("tone", "")) == "",
+			String(beat.get("tone", "")))
+		# 실화면에 세워 문면이 실제로 그려지는지 — 키가 없으면 화면은 키 원문을 그린다.
+		var beat_screen := _mount_payload(data, brief, beat)
+		_ok("비트 1라인 = 데이터 문면",
+			(beat_screen.get_node("%BodyLabel") as Label).text
+				== data.strings.text("vn.reunion.beat01"),
+			(beat_screen.get_node("%BodyLabel") as Label).text)
+		# **비트가 축을 민다** — 판별이 좁혀졌으므로(19차) 표 실재가 계수의 근거다.
+		_ok("비트 발생 = 재회 축 +1",
+			int(brief.outgame.relation_counters.get("relation_reunion", 0)) == 1,
+			str(brief.outgame.relation_counters))
+		_release_vn(beat_screen)
+		# 단계가 오르면 이 비트는 더 이상 서지 않는다 — 조건 3열이 실제로 무는가.
+		brief.outgame.relation_stages["relation_reunion"] = 1
+		_ok("단계 1 = 비트 미발동", brief._pending_brief_beats().is_empty(),
+			str(brief._pending_brief_beats().size()))
+		brief.outgame.relation_stages["relation_reunion"] = 0
+		# 무대가 다르면 서지 않는다 — 무대 조건도 실제로 무는가.
+		brief.season.tour_slot = 1
+		_ok("타 무대 = 비트 미발동", brief._pending_brief_beats().is_empty(),
+			brief.season.current_stage_id())
+		# **판별의 양성 형태가 실제로 좁히는가** (19차 정밀화 · 총괄 판정 IMPL-289 ③).
+		# 16차 형태("`act_vn` 이 아니면 비트")와 현행("`vn_beats` 에 있으면 비트")은 **현행
+		# 데이터에서 결과가 같다** — 두 표 어디에도 없는 VN 이 브리핑 슬롯을 타는 경우만 갈린다.
+		# 그 경우를 만들어 본다: 갈리지 않으면 정밀화가 이름만 남는다.
+		var stray := RunSession.new()
+		stray.setup(data)
+		stray.begin_career(2)
+		stray.season.tour_slot = alta_slot + 1
+		var stray_screen := _mount_payload(data, stray, {
+			"vn_id": "vn_not_in_any_table", "slot_id": "vnslot_tour_brief",
+			"line_keys": ["vn.reunion.beat01"], "tone": "calm",
+		})
+		_ok("미상 VN 은 브리핑 슬롯을 타도 축을 밀지 못한다",
+			int(stray.outgame.relation_counters.get("relation_reunion", 0)) == 0,
+			str(stray.outgame.relation_counters))
+		_release_vn(stray_screen)
+
 	# ── ⓖ 재회 축 오염 없음 (IMPL-252 자기 결함 교정 실측) ──
 	var alta := RunSession.new()
 	alta.setup(data)
@@ -1483,7 +1582,7 @@ func _act_vn_consumption(data: GameData) -> void:
 	if slot >= 0:
 		alta.season.tour_slot = slot + 1
 		_ok("알타 리지 투어 성립", alta._is_alta_ridge_tour())
-		var alta_screen := _mount_payload(data, alta, alta.take_act_vn_payload("RACE-01"))
+		var alta_screen := _mount_payload(data, alta, alta.take_brief_payload("RACE-01"))
 		_ok("막 VN 은 재회 비트가 아니다",
 			int(alta.outgame.relation_counters.get("relation_reunion", 0)) == 0,
 			str(alta.outgame.relation_counters))

@@ -22,7 +22,7 @@
 # **첫 프레임 이후에 돈다** — `_init()` 시점에는 `root` 가 없어 플레이어를 트리에 매달 수 없다.
 extends SceneTree
 
-const MIN_CHECKS := 102
+const MIN_CHECKS := 107
 
 var _checked := 0
 var _failures := 0
@@ -412,6 +412,23 @@ func _session_wiring(data: GameData) -> void:
 	_ok("O15 복원 → 뮤트 해제", not AudioServer.is_bus_mute(AudioServer.get_bus_index("SFX")))
 	_eq("O15 100 → SFX 0dB",
 		AudioServer.get_bus_volume_db(AudioServer.get_bus_index("SFX")), 0.0)
+	# **O3 진동 감쇠도 같은 자리다** — 저장만 되고 소비부가 0 이던 것이 18차 실측이었다.
+	# 3단 문법(표준/감소/끔)이 배율 1.0 / 창구 / 0.0 으로 실제로 내려가는지 본다.
+	session.options.set_index("o3", 0)
+	session.apply_haptic_options()
+	_eq("O3 표준 = 배율 1.0", session.audio.haptic_damping, 1.0)
+	session.options.set_index("o3", 1)
+	session.apply_haptic_options()
+	_eq("O3 감소 = 창구 배율", session.audio.haptic_damping,
+		data.param("param_haptic_damp_ratio"))
+	_ok("감소 배율이 1.0 이 아니다(창구 경유 실증)",
+		data.param("param_haptic_damp_ratio") < 1.0, str(data.param("param_haptic_damp_ratio")))
+	session.options.set_index("o3", 2)
+	session.apply_haptic_options()
+	_eq("O3 끔 = 배율 0.0", session.audio.haptic_damping, 0.0)
+	session.options.set_index("o3", 0)
+	session.apply_haptic_options()
+	_eq("O3 복원 = 1.0", session.audio.haptic_damping, 1.0)
 	# 일시정지 통로도 세션 경유다 — 호출부가 `output` 을 직접 쥐지 않는 것이 계약이다.
 	session.audio.set_paused(true)
 	_ok("세션 경유 일시정지 = SFX 뮤트",

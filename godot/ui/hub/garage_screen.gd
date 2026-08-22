@@ -111,7 +111,7 @@ func _on_depart() -> void:
 	session.save_progress()
 	# 투어 시작 VN — 플로우맵의 "개러지 → 투어 시작 VN → 다음 투어" 지점이다(D09 §2.3).
 	# HUB-01 은 **투어 경계에만** 서므로(대회 사이는 RUN-01/02 경유) 이 자리가 곧 브리핑 슬롯이다.
-	var act_vn := session.take_act_vn_payload("RACE-01")
+	var act_vn := session.take_brief_payload("RACE-01")
 	if not act_vn.is_empty():
 		go("NAR-01", act_vn)
 		return

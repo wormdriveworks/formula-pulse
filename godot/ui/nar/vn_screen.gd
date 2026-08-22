@@ -112,13 +112,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
 # `relation_reunion` 이 **0 → 2**(threshold1 = 대면)에 도달했다. 재회 서사가 하나도 없는데
 # 재회 축이 대면까지 간다.
 #
-# 가름은 데이터가 한다 — `act_vn.json` 인스턴스면 막 전이다. 그래서 지금 이 축의 브리핑 다리는
-# **다시 잠잠해진다**: 재회 체인 브리핑 VN 은 아직 문안이 없다(T7 납품분 = 막 VN). 나머지 두 다리
-# (C3 관계 이벤트·카이 벽 조우)는 그대로 살아 있으므로 축 자체는 전진한다.
+# **판별을 음성에서 양성으로 좁혔다** (총괄 판정 IMPL-289 ③ 정밀화 채택 · 19차 집행).
+# 16차 판별은 "`act_vn` 이 **아니면** 비트"였다 — 브리핑 슬롯 산출이 막 VN 뿐이라 차이가
+# 관측되지 않았고, **그 무관측이 16차 결함의 원인**이었다. 이제 `vn_beats.csv` 에 **실재하면**
+# 비트다: 미상 VN 이 브리핑 슬롯을 타도 축을 밀지 못한다.
+#
+# 부수 효과로 16차 계약이 그대로 유지된다 — 막 VN 은 `vn_beats` 에 없으므로 여전히 비트가 아니다.
 func _is_reunion_chain_beat(vn_id: String, slot_id: String) -> bool:
 	if slot_id != TOUR_BRIEF_SLOT:
 		return false
-	return session.data.act_vn_entry(vn_id).is_empty()
+	return not session.data.vn_beat(vn_id).is_empty()
 
 
 # 정조 해석 — **D12 v1.4 §5.4 확정 문면의 이행**(총괄 판정 IMPL-253 ① · [가안] 해제).

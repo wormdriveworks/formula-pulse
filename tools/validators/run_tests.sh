@@ -33,26 +33,26 @@ TESTS=(
 	"tests/test_events.gd:7039"
 	"tests/test_season.gd:497"
 	"tests/test_tc_o.gd:389"
-	"tests/test_narrative.gd:143"
+	"tests/test_narrative.gd:156"
 	# AUDIO — 오디오 디스패처 정책 4종(봉인·게이트·채널 상한·P1 보호) + 표 전수 대조.
-	"tests/test_audio.gd:350"
+	"tests/test_audio.gd:384"
 	# AUDIO-A — 오디오 **실물** 68식. 표·디스패처 검사(AUDIO)와 파일 검사(검증기 AUD)가 못 보는
 	# 자리 = 임포트 결과다. 임포터 `edit/loop_mode` 열거는 런타임 상수와 한 칸 어긋나서
 	# 선언을 읽는 것으로는 루프 판정이 성립하지 않는다(IMPL-245 등재 함정) — 되읽기만이 증거다.
 	"tests/test_audio_assets.gd:340"
 	# AUDIO-W — 표와 화면 사이의 공백. 부를 곳이 없는 행은 실물이 유입돼도 영원히 울리지
 	# 않는데, 무음 폴백 단계에서는 그 침묵이 정상과 구분되지 않는다.
-	"tests/test_audio_wiring.gd:93"
+	"tests/test_audio_wiring.gd:99"
 	"tests/test_data_driven.gd:55"
 	# AUDIO-P — 재생기(표현 층). 헤드리스 더미 드라이버에서도 버스·볼륨·재생 상태·`finished`
 	# 통지가 실재하므로 **소리 없이 상태 검증이 성립**한다. 관측은 전부 `AudioServer` 되읽기다 —
 	# 설정 호출의 성공은 증거가 아니다(`.import` 문면 함정의 오디오 서버 층 적용).
-	"tests/test_audio_player.gd:102"
+	"tests/test_audio_player.gd:107"
 	# UIOPT — 화면 층 옵션 소비부. 항목만 있고 소비부가 없으면 설정은 켜지는데 화면은 그대로다.
 	"tests/test_ui_options.gd:22"
 	# UISCR — 화면을 실제로 세워 본다. 문맥 결손(무커리어 진입)·포커스 부재는 데이터·코어
 	# 검사가 원리적으로 닿지 못하고, 커리어를 연 경로에서는 멀쩡해 보인다.
-	"tests/test_ui_screens.gd:274"
+	"tests/test_ui_screens.gd:297"
 	# SEAL-E — 실화면을 인스턴스화해 릴 정지 연출 전 UI 노출을 잡는다.
 	# 라운드 수가 GP 길이(12~15턴 + 듀얼 삽입)에 따라 달라지므로 하한은 최소 GP 기준이다.
 	"tests/test_seal_ui.gd:84"

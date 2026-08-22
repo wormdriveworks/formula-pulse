@@ -343,6 +343,31 @@
     "option_count": "int:2,3"
    }
   },
+  "vn_beats.csv": {
+   "id_prefix": "vnbeat_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "axis_id": "fk:relation_axes.csv",
+    "slot_id": "fk:vn_slots.csv",
+    "stage_id": "structure_ref",
+    "min_stage": "int:0,9",
+    "max_stage": "int:0,9",
+    "line_count": "int:1,9",
+    "tone": "enum_optional:calm,tense"
+   }
+  },
+  "vn_beat_lines.csv": {
+   "id_prefix": "vnbline_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "beat_id": "fk:vn_beats.csv",
+    "line_order": "int:1,9",
+    "speaker_key": "string_key",
+    "text_key": "string_key"
+   }
+  },
   "vn_choice_options.csv": {
    "id_prefix": "vnopt_",
    "root": true,

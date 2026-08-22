@@ -31,6 +31,7 @@ func _init() -> void:
 	_ducking()
 	_silent_fallback()
 	_values_come_from_data()
+	_haptic_wiring()
 	print("")
 	# 검사 수 하한 — 스위트가 쪼그라들면 "통과"가 아니다.
 	if _checked < 90:
@@ -51,6 +52,11 @@ func _ok(label: String, condition: bool, detail: String = "") -> void:
 		return
 	_failures += 1
 	print("  [FAIL] %s%s" % [label, (" — " + detail) if detail != "" else ""])
+
+
+func _eq(label: String, actual: float, expected: float, tolerance: float = 0.0001) -> void:
+	_ok(label, absf(actual - expected) <= tolerance,
+		"actual=%f expected=%f" % [actual, expected])
 
 
 func _new_data(override_dir: String = "") -> GameData:
@@ -419,3 +425,117 @@ class RecordingOutput extends AudioOutput:
 
 	func duck_bgm(db: float, return_sec: float) -> void:
 		ducks.append([db, return_sec])
+
+
+# ── 햅틱 결선 (D11 §3.1 · D12 §10.4 · D13 v1.11 §8.3 결정 #20) ──
+#
+# **진동은 출력 경로다**(불변규칙 5). 그래서 이 축의 중심은 강도 값이 아니라 **호출 지점**이다 —
+# 봉인 창 중에 손이 결과를 알면 릴 정지 연출 전 노출이고, 그것은 값이 맞아도 위반이다.
+# `seal_gated` ∧ `haptic≠none` = 4건이 그 이해관계다(18차 실측).
+class HapticSpy extends IHaptics:
+	var calls: Array = []
+
+	func vibrate(strength: float, duration_sec: float) -> void:
+		calls.append({"strength": strength, "duration": duration_sec})
+
+
+func _haptic_dispatcher(data: GameData, spy: HapticSpy) -> AudioDispatcher:
+	var dispatcher := AudioDispatcher.new()
+	dispatcher.setup(data, null, spy)
+	return dispatcher
+
+
+func _haptic_wiring() -> void:
+	var data := _new_data()
+	if data == null:
+		return
+	# ── 등급 4종 → 값 창구 (D13 v1.11 전사분) ──
+	var spy := HapticSpy.new()
+	var dispatcher := _haptic_dispatcher(data, spy)
+	var expected := [
+		{"event": "confirm", "grade": "micro",
+			"amp": "param_haptic_micro_amp", "sec": "param_haptic_micro_sec"},
+		{"event": "grade_l1", "grade": "weak",
+			"amp": "param_haptic_weak_amp", "sec": "param_haptic_l1_sec"},
+		{"event": "duel_enter", "grade": "mid",
+			"amp": "param_haptic_mid_amp", "sec": "param_haptic_mid_sec"},
+		{"event": "retire", "grade": "strong",
+			"amp": "param_haptic_strong_amp", "sec": "param_haptic_l2_sec"},
+	]
+	for index in range(expected.size()):
+		var row: Dictionary = expected[index]
+		# 창구가 먼저다 — 없는 키를 `param()` 이 0 으로 돌려주면 아래 대조가 0 == 0 이 된다.
+		_ok("창구 실재 %s.진폭" % row["grade"], data.params.has(String(row["amp"])), String(row["amp"]))
+		_ok("창구 실재 %s.지속" % row["grade"], data.params.has(String(row["sec"])), String(row["sec"]))
+	spy.calls.clear()
+	for row in expected:
+		dispatcher.emit(String(row["event"]))
+	_ok("등급 4종 전건 발화", spy.calls.size() == expected.size(), str(spy.calls.size()))
+	if spy.calls.size() == expected.size():
+		for index in range(expected.size()):
+			var row: Dictionary = expected[index]
+			var call: Dictionary = spy.calls[index]
+			_eq("%s 진폭 = 창구" % row["grade"], float(call["strength"]),
+				data.param(String(row["amp"])))
+			_eq("%s 지속 = 창구" % row["grade"], float(call["duration"]),
+				data.param(String(row["sec"])))
+	# **등급이 실제로 갈리는가** — 넷이 같은 값이면 위 대조는 전건 통과하면서 매핑이 죽는다.
+	var amps: Dictionary = {}
+	for call in spy.calls:
+		amps[float(Dictionary(call)["strength"])] = true
+	_ok("등급 4종 진폭이 전부 다르다", amps.size() == 4, str(amps.keys()))
+
+	# ── `none` = 무진동 (사운드는 울린다) ──
+	var none_spy := HapticSpy.new()
+	var none_dispatcher := _haptic_dispatcher(data, none_spy)
+	var fired: Array = none_dispatcher.emit("ui_decide")
+	_ok("none 등급 = 사운드 발화", not fired.is_empty(), str(fired))
+	_ok("none 등급 = 진동 0", none_spy.calls.is_empty(), str(none_spy.calls))
+
+	# ── 봉인 (불변규칙 5) ──
+	var seal_spy := HapticSpy.new()
+	var seal_dispatcher := _haptic_dispatcher(data, seal_spy)
+	seal_dispatcher.open_seal()
+	for event_id in ["grade_l1", "grade_l2", "result_trouble"]:
+		seal_dispatcher.emit(event_id)
+	_ok("봉인 창 중 진동 0", seal_spy.calls.is_empty(), str(seal_spy.calls))
+	_ok("봉인 거부 계수 3", seal_dispatcher.seal_refusal_count() == 3,
+		str(seal_dispatcher.seal_refusal_count()))
+	seal_dispatcher.close_seal()
+	seal_dispatcher.emit("grade_l1")
+	_ok("봉인 해제 후 진동 발화", seal_spy.calls.size() == 1, str(seal_spy.calls))
+
+	# ── O3 감쇠 — **진폭에만** (D13 v1.11 명문 · D12 §10.4 곱 순서) ──
+	var damp_spy := HapticSpy.new()
+	var damp_dispatcher := _haptic_dispatcher(data, damp_spy)
+	var ratio: float = data.param("param_haptic_damp_ratio")
+	damp_dispatcher.haptic_damping = ratio
+	damp_dispatcher.emit("retire")
+	_ok("감쇠 = 1회 발화", damp_spy.calls.size() == 1, str(damp_spy.calls))
+	if damp_spy.calls.size() == 1:
+		var damped: Dictionary = damp_spy.calls[0]
+		_eq("감쇠 진폭 = 원값 × 배율",
+			float(damped["strength"]), data.param("param_haptic_strong_amp") * ratio)
+		# 지속을 함께 줄이면 감소 설정이 정보 전달 길이를 바꾼다 — 그것은 감쇠가 아니다.
+		_eq("감쇠 지속 = 불변", float(damped["duration"]), data.param("param_haptic_l2_sec"))
+	# 끔(0.0) = 호출 자체가 없다. 진폭 0 으로 부르면 플랫폼별 거동이 갈린다.
+	var off_spy := HapticSpy.new()
+	var off_dispatcher := _haptic_dispatcher(data, off_spy)
+	off_dispatcher.haptic_damping = 0.0
+	off_dispatcher.emit("retire")
+	_ok("끔 = 호출 0(진폭 0 호출 아님)", off_spy.calls.is_empty(), str(off_spy.calls))
+
+	# ── 게이트 뒤 (한 이벤트의 두 출력이 갈리지 않는다) ──
+	var gate_spy := HapticSpy.new()
+	var gate_dispatcher := _haptic_dispatcher(data, gate_spy)
+	gate_dispatcher.clock_override_msec = 0
+	gate_dispatcher.emit("retire")
+	gate_dispatcher.emit("retire")   # 재트리거 게이트에 걸린다
+	_ok("재트리거 억제분 = 진동도 억제", gate_spy.calls.size() == 1, str(gate_spy.calls.size()))
+
+	# ── 무햅틱 폴백 — 어댑터 미주입에서도 발화가 성립한다 ──
+	var bare := AudioDispatcher.new()
+	bare.setup(data)
+	var bare_fired: Array = bare.emit("retire")
+	_ok("무햅틱 폴백 = 사운드 발화 성립", not bare_fired.is_empty(), str(bare_fired))
+	_ok("무햅틱 폴백 = 어댑터 null", bare.haptics == null)

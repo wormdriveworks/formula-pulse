@@ -53,6 +53,12 @@ var vn_choices: Dictionary = {}        # vnchoice_* id -> 행
 var vn_choice_options: Dictionary = {} # choice_id -> Array[행] (option_order 오름차순)
 # 앵커 대조에서 떨어져 나간 지점 id — 조용한 생략을 관측 가능하게 남긴다(테스트 축이 읽는다).
 var vn_choice_omitted: Array = []
+# 축 결속 브리핑 비트 (D08 §8.7-3 재회 체인 — 총괄 판정 IMPL-289 ③).
+# **조건이 열 3개로 표현된다**: `stage_id`(무대) + `min_stage`/`max_stage`(관계 단계 구간).
+# DSL 도 문맥도 신설하지 않은 것이 이 표의 설계 요점이다.
+var vn_beats: Dictionary = {}          # vnbeat_* id -> 행
+var vn_beat_lines: Dictionary = {}     # beat_id -> Array[행] (line_order 오름차순)
+var vn_beat_omitted: Array = []
 # 이벤트-사운드 매핑 (D12 §5.10 · D11 §8.1) — **한 이벤트에 여러 사운드가 걸린다**
 # (GP_FINISH = SE-U19 + AMB-03 등). 그래서 값이 행이 아니라 행의 배열이다.
 var sound_map: Dictionary = {}         # event_id -> Array[행] (sound_* 행)
@@ -98,6 +104,7 @@ func load_all() -> bool:
 	# **`_load_content()` 뒤여야 한다** — 선택 지점의 앵커 대조가 `act_vn` 의 라인 열을 읽는다.
 	# 순서가 뒤집히면 대조 대상이 비어 전 지점이 생략되고, 그것이 조용히 성립한다.
 	_load_vn_choices()
+	_load_vn_beats()
 	grid = _load_json(STRUCTURES_DIR + "grid_debug.json")
 	season_calendar = _load_json(STRUCTURES_DIR + "season_calendar.json")
 	if not strings.load_file(STRINGS_PATH):
@@ -548,6 +555,65 @@ func vn_choice_at(vn_id: String, after_text_key: String) -> Dictionary:
 
 func vn_choice_options_for(choice_id: String) -> Array:
 	return vn_choice_options.get(choice_id, [])
+
+
+# 브리핑 비트 적재. **`stage_id` 는 검증기가 이미 닫았다**(`structure_ref` — `stage_*.json` 이
+# 루트 id 를 가지므로 `_structure_ids()` 가 수집한다). 그래서 여기 가드는 검증기가 볼 수 없는
+# 것만 본다: **선언한 라인 수와 실제 라인 수의 일치**.
+#
+# 선택지 표와 같은 규약 — 어긋난 행은 `push_error` + 버리고 `_load_ok` 는 내리지 않는다.
+# 비트 하나 때문에 게임이 서면 안 되고, 오타는 "생략 0" 회귀 축이 게이트에서 잡는다.
+func _load_vn_beats() -> void:
+	vn_beats.clear()
+	vn_beat_lines.clear()
+	vn_beat_omitted.clear()
+	var lines_by_beat: Dictionary = {}
+	for row in CsvTable.load_rows(_table_path("vn_beat_lines.csv")):
+		var parent := String(row.get("beat_id", ""))
+		if not lines_by_beat.has(parent):
+			lines_by_beat[parent] = []
+		lines_by_beat[parent].append(row)
+	for row in CsvTable.load_rows(_table_path("vn_beats.csv")):
+		var beat_id := String(row["id"])
+		var lines: Array = lines_by_beat.get(beat_id, [])
+		var declared := CsvTable.to_int(String(row.get("line_count", "0")))
+		if lines.size() != declared:
+			push_error("GameData: vn beat '%s' declares %d lines but has %d"
+				% [beat_id, declared, lines.size()])
+			vn_beat_omitted.append(beat_id)
+			continue
+		lines.sort_custom(func(a, b):
+			return CsvTable.to_int(String(a["line_order"])) < CsvTable.to_int(String(b["line_order"])))
+		vn_beats[beat_id] = row
+		vn_beat_lines[beat_id] = lines
+
+
+func vn_beat(beat_id: String) -> Dictionary:
+	return vn_beats.get(beat_id, {})
+
+
+func vn_beat_lines_for(beat_id: String) -> Array:
+	return vn_beat_lines.get(beat_id, [])
+
+
+# 이 슬롯·무대·관계 단계에서 서는 비트 — **없는 것이 정상이다**(무대 20종 중 결속은 소수).
+# 단계 구간이 반열림이 아니라 닫힌 구간인 것은 의도다: 단계 변주가 유입되면 행이 늘 뿐이고
+# 구간이 겹치지 않게 데이터가 갈라 쓰면 된다(코드가 우선순위를 갖지 않는다).
+func vn_beats_for(slot_id: String, stage_id: String, axis_stage: Callable) -> Array:
+	var matched: Array = []
+	for beat_id in vn_beats:
+		var row: Dictionary = vn_beats[beat_id]
+		if String(row.get("slot_id", "")) != slot_id:
+			continue
+		if String(row.get("stage_id", "")) != stage_id:
+			continue
+		var stage := int(axis_stage.call(String(row.get("axis_id", ""))))
+		if stage < CsvTable.to_int(String(row.get("min_stage", "0"))):
+			continue
+		if stage > CsvTable.to_int(String(row.get("max_stage", "0"))):
+			continue
+		matched.append(row)
+	return matched
 
 
 func _load_points() -> void:

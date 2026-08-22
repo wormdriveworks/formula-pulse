@@ -199,6 +199,7 @@ func _shift(option_id: String, direction: int, value: Label, notice: Label) -> v
 	UiPalette.apply_options(store)
 	# 볼륨도 같은 성격이다 — 버스는 옵션을 스스로 읽지 못한다(O13~O15).
 	session.apply_volume_options()
+	session.apply_haptic_options()   # O3 진동 감쇠도 같은 자리다
 	sfx("ui_toggle")   # SE-U05 토글·슬라이더 — 단계 이동과 볼륨 이동이 같은 축이다
 	_refresh_value(option_id, value, notice)
 
@@ -257,6 +258,7 @@ func _select_tab(index: int) -> void:
 func _on_reset() -> void:
 	session.options.reset_defaults()
 	session.apply_volume_options()   # 기본값 복귀도 버스에 닿아야 한다
+	session.apply_haptic_options()
 	session.options.reset_onboarding()  # 1회성 툴팁 재표시 초기화 (COM-02 — §A-24)
 	# 전 행 값 갱신 — 재구축이 단순하다
 	for panel in _tab_panels:
