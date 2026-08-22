@@ -19,8 +19,10 @@ extends SceneTree
 const CHANNELS := {
 	"sfx": {"dir": "res://assets/audio/sfx/", "total": 68, "ext": "wav"},
 	"jingle": {"dir": "res://assets/audio/jingle/", "total": 5, "ext": "wav"},
-	# BGM 은 13행 중 파일럿 1트랙만 유입됐다 — `intake` 밖 id 는 무대상이다(검증기 AUD 와 같은 규약).
-	"bgm": {"dir": "res://assets/audio/bgm/", "total": 13, "ext": "ogg", "intake": ["bgm_02"]},
+	# BGM 18스템 = 13행(트랙) + A/B 5쌍의 파일 전개. **행 1개에 파일 2개**가 재생기 계약이다
+	# (B 는 A 위 가산 레이어이지 별개 트랙이 아니다). **예비 1 은 행도 파일도 없다**(D11 결정 #5).
+	"bgm": {"dir": "res://assets/audio/bgm/", "total": 13, "ext": "ogg",
+		"stem_pairs": ["bgm_03", "bgm_04", "bgm_05", "bgm_06", "bgm_07"]},
 }
 
 # BGM 길이 기준값 90~150초 (D11 §4.4 확정 기준값)
@@ -49,7 +51,15 @@ func _init() -> void:
 	for channel in CHANNELS:
 		var intake: Array = Array(CHANNELS[channel].get("intake", []))
 		var ext: String = String(CHANNELS[channel].get("ext", "wav"))
+		var pairs_ch: Array = Array(CHANNELS[channel].get("stem_pairs", []))
+		var expanded: Array = []
 		for id in Array(by_channel.get(channel, [])):
+			if pairs_ch.has(id):
+				expanded.append(String(id) + "_a")
+				expanded.append(String(id) + "_b")
+			else:
+				expanded.append(String(id))
+		for id in expanded:
 			if not (intake.is_empty() or intake.has(id)):
 				continue                     # 미유입 선언분 — 무대상
 			var res: Resource = load(String(CHANNELS[channel]["dir"]) + id + "." + ext)
@@ -87,10 +97,20 @@ func _init() -> void:
 					stream.get_length() <= cap)
 			# ④ 무음 아님 — 임포트가 성공해도 데이터가 비면 소리가 없다.
 			_ok("%s 데이터 비지 않음 (%d B)" % [id, stream.data.size()], stream.data.size() > 0)
+	# A/B 쌍 길이 일치 — 적재된 리소스의 길이로 본다(파일 헤더가 아니라 런타임 값).
+	for channel in CHANNELS:
+		for base in Array(CHANNELS[channel].get("stem_pairs", [])):
+			var ka := String(base) + "_a"
+			var kb := String(base) + "_b"
+			if _ogg_len.has(ka) and _ogg_len.has(kb):
+				_ok("%s A/B 길이 %.4fs = %.4fs" % [base, float(_ogg_len[ka]), float(_ogg_len[kb])],
+					is_equal_approx(float(_ogg_len[ka]), float(_ogg_len[kb])))
+			else:
+				_fail("%s: A/B 쌍의 한쪽을 적재하지 못했다" % base)
 	print("")
-	# 검사 수 하한 — 73식 × 5축 + 루프 6 + 길이 3 + 채널 3 + BGM 파일럿 6축 = 383.
-	if _checked < 378:
-		print("AUDIO_ASSET_FAIL checks=%d < 하한 378 (목록 축소·적재 실패 의심)" % _checked)
+	# 검사 수 하한 — 73식 × 5축 + 루프 6 + 길이 3 + 채널 3 + **BGM 18스템 × 6축 + A/B 5쌍** = 490.
+	if _checked < 488:
+		print("AUDIO_ASSET_FAIL checks=%d < 하한 488 (목록 축소·적재 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -135,6 +155,9 @@ func _expected_ids() -> Dictionary:
 # BGM = OGG Vorbis. `.import` 문면은 증거가 아니므로 **적재된 리소스에서 되읽는다**.
 # WAV 의 `edit/loop_mode` 는 열거가 런타임 상수와 한 칸 어긋나는 함정이 있었는데(IMPL-245),
 # OGG 는 불리언 `loop` 이라 그 함정이 없다 — **없다는 것도 실측으로 확인한 결과다**(IMPL-274).
+var _ogg_len: Dictionary = {}
+
+
 func _check_ogg(id: String, res: Resource) -> void:
 	var stream := res as AudioStreamOggVorbis
 	if stream == null:
@@ -153,6 +176,7 @@ func _check_ogg(id: String, res: Resource) -> void:
 	# 길이 ⇔ 박 정합: beat_count / bpm × 60 = 길이. 어긋나면 그리드와 실물이 갈렸다.
 	var from_beats: float = float(stream.beat_count) / stream.bpm * 60.0 if stream.bpm > 0.0 else -1.0
 	_ok("%s 박 산술 %.3fs = 길이 %.3fs" % [id, from_beats, length], absf(from_beats - length) < 0.02)
+	_ogg_len[id] = length
 	print("  [BGM] %s loop=%s bpm=%.1f beats=%d bars=%d len=%.4fs" % [id, str(stream.loop),
 		stream.bpm, stream.beat_count, stream.bar_beats, length])
 

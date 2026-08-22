@@ -43,6 +43,17 @@ const OUT_DIR = path.join(ROOT, 'godot', 'assets', 'audio', 'bgm');
 const PARAMS = path.join(__dirname, 'bgm_params.json');
 const CHECK_ONLY = process.argv.includes('--check');
 const KEEP_WAV = process.argv.includes('--keep-wav');
+// ⚠ **모르는 플래그를 무시하지 않는다.** `--only`(이 도구에 없는 플래그)를 넘겼더니 조용히 무시되고
+//    **전량 재생성**이 돌아 돌연변이 상태의 파라미터로 실물이 덮였다(2026-08-22 실사고).
+//    생성기는 파일을 쓰는 도구이므로 "몰랐으면 안 쓴다"가 맞다.
+{
+  const KNOWN = new Set(['--check', '--keep-wav']);
+  const bad = process.argv.slice(2).filter((a) => a.startsWith('-') && !KNOWN.has(a));
+  if (bad.length) {
+    console.error(`FATAL: 미지의 플래그 ${bad.join(' ')} — 아는 것은 ${[...KNOWN].join(' ')} 뿐이다`);
+    process.exit(2);
+  }
+}
 
 const SR = 44100;
 const BITS = 16;
@@ -120,16 +131,63 @@ function renderNote(buf, opts, rnd) {
   }
 }
 
+// ── 메인 모티프 대조. 원장은 `motif.json` 이고 인용부는 **여러 트랙**이다(BGM-01 원형 · BGM-12 회귀 ·
+//    BGM-07 총화 · JG-04 징글). 값이 여러 곳에 있으므로 대조한다 — 한쪽만 고치면 나머지가 조용히 어긋난다.
+//    트랙은 `motif: {voice, degrees}` 로 선언하고, 그 `degrees` 가 원장과 같아야 하며
+//    선언한 보이스의 프레이즈 도수 열이 그 `degrees` 로 시작해야 한다(뒤에 붙는 음은 트랙 재량 — §3-①).
+function checkMotifTracks(tracks) {
+  const MOTIF = path.join(__dirname, 'motif.json');
+  if (!fs.existsSync(MOTIF)) { fail('motif.json 부재 — 모티프 원장이 없다'); return []; }
+  const ledger = JSON.parse(fs.readFileSync(MOTIF, 'utf8')).main.degrees_semitones_from_root;
+  const quoted = [];
+  for (const t of tracks) {
+    if (!t.motif) continue;
+    quoted.push(t.id);
+    const d = t.motif.degrees;
+    if (JSON.stringify(d) !== JSON.stringify(ledger)) {
+      fail(`${t.id}: 모티프 도수 ${JSON.stringify(d)} != 원장 ${JSON.stringify(ledger)} — 한쪽만 고쳐졌다`);
+      continue;
+    }
+    const v = t.voices[t.motif.voice];
+    if (!v || !v.phrase) { fail(`${t.id}: 모티프 보이스 '${t.motif.voice}' 에 프레이즈가 없다`); continue; }
+    if (v.rel !== 'tonic') fail(`${t.id}.${t.motif.voice}: 모티프 인용부는 rel='tonic' 이어야 한다(원장 도수를 그대로 쓴다)`);
+    const head = v.phrase.slice(0, d.length).map((n) => n.degree);
+    if (JSON.stringify(head) !== JSON.stringify(d)) {
+      fail(`${t.id}.${t.motif.voice}: 프레이즈 선두 ${JSON.stringify(head)} != 모티프 ${JSON.stringify(d)}`);
+    }
+  }
+  return quoted;
+}
+
+// ── 프리셋 병합. 음색 계열을 트랙마다 다시 적지 않게 하고, 겸해서
+//    "같은 계열" 이라는 주장을 **같은 프리셋 참조**로 기계화한다(BGM-09/10 정조 쌍이 그 요구다).
+function resolveVoice(spec, presets, name) {
+  const v = spec.voices[name];
+  if (!v) die(`미지의 보이스 '${name}'`);
+  if (!v.preset) return v;
+  const base = presets[v.preset];
+  if (!base) die(`미지의 프리셋 '${v.preset}'`);
+  return Object.assign({}, base, v);
+}
+
+// ── 코드 도수 → 절대 반음. `rel` 이 'bass' 면 화음의 베이스 기준, 아니면 화음 근음 기준이다.
+function degOf(chord, v, deg) {
+  // 'tonic' = 트랙 근음(0) 기준. 모티프 인용부가 이것을 쓴다 — 원장의 도수를 **그대로** 적어야
+  // `checkMotif` 대조가 성립하고, 화음 기준으로 적으면 같은 선율이 마디마다 다른 숫자가 된다.
+  const anchor = v.rel === 'tonic' ? 0 : (v.rel === 'bass' ? chord.bass : chord.chord[0]);
+  return anchor + deg + (v.octave || 0);
+}
+
 // ── 트랙 합성
-function synth(track) {
+function synth(track, presets) {
   const spb = SR * 60 / track.bpm;
   if (!Number.isInteger(spb)) die(`${track.id}: BPM ${track.bpm} → 박당 ${spb} 샘플 (정수가 아니다 — 루프가 깨진다)`);
   const beatsPerBar = track.beats_per_bar;
   const total = track.bars * beatsPerBar * spb;
   const buf = new Float64Array(total);
   const rnd = mulberry32(track.seed);
-  const V = track.voices;
   const prog = track.progression;
+  const order = Object.keys(track.voices);      // 선언 순서 = 렌더 순서 (잡음 PRNG 소비 순서가 여기 걸린다)
 
   const activeAt = (bar) => {
     for (const s of track.sections) if (bar >= s.from_bar && bar < s.to_bar) return s.voices;
@@ -141,34 +199,62 @@ function synth(track) {
     const chord = prog[bar % prog.length];
     const barStart = bar * beatsPerBar * spb;
 
-    if (on.includes('tap')) for (const b of V.tap.beats) {
-      renderNote(buf, { start: barStart + Math.round(b * spb), noteSamples: Math.round(0.05 * SR),
-        freq: V.tap.pitch_hz, pitchDropHz: V.tap.pitch_drop_hz, wave: V.tap.wave,
-        gain: V.tap.gain, adsr: V.tap.adsr_ms, lpfHz: V.tap.lpf_hz }, rnd);
-    }
-    if (on.includes('hat')) for (const b of V.hat.beats) {
-      renderNote(buf, { start: barStart + Math.round(b * spb), noteSamples: Math.round(0.02 * SR),
-        freq: 1, wave: V.hat.wave, gain: V.hat.gain, adsr: V.hat.adsr_ms, hpfHz: V.hat.hpf_hz }, rnd);
-    }
-    if (on.includes('bass')) for (const nt of V.bass.notes) {
-      renderNote(buf, { start: barStart + Math.round(nt.beat * spb),
-        noteSamples: Math.round(nt.len_beats * spb),
-        freq: hz(track.root_hz, chord.bass + nt.degree), wave: V.bass.wave, duty: V.bass.duty,
-        gain: V.bass.gain, adsr: V.bass.adsr_ms, lpfHz: V.bass.lpf_hz }, rnd);
-    }
-    if (on.includes('pad')) for (const deg of chord.chord) {
-      renderNote(buf, { start: barStart, noteSamples: Math.round(V.pad.len_beats * spb),
-        freq: hz(track.root_hz, deg + V.pad.octave), wave: V.pad.wave,
-        gain: V.pad.gain, adsr: V.pad.adsr_ms, lpfHz: V.pad.lpf_hz, detuneCents: V.pad.detune_cents }, rnd);
-    }
-    // 리드 프레이즈는 4마디 단위 — 프레이즈 시작 마디에서만 건다.
-    if (on.includes('lead') && bar % 4 === 0) for (const nt of V.lead.phrase) {
-      const chordAt = prog[(bar + Math.floor(nt.beat / beatsPerBar)) % prog.length];
-      renderNote(buf, { start: barStart + Math.round(nt.beat * spb),
-        noteSamples: Math.round(nt.len_beats * spb),
-        freq: hz(track.root_hz, chordAt.chord[0] + nt.degree + V.lead.octave),
-        wave: V.lead.wave, duty: V.lead.duty, gain: V.lead.gain,
-        adsr: V.lead.adsr_ms, lpfHz: V.lead.lpf_hz }, rnd);
+    for (const name of order) {
+      if (!on.includes(name)) continue;
+      const v = resolveVoice(track, presets, name);
+      const common = { wave: v.wave, duty: v.duty, gain: v.gain, adsr: v.adsr_ms,
+        lpfHz: v.lpf_hz, hpfHz: v.hpf_hz, detuneCents: v.detune_cents };
+
+      switch (v.kind) {
+        case 'hit':          // 고정 음정 타격 — 탭·킥. 음정 하강 포함
+          for (const b of v.beats) renderNote(buf, Object.assign({}, common, {
+            start: barStart + Math.round(b * spb), noteSamples: Math.round((v.hit_ms || 50) / 1000 * SR),
+            freq: v.pitch_hz, pitchDropHz: v.pitch_drop_hz }), rnd);
+          break;
+        case 'noise':        // 잡음 타격 — 햇·셰이커
+          for (const b of v.beats) renderNote(buf, Object.assign({}, common, {
+            start: barStart + Math.round(b * spb), noteSamples: Math.round((v.hit_ms || 20) / 1000 * SR),
+            freq: 1 }), rnd);
+          break;
+        case 'bassline':
+          for (const nt of v.notes) renderNote(buf, Object.assign({}, common, {
+            start: barStart + Math.round(nt.beat * spb), noteSamples: Math.round(nt.len_beats * spb),
+            freq: hz(track.root_hz, chord.bass + nt.degree + (v.octave || 0)) }), rnd);
+          break;
+        case 'chord':        // 화음 전음 동시 — 패드·스탭
+          for (const beat of (v.beats || [0])) for (const deg of chord.chord)
+            renderNote(buf, Object.assign({}, common, {
+              start: barStart + Math.round(beat * spb),
+              noteSamples: Math.round(v.len_beats * spb),
+              freq: hz(track.root_hz, deg + (v.octave || 0)) }), rnd);
+          break;
+        case 'arp': {        // 화음 구성음을 세분박으로 순회 — 네온 계열의 구동
+          const step = v.step_beats;
+          const count = Math.round(beatsPerBar / step);
+          for (let i = 0; i < count; i++) {
+            const deg = chord.chord[i % chord.chord.length]
+              + ((v.rise_octave && i >= count / 2) ? 12 : 0);
+            renderNote(buf, Object.assign({}, common, {
+              start: barStart + Math.round(i * step * spb),
+              noteSamples: Math.round(step * spb * (v.gate || 0.9)),
+              freq: hz(track.root_hz, deg + (v.octave || 0)) }), rnd);
+          }
+          break;
+        }
+        case 'phrase': {     // 선율 — every_bars 마디 주기의 프레이즈
+          const every = v.every_bars || 1;
+          if (bar % every !== 0) break;
+          for (const nt of v.phrase) {
+            const cAt = prog[(bar + Math.floor(nt.beat / beatsPerBar)) % prog.length];
+            renderNote(buf, Object.assign({}, common, {
+              start: barStart + Math.round(nt.beat * spb),
+              noteSamples: Math.round(nt.len_beats * spb),
+              freq: hz(track.root_hz, degOf(cAt, v, nt.degree)) }), rnd);
+          }
+          break;
+        }
+        default: die(`${track.id}.${name}: 미지의 kind '${v.kind}'`);
+      }
     }
   }
   return buf;
@@ -203,10 +289,12 @@ if (!CHECK_ONLY) fs.mkdirSync(OUT_DIR, { recursive: true });
 
 console.log(`BGM 절차 합성 ${CHECK_ONLY ? '대조' : ''} — ${tracks.length}트랙 · oggenc -q/--serial 고정\n`);
 const rows = [];
+const pairs = [];
+const quotedMotif = checkMotifTracks(tracks);
 
 for (const t of tracks) {
   if (!/^[a-z0-9_]+$/.test(t.id)) die(`파일명 규약 위반: ${t.id}`);
-  const buf = synth(t);
+  const buf = synth(t, spec.voice_presets || {});
   const { wav, gain } = toWav(buf, t.target_peak_dbfs);
 
   const tmp = path.join(os.tmpdir(), `${t.id}_${process.pid}.wav`);
@@ -258,19 +346,54 @@ for (const t of tracks) {
   const last = dec.readInt16LE(dec.length - 2);
   const seam = peak16 ? Math.abs(first - last) / peak16 : 0;
 
-  rows.push({ id: t.id, bytes: ogg.length, sec: seconds, bars: t.bars, bpm: t.bpm,
+  rows.push({ id: t.id, bytes: ogg.length, sec: seconds, bars: t.bars, bpm: t.bpm, frames: frames,
+    pcm: /_[ab]$/.test(t.id) ? dec.subarray(44) : null,
     peak: peak16, dbfs: 20 * Math.log10(peak16 / 32768), seam,
     kbps: (ogg.length * 8 / seconds / 1000),
     sha: crypto.createHash('sha256').update(ogg).digest('hex').slice(0, 12) });
   for (const f of [tmp, oggTmp, decTmp]) { try { fs.unlinkSync(f); } catch (_) {} }
 }
 
+// ── A/B 스템 쌍 검사 (발주 §2 "동일 길이 샘플 단위 일치 · B = A 위 가산 스템").
+//    길이가 1샘플만 어긋나도 두 스템이 서로 밀려 박 동기가 깨진다. 그리고 **합산이 클리핑하면
+//    가산 레이어가 성립하지 않는다** — 재생기는 B 볼륨만 켜므로 두 파일이 동시에 울린다.
+for (const r of rows) {
+  if (!r.id.endsWith('_a')) continue;
+  const bId = r.id.slice(0, -2) + '_b';
+  const b = rows.find((x) => x.id === bId);
+  if (!b) { fail(`${r.id}: 짝 ${bId} 가 없다 — A/B 는 쌍으로만 성립한다`); continue; }
+  if (r.frames !== b.frames) {
+    fail(`${r.id}/${bId}: 프레임 ${r.frames} vs ${b.frames} — 샘플 단위 불일치(박 동기 파손)`);
+  }
+  if (r.bpm !== b.bpm || r.bars !== b.bars) {
+    fail(`${r.id}/${bId}: 템포·마디 불일치 (${r.bpm}/${r.bars} vs ${b.bpm}/${b.bars})`);
+  }
+  if (r.pcm && b.pcm) {
+    let sumPeak = 0;
+    const n = Math.min(r.pcm.length, b.pcm.length) / 2;
+    for (let i = 0; i < n; i++) {
+      const v = Math.abs(r.pcm.readInt16LE(i * 2) + b.pcm.readInt16LE(i * 2));
+      if (v > sumPeak) sumPeak = v;
+    }
+    const db = 20 * Math.log10(sumPeak / 32768);
+    pairs.push({ a: r.id, b: bId, frames: r.frames, sumPeak, db });
+    if (sumPeak >= 32768) fail(`${r.id}+${bId}: 합산 피크 ${sumPeak} — 동시 재생이 클리핑한다(가산 레이어 불성립)`);
+  }
+}
+if (pairs.length) {
+  console.log('  A/B 쌍       프레임      합산피크  합산dBFS');
+  for (const p2 of pairs) {
+    console.log(`  ${p2.a}/${p2.b.slice(-1)}  ${String(p2.frames).padStart(9)}  ${String(p2.sumPeak).padStart(8)}  ${p2.db.toFixed(1).padStart(7)}`);
+  }
+  console.log('');
+}
 console.log('  id       바이트    길이(s)  마디 BPM   피크   dBFS   seam   kbps  sha256[12]');
 for (const r of rows) {
   console.log(`  ${r.id.padEnd(8)} ${String(r.bytes).padStart(8)} ${r.sec.toFixed(3).padStart(8)} ${String(r.bars).padStart(5)} ${String(r.bpm).padStart(4)} ${String(r.peak).padStart(6)} ${r.dbfs.toFixed(1).padStart(6)} ${(r.seam * 100).toFixed(2).padStart(6)}% ${r.kbps.toFixed(0).padStart(5)}  ${r.sha}`);
 }
 console.log('');
 console.log(`  포맷: OGG Vorbis ${SR}Hz 모노 · q0.7(oggenc -q 7) · 시리얼 고정 — D12 §10.1`);
+if (quotedMotif.length) console.log(`  모티프 인용 ${quotedMotif.length}처 원장 대조 통과: ${quotedMotif.join(' · ')} (원장 = motif.json)`);
 console.log('  seam = 디코드 후 첫·끝 샘플 진폭 차(피크 대비) — 꼬리 감김의 결과이며 위상·질감은 귀 소관이다');
 
 if (fails) { console.error(`\nBGM_GEN FAIL fails=${fails}`); process.exit(1); }

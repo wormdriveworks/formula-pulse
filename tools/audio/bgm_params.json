@@ -1,4 +1,7 @@
 {
+  "_scope": "**18스템 전량**(13트랙 — 5무대는 A/B 2스템). 파일럿 `bgm_02`(IMPL-274 · 귀 판정 통과 — 값 무접촉) + 확대 17스템(IMPL-280). **예비 1 = 미배정 유보 · 파일 생성 금지**(D11 결정 #5) — 여기에 항목이 없는 것이 그 이행이다.",
+  "_ab": "A/B 5쌍 = **동일 BPM·마디·근음·화성 진행**(샘플 단위 길이 일치가 규격이며 생성기가 검사한다). **B 는 곡이 아니라 얹는 층**이다 — 구동·화성은 A 에 있으므로 B 는 대선율·질감만 담고, B 단독으로 성립하지 않는 것이 정상이다. 재생기는 B 볼륨만 켜므로 두 파일이 동시에 울린다 → **합산 피크가 클리핑하면 가산 레이어가 불성립**이고 생성기가 그것도 검사한다. B 의 목표 피크를 −12dB 대로 둔 이유가 그것이다.",
+  "_motif": "모티프 인용 = **BGM-01(원형) · BGM-07_b(총화) · BGM-12(회귀)** 3처 + 징글 `jg_04`. 원장은 `motif.json` 이고 `checkMotif` 가 선두 4음을 대조한다 — **뒤에 붙는 음은 트랙 재량**이라 BGM-12 가 여지를 닫는 2음을 더할 수 있다.",
   "_doc": "BGM 절차 합성 파라미터. 이 파일 + `bgm_gen.js` 가 실물 OGG 의 유일한 출처다 — 손으로 고친 오디오는 `--check` 가 걸어낸다.",
   "_pipeline": "시퀀서(BPM 그리드) → 신시사이저(오실레이터·ADSR·1극 LPF/HPF) → 믹서 → PCM 마스터(WAV) → `oggenc` → OGG. jsfxr 은 단발 효과음 합성기라 지속·다성 음악에 쓸 수 없어 신시사이저를 새로 썼다(SFX 경로는 무접촉).",
   "_grid": "**BPM 은 박당 샘플 수가 정수가 되는 값에서만 고른다.** 44100×60 = 2,646,000 이므로 2646000/BPM 이 정수여야 하고, 아니면 마디마다 소수점 오차가 쌓여 루프 길이가 정수 샘플이 아니게 된다 — 심리스 루프가 그 자리에서 깨진다. BPM 98 → 박당 **27,000 샘플** 정확.",
@@ -6,6 +9,32 @@
   "_ogg": "`oggenc -q 7 --serial <고정>`. **q 매핑** = D12 §10.1 의 \"~q0.7\" 은 libvorbis 정규화 품질(−0.1~1.0) 이고 `oggenc -q` 는 그 값의 10배 스케일(0~10)이므로 **q0.7 = `-q 7`** 이다. **`--serial` 고정이 재현 계약의 필수 조건**이다 — 실측: 고정하지 않으면 같은 입력이 매번 다른 바이트를 낸다(스트림 시리얼과 그것에 딸린 CRC 32바이트가 달라진다). 고정 시 3/3 동일.",
   "_determinism": "잡음 계열(hat)은 PRNG(mulberry32)를 항목별 seed 로 돌린다 — SFX 생성기와 같은 장치이며 이유도 같다.",
 
+  "voice_presets": {
+    "_doc": "음색 프리셋. 트랙마다 값을 다시 적지 않게 하고, 겸해서 **\"같은 계열\"이라는 주장을 같은 프리셋 참조로 기계화**한다 — BGM-09/10(정조 2종의 쌍)이 그것을 요구한다(발주 §3-③). 트랙은 `preset` 을 참조하고 필요한 값만 덮어쓴다.",
+
+    "tap_soft":   { "kind": "hit",   "wave": "sine",     "gain": 0.22, "lpf_hz": 900,  "adsr_ms": [1, 20, 0.0, 50], "pitch_hz": 180, "pitch_drop_hz": 150, "hit_ms": 50 },
+    "tap_dry":    { "kind": "hit",   "wave": "square",   "duty": 0.5, "gain": 0.20, "lpf_hz": 700, "adsr_ms": [1, 14, 0.0, 26], "pitch_hz": 150, "pitch_drop_hz": 120, "hit_ms": 30 },
+    "kick_drive": { "kind": "hit",   "wave": "sine",     "gain": 0.30, "lpf_hz": 420,  "adsr_ms": [1, 28, 0.0, 80], "pitch_hz": 110, "pitch_drop_hz": 52, "hit_ms": 70 },
+    "hat_tight":  { "kind": "noise", "wave": "noise", "gain": 0.085, "hpf_hz": 4200, "adsr_ms": [1, 12, 0.0, 28], "hit_ms": 20 },
+    "hat_open":   { "kind": "noise", "wave": "noise", "gain": 0.075, "hpf_hz": 3200, "adsr_ms": [1, 30, 0.0, 90], "hit_ms": 40 },
+    "shaker":     { "kind": "noise", "wave": "noise", "gain": 0.055, "hpf_hz": 6000, "adsr_ms": [2, 18, 0.0, 40], "hit_ms": 24 },
+
+    "bass_warm":  { "kind": "bassline", "wave": "square", "duty": 0.32, "gain": 0.30, "lpf_hz": 800,  "adsr_ms": [4, 40, 0.55, 220] },
+    "bass_drive": { "kind": "bassline", "wave": "saw",    "gain": 0.26, "lpf_hz": 1200, "adsr_ms": [3, 30, 0.60, 130] },
+    "bass_deep":  { "kind": "bassline", "wave": "square", "duty": 0.5,  "gain": 0.30, "lpf_hz": 460,  "adsr_ms": [6, 60, 0.70, 300] },
+
+    "pad_warm":   { "kind": "chord", "wave": "triangle", "gain": 0.155, "lpf_hz": 2400, "detune_cents": 7,  "adsr_ms": [420, 300, 0.62, 700] },
+    "pad_glass":  { "kind": "chord", "wave": "triangle", "gain": 0.115, "lpf_hz": 4200, "detune_cents": 12, "adsr_ms": [260, 240, 0.58, 620] },
+    "pad_dark":   { "kind": "chord", "wave": "saw",      "gain": 0.095, "lpf_hz": 1100, "detune_cents": 5,  "adsr_ms": [520, 420, 0.66, 900] },
+    "stab":       { "kind": "chord", "wave": "square",   "duty": 0.4, "gain": 0.105, "lpf_hz": 2800, "adsr_ms": [3, 50, 0.25, 160] },
+
+    "lead_chip":  { "kind": "phrase", "wave": "square",   "duty": 0.5, "gain": 0.14, "lpf_hz": 3800, "adsr_ms": [6, 60, 0.5, 180] },
+    "lead_soft":  { "kind": "phrase", "wave": "triangle", "gain": 0.17, "lpf_hz": 3000, "adsr_ms": [40, 120, 0.55, 420] },
+    "lead_bright":{ "kind": "phrase", "wave": "square",   "duty": 0.35, "gain": 0.155, "lpf_hz": 5200, "adsr_ms": [4, 45, 0.5, 150] },
+
+    "arp_neon":   { "kind": "arp", "wave": "square", "duty": 0.25, "gain": 0.10, "lpf_hz": 5000, "adsr_ms": [2, 40, 0.3, 90], "gate": 0.85 },
+    "arp_soft":   { "kind": "arp", "wave": "triangle", "gain": 0.115, "lpf_hz": 3200, "adsr_ms": [8, 60, 0.4, 140], "gate": 0.9 }
+  },
   "tracks": [
     {
       "id": "bgm_02",
@@ -33,6 +62,7 @@
       ],
       "voices": {
         "tap": {
+          "kind": "hit", "hit_ms": 50,
           "wave": "sine", "gain": 0.22, "lpf_hz": 900,
           "adsr_ms": [1, 20, 0.0, 50],
           "pitch_hz": 180, "pitch_drop_hz": 150,
@@ -40,24 +70,28 @@
           "comment": "정비의 맥동 — 킥이 아니라 탭. 룸톤 대역(≤72Hz)을 비운다"
         },
         "hat": {
+          "kind": "noise", "hit_ms": 20,
           "wave": "noise", "gain": 0.085, "hpf_hz": 4200,
           "adsr_ms": [1, 12, 0.0, 28],
           "beats": [0.5, 1.5, 2.5, 3.5],
           "comment": "8분 뒷박. 4.2kHz 위만 남겨 베이스·패드와 대역이 겹치지 않는다"
         },
         "bass": {
+          "kind": "bassline",
           "wave": "square", "duty": 0.32, "gain": 0.30, "lpf_hz": 800,
           "adsr_ms": [4, 40, 0.55, 220],
           "notes": [ { "beat": 0, "len_beats": 1.75, "degree": 0 }, { "beat": 2, "len_beats": 1.75, "degree": 7 } ],
           "comment": "근음 → 5도. C3 = 131Hz 로 룸톤 한 옥타브 위"
         },
         "pad": {
+          "kind": "chord", "beats": [0],
           "wave": "triangle", "gain": 0.155, "lpf_hz": 2400, "detune_cents": 7,
           "adsr_ms": [420, 300, 0.62, 700],
           "octave": 0, "len_beats": 3.9,
           "comment": "온기의 본체 — 느린 어택·디튠 2성. 삼각파는 구형파보다 배음이 적어 리드를 가리지 않는다"
         },
         "lead": {
+          "kind": "phrase", "every_bars": 4, "rel": "root",
           "wave": "square", "duty": 0.5, "gain": 0.14, "lpf_hz": 3800,
           "adsr_ms": [6, 60, 0.5, 180],
           "octave": 12,
@@ -75,6 +109,448 @@
           ],
           "comment": "4마디(16박) 프레이즈. 코드 도수를 따라가되 쉼이 많다 — 앞에 나서면 '일상'이 아니다. 옥타브 +12(C5 권역)"
         }
+      }
+    },
+    {
+      "id": "bgm_01",
+      "spec": "BGM-01 타이틀 (타이틀·메인 메뉴) — D11 §4.1 \"**메인 모티프 원형** (노스윈드 테마 1개만 운용·캐릭터별 테마 불채택)\"",
+      "intent": "**원형은 여지를 남긴다.** 모티프 4음(오프셋 [−5,0,+2,+4] = 5→1→2→3)을 장3도에서 멈춘 채 두고 해결하지 않는다 — 징글 회차가 세운 논거이며 BGM-12(최대 해방)가 그 여지를 닫는 쪽이다(발주 §3-①). 그래서 ①**리드가 모티프만 부르고 그 뒤에 아무것도 붙이지 않는다** ②화성이 F(IV)로 끝나 으뜸음으로 되돌지 않는다 ③밀도를 최대까지 올리지 않는다(패드+리드+베이스 3성 · 타격은 탭 하나). 84BPM·32마디 = 91.4초 — 타이틀은 짧게 돌아야 반복이 눌리지 않는다.",
+      "bpm": 84, "beats_per_bar": 4, "bars": 32,
+      "root_hz": 261.626, "target_peak_dbfs": -6.0, "ogg_quality": 7, "ogg_serial": 20260822, "seed": 2001,
+      "motif": { "voice": "lead", "degrees": [-5, 0, 2, 4] },
+      "progression": [
+        { "name": "C",  "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "G",  "chord": [-5, -1, 2], "bass": -17 },
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 8,  "voices": ["tap", "bass", "pad"], "comment": "열기 — 모티프 전" },
+        { "from_bar": 8,  "to_bar": 24, "voices": ["tap", "bass", "pad", "lead"], "comment": "모티프 진술" },
+        { "from_bar": 24, "to_bar": 32, "voices": ["tap", "bass", "pad"], "comment": "닫기 — 첫 8마디와 같은 밀도(되감기 은폐)" }
+      ],
+      "voices": {
+        "tap":  { "preset": "tap_soft", "beats": [0, 2] },
+        "bass": { "preset": "bass_warm", "notes": [ { "beat": 0, "len_beats": 2.0, "degree": 0 }, { "beat": 2, "len_beats": 1.8, "degree": 7 } ] },
+        "pad":  { "preset": "pad_warm", "len_beats": 3.9, "octave": 0 },
+        "lead": { "preset": "lead_soft", "rel": "tonic", "octave": 12, "every_bars": 8,
+          "phrase": [
+            { "beat": 0.0,  "len_beats": 1.0, "degree": -5 },
+            { "beat": 1.0,  "len_beats": 1.0, "degree": 0 },
+            { "beat": 2.0,  "len_beats": 1.0, "degree": 2 },
+            { "beat": 3.0,  "len_beats": 3.2, "degree": 4 }
+          ],
+          "comment": "모티프 4음 전속 — **뒤에 아무것도 붙이지 않는다**(원형의 여지). 8마디 주기" }
+      }
+    },
+    {
+      "id": "bgm_03_a",
+      "spec": "BGM-03 메트로 나이트 A (무대 1 · 투어 전 GP 공용) — D11 §4.2 \"네온 신스·업템포 — 개막의 화려한 질주\" (축제)",
+      "intent": "**A 는 단독으로 완결돼야 한다**(발주 §2) — 구동(킥·베이스)·화성(아르페지오)·공간(햇)이 A 안에 다 있다. 네온 = `arp_neon`(듀티 0.25 좁은 구형파 · LPF 5kHz)의 8분 순회이고, 후반 절반에서 옥타브가 오르는 `rise_octave` 로 개막의 상승을 만든다. 126BPM = 5무대 중 최고 템포(축제) · 48마디 91.4초. 단조 순환(Am–F–C–G)이 화려함과 질주를 함께 담는다 — 장조만으로는 '밤'이 안 된다.",
+      "bpm": 126, "beats_per_bar": 4, "bars": 48,
+      "root_hz": 261.626, "target_peak_dbfs": -6.0, "ogg_quality": 7, "ogg_serial": 20260823, "seed": 2003,
+      "progression": [
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "C",  "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "G",  "chord": [-5, -1, 2], "bass": -17 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 8,  "voices": ["kick", "hat", "bass"] },
+        { "from_bar": 8,  "to_bar": 40, "voices": ["kick", "hat", "bass", "arp"] },
+        { "from_bar": 40, "to_bar": 48, "voices": ["kick", "hat", "bass"] }
+      ],
+      "voices": {
+        "kick": { "preset": "kick_drive", "beats": [0, 1, 2, 3], "comment": "4박 구동 — 업템포의 골격" },
+        "hat":  { "preset": "hat_tight", "beats": [0.5, 1.5, 2.5, 3.5] },
+        "bass": { "preset": "bass_drive", "notes": [ { "beat": 0, "len_beats": 0.9, "degree": 0 }, { "beat": 1, "len_beats": 0.9, "degree": 0 }, { "beat": 2, "len_beats": 0.9, "degree": 7 }, { "beat": 3, "len_beats": 0.9, "degree": 0 } ] },
+        "arp":  { "preset": "arp_neon", "step_beats": 0.5, "octave": 12, "rise_octave": true }
+      }
+    },
+    {
+      "id": "bgm_03_b",
+      "spec": "BGM-03 메트로 나이트 B (긴장 레이어) — D11 §4.3 \"B = A 위 가산 스템\" · 동일 길이·템포·박 동기",
+      "intent": "**B 는 곡이 아니라 얹는 층이다** — 구동·화성은 A 에 있으므로 넣지 않고 **대선율(리드)과 셰이커만** 둔다. 이것이 '교체가 아니라 가산'의 실체다: B 단독으로 들으면 성립하지 않는 것이 정상이고, A+B 합산이 클리핑하지 않는 것이 요구다(생성기가 합산 피크를 검사한다). 긴장은 밀도로 준다 — 리드가 4마디 주기로 쉼 없이 돌고 셰이커가 16분을 채운다.",
+      "bpm": 126, "beats_per_bar": 4, "bars": 48,
+      "root_hz": 261.626, "target_peak_dbfs": -12.0, "ogg_quality": 7, "ogg_serial": 20260824, "seed": 2004,
+      "progression": [
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "C",  "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "G",  "chord": [-5, -1, 2], "bass": -17 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 48, "voices": ["shaker", "lead"], "comment": "B 는 구간을 가르지 않는다 — 켜지면 끝까지 얹힌다" }
+      ],
+      "voices": {
+        "shaker": { "preset": "shaker", "beats": [0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75] },
+        "lead":   { "preset": "lead_bright", "rel": "root", "octave": 12, "every_bars": 4,
+          "phrase": [
+            { "beat": 0.0,  "len_beats": 0.5, "degree": 0 },
+            { "beat": 0.5,  "len_beats": 0.5, "degree": 4 },
+            { "beat": 1.0,  "len_beats": 0.5, "degree": 7 },
+            { "beat": 2.0,  "len_beats": 1.5, "degree": 12 },
+            { "beat": 4.0,  "len_beats": 0.5, "degree": 7 },
+            { "beat": 5.0,  "len_beats": 0.5, "degree": 4 },
+            { "beat": 6.0,  "len_beats": 1.5, "degree": 0 },
+            { "beat": 8.5,  "len_beats": 0.5, "degree": 4 },
+            { "beat": 9.5,  "len_beats": 0.5, "degree": 7 },
+            { "beat": 10.5, "len_beats": 1.5, "degree": 11 },
+            { "beat": 12.0, "len_beats": 0.5, "degree": 7 },
+            { "beat": 13.0, "len_beats": 2.0, "degree": 4 }
+          ] }
+      }
+    },
+    {
+      "id": "bgm_04_a",
+      "spec": "BGM-04 아주르 코스트 A — D11 §4.2 \"개방적 하이스피드 그루브 — 해풍과 직선의 쾌감\" (쾌감)",
+      "intent": "**개방감 = 화성이 넓고 리듬이 뒤로 눕는다.** 메트로 나이트가 4박 킥으로 밀어붙이는 데 비해 여기는 킥을 1·3박으로 줄이고 **오픈 햇**(감쇠 90ms)으로 공간을 연다. 화성은 장조 I–V–IV–V 로 흐려지지 않게 두고, `pad_glass`(LPF 4.2kHz·디튠 12센트)가 해풍의 폭을 만든다. 120BPM·48마디 96초 — 직선의 쾌감은 속도가 아니라 **박이 흔들리지 않는 것**이다.",
+      "bpm": 120, "beats_per_bar": 4, "bars": 48,
+      "root_hz": 261.626, "target_peak_dbfs": -6.0, "ogg_quality": 7, "ogg_serial": 20260825, "seed": 2005,
+      "progression": [
+        { "name": "C", "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "G", "chord": [-5, -1, 2], "bass": -17 },
+        { "name": "F", "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "G", "chord": [-5, -1, 2], "bass": -17 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 8,  "voices": ["kick", "hat", "bass"] },
+        { "from_bar": 8,  "to_bar": 40, "voices": ["kick", "hat", "bass", "pad", "arp"] },
+        { "from_bar": 40, "to_bar": 48, "voices": ["kick", "hat", "bass"] }
+      ],
+      "voices": {
+        "kick": { "preset": "kick_drive", "gain": 0.26, "beats": [0, 2] },
+        "hat":  { "preset": "hat_open", "beats": [0.5, 1.5, 2.5, 3.5] },
+        "bass": { "preset": "bass_drive", "notes": [ { "beat": 0, "len_beats": 1.4, "degree": 0 }, { "beat": 1.5, "len_beats": 0.9, "degree": 7 }, { "beat": 2.5, "len_beats": 1.4, "degree": 0 } ] },
+        "pad":  { "preset": "pad_glass", "len_beats": 3.9, "octave": 0 },
+        "arp":  { "preset": "arp_soft", "step_beats": 0.5, "octave": 12 }
+      }
+    },
+    {
+      "id": "bgm_04_b",
+      "spec": "BGM-04 아주르 코스트 B (긴장 레이어)",
+      "intent": "가산 층 = **상승하는 대선율 + 스탭**. 쾌감 무대의 긴장은 조여드는 것이 아니라 **더 열리는 것**이라(해풍·직선) 리드를 위로 올리고(옥타브 +12·최고 5음까지) 화음 스탭을 뒷박에 얹어 추진을 준다. 하강 종지를 두지 않는다.",
+      "bpm": 120, "beats_per_bar": 4, "bars": 48,
+      "root_hz": 261.626, "target_peak_dbfs": -12.0, "ogg_quality": 7, "ogg_serial": 20260826, "seed": 2006,
+      "progression": [
+        { "name": "C", "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "G", "chord": [-5, -1, 2], "bass": -17 },
+        { "name": "F", "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "G", "chord": [-5, -1, 2], "bass": -17 }
+      ],
+      "sections": [ { "from_bar": 0, "to_bar": 48, "voices": ["stab", "lead"] } ],
+      "voices": {
+        "stab": { "preset": "stab", "beats": [1.5, 3.5], "len_beats": 0.4, "octave": 0 },
+        "lead": { "preset": "lead_bright", "rel": "root", "octave": 12, "every_bars": 4,
+          "phrase": [
+            { "beat": 0.0,  "len_beats": 1.0, "degree": 4 },
+            { "beat": 1.5,  "len_beats": 0.5, "degree": 7 },
+            { "beat": 2.0,  "len_beats": 2.0, "degree": 12 },
+            { "beat": 5.0,  "len_beats": 0.5, "degree": 11 },
+            { "beat": 6.0,  "len_beats": 1.5, "degree": 7 },
+            { "beat": 8.0,  "len_beats": 1.0, "degree": 4 },
+            { "beat": 10.0, "len_beats": 2.0, "degree": 9 },
+            { "beat": 13.0, "len_beats": 2.5, "degree": 12 }
+          ] }
+      }
+    },
+    {
+      "id": "bgm_05_a",
+      "spec": "BGM-05 알타 리지 A — D11 §4.2 \"미니멀·타이트 리듬 — 희박한 공기의 집중\" (긴장)",
+      "intent": "**미니멀 = 넣지 않은 것이 규격이다.** 5무대 중 유일하게 패드·아르페지오가 없다 — 건조한 탭(`tap_dry`)·짧은 베이스·타이트 햇 3성뿐이고 빈 자리가 곧 희박한 공기다. 화성도 Am–Em–F–Am 으로 으뜸음을 두 번 밟아 **움직이지 않는 긴장**을 만든다(전개가 아니라 정지). 105BPM = 5무대 중 최저 템포 — 집중은 빠름이 아니다.",
+      "bpm": 105, "beats_per_bar": 4, "bars": 40,
+      "root_hz": 261.626, "target_peak_dbfs": -6.5, "ogg_quality": 7, "ogg_serial": 20260827, "seed": 2007,
+      "progression": [
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 },
+        { "name": "Em", "chord": [4, 7, 11],  "bass": -8 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 8,  "voices": ["tap", "bass"] },
+        { "from_bar": 8,  "to_bar": 32, "voices": ["tap", "hat", "bass"] },
+        { "from_bar": 32, "to_bar": 40, "voices": ["tap", "bass"] }
+      ],
+      "voices": {
+        "tap":  { "preset": "tap_dry", "beats": [0, 1.5, 2, 3.5], "comment": "엇박이 섞인 타이트 패턴 — 4박 균등은 이 무드가 아니다" },
+        "hat":  { "preset": "hat_tight", "gain": 0.07, "beats": [1, 3] },
+        "bass": { "preset": "bass_warm", "gain": 0.28, "adsr_ms": [3, 24, 0.35, 90],
+          "notes": [ { "beat": 0, "len_beats": 0.6, "degree": 0 }, { "beat": 1.5, "len_beats": 0.5, "degree": 0 }, { "beat": 2.5, "len_beats": 0.6, "degree": 7 } ] }
+      }
+    },
+    {
+      "id": "bgm_05_b",
+      "spec": "BGM-05 알타 리지 B (긴장 레이어)",
+      "intent": "미니멀 트랙의 가산 층은 **성분을 늘리는 것이 아니라 하나를 밀어넣는 것**이다 — 어두운 패드(`pad_dark` · 톱니 LPF 1.1kHz) 하나만 얹어 공기의 밀도를 바꾼다. A 가 비워 둔 자리에 정확히 그것만 들어간다.",
+      "bpm": 105, "beats_per_bar": 4, "bars": 40,
+      "root_hz": 261.626, "target_peak_dbfs": -13.0, "ogg_quality": 7, "ogg_serial": 20260828, "seed": 2008,
+      "progression": [
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 },
+        { "name": "Em", "chord": [4, 7, 11],  "bass": -8 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 }
+      ],
+      "sections": [ { "from_bar": 0, "to_bar": 40, "voices": ["pad"] } ],
+      "voices": { "pad": { "preset": "pad_dark", "len_beats": 3.8, "octave": 0 } }
+    },
+    {
+      "id": "bgm_06_a",
+      "spec": "BGM-06 미라지 플랫 A — D11 §4.2 \"무겁고 건조한 저음 구동 — 소모전의 인내\" (시련)",
+      "intent": "**무거움은 크기가 아니라 느림과 저역이다.** 90BPM 최저역 베이스(`bass_deep` · LPF 460Hz)를 온음표로 끌고, 타격은 건조한 탭 1·3박만 둔다. 화성은 Dm–Bb–F–C 로 단조에서 시작해 장조로 풀리지 않는다(인내 = 해결의 지연). 아르페지오·리드 없음 — **소모전에 선율은 사치다.** 36마디 96초.",
+      "bpm": 90, "beats_per_bar": 4, "bars": 36,
+      "root_hz": 261.626, "target_peak_dbfs": -6.0, "ogg_quality": 7, "ogg_serial": 20260829, "seed": 2009,
+      "progression": [
+        { "name": "Dm", "chord": [2, 5, 9],   "bass": -10 },
+        { "name": "Bb", "chord": [-2, 2, 5],  "bass": -14 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "C",  "chord": [0, 4, 7],   "bass": -12 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 8,  "voices": ["tap", "bass"] },
+        { "from_bar": 8,  "to_bar": 28, "voices": ["tap", "bass", "pad"] },
+        { "from_bar": 28, "to_bar": 36, "voices": ["tap", "bass"] }
+      ],
+      "voices": {
+        "tap":  { "preset": "tap_dry", "gain": 0.22, "beats": [0, 2] },
+        "bass": { "preset": "bass_deep", "notes": [ { "beat": 0, "len_beats": 3.6, "degree": 0 } ], "comment": "온음표 — 움직이지 않는 저역이 무게다" },
+        "pad":  { "preset": "pad_dark", "gain": 0.11, "len_beats": 3.8, "octave": 0 }
+      }
+    },
+    {
+      "id": "bgm_06_b",
+      "spec": "BGM-06 미라지 플랫 B (긴장 레이어)",
+      "intent": "가산 층 = **중역의 갈리는 소리**. 저역은 A 가 다 쓰고 있으므로 B 는 중역(옥타브 +12)에 톱니 스탭을 뒷박마다 박아 마찰을 만든다 — 시련의 긴장은 밝아지는 것이 아니라 **거칠어지는 것**이다.",
+      "bpm": 90, "beats_per_bar": 4, "bars": 36,
+      "root_hz": 261.626, "target_peak_dbfs": -13.0, "ogg_quality": 7, "ogg_serial": 20260830, "seed": 2010,
+      "progression": [
+        { "name": "Dm", "chord": [2, 5, 9],   "bass": -10 },
+        { "name": "Bb", "chord": [-2, 2, 5],  "bass": -14 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "C",  "chord": [0, 4, 7],   "bass": -12 }
+      ],
+      "sections": [ { "from_bar": 0, "to_bar": 36, "voices": ["grind", "shaker"] } ],
+      "voices": {
+        "grind":  { "preset": "stab", "wave": "saw", "gain": 0.10, "lpf_hz": 1600, "beats": [1, 3], "len_beats": 0.8, "octave": 12 },
+        "shaker": { "preset": "shaker", "gain": 0.045, "beats": [0.5, 1.5, 2.5, 3.5] }
+      }
+    },
+    {
+      "id": "bgm_07_a",
+      "spec": "BGM-07 펄스 돔 A — D11 §4.2 \"시즌 모티프 총화·최대 강도 — 결전\" (절정) · 최종전 무대(`amb_05` 결전 베드와 공존)",
+      "intent": "**최대 강도 = 5무대 중 최고 템포(140) + 최다 성분(6성).** 킥 4박·베이스 8분·아르페지오·스탭·햇·셰이커가 동시에 돈다. 화성은 C–Am–F–G 로 **모티프가 앉을 수 있는 자리**를 만들어 둔다(총화는 B 가 진다 — §3-②). 56마디 96초.",
+      "bpm": 140, "beats_per_bar": 4, "bars": 56,
+      "root_hz": 261.626, "target_peak_dbfs": -5.5, "ogg_quality": 7, "ogg_serial": 20260831, "seed": 2011,
+      "progression": [
+        { "name": "C",  "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "G",  "chord": [-5, -1, 2], "bass": -17 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 8,  "voices": ["kick", "hat", "bass"] },
+        { "from_bar": 8,  "to_bar": 48, "voices": ["kick", "hat", "shaker", "bass", "stab", "arp"] },
+        { "from_bar": 48, "to_bar": 56, "voices": ["kick", "hat", "bass"] }
+      ],
+      "voices": {
+        "kick":   { "preset": "kick_drive", "beats": [0, 1, 2, 3] },
+        "hat":    { "preset": "hat_tight", "beats": [0.5, 1.5, 2.5, 3.5] },
+        "shaker": { "preset": "shaker", "beats": [0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75] },
+        "bass":   { "preset": "bass_drive", "gain": 0.28, "notes": [ { "beat": 0, "len_beats": 0.45, "degree": 0 }, { "beat": 0.5, "len_beats": 0.45, "degree": 0 }, { "beat": 1, "len_beats": 0.45, "degree": 12 }, { "beat": 1.5, "len_beats": 0.45, "degree": 0 }, { "beat": 2, "len_beats": 0.45, "degree": 0 }, { "beat": 2.5, "len_beats": 0.45, "degree": 7 }, { "beat": 3, "len_beats": 0.45, "degree": 0 }, { "beat": 3.5, "len_beats": 0.45, "degree": 12 } ] },
+        "stab":   { "preset": "stab", "beats": [1.5, 3.5], "len_beats": 0.35, "octave": 0 },
+        "arp":    { "preset": "arp_neon", "gain": 0.095, "step_beats": 0.25, "octave": 12, "rise_octave": true }
+      }
+    },
+    {
+      "id": "bgm_07_b",
+      "spec": "BGM-07 펄스 돔 B (긴장 레이어) — **시즌 모티프 총화** (발주 §3-② · 인용부이므로 `checkMotif` 대상 편입)",
+      "intent": "**총화는 여기다.** 무대 5종 중 유일하게 모티프를 인용하며(§3-② 재량 조항 채택) **B 층에 둔 것이 판단**이다 — A 는 무대 공용 기본층이라 GP 전 구간에 깔리는데, 모티프가 거기 있으면 결전이 아니라 배경이 된다. **긴장 레이어 = 게이지 만충·듀얼 국면**에서만 켜지므로 모티프가 그 순간에 도착한다. 원장 4음을 그대로 부르고(오프셋 [−5,0,+2,+4]·`rel` tonic) **뒤에 아무것도 붙이지 않는다** — 닫는 것은 BGM-12 의 몫이고 여기는 총화이지 종결이 아니다. 음역은 +24(최고)로 올려 6성 위에서 들리게 했다.",
+      "bpm": 140, "beats_per_bar": 4, "bars": 56,
+      "root_hz": 261.626, "target_peak_dbfs": -12.0, "ogg_quality": 7, "ogg_serial": 20260832, "seed": 2012,
+      "motif": { "voice": "lead", "degrees": [-5, 0, 2, 4] },
+      "progression": [
+        { "name": "C",  "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "G",  "chord": [-5, -1, 2], "bass": -17 }
+      ],
+      "sections": [ { "from_bar": 0, "to_bar": 56, "voices": ["lead"] } ],
+      "voices": {
+        "lead": { "preset": "lead_bright", "gain": 0.19, "rel": "tonic", "octave": 24, "every_bars": 8,
+          "phrase": [
+            { "beat": 0.0, "len_beats": 1.0, "degree": -5 },
+            { "beat": 1.0, "len_beats": 1.0, "degree": 0 },
+            { "beat": 2.0, "len_beats": 1.0, "degree": 2 },
+            { "beat": 3.0, "len_beats": 3.0, "degree": 4 }
+          ] }
+      }
+    },
+    {
+      "id": "bgm_08",
+      "spec": "BGM-08 GP 결산 (RESULT·중간 결산) — D11 §4.1 \"담백한 정리 — **성과의 온도는 징글(JG-01/02)이 담당**\"",
+      "intent": "**BGM 이 온도를 얹지 않는 것이 규격이다.** 그래서 **선율을 두지 않았다** — 리드·아르페지오 없음, 패드와 베이스와 탭 3성뿐이다. 선율은 그 자체로 감정을 실으므로, 상위/중하위가 갈리는 자리에서 BGM 이 노래하면 징글의 온도차와 싸운다(`jg_01`/`jg_02` 가 그 축을 이미 전담한다). 화성도 C–F–C–G 로 으뜸음을 두 번 밟아 사건성을 지운다. 98BPM·40마디 98초.",
+      "bpm": 98, "beats_per_bar": 4, "bars": 40,
+      "root_hz": 261.626, "target_peak_dbfs": -7.5, "ogg_quality": 7, "ogg_serial": 20260833, "seed": 2013,
+      "progression": [
+        { "name": "C", "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "F", "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "C", "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "G", "chord": [-5, -1, 2], "bass": -17 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 8,  "voices": ["tap", "bass"] },
+        { "from_bar": 8,  "to_bar": 32, "voices": ["tap", "bass", "pad"] },
+        { "from_bar": 32, "to_bar": 40, "voices": ["tap", "bass"] }
+      ],
+      "voices": {
+        "tap":  { "preset": "tap_soft", "gain": 0.18, "beats": [0, 2] },
+        "bass": { "preset": "bass_warm", "gain": 0.26, "notes": [ { "beat": 0, "len_beats": 2.0, "degree": 0 }, { "beat": 2, "len_beats": 1.8, "degree": 7 } ] },
+        "pad":  { "preset": "pad_warm", "gain": 0.14, "len_beats": 3.9, "octave": 0 }
+      }
+    },
+    {
+      "id": "bgm_09",
+      "spec": "BGM-09 VN 일상 (VN 이벤트 · 평시) — D11 §4.1 · **트랙 선택은 이벤트 데이터 `tone` 열**(D12 v1.4) · 정조 2종의 쌍 중 평시 측",
+      "intent": "**BGM-10 과 프리셋을 공유한다** — `tap_soft`·`bass_warm`·`pad_warm`·`arp_soft` 네 프리셋이 두 트랙에 같이 들어가고 BPM·마디·근음·박까지 같다(발주 §3-③: *\"트랙 교체가 청자에게 장면 이동으로 읽히면 안 된다\"*). VN 은 **같은 화면에서 정조만 바뀌므로** 음색이 갈리면 화면이 바뀐 것처럼 들린다. 평시 측은 장조 순환(C–Am–F–G)·아르페지오 8분·성분 4개.",
+      "bpm": 84, "beats_per_bar": 4, "bars": 32,
+      "root_hz": 261.626, "target_peak_dbfs": -8.0, "ogg_quality": 7, "ogg_serial": 20260834, "seed": 2014,
+      "progression": [
+        { "name": "C",  "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "G",  "chord": [-5, -1, 2], "bass": -17 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 8,  "voices": ["tap", "bass", "pad"] },
+        { "from_bar": 8,  "to_bar": 24, "voices": ["tap", "bass", "pad", "arp"] },
+        { "from_bar": 24, "to_bar": 32, "voices": ["tap", "bass", "pad"] }
+      ],
+      "voices": {
+        "tap":  { "preset": "tap_soft", "gain": 0.16, "beats": [0, 2] },
+        "bass": { "preset": "bass_warm", "gain": 0.26, "notes": [ { "beat": 0, "len_beats": 2.0, "degree": 0 }, { "beat": 2, "len_beats": 1.8, "degree": 7 } ] },
+        "pad":  { "preset": "pad_warm", "len_beats": 3.9, "octave": 0 },
+        "arp":  { "preset": "arp_soft", "gain": 0.09, "step_beats": 0.5, "octave": 12 }
+      }
+    },
+    {
+      "id": "bgm_10",
+      "spec": "BGM-10 VN 긴장 (VN 이벤트 · 대립·위기) — 정조 2종의 쌍 중 긴장 측",
+      "intent": "**BGM-09 와 같은 프리셋·같은 BPM·같은 마디·같은 박.** 갈리는 것은 **화성과 밀도뿐**이다(발주 §3-③): ①순환을 Am–F–Dm–G 로 바꿔 단조로 기울이고 ②아르페지오를 16분으로 조이고 ③탭을 4박으로 늘려 맥이 빨라진 것처럼 들리게 한다(템포는 같다 — 같은 화면이므로 템포가 바뀌면 장면이 바뀐다). **음색을 하나도 바꾸지 않은 것이 이 트랙의 규격 이행이다.**",
+      "bpm": 84, "beats_per_bar": 4, "bars": 32,
+      "root_hz": 261.626, "target_peak_dbfs": -8.0, "ogg_quality": 7, "ogg_serial": 20260835, "seed": 2015,
+      "progression": [
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "Dm", "chord": [2, 5, 9],   "bass": -10 },
+        { "name": "G",  "chord": [-5, -1, 2], "bass": -17 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 8,  "voices": ["tap", "bass", "pad"] },
+        { "from_bar": 8,  "to_bar": 24, "voices": ["tap", "bass", "pad", "arp"] },
+        { "from_bar": 24, "to_bar": 32, "voices": ["tap", "bass", "pad"] }
+      ],
+      "voices": {
+        "tap":  { "preset": "tap_soft", "gain": 0.16, "beats": [0, 1, 2, 3] },
+        "bass": { "preset": "bass_warm", "gain": 0.26, "notes": [ { "beat": 0, "len_beats": 1.4, "degree": 0 }, { "beat": 1.5, "len_beats": 0.9, "degree": 0 }, { "beat": 2.5, "len_beats": 1.2, "degree": 7 } ] },
+        "pad":  { "preset": "pad_warm", "len_beats": 3.9, "octave": 0 },
+        "arp":  { "preset": "arp_soft", "gain": 0.09, "step_beats": 0.25, "octave": 12 }
+      }
+    },
+    {
+      "id": "bgm_11",
+      "spec": "BGM-11 시즌 결산 (SET-02) — D11 §4.1 \"**소프트 실패 문면 원칙(D09 §5.1) 정합 — 실패 정서 배제, 회고와 이행의 톤**\"",
+      "intent": "**챔피언 미달 시즌에도 이 트랙이 깔린다** — D09 §5.1 이 \"실패/GAME OVER 계열\"을 금지하므로 **하강 종지와 단조 종결은 규격 위반**이다(`jg_02` 와 같은 축). 그래서 ①화성을 C–Em–F–G 로 두고 **G(도미넌트)에서 끝난다** — 으뜸음으로 닫지 않는 것이 *이행*이다(닫으면 회고가 되고, 내려가면 실패가 된다) ②리드는 `lead_soft`(삼각파·어택 40ms)로 노래하되 **최고음이 5음까지만** 올라가 승리의 문법을 피한다 ③밀도를 낮게 유지한다(회고는 조용하다). 84BPM·36마디 102.9초.",
+      "bpm": 84, "beats_per_bar": 4, "bars": 36,
+      "root_hz": 261.626, "target_peak_dbfs": -7.5, "ogg_quality": 7, "ogg_serial": 20260836, "seed": 2016,
+      "progression": [
+        { "name": "C",  "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "Em", "chord": [4, 7, 11],  "bass": -8 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "G",  "chord": [-5, -1, 2], "bass": -17 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 8,  "voices": ["tap", "bass", "pad"] },
+        { "from_bar": 8,  "to_bar": 28, "voices": ["tap", "bass", "pad", "lead"] },
+        { "from_bar": 28, "to_bar": 36, "voices": ["tap", "bass", "pad"] }
+      ],
+      "voices": {
+        "tap":  { "preset": "tap_soft", "gain": 0.15, "beats": [0, 2] },
+        "bass": { "preset": "bass_warm", "gain": 0.25, "notes": [ { "beat": 0, "len_beats": 2.0, "degree": 0 }, { "beat": 2, "len_beats": 1.8, "degree": 7 } ] },
+        "pad":  { "preset": "pad_warm", "gain": 0.145, "len_beats": 3.9, "octave": 0 },
+        "lead": { "preset": "lead_soft", "gain": 0.15, "rel": "root", "octave": 12, "every_bars": 4,
+          "phrase": [
+            { "beat": 0.0,  "len_beats": 1.5, "degree": 0 },
+            { "beat": 2.0,  "len_beats": 1.5, "degree": 4 },
+            { "beat": 4.0,  "len_beats": 2.0, "degree": 7 },
+            { "beat": 8.0,  "len_beats": 1.5, "degree": 4 },
+            { "beat": 10.0, "len_beats": 1.5, "degree": 2 },
+            { "beat": 12.0, "len_beats": 3.0, "degree": 4 }
+          ],
+          "comment": "최고음 7(5도)까지 · 마지막 음이 4(3도)로 **머문다** — 으뜸음 종결도 하강 종결도 아니다" }
+      }
+    },
+    {
+      "id": "bgm_12",
+      "spec": "BGM-12 진엔딩 (시즌 챔피언십 달성) — D11 §4.1 \"**메인 모티프 회귀·최대 해방**\" · 원형(BGM-01)과 구분돼야 한다(발주 §3-①)",
+      "intent": "**BGM-01 과 선율 원장을 공유하고 편성·음역·강도로 가른다.** 같은 4음이 여기서 다르게 들려야 하는 이유는 D11 이 **원형(01)** 과 **최대 해방(12)** 을 갈라 두었기 때문이다. 가른 방식 넷: ①**음역 +24**(01 은 +12 — 한 옥타브 위에서 부른다) ②**성분 6개**(01 은 4개 — 킥·아르페지오·햇 가산) ③**피크 −4.5dB**(01 은 −6.0 — 최대 강도) ④**여지를 닫는다**: 모티프 4음 뒤에 **으뜸음 옥타브(+12)로 올라가 종결**한다. 01 은 장3도에서 멈춰 여지를 남기고 **12 는 그 여지를 닫는다** — 이것이 징글 회차 논거의 대칭이다. **원장 대조는 선두 4음에 걸리고 뒤에 붙는 음은 트랙 재량**이므로 `checkMotif` 가 이 구조를 허용한다. 84BPM·40마디 114.3초.",
+      "bpm": 84, "beats_per_bar": 4, "bars": 40,
+      "root_hz": 261.626, "target_peak_dbfs": -4.5, "ogg_quality": 7, "ogg_serial": 20260837, "seed": 2017,
+      "motif": { "voice": "lead", "degrees": [-5, 0, 2, 4] },
+      "progression": [
+        { "name": "C",  "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "G",  "chord": [-5, -1, 2], "bass": -17 },
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 8,  "voices": ["kick", "hat", "bass", "pad"] },
+        { "from_bar": 8,  "to_bar": 32, "voices": ["kick", "hat", "bass", "pad", "arp", "lead"] },
+        { "from_bar": 32, "to_bar": 40, "voices": ["kick", "hat", "bass", "pad"] }
+      ],
+      "voices": {
+        "kick": { "preset": "kick_drive", "gain": 0.24, "beats": [0, 2] },
+        "hat":  { "preset": "hat_open", "gain": 0.065, "beats": [1, 3] },
+        "bass": { "preset": "bass_warm", "notes": [ { "beat": 0, "len_beats": 2.0, "degree": 0 }, { "beat": 2, "len_beats": 1.8, "degree": 7 } ] },
+        "pad":  { "preset": "pad_glass", "gain": 0.13, "len_beats": 3.9, "octave": 0 },
+        "arp":  { "preset": "arp_soft", "gain": 0.085, "step_beats": 0.5, "octave": 12 },
+        "lead": { "preset": "lead_bright", "gain": 0.165, "rel": "tonic", "octave": 24, "every_bars": 8,
+          "phrase": [
+            { "beat": 0.0,  "len_beats": 1.0, "degree": -5 },
+            { "beat": 1.0,  "len_beats": 1.0, "degree": 0 },
+            { "beat": 2.0,  "len_beats": 1.0, "degree": 2 },
+            { "beat": 3.0,  "len_beats": 2.0, "degree": 4 },
+            { "beat": 5.5,  "len_beats": 0.5, "degree": 7 },
+            { "beat": 6.0,  "len_beats": 4.0, "degree": 12 }
+          ],
+          "comment": "선두 4음 = 원장(대조 대상) · 뒤 2음 = **여지를 닫는 트랙 재량분**(5도 경유 → 으뜸음 옥타브 4박 지속)" }
+      }
+    },
+    {
+      "id": "bgm_13",
+      "spec": "BGM-13 에필로그 (에필로그 계층 — D05 §10.2) — D11 §4.1 \"여운형\"",
+      "intent": "**여운 = 남는 것이 소리보다 길다.** 릴리스를 전 트랙 최장(패드 1400ms·리드 900ms)으로 두고 타격을 아예 없앴다 — 에필로그에 맥동이 있으면 아직 진행 중인 것으로 들린다. 성분 3개(패드·베이스·리드)·최저 밀도. 모티프를 인용하지 **않는다** — 회귀는 BGM-12 가 이미 했고, 에필로그가 또 부르면 회귀가 두 번이 되어 12 의 자리가 없어진다. 화성 C–F–Am–G · 84BPM·32마디 91.4초.",
+      "bpm": 84, "beats_per_bar": 4, "bars": 32,
+      "root_hz": 261.626, "target_peak_dbfs": -8.5, "ogg_quality": 7, "ogg_serial": 20260838, "seed": 2018,
+      "progression": [
+        { "name": "C",  "chord": [0, 4, 7],   "bass": -12 },
+        { "name": "F",  "chord": [-7, -3, 0], "bass": -19 },
+        { "name": "Am", "chord": [-3, 0, 4],  "bass": -15 },
+        { "name": "G",  "chord": [-5, -1, 2], "bass": -17 }
+      ],
+      "sections": [
+        { "from_bar": 0,  "to_bar": 8,  "voices": ["bass", "pad"] },
+        { "from_bar": 8,  "to_bar": 26, "voices": ["bass", "pad", "lead"] },
+        { "from_bar": 26, "to_bar": 32, "voices": ["bass", "pad"] }
+      ],
+      "voices": {
+        "bass": { "preset": "bass_warm", "gain": 0.22, "adsr_ms": [10, 80, 0.6, 500], "notes": [ { "beat": 0, "len_beats": 3.6, "degree": 0 } ] },
+        "pad":  { "preset": "pad_warm", "gain": 0.15, "adsr_ms": [600, 400, 0.6, 1400], "len_beats": 3.8, "octave": 0 },
+        "lead": { "preset": "lead_soft", "gain": 0.135, "adsr_ms": [80, 200, 0.5, 900], "rel": "root", "octave": 12, "every_bars": 4,
+          "phrase": [
+            { "beat": 0.0,  "len_beats": 2.5, "degree": 4 },
+            { "beat": 4.0,  "len_beats": 2.5, "degree": 0 },
+            { "beat": 9.0,  "len_beats": 2.0, "degree": 7 },
+            { "beat": 13.0, "len_beats": 2.5, "degree": 4 }
+          ] }
       }
     }
   ]

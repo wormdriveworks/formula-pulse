@@ -24,6 +24,7 @@ var _structures: Dictionary = {}    # 파일명 -> Dictionary
 var _strings: Dictionary = {}       # key -> {언어: 값}
 var _code_files: Array = []         # {path, source}
 var _aud_completed := false         # AUD 스캔 완주 표시 — 아래 관문의 근거
+var _aud_frames: Dictionary = {}    # id -> 프레임 수 (A/B 쌍 대조용)
 
 
 func _init() -> void:
@@ -1591,8 +1592,13 @@ const AUD_CHANNELS := {
 		"params": "tools/audio/sfx_params.json", "params_key": "sounds"},
 	"jingle": {"dir": "godot/assets/audio/jingle", "total": 5, "ext": "wav",
 		"params": "tools/audio/sfx_params.json", "params_key": "sounds"},
-	"bgm": {"dir": "godot/assets/audio/bgm", "total": 13, "ext": "ogg", "intake": ["bgm_02"],
-		"params": "tools/audio/bgm_params.json", "params_key": "tracks"},
+	"bgm": {"dir": "godot/assets/audio/bgm", "total": 13, "ext": "ogg",
+		"params": "tools/audio/bgm_params.json", "params_key": "tracks",
+		# A/B 5쌍 = **행 1개에 파일 2개**다(재생기 계약 — B 는 A 위 가산 레이어이지 별개 트랙이 아니다).
+		# `sound_map` 이 트랙 단위 행이므로 파일명 도출에 이 목록이 필요하다.
+		"stem_pairs": ["bgm_03", "bgm_04", "bgm_05", "bgm_06", "bgm_07"]},
+	# **예비 1 = 대상 외** (D11 결정 #5 미배정 유보 · 발주 §1 "파일 생성 금지"). `sound_map` 에 행이
+	#   없으므로 계수 13 에도 들어오지 않고, 만들면 ⑥ 잉여 축이 잡는다 — 금지가 검사로 받쳐진다.
 }
 const AUD_LOOP_IDS := ["se_r02", "se_t03", "se_u15", "amb_01", "amb_04", "amb_05"]
 const AUD_LENGTH_CAP := {"se_l1": 0.8, "se_l2": 1.5, "se_l3": 2.5}
@@ -1621,6 +1627,7 @@ func _run_audio_asset_scan() -> void:
 			_fail("AUD", "sound_map channel=%s 행 %d != 정본 확정 %d식" % [channel, found, declared])
 
 	# 파라미터 등재 목록 (⑤) — 채널마다 원장이 다르다. 한 파일만 뒤지면 BGM 이 전건 미등재로 잡힌다.
+	_aud_frames.clear()
 	var params_ids: Dictionary = {}
 	for channel in AUD_CHANNELS:
 		var pf := String(AUD_CHANNELS[channel].get("params", ""))
@@ -1645,7 +1652,19 @@ func _run_audio_asset_scan() -> void:
 		var spec_ch: Dictionary = AUD_CHANNELS[channel]
 		var ext: String = String(spec_ch.get("ext", "wav"))
 		var intake: Array = Array(spec_ch.get("intake", []))
+		var pairs_ch: Array = Array(spec_ch.get("stem_pairs", []))
+		var expanded: Array = []
 		for id in ids:
+			if pairs_ch.has(id):
+				expanded.append(id + "_a")
+				expanded.append(id + "_b")
+			else:
+				expanded.append(id)
+		checked += 1
+		if not pairs_ch.is_empty() and expanded.size() != ids.size() + pairs_ch.size():
+			_fail("AUD", "%s: A/B 전개 계수 오류 (행 %d · 쌍 %d → 파일 %d)"
+				% [channel, ids.size(), pairs_ch.size(), expanded.size()])
+		for id in expanded:
 			var wav_path: String = "%s/%s.%s" % [String(spec_ch["dir"]), id, ext]
 			var declared_intake: bool = intake.is_empty() or intake.has(id)
 			var exists: bool = FileAccess.file_exists(wav_path)
@@ -1662,6 +1681,8 @@ func _run_audio_asset_scan() -> void:
 			if not params_ids.has(id):
 				_fail("AUD", "%s: 파라미터 원장 미등재 — 재생성 불가(재현 계약 위반)" % id)
 			var header: Dictionary = _aud_ogg_header(wav_path) if ext == "ogg" else _aud_wav_header(wav_path)
+			if ext == "ogg":
+				_aud_frames[id] = int(header.get("data_size", 0)) / 2
 			checked += 1
 			if header.has("error"):
 				_fail("AUD", "%s: %s" % [id, String(header["error"])])
@@ -1723,8 +1744,14 @@ func _run_audio_asset_scan() -> void:
 	# ⑥ 잉여 파일 — 채널별로 본다. ①이 부족을 보고 여기가 과잉을 본다.
 	for channel in AUD_CHANNELS:
 		var known: Dictionary = {}
+		var pairs_x: Array = Array(AUD_CHANNELS[channel].get("stem_pairs", []))
 		for id in Array(by_channel.get(channel, [])):
-			known[String(id)] = true
+			# A/B 쌍은 행 1개가 파일 2개다 — 여기서도 전개해야 정상 파일이 "표 밖"으로 잡히지 않는다.
+			if pairs_x.has(id):
+				known[String(id) + "_a"] = true
+				known[String(id) + "_b"] = true
+			else:
+				known[String(id)] = true
 		var dir := DirAccess.open(String(AUD_CHANNELS[channel]["dir"]))
 		if dir == null:
 			continue
@@ -1738,6 +1765,20 @@ func _run_audio_asset_scan() -> void:
 						% [channel, entry])
 			entry = dir.get_next()
 		dir.list_dir_end()
+	# A/B 스템 쌍 — **샘플 단위 길이 일치** (발주 §4 · D11 §4.3 "동일 길이·동일 템포·박 동기").
+	# 1샘플만 어긋나도 두 스템이 서로 밀려 박 동기가 깨진다. 재생기는 B 볼륨만 켜므로
+	# 어긋남이 "가산 레이어"를 어긋난 캐논으로 바꾼다 — 조용히 틀리는 자리다.
+	for channel in AUD_CHANNELS:
+		for base in Array(AUD_CHANNELS[channel].get("stem_pairs", [])):
+			var ka := String(base) + "_a"
+			var kb := String(base) + "_b"
+			checked += 1
+			if not (_aud_frames.has(ka) and _aud_frames.has(kb)):
+				_fail("AUD", "%s: A/B 쌍의 한쪽을 읽지 못했다 (%s/%s)" % [base, ka, kb])
+				continue
+			if int(_aud_frames[ka]) != int(_aud_frames[kb]):
+				_fail("AUD", "%s: A/B 프레임 %d vs %d — 샘플 단위 불일치(박 동기 파손)"
+					% [base, int(_aud_frames[ka]), int(_aud_frames[kb])])
 	_aud_completed = true
 	_report("AUD", "audio assets", checked, before_fail, before_warn)
 

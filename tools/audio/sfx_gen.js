@@ -63,8 +63,17 @@ const MOTIF = path.join(__dirname, 'motif.json');
 const CHECK_ONLY = process.argv.includes('--check');
 const TWICE = process.argv.includes('--twice');
 const ONLY = (() => {
+  // ⚠ 값 없는 `--only` 는 **오류**다. 필터 없음으로 흘리면 부분 주행 의도가 전량 생성이 되고,
+  //    돌연변이 상태의 파라미터로 실물이 덮인다(2026-08-22 실사고 — BGM 확대 회차).
+  if (process.argv.includes('--only')) {
+    console.error("FATAL: --only 에 값이 없다 — `--only=id[,id]` 형식이다 (값 없는 필터는 전량 주행이 된다)");
+    process.exit(2);
+  }
   const a = process.argv.find((x) => x.startsWith('--only='));
-  return a ? new Set(a.slice(7).split(',').filter(Boolean)) : null;
+  if (!a) return null;
+  const set = new Set(a.slice(7).split(',').filter(Boolean));
+  if (!set.size) { console.error('FATAL: --only= 가 비었다'); process.exit(2); }
+  return set;
 })();
 
 // D12 §10.1 확정 포맷 — 항목별로 적지 않고 여기서 강제한다
