@@ -100,8 +100,8 @@ func _process(_delta: float) -> bool:
 	_tutorial_callout_placement()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 249:
-		print("UI_SCREENS_FAIL checks=%d < 하한 249 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 252:
+		print("UI_SCREENS_FAIL checks=%d < 하한 252 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1343,6 +1343,22 @@ func _act_vn_consumption(data: GameData) -> void:
 	_ok("선택 지점 자동 도달", Array(screen.choice_omissions) == ["vnchoice_act1_number"],
 		str(screen.choice_omissions))
 	_ok("아카이브 등재", session.narrative.vn_seen.has("vn_act1"))
+	# **표제 표가 낡으면 기계가 잡는다.** 리터럴 표를 쓴 것은 V6 가 조립 키를 보지 못해서이고,
+	# 그 대가(7번째 막이 조용히 폴백으로 떨어짐)를 이 축이 받는다(IMPL-278 회수분 결선).
+	var titles: Dictionary = load("res://ui/hub/records_screen.gd").ACT_VN_TITLES
+	var missing_title := 0
+	var missing_key := 0
+	for entry in data.act_vn_entries():
+		var vn_id := String(Dictionary(entry).get("id", ""))
+		if not titles.has(vn_id):
+			missing_title += 1
+			continue
+		if not data.strings.has_key(String(titles[vn_id])):
+			missing_key += 1
+	_ok("막 VN 전건 표제 표 등재", missing_title == 0, "missing=%d" % missing_title)
+	_ok("표제 키 전건 실재", missing_key == 0, "missing=%d" % missing_key)
+	_ok("표제 = 슬롯 유형 표기 아님",
+		data.strings.text(String(titles["vn_act1"])) != data.strings.text("ui.vnSlot.tourBrief"))
 	_release_vn(screen)
 
 	# ── ⓒ tense 막 = BGM-10 (정조 미전달의 조용한 실패를 잡는 자리) ──

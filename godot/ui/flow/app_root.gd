@@ -44,7 +44,9 @@ func _ready() -> void:
 		return
 	session = RunSession.new()
 	# 합성 지점 — 라우터도 구현체 이름을 모른다. 플랫폼 선택은 `PlatformServices.create()` 전속.
-	session.setup(data, PlatformServices.create())
+	# 재생기의 트리 숙주 = 라우터. 화면은 교체되지만 오디오는 세션 수명을 살아야 하므로
+	# 플레이어를 화면에 매달 수 없다 — 화면과 함께 사라지면 BGM 이 전이마다 끊긴다.
+	session.setup(data, PlatformServices.create(), self)
 	_mount_save_indicator(data)
 	_show(ENTRY_SCREEN, {})
 

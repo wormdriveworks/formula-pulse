@@ -33,6 +33,7 @@ var _voices: Array = []            # 재생 중 보이스 [{sfx_id, priority}] �
 var _last_fire_msec: Dictionary = {}   # sfx_id -> 마지막 발화 시각
 var _bgm_track := ""
 var _tension := false
+var _paused := false
 # 발화 기록 — 검사·회귀 전용. 봉인 창 중에는 결과 상관 사운드가 애초에 들어오지 못한다.
 var fired: Array = []
 
@@ -150,6 +151,24 @@ func set_tension(on: bool) -> void:
 		return
 	_tension = on
 	output.set_bgm_tension(on)
+
+
+# 일시정지 (D11 §4.3 — BGM 유지·SFX 뮤트). **정책이 아니라 통로다** — 뮤트는 표현 층이 하고
+# 디스패처는 그 호출이 통과하는 유일한 창구를 유지한다(호출부가 `output` 을 직접 쥐지 않는다).
+func set_paused(on: bool) -> void:
+	if _paused == on:
+		return
+	_paused = on
+	output.set_paused(on)
+
+
+func paused() -> bool:
+	return _paused
+
+
+# 볼륨 옵션 → 버스 (D12 §10.1 O13~O15 직결). 값 해석은 표현 층 소관이다.
+func apply_volume_options(master: int, bgm: int, sfx: int) -> void:
+	output.apply_volumes(master, bgm, sfx)
 
 
 # 리타이어 = BGM 즉시 정지 → JG-03 (D11 §4.3 전이 규칙표). 순서가 규칙이므로 코드가 갖는다.

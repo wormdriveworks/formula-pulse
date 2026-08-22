@@ -61,17 +61,37 @@ var platform: PlatformServices
 var audio: AudioDispatcher
 
 
-func setup(game_data: GameData, services: PlatformServices = null) -> void:
+# `audio_host` = 재생기가 `AudioStreamPlayer` 를 매달 트리 노드. **없으면 무음 폴백이다** —
+# 플래그가 아니라 구조다: 실물 재생기는 SceneTree 를 요구하므로 트리가 없는 문맥
+# (로직 테스트·러너)에서는 무음이 유일하게 가능한 거동이다.
+func setup(game_data: GameData, services: PlatformServices = null, audio_host: Node = null) -> void:
 	data = game_data
 	platform = services
 	SaveManager.configure(data)
 	options = OptionsStore.new()
 	options.setup(data)  # 기기별 구성 — 프로필·커리어와 무관하게 세션 개시 시 적재
-	# 재생기 주입 = 합성 지점. 실물 유입 시 여기 한 줄만 바뀐다(디스패처·호출부 무접촉).
+	# 재생기 주입 = 합성 지점. 디스패처·호출부는 어느 구현이 들어왔는지 모른다.
 	audio = AudioDispatcher.new()
-	var sink := SilentAudioOutput.new()
-	audio.setup(data, sink)
-	sink.bind_dispatcher(audio)
+	if audio_host != null:
+		var player := GameAudioOutput.new()
+		player.setup(data, audio_host)
+		audio.setup(data, player)
+		player.bind_dispatcher(audio)
+	else:
+		var sink := SilentAudioOutput.new()
+		audio.setup(data, sink)
+		sink.bind_dispatcher(audio)
+	apply_volume_options()
+
+
+# 볼륨 옵션 → 버스. **소비 시점에 스스로 읽지 못하는 층**이라 옵션이 바뀌는 지점마다 밀어야
+# 한다 — `UiPalette.apply_options()` 와 같은 성격이며, 빠뜨리면 슬라이더는 움직이는데 소리가
+# 그대로다(O13~O15 가 저장만 되고 소비부가 0 이던 상태가 정확히 그것이었다).
+func apply_volume_options() -> void:
+	if audio == null or options == null:
+		return
+	audio.apply_volume_options(
+		options.index_of("o13"), options.index_of("o14"), options.index_of("o15"))
 
 
 # 새 커리어 — 마스터 시드를 뽑아 시즌·아웃게임 층을 연다 (D12 §6.1)

@@ -43,3 +43,21 @@ func play_jingle(_jingle_id: String) -> void:
 # 덕킹 (D11 §6.3 — L2·L3 스팅·징글 재생 중 BGM 감쇠, 값 D13 별첨A §8.3).
 func duck_bgm(_db: float, _return_sec: float) -> void:
 	pass
+
+
+# 일시정지 — **BGM 유지 · SFX 뮤트** (D11 §4.3 확정 · 레트로 관례).
+# 정책이 아니라 버스 조작이므로 표현 층 소관이다: 발화 자체를 막는 것이 아니라 들리지 않게 한다.
+func set_paused(_on: bool) -> void:
+	pass
+
+
+# 볼륨 옵션 O13~O15 → 버스 감쇠 (D12 §10.1 — 0 = 뮤트 · 100 = 0dB · 지각 선형 로그 커브).
+# 값은 0~100 정수(`options_store` 저장 형식) 그대로 받는다 — 변환은 표현 층 소관이다.
+func apply_volumes(_master: int, _bgm: int, _sfx: int) -> void:
+	pass
+
+
+# 페이드 진행 — 시간 축을 가진 것(트랙 크로스페이드·레이어 전환·덕킹 복귀)의 유일한 진행 지점.
+# 계약에 두는 이유: 이것을 두지 않으면 구현이 엔진 `Tween` 에 숨고 검사가 벽시계에 묶인다.
+func advance_fades(_delta: float) -> void:
+	pass

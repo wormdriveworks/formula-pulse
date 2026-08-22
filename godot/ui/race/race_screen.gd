@@ -200,7 +200,9 @@ func _boot() -> void:
 	_e10_log.configure(int(data.param("param_log_slot_cap")), int(data.param("param_font_size_body")))
 	_duel_overlay.boost_pressed_signal().connect(_on_boost)
 	_pause_overlay.setup(session)
-	_pause_overlay.resumed.connect(func(): _paused = false)
+	_pause_overlay.resumed.connect(func():
+		_paused = false
+		session.audio.set_paused(false))
 	_pause_overlay.quit_to_title.connect(func(): go("SYS-01", {}))
 	(%E14Menu as Button).pressed.connect(_open_pause)
 	_collect_consumable_slots()
@@ -242,6 +244,10 @@ func _open_pause() -> void:
 	if _paused:
 		return
 	_paused = true
+	# 일시정지 = BGM 유지·SFX 뮤트 (D11 §4.3 확정 — 레트로 관례).
+	# **발화를 막는 것이 아니라 들리지 않게 한다** — 정지 중에도 상태 전이는 사운드를 던지고,
+	# 그것을 코어에서 걸면 재개 시점에 무엇이 울렸어야 하는지가 사라진다.
+	session.audio.set_paused(true)
 	# 개입 창 중이면 가림막 — 정지 중 보드 숙고 차단 (D09 §3.7 · F2 보호)
 	_pause_overlay.open(_timer_active)
 

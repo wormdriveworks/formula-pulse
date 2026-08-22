@@ -158,13 +158,32 @@ func _fill_archive() -> void:
 
 # [가안] VN 인스턴스 id → 표제: 실문안 대장(D04 트랙) 유입 전까지 슬롯 유형으로 표기
 #
-# 막 VN 6건은 T7 로 실문안이 내려왔는데 **표제 키는 납품에 없다** — 그래서 여기서도 슬롯 유형
-# ('투어 브리핑')으로 접힌다. 아카이브 6행이 같은 표제로 서는 것은 알고 있는 결함이고,
-# 6개 표제 문안은 내러티브 몫이다(구현이 만들 자리가 아니다 — 불변규칙 2). 다만 **원문 id 가
-# 화면에 그려지는 것은 막는다**: 그건 표제 부재가 아니라 표제 오류다.
+# 막 VN 표제는 T7 3차로 유입됐다(IMPL-278 — 16차 [인계] 회수분).
+#
+# **규칙(`"ui.vnSlot." + id.trim_prefix("vn_")`) 대신 리터럴 표를 쓴 것은 검사 때문이다.**
+# V6 는 코드 리터럴·표의 `string_key` 열·구조 값에서 참조를 모으므로 **조립한 키는 보이지
+# 않는다** — 실측: 규칙판으로 붙였을 때 6키가 여전히 고아 경고로 남았다. 소비부가 있는데
+# 없다고 보고하는 상태를 남기면 그 경고는 다음 사람에게 잡음이 된다.
+#
+# 표가 낡는 위험(7번째 막이 조용히 폴백으로 떨어짐)은 **검사가 받는다** — UISCR 축이
+# `act_vn` 전 항목이 이 표에 있는지 본다. 표와 규칙 중 하나를 고르는 대신, 표를 쓰고
+# 누락을 기계가 잡게 했다.
+const ACT_VN_TITLES := {
+	"vn_act1": "ui.vnSlot.act1",
+	"vn_act2": "ui.vnSlot.act2",
+	"vn_act3": "ui.vnSlot.act3",
+	"vn_act4": "ui.vnSlot.act4",
+	"vn_origin": "ui.vnSlot.origin",
+	"vn_epilogue": "ui.vnSlot.epilogue",
+}
+
+
 func _vn_title(vn_id: String) -> String:
 	var s := session.data.strings
+	if ACT_VN_TITLES.has(vn_id):
+		return s.text(String(ACT_VN_TITLES[vn_id]))
 	if not session.data.act_vn_entry(vn_id).is_empty():
+		# 표에 없는 막 — 원문 id 를 그리지는 않는다(표제 부재보다 표제 오류가 나쁘다).
 		return s.text("ui.vnSlot.tourBrief")
 	if vn_id.begins_with("vn_season_open"):
 		return s.text("ui.vnSlot.seasonOpen")
