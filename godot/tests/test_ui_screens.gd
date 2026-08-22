@@ -100,8 +100,8 @@ func _process(_delta: float) -> bool:
 	_tutorial_callout_placement()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 252:
-		print("UI_SCREENS_FAIL checks=%d < 하한 252 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 257:
+		print("UI_SCREENS_FAIL checks=%d < 하한 257 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1144,6 +1144,7 @@ func _anchor_preset_placement(data: GameData) -> void:
 const VALIDATOR_SOURCE := "res://../tools/validators/run_validators.gd"
 const VALIDATOR_CONFIG := "res://../tools/validators/config.json"
 const CHOICE_DOMAIN := "vnChoice."
+const SLOT_DOMAIN := "ui.vnSlot."
 # 면제 목록은 **조용히 넓어지는 상수**다 — 넓히려면 이 단언을 함께 고쳐야 한다
 # (검사 수 하한과 같은 축: 의도적 완화만 통과시킨다).
 const ANCH_EXEMPT_EXPECTED := 'const ANCH_EXEMPT_PRESETS := ["PRESET_FULL_RECT"]'
@@ -1198,6 +1199,21 @@ func _anch_check_present() -> void:
 	_ok("vnChoice. = 전각 14", int(choice_rule.get("max_chars_full", -1)) == 14, str(choice_rule))
 	_ok("vnChoice. V7 도메인 편입",
 		Array(Dictionary(config).get("v7_domains", [])).has(CHOICE_DOMAIN))
+	# ── 아카이브 표제 자수 규칙 (총괄 판정 IMPL-284 ①) ──
+	# `vnChoice.` 와 같은 성격 — 행이 지워지면 검사는 죽지 않고 **그 도메인만 규율 밖으로** 나간다.
+	# 값 13 의 출처는 D13 대장이 아니라 라벨 폭 140px 실기 역산이라(라벨 폭 = 씬 소관)
+	# 규칙 행의 `source` 필드가 그 사실을 이고 있다 — 그것까지 실재를 건다.
+	var slot_rule: Dictionary = {}
+	for rule in Array(Dictionary(config).get("string_write_rules", [])):
+		if Array(Dictionary(rule).get("domain_prefixes", [])).has(SLOT_DOMAIN):
+			slot_rule = rule
+	_ok("ui.vnSlot. 자수 규칙 행 실재", not slot_rule.is_empty())
+	_ok("ui.vnSlot. = 1줄", int(slot_rule.get("max_lines", -1)) == 1, str(slot_rule))
+	_ok("ui.vnSlot. = 전각 13", int(slot_rule.get("max_chars_full", -1)) == 13, str(slot_rule))
+	_ok("ui.vnSlot. 값 출처 명기(대장 밖)",
+		String(slot_rule.get("source", "")).contains("140px"), String(slot_rule.get("source", "")))
+	_ok("ui.vnSlot. V7 도메인 편입",
+		Array(Dictionary(config).get("v7_domains", [])).has(SLOT_DOMAIN))
 	# ── `act_vn.json` 배열 스펙 (총괄 판정 IMPL-257 ① 부속) ──
 	# 스펙을 지우면 V1 은 **그대로 통과한다** — 검사가 죽는 게 아니라 볼 것이 없어질 뿐이다
 	# (돌연변이 M18 미검출로 실측). 같은 값 도메인이 표에서는 차단되고 구조에서는 새던

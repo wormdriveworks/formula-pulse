@@ -88,6 +88,7 @@ func _initialize() -> void:
 	_reverse(called)
 	_derivations()
 	_no_voice_jam()
+	_haptic_ledger()
 	Engine.time_scale = TIME_SCALE
 	var menu_packed := load(MENU_SCENE_PATH) as PackedScene
 	var packed := load(SCENE_PATH) as PackedScene
@@ -100,6 +101,69 @@ func _initialize() -> void:
 	root.add_child(_menu_screen)
 	_screen = packed.instantiate()
 	_phase = "menu"
+
+
+# ── ⑤ 햅틱 값 창구 대장 (총괄 발주 IMPL-285 §2 — 결선 중단 사유의 기계화) ──
+#
+# `sound_map.haptic` 은 5등급을 적어 두고 **아무도 읽지 않는다**(`vibrate()` 호출 0건 실측).
+# 결선이 막힌 이유는 코드가 아니라 값이다: D11 §3.1 이 등급을 **정성으로만** 확정하고
+# (미세/약/중/강) D13 별첨A §8.3 에 실린 햅틱 값은 3항(감쇠 50% · L1 0.1초 · L2 0.25초)뿐이다.
+# 강도(0~1 진폭) 4항과 micro·mid 지속 2항이 **대장에 없다** — 불변규칙 2 에 따라 발명하지 않는다.
+#
+# **그 공백을 대장으로 못박는다.** 이 축은 두 방향을 다 잡는다:
+#   · 표에 새 등급이 생기면 → 창구도 미충전 대장도 없으므로 실패
+#   · D13 이 값을 채우면 → 미충전 대장이 낡아 실패(대장을 줄이라고 요구한다)
+# "값이 없어서 못 했다"가 회신문 문장으로만 남으면 다음 회차에 잊힌다.
+const HAPTIC_GRADES := ["none", "micro", "weak", "mid", "strong"]
+# 등급별 (강도 창구, 지속 창구). "" = **대장 미충전**(D13 부재 — 충전 시 이 표가 먼저 바뀐다).
+const HAPTIC_PARAMS := {
+	"none": {"strength": "-", "duration": "-"},      # 정의상 무진동 — 값이 필요 없다
+	"micro": {"strength": "", "duration": ""},
+	"weak": {"strength": "", "duration": "param_haptic_l1_sec"},
+	"mid": {"strength": "", "duration": ""},
+	"strong": {"strength": "", "duration": "param_haptic_l2_sec"},
+}
+
+
+func _haptic_ledger() -> void:
+	var used: Dictionary = {}
+	for event_id in _data.sound_map:
+		for row in Array(_data.sound_map[event_id]):
+			used[String(Dictionary(row).get("haptic", "none"))] = true
+	# 표가 쓰는 등급이 전부 대장에 있는가 — 6번째 등급이 조용히 생기는 경로를 막는다.
+	for grade in used:
+		_ok("햅틱 등급 '%s' 대장 등재" % grade, HAPTIC_PARAMS.has(String(grade)), str(used.keys()))
+	_ok("대장 등급 = enum 5단", HAPTIC_GRADES.size() == HAPTIC_PARAMS.size())
+	# 창구가 선언된 항은 **실제로 실재해야** 한다(선언만 남고 키가 사라지는 경로 차단).
+	var declared := 0
+	var unfilled := 0
+	for grade in HAPTIC_PARAMS:
+		for axis in ["strength", "duration"]:
+			var key := String(Dictionary(HAPTIC_PARAMS[grade])[axis])
+			if key == "" :
+				unfilled += 1
+				continue
+			if key == "-":
+				continue
+			declared += 1
+			_ok("창구 '%s' 실재 (%s.%s)" % [key, grade, axis], _data.params.has(key), key)
+	# **미충전 수가 계약이다.** 줄면 D13 이 충전된 것이므로 대장을 갱신해야 하고,
+	# 늘면 창구가 사라진 것이므로 둘 다 여기서 걸린다.
+	_ok("미충전 항 = 6 (강도 4 + micro·mid 지속 2)", unfilled == 6, str(unfilled))
+	_ok("충전 항 = 2 (L1·L2 지속)", declared == 2, str(declared))
+	# 감쇠 배율은 실재한다 — O3 소비부가 서는 날 곱해질 값이다(D12 §10.4 곱 순서).
+	_ok("감쇠 배율 창구 실재", _data.params.has("param_haptic_damp_ratio"))
+	# **봉인 이해관계 실측** — 진동도 출력 경로이므로(불변규칙 5) 봉인 행에 실린 등급이
+	# 실재하는지가 결선 지점 선택의 근거가 된다. 0건이면 봉인 논의가 공회전이다.
+	var sealed_haptic := 0
+	for event_id in _data.sound_map:
+		for row in Array(_data.sound_map[event_id]):
+			var entry: Dictionary = row
+			if CsvTable.to_int(String(entry.get("seal_gated", "0"))) == 1 \
+				and String(entry.get("haptic", "none")) != "none":
+				sealed_haptic += 1
+	_ok("봉인 행 × 비-none 햅틱 = 4건(결선 지점이 봉인 뒤여야 하는 근거)",
+		sealed_haptic == 4, str(sealed_haptic))
 
 
 # ── ① 표 전수 대비 호출 지점 ──

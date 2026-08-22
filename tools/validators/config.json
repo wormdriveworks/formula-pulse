@@ -640,6 +640,14 @@
  "string_write_rules": [
   {
    "domain_prefixes": [
+    "ui.vnSlot."
+   ],
+   "max_lines": 1,
+   "max_chars_full": 13,
+   "source": "기록실 아카이브 표제 라벨 폭 140px 역산 (records_screen.gd — Galmuri9 @ 9px). D13 확정 기준값 대장 밖이다: 라벨 폭은 씬 소관이고 대장은 게임 수치의 창구다. 값이 바뀌는 트리거 = 라벨 폭 변경."
+  },
+  {
+   "domain_prefixes": [
     "raceLog.",
     "relay.",
     "vane."
@@ -663,6 +671,7 @@
   }
  ],
  "v7_domains": [
+  "ui.vnSlot.",
   "raceLog.",
   "relay.",
   "vane.",
