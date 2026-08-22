@@ -93,8 +93,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if key == null or not key.pressed or key.echo:
 		return
 	if key.keycode == KEY_SPACE or key.keycode == KEY_ENTER:
-		_advance()
+		# **소비 표시를 진행보다 먼저 한다.** `_advance()` 는 마지막 라인에서 화면을 이탈시키고
+		# (`_finish()` → `go()` → 라우터가 이 노드를 내린다), 그러면 이 노드는 트리 밖이라
+		# `get_viewport()` 가 **null** 이다 — 실기에서 그대로 터졌다(주력 11차 실측:
+		# 진행 입력을 빠르게 연속 넣어 마지막 라인을 넘긴 프레임 · `Cannot call method
+		# 'set_input_as_handled' on a null value`). 순서만 바꾸면 사라진다: 이 핸들러가
+		# 불린 시점의 노드는 트리 안이므로 뷰포트가 반드시 있다.
 		get_viewport().set_input_as_handled()
+		_advance()
 
 
 # 브리핑 슬롯의 VN 이 **재회 체인 비트인가** — 승인 문면은 "알타 리지 투어 내 **체인 비트** 발생"이고

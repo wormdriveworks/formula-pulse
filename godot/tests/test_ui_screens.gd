@@ -44,6 +44,7 @@ const PAD_LB_INDEX := 9
 const PAD_DPAD_LEFT_INDEX := 13
 const PAD_DPAD_RIGHT_INDEX := 14
 const LOG_FEED_SCRIPT := "res://ui/race/log_feed.gd"
+const VN_SCREEN_SCRIPT := "res://ui/nar/vn_screen.gd"
 
 var _checked := 0
 var _failures := 0
@@ -57,6 +58,7 @@ const LAYOUT_SETTLE_FRAMES := 4
 var _frame := 0
 var _settle_probe: Control
 var _settle_race: Control
+var _settle_choice: Control
 
 
 func _process(_delta: float) -> bool:
@@ -72,6 +74,13 @@ func _process(_delta: float) -> bool:
 			# 튜토리얼 콜아웃 축(⑯)도 정렬이 끝난 부모를 요구한다 — 예약 영역(Zone A)의
 			# 실 rect 를 읽어 배치하므로, 스트립이 0 크기면 "불침범"이 0==0 으로 성립한다.
 			_settle_race = _mount(RACE_SCENE, _fresh_session(data))
+			# 선택 오버레이 배치 축(⑰-ⓓ)도 정렬이 끝난 뒤에 재야 한다 — 오버레이는
+			# **내용이 크기를 정하는 PanelContainer** 라 지점을 연 그 프레임에는 크기가 0이고,
+			# 0 크기에서는 "스킵을 안 가린다"가 0==0 으로 성립한다.
+			_settle_choice = _mount_vn(data, CHOICE_LINES, true)
+			if _settle_choice != null:
+				_settle_choice._advance()
+				_settle_choice._advance()
 		return false
 	_achievement_without_career(data)
 	_achievement_with_career(data)
@@ -96,12 +105,14 @@ func _process(_delta: float) -> bool:
 	_anch_check_present()
 	_vn_line_speakers(data)
 	_vn_choice_point(data)
+	_vn_choice_geometry(data)
+	_vn_last_line_input(data)
 	_act_vn_consumption(data)
 	_tutorial_callout_placement()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 257:
-		print("UI_SCREENS_FAIL checks=%d < 하한 257 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 274:
+		print("UI_SCREENS_FAIL checks=%d < 하한 274 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -908,6 +919,29 @@ func _save_indicator_wiring(data: GameData) -> void:
 	# 회전이 중심을 돌아야 한다 — 피벗이 0 이면 아이콘이 좌상단 축으로 휘돈다.
 	_ok("회전 피벗 = 도상 중심",
 		indicator.pivot_offset.is_equal_approx(r.size * 0.5), str(indicator.pivot_offset))
+	# **도는 도상은 회전 대칭이어야 한다** (주력 11차 IMPL-291). 상수 선언이 아니라
+	# **실제로 물린 텍스처의 파일명**을 본다 — 선언은 결선의 증거가 아니다.
+	# 방향성 글리프로 되돌리면 180° 마다 의미가 '불러오기'로 반전한다(10차 §5 판독).
+	_ok("회전 도상 = 회전 대칭 변형",
+		indicator.texture != null
+			and indicator.texture.resource_path.get_file() == "sys_save_spin.png",
+		"" if indicator.texture == null else indicator.texture.resource_path.get_file())
+	# 대칭은 파일명이 아니라 픽셀의 성질이다 — 알파 형상을 90°·180° 회전과 대조한다.
+	if indicator.texture != null:
+		var img := indicator.texture.get_image()
+		var w := img.get_width()
+		var h := img.get_height()
+		var sym90 := w == h
+		var sym180 := true
+		for y in range(h):
+			for x in range(w):
+				var on: bool = img.get_pixel(x, y).a >= 0.5
+				if sym90 and on != (img.get_pixel(y, h - 1 - x).a >= 0.5):
+					sym90 = false
+				if on != (img.get_pixel(w - 1 - x, h - 1 - y).a >= 0.5):
+					sym180 = false
+		_ok("회전 도상 — 90° 대칭", sym90)
+		_ok("회전 도상 — 180° 대칭", sym180)
 
 	# ⓐ 값 창구. **표 행 실재를 먼저 본다** — 행이 없으면 `GameData.param()` 은 양쪽에서
 	# 똑같이 0.0 을 돌려주므로, 비교만으로는 `0.0 == 0.0` 이 되어 조용히 통과한다
@@ -1355,8 +1389,12 @@ func _act_vn_consumption(data: GameData) -> void:
 	_ok("마지막 라인 = beat12",
 		(screen.get_node("%BodyLabel") as Label).text == data.strings.text("vn.act1.beat12"))
 	# 선택 4지점은 페이로드가 vn_id·라인 열을 넘기는 순간 자동 도달한다 — 그 자동성을 본다.
+	# **관측 지점이 바뀌었다**: 씬 실물이 서기 전에는 '생략 기록'이 도달의 증거였고, 선 뒤에는
+	# **오버레이가 실제로 떴는가**가 증거다(생략은 이제 0이어야 한다 — 주력 11차 IMPL-290).
 	screen._advance()
-	_ok("선택 지점 자동 도달", Array(screen.choice_omissions) == ["vnchoice_act1_number"],
+	var auto_overlay := screen.find_child(VN_CHOICE_OVERLAY, true, false) as Control
+	_ok("선택 지점 자동 도달", auto_overlay != null and auto_overlay.visible)
+	_ok("자동 도달 = 생략 0", Array(screen.choice_omissions).is_empty(),
 		str(screen.choice_omissions))
 	_ok("아카이브 등재", session.narrative.vn_seen.has("vn_act1"))
 	# **표제 표가 낡으면 기계가 잡는다.** 리터럴 표를 쓴 것은 V6 가 조립 키를 보지 못해서이고,
@@ -1469,18 +1507,27 @@ func _mount_payload(data: GameData, session: RunSession, payload: Dictionary) ->
 # 경로만 보면, 주력이 노드를 세운 날 결선이 끊긴 것을 아무도 모른다.
 const CHOICE_VN_ID := "vn_act3"
 const CHOICE_ID := "vnchoice_act3_corner"
+# 씬 계약의 이름 — 화면 코드와 같은 문자열을 두 곳에 적지 않는다.
+const VN_CHOICE_OVERLAY := "ChoiceOverlay"
+const VN_CHOICE_LIST := "ChoiceList"
+# 앵커 라인(`beat11`) 앞뒤 3라인 — 지점 축과 배치 축이 같은 열을 쓴다.
+const CHOICE_LINES: Array = [
+	{"speaker_key": "ui.vn.speakerMarta", "text_key": "vn.act3.beat10"},
+	{"speaker_key": "ui.vn.speakerMarta", "text_key": "vn.act3.beat11"},
+	{"speaker_key": "ui.vn.speakerVane", "text_key": "vn.act3.beat12"},
+]
 
 
 func _vn_choice_point(data: GameData) -> void:
-	var lines: Array = [
-		{"speaker_key": "ui.vn.speakerMarta", "text_key": "vn.act3.beat10"},
-		{"speaker_key": "ui.vn.speakerMarta", "text_key": "vn.act3.beat11"},
-		{"speaker_key": "ui.vn.speakerVane", "text_key": "vn.act3.beat12"},
-	]
-	# ── ⓐ 노드 부재 = 지점 생략 · 진행 계속 (현행 씬 실물) ──
+	var lines: Array = CHOICE_LINES
+	# ── ⓐ 노드 부재 = 지점 생략 · 진행 계속 (실물을 떼어 만든 상태) ──
+	# 씬에 실물이 선 뒤에도 이 축은 살아 있어야 한다 — 노드를 지우거나 이름을 바꾼 회차에
+	# 화면이 그 자리에서 멈추지 않는다는 계약은 그대로다.
 	var absent := _mount_vn(data, lines, false)
 	if absent == null:
 		return
+	_ok("전제: 부재 축이 실제로 부재다",
+		absent.find_child(VN_CHOICE_OVERLAY, true, false) == null)
 	absent._advance()
 	absent._advance()
 	_ok("노드 부재 = 지점 생략 관측", Array(absent.choice_omissions) == [CHOICE_ID],
@@ -1494,8 +1541,13 @@ func _vn_choice_point(data: GameData) -> void:
 	var screen := _mount_vn(data, lines, true)
 	if screen == null:
 		return
-	var overlay := screen.find_child("ChoiceOverlay", true, false) as Control
-	var list := screen.find_child("ChoiceList", true, false) as Container
+	var overlay := screen.find_child(VN_CHOICE_OVERLAY, true, false) as Control
+	var list := screen.find_child(VN_CHOICE_LIST, true, false) as Container
+	# **씬 실물 실재를 먼저 세운다** — 없으면 아래 단언이 null 접근으로 죽어 진단이 사라진다.
+	_ok("전제: 씬에 실물 오버레이 2노드 실재", overlay != null and list != null)
+	if overlay == null or list == null:
+		_release_vn(screen)
+		return
 	_ok("지점 전에는 오버레이 비표시", not overlay.visible)
 	screen._advance()
 	screen._advance()
@@ -1567,15 +1619,17 @@ func _mount_vn(data: GameData, lines: Array, with_overlay: bool) -> Control:
 	var screen := packed.instantiate() as Control
 	var session := _fresh_session(data)
 	screen.session = session
+	# **실물 노드가 씬에 섰다**(주력 11차 IMPL-290) — 그래서 축의 방향이 뒤집혔다.
+	# 종전은 부재가 실물이고 실재가 스텁이었다. 지금 스텁을 계속 주입하면 `find_child` 가
+	# 트리 순서상 **씬 실물을 먼저 집어** 검사가 스텁을 안 보고, 반대로 부재 축은 실물 때문에
+	# 성립하지 않는다(실측: 노드를 세운 직후 ⓐ 3검사 FAIL — 전환을 감지했다).
+	# 그래서 **부재는 실물을 떼어 만든다.** 두 축 모두 실물 계약을 본다.
+	if not with_overlay:
+		var real := screen.find_child(VN_CHOICE_OVERLAY, true, false)
+		if real != null:
+			real.get_parent().remove_child(real)
+			real.free()
 	root.add_child(screen)
-	if with_overlay:
-		var overlay := Control.new()
-		overlay.name = "ChoiceOverlay"
-		overlay.visible = false
-		var list := VBoxContainer.new()
-		list.name = "ChoiceList"
-		overlay.add_child(list)
-		screen.add_child(overlay)
 	# 재열람 경로로 세운다 — 슬롯 발생 판정을 거치지 않으므로 지점 축만 남는다.
 	# (§3.2 — 재열람에서도 지점은 다시 선다: 다른 선택의 반응이 회수 경로다.)
 	screen.bind(session, {
@@ -1642,3 +1696,103 @@ func _tutorial_callout_placement() -> void:
 		overlay.notify_action(String(step["advance_on"]))
 	_unmount(screen)
 	_settle_race = null
+
+
+# ── ⑰-ⓓ 선택 오버레이 배치 (씬 계약 · 발주 배치 구속 — IMPL-290) ──
+#
+# **살아 있는 것과 누를 수 있는 것은 다르다.** 지점 위 스킵 생존은 `visible`·`disabled` 로
+# 이미 보고 있지만, 오버레이가 스킵 위에 겹치면 시각·입력 양쪽이 막히면서도 그 두 속성은
+# 그대로다. 그래서 **실 rect 교집합**으로 본다(주력 10차 콜아웃 축과 같은 형태).
+#
+# 정렬이 끝난 프레임에서 잰다 — 오버레이는 내용이 크기를 정하는 PanelContainer 라
+# 지점을 연 프레임에는 0 크기이고, 그때 재면 "안 가린다"가 0==0 으로 성립한다.
+func _vn_choice_geometry(data: GameData) -> void:
+	var screen := _settle_choice
+	if screen == null:
+		_ok("전제: 배치 측정용 VN 화면 실재", false)
+		return
+	var overlay := screen.find_child(VN_CHOICE_OVERLAY, true, false) as Control
+	var list := screen.find_child(VN_CHOICE_LIST, true, false) as Container
+	_ok("전제: 씬 실물 2노드", overlay != null and list != null)
+	if overlay == null or list == null:
+		_unmount(screen)
+		_settle_choice = null
+		return
+	_ok("전제: 지점이 열려 있다", overlay.visible)
+	_ok("전제: 오버레이가 실 크기를 가진다", overlay.size.x > 0.0 and overlay.size.y > 0.0,
+		str(overlay.size))
+	var orect := overlay.get_global_rect()
+	var skip_hit := orect.intersection(
+		(screen.get_node("%SkipButton") as Control).get_global_rect()).get_area()
+	_ok("오버레이 — 스킵 불가림", skip_hit <= 0.0, "겹침=%.1fpx²" % skip_hit)
+	var say_hit := orect.intersection(
+		(screen.get_node("DialoguePanel") as Control).get_global_rect()).get_area()
+	_ok("오버레이 — 대사창 불가림", say_hit <= 0.0, "겹침=%.1fpx²" % say_hit)
+	_ok("오버레이 — 화면 내",
+		orect.position.x >= -0.5 and orect.position.y >= -0.5
+			and orect.end.x <= CANVAS.x + 0.5 and orect.end.y <= CANVAS.y + 0.5, str(orect))
+	_ok_centered_h("오버레이", overlay)
+	# E05 = **1줄** 14전각. 자수는 데이터 층(V3·STRF)이 보고, 렌더가 1줄인지는 여기서만 보인다.
+	var body_font := float(data.param("param_font_size_body"))
+	var multiline := 0
+	for index in range(list.get_child_count()):
+		if (list.get_child(index) as Control).size.y > body_font * 2.5:
+			multiline += 1
+	_ok("선택지 버튼 = 1줄 높이", multiline == 0, "2줄 이상=%d" % multiline)
+	_unmount(screen)
+	_settle_choice = null
+
+
+# ── ⑱ VN 마지막 라인의 진행 키 (실기 발견 결함 — 주력 11차 IMPL-292) ──
+#
+# **화면을 이탈시키는 입력은 자기 뒤처리를 못 한다.** `_advance()` 가 마지막 라인에서
+# `go()` 를 부르면 라우터가 이 노드를 트리에서 내리고, 그 뒤에 `get_viewport()` 를 부르면
+# null 이다 — 실기에서 그대로 터졌다(`Cannot call method 'set_input_as_handled' on a null
+# value` · `vn_screen.gd` `_unhandled_key_input`). 헤드리스 단위 검사가 못 잡은 이유는
+# `_advance()` 를 **직접 부르기** 때문이다: 입력 경로를 타지 않으면 그 줄에 도달하지 않는다.
+#
+# 관측 지점 = **입력 소비 표시**. 순서가 틀리면 그 호출 자체가 죽으므로 플래그가 서지 않는다.
+# "라우팅됐는가"로는 못 본다 — 라우팅은 죽은 줄보다 **앞**에서 이미 일어난다.
+func _vn_last_line_input(data: GameData) -> void:
+	var session := _fresh_session(data)
+	var screen := _mount_payload(data, session, {
+		"vn_id": "", "slot_id": "",
+		"line_keys": [{"speaker_key": "ui.vn.speakerMarta", "text_key": "vn.act1.beat02"}],
+	})
+	if screen == null:
+		_ok("전제: VN 화면 실재", false)
+		return
+	# 라우터가 하는 일을 그대로 한다 — 이탈 신호에 화면을 내린다.
+	var routed: Array = []
+	screen.navigate.connect(func(target: String, _p: Dictionary):
+		routed.append(target)
+		if screen.get_parent() != null:
+			root.remove_child(screen))
+	# 진행 버튼이 키를 먼저 먹으면 `_unhandled_key_input` 에 도달하지 않는다 —
+	# 실기에서 터진 문맥은 포커스가 그 버튼에 없던 프레임이었다.
+	(screen.get_node("%AdvanceButton") as Button).release_focus()
+	root.push_input(_key_event(KEY_SPACE))
+	_ok("마지막 라인 = 화면 이탈", routed.size() == 1, str(routed))
+	# **거동으로는 관측점이 없다.** 엔진 오류는 GDScript 에서 잡히지 않고, 입력 소비 플래그는
+	# 리셋 창구가 없어 `is_input_handled()` 가 앞선 검사의 값을 물고 **항진명제**가 된다
+	# (실측: 결함을 되돌린 상태에서도 true). 라우팅 여부로도 못 본다 — 라우팅은 죽는 줄보다
+	# 앞에서 이미 끝난다. 그래서 **순서를 원문으로 단언한다**(ANCH·STRF 실재 축과 같은 형태).
+	# 주석은 걷어내고 본다 — 주석에 같은 낱말이 있으면 순서 비교가 무의미해진다.
+	var source := FileAccess.get_file_as_string(VN_SCREEN_SCRIPT)
+	var head := source.find("func _unhandled_key_input(")
+	_ok("전제: 입력 핸들러 실재", head >= 0)
+	if head >= 0:
+		var tail := source.find("\nfunc ", head + 1)
+		var block := source.substr(head, (tail if tail > head else source.length()) - head)
+		var code: Array[String] = []
+		for line in block.split("\n"):
+			if not String(line).strip_edges().begins_with("#"):
+				code.append(String(line))
+		var body := "\n".join(code)
+		var mark := body.find("set_input_as_handled()")
+		var adv := body.find("_advance()")
+		_ok("이탈 입력 = 소비 표시가 진행보다 먼저", mark >= 0 and adv >= 0 and mark < adv,
+			"mark=%d advance=%d" % [mark, adv])
+	if screen.get_parent() != null:
+		root.remove_child(screen)
+	screen.queue_free()
