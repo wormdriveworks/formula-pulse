@@ -189,6 +189,12 @@ ui.vnSlot.seasonOpen,시즌 개막
 ui.vnSlot.seasonClose,시즌 결산
 ui.vnSlot.tourBrief,투어 브리핑
 ui.vnSlot.tourMilestone,투어 종료 회상
+ui.vnSlot.act1,1막 그리드의 노이즈
+ui.vnSlot.act2,2막 북풍
+ui.vnSlot.act3,3막 브레이킹 포인트
+ui.vnSlot.act4,4막 휠투휠
+ui.vnSlot.origin,기원 공개
+ui.vnSlot.epilogue,에필로그
 ui.milestoneVn.actTransition,막 전이
 ui.milestoneVn.crewJoin,크루 합류
 ui.milestoneVn.originClue,기원 단서
