@@ -260,6 +260,44 @@ function applyPatch(name, w, h, buf, spec, geomLocked) {
     if (op.rect) { const [x, y, rw, rh] = op.rect; for (let dy = 0; dy < rh; dy++) for (let dx = 0; dx < rw; dx++) put(x + dx, y + dy, op.color); }
     else if (op.set) { for (const [x, y] of op.set) put(x, y, op.color); }
     else if (op.digits) applyDigits(name, w, h, put, op.digits);
+    else if (op.shift) {
+      // ── 구획 이동 (`shift`) — 표정 차분의 주력 도구 (2026-08-23 신설 · IMPL-362).
+      //
+      // **왜 그리지 않고 옮기는가.** 표정은 눈썹 높이·눈꺼풀 개폐·입선 곡률로 만들어지고
+      // 이 셀에서 각 특징은 20~40px 다. 그것을 **새로 그리면 필치가 갈린다** — RD 렌더는
+      // 세밀한 도트이고 거친 손 블록은 주변과 어긋난다(ax9 바퀴에서 실측한 벽).
+      // **원화가 이미 그린 눈썹을 2px 올리면** 필치가 구성으로 유지된다. 세컨드 리버리에서
+      // *"베이스 자기 텍스처를 복사하면 필치가 구성으로 맞는다"* 를 쓴 것과 같은 축이다.
+      //
+      // 비운 자리는 `fill` 로 메운다(보통 국부 피부톤). 알파를 건드리지 않으므로
+      // 파생의 기하 잠금과 양립한다 — 표정이 바뀌어도 실루엣은 원판과 같다.
+      const { from, by, fill } = op.shift;
+      if (!Array.isArray(from) || from.length !== 4) die(`patch ${name}: shift.from 은 [x,y,w,h] 다`);
+      if (!Array.isArray(by) || by.length !== 2) die(`patch ${name}: shift.by 은 [dx,dy] 다`);
+      if (!fill) die(`patch ${name}: shift 는 fill 선언을 요구한다 — 비운 자리를 무엇으로 메우는지가 결과를 정한다`);
+      const [fx, fy, fw, fh] = from, [dx, dy] = by;
+      if (dx === 0 && dy === 0) die(`patch ${name}: shift.by 가 [0,0] 이다 — 아무 일도 하지 않는 op 은 낡은 원장이다`);
+      // 원본을 먼저 뜬다 — 겹치는 이동에서 자기 자신을 읽어 번지는 것을 막는다.
+      const snap = [];
+      for (let y = 0; y < fh; y++) for (let x = 0; x < fw; x++) {
+        const sx = fx + x, sy = fy + y;
+        if (sx < 0 || sy < 0 || sx >= w || sy >= h) die(`patch ${name}: shift.from 이 캔버스 밖 (${sx},${sy})`);
+        const i = (sy * w + sx) * 4;
+        snap.push([sx, sy, buf[i], buf[i + 1], buf[i + 2], buf[i + 3]]);
+      }
+      let moved = 0, vac = 0;
+      // ① 비우기 — 원 구획을 fill 로. ② 놓기 — 이동한 자리에 원본 색.
+      for (const [sx, sy] of snap) { put(sx, sy, fill); vac++; }
+      for (const [sx, sy, r, g, b, a] of snap) {
+        const tx = sx + dx, ty = sy + dy;
+        if (tx < 0 || ty < 0 || tx >= w || ty >= h) die(`patch ${name}: shift 결과가 캔버스 밖 (${tx},${ty})`);
+        const j = (ty * w + tx) * 4;
+        if (geomLocked && buf[j + 3] === 0) die(`derive ${name}: shift 가 실루엣 밖으로 나간다 (${tx},${ty}) — 파생은 기하를 바꿀 수 없다`);
+        if (a === 0) continue;                       // 원본이 투명이면 옮길 것이 없다
+        buf[j] = r; buf[j + 1] = g; buf[j + 2] = b; buf[j + 3] = 255; touched++; moved++;
+      }
+      if (moved === 0) die(`patch ${name}: shift 가 아무 픽셀도 옮기지 않았다 — from 구획이 전부 투명이다`);
+    }
     else if (op.remap) {
       // ── 색 계층 치환 (`remap`) — 표면 변조의 주력 도구 (사양서 v1.8 §4.2 파생).
       //
@@ -290,7 +328,7 @@ function applyPatch(name, w, h, buf, spec, geomLocked) {
       // 좌표가 틀렸다. 조용히 지나가면 변조가 없는데 있다고 믿게 된다.
       if (hit === 0) die(`patch ${name}: remap 이 한 픽셀도 맞추지 못했다 — 원판의 색이 바뀌었거나 in 구획이 틀렸다`);
     }
-    else die(`patch ${name}: op 에 rect·set·digits·remap 이 없다`);
+    else die(`patch ${name}: op 에 rect·set·digits·remap·shift 가 없다`);
   }
   return touched;
 }
@@ -308,7 +346,15 @@ const patchKeys = Object.keys(PATCH.patches || {}).filter((k) => k.startsWith(DS
 // 재확인하는 이중 안전장치로 남긴다(총괄 승인 게이트).
 const DERIVE = Object.entries(PATCH.derive || {})
   .filter(([k]) => k.startsWith(DST_TAG + '/'))
-  .map(([k, v]) => ({ out: k.slice(DST_TAG.length + 1), src: v.from, spec: v }));
+  .map(([k, v]) => ({ out: k.slice(DST_TAG.length + 1), src: v.from, crop: v.crop, spec: v }));
+// `crop` — 원판의 한 구획만 산출물로 뜬다. 표정 차분(112×112 얼굴 레이어)이 기본 시트
+// (180×240)의 자기 얼굴 구획에서 나오게 하는 장치다. **같은 픽셀에서 출발하므로
+// 눈·코·입이 움직일 방법이 없다** — 레이어 정합이 계산이 아니라 출처의 성질이 된다.
+for (const d of DERIVE) {
+  if (d.crop === undefined) continue;
+  if (!Array.isArray(d.crop) || d.crop.length !== 4) die(`derive ${d.out}: crop 은 [x,y,w,h] 다`);
+  if (d.crop.some((n) => !Number.isInteger(n) || n < 0)) die(`derive ${d.out}: crop 값은 음이 아닌 정수다`);
+}
 const DERIVE_SRC = new Set(DERIVE.map((d) => d.src));
 for (const d of DERIVE) if (!d.src) die(`derive ${d.out}: from 선언이 없다`);
 
@@ -326,13 +372,20 @@ const cache = new Map();
 // 작업 목록 — 직접 산출(1:1) + 파생 산출(1 원판 → N).
 const jobs = [
   ...direct.map((f) => ({ out: f, src: f, spec: (PATCH.patches || {})[`${DST_TAG}/${f}`], derived: false })),
-  ...DERIVE.map((d) => ({ out: d.out, src: d.src, spec: d.spec, derived: true })),
+  ...DERIVE.map((d) => ({ out: d.out, src: d.src, crop: d.crop, spec: d.spec, derived: true })),
 ];
 const alphaOf = new Map();                       // 파생 출력의 알파 지문 — IoU 재확인용
 
 for (const job of jobs) {
   const f = job.out;
-  const img = decode(path.join(SRC, job.src));
+  let img = decode(path.join(SRC, job.src));
+  if (job.crop) {
+    const [cx, cy, cw, chh] = job.crop;
+    if (cx + cw > img.w || cy + chh > img.h) die(`derive ${f}: crop [${job.crop}] 이 원판 ${img.w}×${img.h} 밖으로 나간다`);
+    const sub = Buffer.alloc(cw * chh * 4);
+    for (let y = 0; y < chh; y++) img.rgba.copy(sub, y * cw * 4, ((cy + y) * img.w + cx) * 4, ((cy + y) * img.w + cx + cw) * 4);
+    img = { w: cw, h: chh, rgba: sub };
+  }
   const out = Buffer.alloc(img.w * img.h * 4);
   const before = new Set(), after = new Set();
   for (let i = 0; i < img.w * img.h; i++) {
@@ -351,8 +404,11 @@ for (const job of jobs) {
   if (job.derived) {
     let sig = '';
     for (let i = 0; i < img.w * img.h; i++) sig += out[i * 4 + 3] ? '1' : '0';
-    if (!alphaOf.has(job.src)) alphaOf.set(job.src, new Map());
-    alphaOf.get(job.src).set(f, sig);
+    // 묶음 키 = **원판 + 크롭**. 크롭이 다르면 알파 지문이 달라도 정상이므로
+    // 원판만으로 묶으면 정상 상태를 불일치로 오판한다.
+    const gkey = job.src + (job.crop ? `#${job.crop.join(',')}` : '');
+    if (!alphaOf.has(gkey)) alphaOf.set(gkey, new Map());
+    alphaOf.get(gkey).set(f, sig);
   }
   const dstFile = path.join(DST, f);
   const tag = `${img.w}×${img.h} · 고유색 ${before.size} → ${after.size}`
