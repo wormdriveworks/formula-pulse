@@ -354,6 +354,42 @@ stretch_mode = 3
 layout_mode = 2
 theme_override_font_sizes/font_size = 9
 
+[node name="E05Snapshot" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=1748110301]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+
+[node name="SnapshotRow" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Snapshot" unique_id=1748110302]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="Sym0" type="TextureRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Snapshot/SnapshotRow" unique_id=1748110303]
+texture_filter = 1
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+mouse_filter = 2
+stretch_mode = 3
+
+[node name="Sym1" type="TextureRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Snapshot/SnapshotRow" unique_id=1748110304]
+texture_filter = 1
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+mouse_filter = 2
+stretch_mode = 3
+
+[node name="Sym2" type="TextureRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Snapshot/SnapshotRow" unique_id=1748110305]
+texture_filter = 1
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+mouse_filter = 2
+stretch_mode = 3
+
 [node name="ReelSpacer" type="Control" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=915073966]
 layout_mode = 2
 size_flags_vertical = 3

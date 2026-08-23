@@ -25,6 +25,8 @@ const JUDE_ID := "ai_jude"
 # 튜토리얼이 잠긴다. 검사가 두 쪽을 대조하므로 한쪽만 고치면 통과하지 못한다.
 const TUTORIAL_ACTIONS := ["spin", "hold", "respin", "charge", "confirm"]
 const HOLD_KEYS := [KEY_1, KEY_2, KEY_3]
+# 스킬 슬롯 1~5 = F1~F5 (D09 §1.3 확정 기준값)
+const SKILL_KEYS := [KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5]
 
 # ── 레이스 컨텍스트 층 패드 (D09 v1.3 §1.3 두 번째 표 · 총괄 판정 IMPL-200 ③) ──
 # 버튼 인덱스는 엔진 실측 확정(IMPL-186): A=0 · X=2 · Y=3 · LB=9 · RB=10 · D패드 좌13/우14.
@@ -116,6 +118,7 @@ var _reel_frame_styles: Array[StyleBoxFlat] = []
 var _cursor_active := false
 var _hold_boxes: Array[CheckBox] = []
 var _skill_buttons: Array[Button] = []
+var _snapshot_icons: Array[TextureRect] = []   # SH3 이전 후보 줄의 도상 3기
 
 @onready var _e01_position: Label = %E01Position
 @onready var _e02_lap_sector: Label = %E02LapSector
@@ -131,6 +134,7 @@ var _skill_buttons: Array[Button] = []
 @onready var _e07_text: Label = %E07VaneText
 @onready var _e08_respin: Button = %E08Respin
 @onready var _e08_skills: HBoxContainer = %E08Skills
+@onready var _e05_snapshot: Button = %E05Snapshot
 @onready var _e08_charge: Button = %E08ChargeIntervene
 @onready var _e08_confirm: Button = %E08Confirm
 @onready var _e10_log: LogFeed = %E10LogFeed
@@ -153,6 +157,7 @@ var _pad_held: Dictionary = {}         # button_index -> true
 var _pad_combo_used: Dictionary = {}   # button_index -> 이 홀드가 조합으로 소비됐는가
 # X 홀드 중 D패드 좌우가 고르는 릴. **선택 표시는 아직 없다** — 입력 판독 층만 결선했다.
 var _hold_cursor := 0
+var _skill_cursor := 0        # RB 조합 중 고른 스킬 슬롯 (포커스로 표시)
 
 # 통상 턴의 릴 표시 배열 — 듀얼 중에는 오버레이의 릴로 스왑된다 (아래 _enter_duel 참조)
 var _base_reel_icons: Array[TextureRect] = []
@@ -218,6 +223,14 @@ func _boot() -> void:
 	_e08_confirm.pressed.connect(_on_primary_action)
 	_e08_respin.pressed.connect(_on_respin)
 	_e08_charge.pressed.connect(_on_charge_intervene)
+	# ── E08 스킬 슬롯 5개 (원격 20차 계약 §1.1·§1.2 · IMPL-308~310) ──
+	# 세 입력이 **같은 핸들러**를 탄다 — 클릭은 여기, F1~F5 는 `_unhandled_key_input`,
+	# 패드 RB 조합은 `_handle_pad_context` 가 같은 `_on_skill_slot(i)` 를 부른다.
+	# 12차에 마우스 경로만 죽어 있던 결함(IMPL-301)이 슬롯에서 재발하지 않게 결선을
+	# 세우는 자리에서 세 경로를 한꺼번에 못박는다 — UISCR ⑳ 가 면제 없이 그것을 본다.
+	for skill_index in range(_skill_buttons.size()):
+		_skill_buttons[skill_index].pressed.connect(_on_skill_slot.bind(skill_index))
+	_e05_snapshot.pressed.connect(_on_snapshot_revert)
 	_collect_consumable_slots()
 	_apply_static_strings()
 	# TUT-01 — 첫 그랑프리 실주행 위 오버레이(§6 "별도 튜토리얼 스테이지 불신설").
@@ -277,12 +290,9 @@ func _apply_static_strings() -> void:
 	(%E14Menu as Button).text = s.text("ui.race.menu")
 	for box in _hold_boxes:
 		box.text = s.text("ui.race.hold")
-	for i in range(_skill_buttons.size()):
-		# 덱 결선 전이라 전 슬롯이 잠금 표기다 (D09 §3.2 미확장 슬롯 규격 준용).
-		var slot_label := s.text("ui.race.skillSlotFormat", {"index": i + 1})
-		_skill_buttons[i].text = s.text("ui.race.locked")
-		_skill_buttons[i].tooltip_text = slot_label
-	# 비용 ◆n 상시 병기 (D09 §3.2). 어순도 문면이므로 서식은 스트링 키가 갖는다(IMPL-027 전례).
+	# 스킬 슬롯 문면은 **정적이 아니다** — 덱 내용·잔여 횟수·차지에 따라 매 갱신마다
+	# 바뀌므로 `_refresh_skill_slots()` 가 진다(여기서 잠금으로 덮어쓰면 첫 프레임이
+	# 잠금으로 깜빡인다). 13차에 덱이 결선되며 이 자리의 정적 잠금 표기를 걷었다.
 	var respin_label := _with_cost("ui.race.respin", "param_charge_hold_cost")
 	var negate_label := _with_cost("ui.race.chargeIntervene", "param_charge_negate_cost")
 	_e08_respin.text = respin_label
@@ -412,16 +422,36 @@ func _handle_pad_context(event: InputEvent) -> bool:
 			_toggle_hold(_hold_cursor)
 			_pad_combo_used[PAD_X] = true
 			return true
-	# ── RB 홀드 + D패드/A : 스킬 슬롯 ──
-	# **활성화 경로가 아직 없다** — 스킬 버튼에 소비부가 없고 키보드 F1~F5 도 미결선이다
-	# (인게임 스킬 소비부 결선 = 별도 이월 트랙). 여기서는 조합을 **가로채기만** 한다:
-	# 놓아두면 RB 홀드 중의 A 가 공통 층으로 흘러 **스핀으로 오발화**하기 때문이다.
-	if pad.pressed and _pad_is_held(PAD_RB) \
-		and (pad.button_index == PAD_A or pad.button_index == PAD_DPAD_LEFT
-			or pad.button_index == PAD_DPAD_RIGHT):
-		_pad_combo_used[PAD_RB] = true
-		get_viewport().set_input_as_handled()
-		return true
+	# ── RB 홀드 + D패드 좌우 → A : 스킬 슬롯 (D09 §1.3 확정 기준값) ──
+	#
+	# 13차에 소비부가 서면서 **가로채기가 활성화로 바뀌었다.** 종전 주석의 "활성화 경로가
+	# 아직 없다"는 해소됐다 — 놓아두면 RB 홀드 중의 A 가 공통 층으로 흘러 스핀으로
+	# 오발화하던 이유는 그대로이므로 소비 처리는 유지한다.
+	#
+	# 커서는 **포커스로 보인다** — 스킬 버튼에 `grab_focus()` 를 걸면 기존 포커스 링이
+	# 그대로 어디를 고르는 중인지 말한다(릴 커서가 프레임 색으로 말하는 것과 같은 축).
+	# 새 시각 어휘를 만들지 않는다.
+	if pad.pressed and _pad_is_held(PAD_RB):
+		if pad.button_index == PAD_DPAD_LEFT or pad.button_index == PAD_DPAD_RIGHT:
+			get_viewport().set_input_as_handled()
+			var skill_step := -1 if pad.button_index == PAD_DPAD_LEFT else 1
+			_skill_cursor = wrapi(_skill_cursor + skill_step, 0, _skill_buttons.size())
+			_skill_buttons[_skill_cursor].grab_focus()
+			_pad_combo_used[PAD_RB] = true
+			return true
+		if pad.button_index == PAD_A:
+			get_viewport().set_input_as_handled()
+			_on_skill_slot(_skill_cursor)
+			_pad_combo_used[PAD_RB] = true
+			return true
+	# RB 를 놓으면 포커스를 기본 자리(확정)로 돌린다 — 별첨A §A-6 "초기 포커스: 스핀(=확정)".
+	# 스킬 버튼에 포커스가 남으면 그 다음 A 가 조합 없이 스킬을 쏜다.
+	if not pad.pressed and pad.button_index == PAD_RB:
+		if bool(_pad_combo_used.get(PAD_RB, false)):
+			_pad_combo_used[PAD_RB] = false
+			_e08_confirm.grab_focus()
+			get_viewport().set_input_as_handled()
+			return true
 	# ── X 단독(뗌 시점 판정) : 리스핀 ──
 	if not pad.pressed and pad.button_index == PAD_X:
 		var used: bool = bool(_pad_combo_used.get(PAD_X, false))
@@ -449,6 +479,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		_on_charge_intervene()
 		return
+	# 스킬 슬롯 F1~F5. **소비 표시가 분기의 첫 줄이다** (IMPL-299) — 동작이 화면을
+	# 이탈시킨 뒤 뷰포트를 만지면 null 참조로 죽는다.
+	var skill_index := SKILL_KEYS.find(key.keycode)
+	if skill_index >= 0:
+		get_viewport().set_input_as_handled()
+		_on_skill_slot(skill_index)
+		return
 	var hold_index := HOLD_KEYS.find(key.keycode)
 	if hold_index >= 0:
 		get_viewport().set_input_as_handled()
@@ -473,6 +510,8 @@ func _collect_reels() -> void:
 	_reel_icons = _base_reel_icons
 	for child in _e08_skills.get_children():
 		_skill_buttons.append(child)
+	for child in _e05_snapshot.get_node("SnapshotRow").get_children():
+		_snapshot_icons.append(child)
 
 
 # ── GP 수명 주기 ──
@@ -572,6 +611,10 @@ func _on_gp_finished() -> void:
 # ── 개입 창 (T2~T4) ──
 func _on_primary_action() -> void:
 	if _revealing or engine == null or engine.finished:
+		return
+	# SH3 택1 대기 중이면 확정은 **새 후보 채택**이고 턴은 넘기지 않는다 — 한 입력이
+	# 택1과 확정을 겸하면 되돌릴 기회가 사라진다(신구 병치의 의미가 없어진다).
+	if _resolve_snapshot_keep_new():
 		return
 	if _timer_active:
 		_on_confirm()
@@ -676,6 +719,168 @@ func _on_charge_intervene() -> void:
 	_refresh_resources()
 	_refresh_action_enabled()
 
+
+
+
+# ── E08 스킬 슬롯 (D09 §3.2 액션 열 · §1.3 "F1~F5 / 클릭 / RB 홀드 + D패드·A") ──
+#
+# 화면은 **`engine.skill_slots()` 하나만 읽는다** — `data.skills` 도 `outgame.deck` 도 보지
+# 않는다(원격 20차 계약 §1.2). 가용 판정을 화면이 재구현하면 "버튼은 켜지는데 눌리지 않는"
+# 상태가 생기므로 판정은 엔진 한 곳뿐이다.
+#
+# 라벨은 **`S{n}` + 비용 ◆n** 이다 — 별첨A §A-6 의 배치도 자체가 `[리스핀R][S1~S5][차지C]`
+# 로 슬롯을 번호로 적고, 액션 열 실폭이 371px 이라 스킬명 5개(최장 8자)가 물리적으로 들어가지
+# 않는다. 이름·효과·잔여 횟수는 툴팁이 진다(툴팁 고정 = `detail_info` T·Y).
+func _refresh_skill_slots() -> void:
+	var s := data.strings
+	var slots: Array = engine.skill_slots() if engine != null else []
+	# 개입 창 밖·정지 연출 중에는 전 슬롯이 닫힌다. `usable` 에도 국면 관문이 들어 있지만
+	# `_revealing` 은 화면 층 상태라 엔진이 모른다 — 두 겹 다 본다.
+	var open := _timer_active and not _revealing and not _snapshot_pending()
+	for i in range(_skill_buttons.size()):
+		var button := _skill_buttons[i]
+		var slot_label := s.text("ui.race.skillSlotFormat", {"index": i + 1})
+		if i >= slots.size():
+			# 미확장 슬롯 = 잠금 표기 (D09 §3.2). 덱 상한은 아웃게임이 늘린다.
+			button.text = s.text("ui.race.locked")
+			button.tooltip_text = slot_label
+			button.disabled = true
+			continue
+		var slot: Dictionary = slots[i]
+		button.text = s.text("ui.race.actionWithCost", {
+			"label": slot_label,
+			"cost": s.text("ui.race.costFormat", {"cost": int(slot["charge_cost"])}),
+		})
+		button.tooltip_text = s.text("ui.race.actionWithCost", {
+			"label": s.text(String(slot["name_key"])),
+			"cost": s.text("ui.race.costFormat", {"cost": int(slot["charge_cost"])}),
+		})
+		button.disabled = not open or not bool(slot["usable"])
+
+
+# 릴 인자는 **홀드 선택을 그대로 읽는다** — 이 화면의 릴 지정 어포던스는 E05 클릭·E06 토글·
+# 패드 커서 하나뿐이고(별첨A §A-6 "클릭 = 홀드 토글"), 스킬용 선택 어휘를 새로 만들면
+# 같은 릴에 두 가지 선택 상태가 생긴다.
+#
+# `[가안]` **SC3(심볼 복제)의 target/donor 배정** — 선택 2개 중 **낮은 인덱스 = donor ·
+# 높은 인덱스 = target** 으로 둔다. 엔진은 `provisional[target] = provisional[donor]` 이므로
+# 배정이 뒤집히면 플레이어 의도와 반대로 덮인다. 릴이 좌→우 순차 정지라 좌측이 먼저 확정된
+# 값이라는 것이 유일한 방향 근거인데, **정본이 대상 지정 흐름을 정하지 않았다** —
+# 진짜 답은 대상 지정 UI 이고 그것은 판정 사안이다(회신 판정 요청).
+func _skill_args(family: String) -> Dictionary:
+	var picked: Array = []
+	for i in range(REEL_COUNT):
+		if _hold_boxes[i].button_pressed:
+			picked.append(i)
+	match family:
+		"hold":
+			return {"keep": picked}
+		"convert":
+			if picked.is_empty():
+				return {}   # 엔진이 "target" 으로 거부한다 — 화면이 대신 판정하지 않는다
+			if picked.size() >= 2:
+				return {"target": int(picked[picked.size() - 1]), "donor": int(picked[0])}
+			return {"target": int(picked[0])}
+		_:
+			return {}
+
+
+func _on_skill_slot(index: int) -> void:
+	if not _timer_active or _revealing or _snapshot_pending():
+		return
+	if engine == null:
+		return
+	var slots: Array = engine.skill_slots()
+	if index >= slots.size():
+		return
+	var slot: Dictionary = slots[index]
+	var family := String(slot["family"])
+	var outcome := engine.use_skill(String(slot["id"]), _skill_args(family))
+	if not bool(outcome.get("ok", false)):
+		sfx("input_rejected")   # 거부 = 비용·횟수 무변경 (계약 §1.1)
+		_refresh_action_enabled()
+		return
+	# 계열음 4종 = SE-I05~I08. `family` 를 그대로 쓴다 — 표에 이미 서 있다(계약 §1.5).
+	sfx("skill_%s" % String(outcome["family"]))
+	_push_events(outcome.get("events", []))
+	# 홀드 계열은 릴을 다시 굴린다 → **재정지 연출을 다시 재생한다**(리스핀 전례).
+	# 변환 계열은 잠정 결과를 제자리에서 바꾸므로 즉시 갱신이 맞다(정지가 아니다).
+	if family == "hold":
+		_seal(true)
+		var keep: Array = _skill_args("hold").get("keep", [])
+		var changed: Array = []
+		for i in range(REEL_COUNT):
+			if not keep.has(i):
+				changed.append(i)
+		_reveal_reels(changed, false)
+	else:
+		_repaint_provisional()
+	_refresh_snapshot_row()
+	_refresh_resources()
+	_refresh_action_enabled()
+
+
+# 변환 계열이 바꾼 잠정 결과를 릴에 다시 그린다. **정지 연출이 아니다** — 심볼이 제자리에서
+# 바뀌는 것이고 개입 창 내부이므로 봉인 대상이 아니다(결과는 이미 공개돼 있다).
+func _repaint_provisional() -> void:
+	var provisional := engine.get_provisional()
+	for i in range(mini(REEL_COUNT, provisional.size())):
+		_reel_icons[i].texture = _icon_texture(String(provisional[i]))
+
+
+# ── SH3 스냅샷 택1 — 신구 병치 ──
+#
+# `snapshot_previous` 가 비지 않은 동안이 택1 대기다. 살아 있는 릴이 **새 후보**이고
+# 그 위에 뜨는 줄이 **이전 후보**다 — 새 문면을 만들지 않고 배치와 조작으로 가른다:
+# 이전 후보 줄을 누르면 되돌아가고, 확정을 누르면 새 후보로 간다.
+#
+# 문면 2건(새/이전 라벨)이 있으면 더 분명하겠지만 `strings.csv` 는 내러티브 레인 배타
+# 창구다 — 키 이름을 회신에 올리고 여기서는 만들지 않는다(없는 키를 참조하면 화면에
+# 키 문자열이 그대로 뜬다: `StringTable.text()` 가 미등재 키를 그대로 돌려준다).
+func _snapshot_pending() -> bool:
+	return engine != null and not engine.snapshot_previous.is_empty()
+
+
+func _refresh_snapshot_row() -> void:
+	var pending := _snapshot_pending()
+	_e05_snapshot.visible = pending
+	if not pending:
+		return
+	var previous: Array = engine.snapshot_previous
+	for i in range(mini(_snapshot_icons.size(), previous.size())):
+		_snapshot_icons[i].texture = _icon_texture(String(previous[i]))
+	# 이전 후보가 무엇이었는지는 도상이 말하고, 이 줄의 정체는 툴팁이 말한다.
+	_e05_snapshot.tooltip_text = data.strings.text("ui.skill.sh3")
+
+
+func _on_snapshot_revert() -> void:
+	if not _snapshot_pending():
+		return
+	var outcome := engine.choose_snapshot(false)
+	if not bool(outcome.get("ok", false)):
+		sfx("input_rejected")
+		return
+	sfx("skill_hold")   # 되돌림도 홀드 계열의 귀결이다 (SH3 = hold)
+	_repaint_provisional()
+	_refresh_snapshot_row()
+	_refresh_resources()
+	_refresh_action_enabled()
+
+
+# 택1 대기 중의 확정 = **새 후보 채택**이다. 턴을 넘기지 않는다 — 그러면 한 입력이
+# 두 결정(택1 + 확정)을 겸해 되돌릴 기회가 사라진다.
+func _resolve_snapshot_keep_new() -> bool:
+	if not _snapshot_pending():
+		return false
+	var outcome := engine.choose_snapshot(true)
+	if bool(outcome.get("ok", false)):
+		sfx("skill_hold")
+	else:
+		sfx("input_rejected")
+	_refresh_snapshot_row()
+	_refresh_resources()
+	_refresh_action_enabled()
+	return true
 
 func _toggle_hold(index: int) -> void:
 	if not _timer_active or _revealing:
@@ -809,6 +1014,8 @@ func _hide_reels() -> void:
 	for box in _hold_boxes:
 		box.button_pressed = false
 	_refresh_reel_frames()
+	# 턴 경계에서 엔진이 `snapshot_previous` 를 비운다(`begin_turn`) — 표시를 맞춰 둔다.
+	_refresh_snapshot_row()
 
 
 # 홀드 상태 = 프레임 잠금 표시 + 토글 점등의 이중 표시 (D09 §3.2)
@@ -941,6 +1148,7 @@ func _refresh_action_enabled() -> void:
 	var open := _timer_active and not _revealing
 	_e08_respin.disabled = not open or engine == null or engine.hold_used
 	_e08_charge.disabled = not open
+	_refresh_skill_slots()
 	for box in _hold_boxes:
 		box.disabled = not open
 	var can_spin := (

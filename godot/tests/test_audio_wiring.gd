@@ -39,6 +39,8 @@ const DERIVED := [
 		"ids": ["grade_l1", "grade_l2", "grade_l3"]},
 	{"file": "res://ui/nar/vn_screen.gd", "form": "\"vn_enter_%s\"", "what": "VN 트랙",
 		"ids": ["vn_enter_calm", "vn_enter_tense"]},
+	{"file": "res://ui/race/race_screen.gd", "form": "\"skill_%s\"", "what": "스킬 계열음",
+		"ids": ["skill_hold", "skill_convert", "skill_amplify", "skill_insure"]},
 ]
 
 const STAGE_BGM_ENTRY := 0   # DERIVED 중 무대 파생 항목 — 무대 전수 대조가 참조한다
@@ -52,14 +54,8 @@ const PENDING := {
 		+ " 발행한다(섹터 턴 480건 전수 실측 0). 총괄 미발화 확정 · P-2 ㉚",
 	"sell": "튜닝 재배분(환급) 경로 미결선 — HUB-03 골격이 구매만 연다",
 	"crew_join": "크루 영입 스테이션(StRecruit) 미구현 — 라우트 자체가 빈 칸이다",
-	# **사유가 갈렸다 (20차)** — 엔진 API(`RaceEngine.use_skill`)와 조회 창구(`skill_slots`)는
-	# 섰다. 남은 것은 화면 층 하나다: RACE-01 이 아직 슬롯을 렌더하지 않아 누를 자리가 없다
-	# (주력 13차 몫 · 무접촉 회차). 계열 4종 → `sfx("skill_%s" % family)` 한 줄이면 결선된다.
-	# 사유를 고치지 않으면 "덱이 잠겨서"라는 이미 해소된 이유가 대장에 남아 다음 사람을 속인다.
-	"skill_hold": "화면 슬롯 미렌더 — 엔진 API·조회 창구는 실재 (주력 13차)",
-	"skill_convert": "화면 슬롯 미렌더 (동일)",
-	"skill_amplify": "화면 슬롯 미렌더 (동일)",
-	"skill_insure": "화면 슬롯 미렌더 (동일)",
+	# **스킬 계열음 4종은 13차에 결선됐다** — `skill_hold`·`skill_convert`·`skill_amplify`·
+	# `skill_insure` 는 이 대장에서 빠지고 위 DERIVED 로 옮겼다(RACE-01 슬롯 렌더 + 투입).
 	"duel_warning": "게이지 만충 임박 점멸 연출(D09 §3.4) 미결선 — 소리가 동기할 그림이 없다",
 	"choice_shown": "VN 선택지 오버레이 미결선 (D04 문안 트랙 의존)",
 	"true_ending_enter": "진엔딩 시퀀스(BGM-12) 미결선 — 전용 화면 부재",

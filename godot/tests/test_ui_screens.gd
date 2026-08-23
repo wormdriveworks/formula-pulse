@@ -113,10 +113,12 @@ func _process(_delta: float) -> bool:
 	_act_vn_consumption(data)
 	_skill_session_channel(data)
 	_tutorial_callout_placement()
+	_skill_slots(data)
+	_skill_snapshot_pairing(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 332:
-		print("UI_SCREENS_FAIL checks=%d < 하한 332 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 360:
+		print("UI_SCREENS_FAIL checks=%d < 하한 360 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -2066,11 +2068,11 @@ func _collect_gd(dir_path: String, out: Array[String]) -> void:
 # 축을 화면 하나가 아니라 **라우팅 대장 전건**에 둔다 — 전수 감사에서 18화면은 결선돼
 # 있었고 이 화면만 빠져 있었다. 다음에 어느 화면이 빠지든 여기서 걸린다.
 #
-# **면제는 명시 목록으로만.** 스킬 5슬롯은 인게임 소비부가 아직 없는 이월 트랙이고
-# (`ui.race.locked` 표기·상시 `disabled`), 그 사실을 목록으로 못박아 둔다. 목록을 넓히려면
-# 이 상수를 함께 고쳐야 한다 — ANCH 면제 목록과 같은 규율이다.
-const CLICK_EXEMPT := ["Skill1", "Skill2", "Skill3", "Skill4", "Skill5"]
-
+# **면제는 명시 목록으로만.** 13차에 스킬 5슬롯이 결선되면서 **목록이 비었다** — 종전 사유
+# ("인게임 소비부가 아직 없는 이월 트랙")는 해소됐고, 사유가 사라진 면제를 남겨 두면 그
+# 화면이 다시 빠져도 검사가 통과한다. 상수는 남긴다(다음 면제의 자리이자, 넓히려면 이 줄을
+# 함께 고쳐야 한다는 규율의 표지 — ANCH 면제 목록과 같은 축).
+const CLICK_EXEMPT: Array[String] = []
 
 func _mouse_click_paths(data: GameData) -> void:
 	var routes: Dictionary = load(APP_ROOT_SCENE_SCRIPT).ROUTES
@@ -2142,6 +2144,171 @@ func _mouse_click_paths(data: GameData) -> void:
 
 # 바인드가 페이로드를 요구하는 화면만 최소분을 넘긴다 — 요구를 우회하는 것이 아니라
 # 감사가 진단 대신 남의 push_error 를 뒤집어쓰지 않게 하는 것이다.
+# ── ㉑ E08 스킬 슬롯 (D09 §3.2·§1.3 · 원격 20차 계약 §1.2 — 13차 결선) ──
+#
+# **화면이 표를 다시 읽지 않는다**가 계약의 핵심이므로, 축을 "라벨이 그려졌는가"가 아니라
+# **"엔진 행에서 왔는가"** 에 둔다: 툴팁의 스킬명이 `skills.csv` 의 `name_key` 를 거친
+# 문면과 일치하는지 본다. 화면이 이름을 자기 리터럴로 갖고 있으면 이 축이 깨진다.
+#
+# 활성화는 **경로마다 따로** 본다(IMPL-301 의 교훈 — 한 경로만 살아 있어도 화면은 정상처럼
+# 보인다). 클릭 경로는 `pressed` 시그널로, 키보드 경로는 실 `InputEventKey` 로 들어간다.
+func _skill_slots(data: GameData) -> void:
+	var session := _fresh_session(data)
+	var screen := _mount(RACE_SCENE, session)
+	if screen == null:
+		return
+	# 전제 — 덱 2슬롯. 아웃게임 반입 경로가 아니라 **엔진 상태를 직접 세운다**:
+	# 이 축이 보려는 것은 "화면이 엔진을 읽는가"이므로 반입 경로를 끼우면 관측이 흐려진다.
+	screen.engine.deck = ["skill_sa1", "skill_sh1"]
+	screen.engine.charge = 10
+	screen._refresh_skill_slots()
+	var slots: Array = screen.engine.skill_slots()
+	_ok("전제: 덱 2슬롯이 창구에 선다", slots.size() == 2, "size=%d" % slots.size())
+	var buttons: Array = screen._skill_buttons
+	_ok("전제: 슬롯 버튼 5기", buttons.size() == 5, "count=%d" % buttons.size())
+	if slots.size() < 2 or buttons.size() < 5:
+		_unmount(screen)
+		return
+	# ⓐ 장착분 = 비용 병기 · 미확장분 = 잠금 (D09 §3.2)
+	var cost0 := int(slots[0]["charge_cost"])
+	_ok("슬롯 1 라벨에 비용 ◆n 병기",
+		buttons[0].text.contains(str(cost0)), buttons[0].text)
+	_ok("미확장 슬롯 3~5 = 잠금 표기",
+		buttons[2].text == data.strings.text("ui.race.locked")
+			and buttons[3].text == data.strings.text("ui.race.locked")
+			and buttons[4].text == data.strings.text("ui.race.locked"),
+		"%s / %s / %s" % [buttons[2].text, buttons[3].text, buttons[4].text])
+	_ok("미확장 슬롯은 상시 비활성", buttons[2].disabled and buttons[3].disabled)
+	# ⓑ **툴팁이 엔진 행을 거쳤는가** — 화면 리터럴이면 깨진다
+	var expected_name := data.strings.text(String(slots[0]["name_key"]))
+	_ok("툴팁 = 표의 스킬명(name_key 경유)",
+		buttons[0].tooltip_text.contains(expected_name),
+		"tooltip=%s expected=%s" % [buttons[0].tooltip_text, expected_name])
+	# ⓒ 개입 창 밖에서는 장착분도 닫힌다 (`_timer_active` false 상태)
+	_ok("개입 창 밖 = 장착 슬롯도 비활성", buttons[0].disabled)
+	_unmount(screen)
+
+	# ⓔ **행 폭 예산** — 액션 열은 단일 수평 열이고 확정이 최우측 최대다(D09 §3.2).
+	# 5슬롯 만재에서 열이 넘치면 확정이 밀려 규격이 깨진다. 라벨을 스킬명이 아니라
+	# `S{n}` 으로 둔 판단의 근거가 이 예산이므로 추정이 아니라 잰다.
+	#
+	# 예산은 **씬이 스스로 선언한 값에서 끌어낸다** — 캔버스 폭과 신축 비율·여백을 읽어
+	# 계산하므로, 비율이 바뀌거나 열에 컨트롤이 늘면 이 축이 함께 움직인다(상수 박제 아님).
+	# 마운트 직후의 실 rect 는 컨테이너 정렬이 지연돼 최소폭(릴 208)만 나오므로 쓸 수 없다.
+	var s5 := _fresh_session(data)
+	var wide := _mount(RACE_SCENE, s5)
+	if wide != null:
+		wide.engine.deck = ["skill_sh1", "skill_sc1", "skill_sa1", "skill_si1", "skill_sh2"]
+		wide.engine.charge = 10
+		wide._refresh_skill_slots()
+		var actions := wide.find_child("E08Actions", true, false) as Control
+		var left := wide.find_child("LeftColumn", true, false) as Control
+		var feed := wide.find_child("E10LogFeed", true, false) as Control
+		var middle := wide.find_child("Middle", true, false) as Control
+		var zone := wide.find_child("ReelZone", true, false) as Control
+		_ok("전제: 폭 산정 노드 전건 실재",
+			actions != null and left != null and feed != null and middle != null and zone != null)
+		if actions != null and left != null and feed != null and middle != null and zone != null:
+			var ratio_sum: float = left.size_flags_stretch_ratio + feed.size_flags_stretch_ratio
+			var column: float = (CANVAS.x - float(middle.get_theme_constant("separation"))) \
+				* left.size_flags_stretch_ratio / ratio_sum
+			var budget: float = column - float(zone.get_theme_constant("margin_left")) \
+				- float(zone.get_theme_constant("margin_right"))
+			var needed: float = actions.get_combined_minimum_size().x
+			_ok("전제: 폭 예산이 릴 열보다 넓다 (산정 실패 오탐 방지)", budget > 208.0,
+				"budget=%.1f" % budget)
+			_ok("5슬롯 만재에서도 액션 열이 폭 예산 안", needed <= budget,
+				"needed=%.1f budget=%.1f" % [needed, budget])
+			# 라벨을 스킬명으로 바꾸면 넘친다 — `S{n}` 판단의 근거를 대조군으로 못박는다.
+			var slots5: Array = wide.engine.skill_slots()
+			for i in range(mini(slots5.size(), wide._skill_buttons.size())):
+				wide._skill_buttons[i].text = data.strings.text(String(slots5[i]["name_key"]))
+			var named: float = actions.get_combined_minimum_size().x
+			_ok("스킬명 라벨은 같은 예산을 넘는다 (S{n} 채택 근거)", named > budget,
+				"named=%.1f budget=%.1f" % [named, budget])
+		_unmount(wide)
+
+	# ⓓ 활성화 — **클릭 경로**(pressed) 와 **키보드 경로**(F1) 를 각자 본다.
+	for entry in [["클릭", "signal"], ["키보드 F1", "key"]]:
+		var s2 := _fresh_session(data)
+		var race := _mount(RACE_SCENE, s2)
+		if race == null:
+			return
+		var label := String(entry[0])
+		race.engine.deck = ["skill_sa1"]
+		race.engine.charge = 10
+		# 개입 창을 손으로 연다 — 릴 정지 연출은 await 라 프레임 구동 검사에서 기다릴 수 없다.
+		race.engine.turn_phase = RaceTypes.TurnPhase.T4_INTERVENTION
+		race.engine.provisional = ["symbol_line", "symbol_line", "symbol_pulse"]
+		race._timer_active = true
+		race._revealing = false
+		race._refresh_action_enabled()
+		var before: int = race.engine.charge
+		_ok("%s — 전제: 슬롯 1 활성" % label, not race._skill_buttons[0].disabled)
+		if String(entry[1]) == "signal":
+			race._skill_buttons[0].pressed.emit()
+		else:
+			race._unhandled_key_input(_key_event(KEY_F1))
+		var spent: int = before - race.engine.charge
+		var cost: int = CsvTable.to_int(String(data.skill("skill_sa1")["charge_cost"]))
+		_ok("%s — 스킬 투입이 차지를 정확히 비용만큼 소모" % label, spent == cost,
+			"spent=%d cost=%d" % [spent, cost])
+		_unmount(race)
+
+
+# ── ㉒ SH3 스냅샷 신구 병치 (원격 20차 계약 §1.1 `choose_snapshot`) ──
+#
+# 택1 대기의 정의는 `snapshot_previous` 가 비지 않은 상태다. 축은 **표시와 상태가 같이
+# 움직이는가** 다 — 줄이 떠 있는데 대기가 아니거나, 대기인데 줄이 없으면 플레이어가
+# 되돌릴 수 있다는 사실을 알 방법이 없다.
+func _skill_snapshot_pairing(data: GameData) -> void:
+	var session := _fresh_session(data)
+	var screen := _mount(RACE_SCENE, session)
+	if screen == null:
+		return
+	var row: Button = screen._e05_snapshot
+	_ok("전제: 스냅샷 줄이 씬에 실재", row != null)
+	if row == null:
+		_unmount(screen)
+		return
+	_ok("대기 아님 = 줄 숨김", not row.visible)
+	_ok("스냅샷 줄 도상 3기", screen._snapshot_icons.size() == 3,
+		"count=%d" % screen._snapshot_icons.size())
+	# 택1 대기 상태를 세운다 — 이전 후보가 새 후보와 달라야 되돌림이 관측된다.
+	screen.engine.turn_phase = RaceTypes.TurnPhase.T4_INTERVENTION
+	screen.engine.provisional = ["symbol_pulse", "symbol_pulse", "symbol_pulse"]
+	screen.engine.snapshot_previous = ["symbol_line", "symbol_line", "symbol_line"]
+	screen._refresh_snapshot_row()
+	_ok("대기 = 줄 표출", row.visible)
+	_ok("대기 중 스킬 슬롯 닫힘 (한 입력이 두 결정을 겸하지 않는다)",
+		screen._skill_buttons[0].disabled)
+	# ⓐ 줄을 누르면 **이전 후보로 되돌아간다**
+	row.pressed.emit()
+	_ok("줄 클릭 = 이전 후보 복귀",
+		screen.engine.provisional.size() == 3
+			and String(screen.engine.provisional[0]) == "symbol_line",
+		str(screen.engine.provisional))
+	_ok("복귀 후 대기 종료 = 줄 숨김", not row.visible)
+	# ⓑ 확정은 **새 후보 채택**이고 턴을 넘기지 않는다
+	screen.engine.provisional = ["symbol_pulse", "symbol_pulse", "symbol_pulse"]
+	screen.engine.snapshot_previous = ["symbol_line", "symbol_line", "symbol_line"]
+	screen._refresh_snapshot_row()
+	# **개입 창을 열어 둔다** — 닫힌 상태면 가로채기를 지워도 `_on_primary_action` 이
+	# 아무 갈래도 타지 않아 "턴을 넘기지 않는다"가 공허하게 통과한다(돌연변이 M4 실측).
+	screen._timer_active = true
+	var phase_before: int = screen.engine.turn_phase
+	screen._on_primary_action()
+	_ok("확정 = 새 후보 유지",
+		screen.engine.provisional.size() == 3
+			and String(screen.engine.provisional[0]) == "symbol_pulse",
+		str(screen.engine.provisional))
+	_ok("확정이 택1만 해소하고 턴은 넘기지 않는다",
+		screen.engine.turn_phase == phase_before,
+		"before=%d after=%d" % [phase_before, screen.engine.turn_phase])
+	_ok("택1 해소 후 줄 숨김", not row.visible)
+	_unmount(screen)
+
+
 func _audit_payload(route: String, data: GameData) -> Dictionary:
 	if route != "RUN-02":
 		return {}
