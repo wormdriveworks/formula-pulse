@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * UI 프레임 파라메트릭 렌더러 — `frame_spec.json` → `godot/assets/ui/frames/*.png`
+ * UI 프레임·글리프 파라메트릭 렌더러 — `frame_spec.json` → `ui/frames/` · `glyphs/`
  *
  * 소유: 에셋 트랙 (`tools/assets/`) · 신설 IMPL-311
  * 전례: `icon_draw.js`(IMPL-215) / `swatch_gen.js`(IMPL-139) — **재현되는 것만 커밋한다.**
@@ -35,7 +35,11 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const OUT_DIR = path.join(ROOT, 'godot', 'assets', 'ui', 'frames');
+const DEFAULT_DIR = path.join(ROOT, 'godot', 'assets', 'ui', 'frames');
+// 산출 디렉토리는 항목별로 갈릴 수 있다 — `key_cap_9p` 는 D10 §5.6 이 **입력 글리프**로 계상했고
+// 배치 대장도 `glyphs/` 에 둔다. 9패치라는 형식이 소속을 정하지 않는다.
+const DIRS = { frames: DEFAULT_DIR, glyphs: path.join(ROOT, 'godot', 'assets', 'glyphs') };
+const dirOf = (s) => DIRS[s.dir || 'frames'] || die(`미지의 dir '${s.dir}'`);
 const SPEC = path.join(__dirname, 'frame_spec.json');
 const PAL_DIR = path.join(ROOT, 'godot', 'assets', 'palettes');
 const DOC_DIR = path.join(ROOT, 'docs', 'assets');
@@ -165,6 +169,7 @@ for (const [k, v] of Object.entries(PAL)) {
   if (!/^#[0-9A-F]{6}$/.test(v)) die(`palette ${k}: 색 형식 아님 (${v})`);
   if (!ledger.has(v)) die(`palette ${k} ${v}: 조달 대장 밖 — 대장(master_60 + 정본 §5) 안에서만 고른다`);
 }
+// `bases._palette` 도 `palette` 키만 가리킬 수 있다 — 색값을 두 곳에 두지 않는다.
 function rgbOf(key, where) {
   if (key === '.') return null;
   const hex = PAL[key];
@@ -187,11 +192,30 @@ function renderNinePatch(name, s) {
   // 동심 링 — ring k = 캔버스 경계로부터 체비셰프 거리 k. 4방 대칭이 구성으로 성립한다.
   const depth = s.profile.length;
   const centerRGB = s.center ? rgbOf(s.center, `${name}.center`) : null;
+  // `open_sides` = 그 변의 테두리를 두지 않는다. 탭은 아래가 패널에 붙으므로 3면만 둘러야
+  // 하는데, 동심 링은 4방 대칭이라 그것을 표현할 수 없다 — 링을 그린 뒤 열린 변을 되돌린다.
+  // **대칭 축 선언(`symmetry`)이 함께 필수다** — 안 그러면 검사가 정상 도상을 비대칭으로 잡는다.
+  const open = new Set(s.open_sides || []);
+  for (const side of open) if (!['top', 'bottom', 'left', 'right'].includes(side)) die(`${name}: 미지의 open_sides '${side}'`);
+  const OPEN_AXIS = { top: 'tb', bottom: 'tb', left: 'lr', right: 'lr' };
+  if (open.size) {
+    const need = new Set([...open].map((k) => OPEN_AXIS[k]));
+    const decl = s.symmetry === undefined ? null : s.symmetry;
+    // 열린 변이 tb 축을 깨면 `symmetry` 는 'lr' 이어야 하고, 그 역도 같다.
+    const allowed = need.has('tb') && need.has('lr') ? 'none' : (need.has('tb') ? 'lr' : 'tb');
+    if (decl !== allowed) die(`${name}: open_sides ${[...open].join(',')} 는 symmetry "${allowed}" 선언이 필요하다 (현재 ${JSON.stringify(decl)})`);
+  }
+  const isOpen = (x, y, ring) => (
+    (open.has('top') && y === ring) || (open.has('bottom') && y === n - 1 - ring)
+    || (open.has('left') && x === ring) || (open.has('right') && x === n - 1 - ring));
   for (let y = 0; y < n; y++) {
     for (let x = 0; x < n; x++) {
       const ring = Math.min(x, y, n - 1 - x, n - 1 - y);
-      if (ring < depth) put(x, y, rgbOf(s.profile[ring], `${name}.profile[${ring}]`));
-      else put(x, y, centerRGB);
+      if (ring < depth) {
+        // 열린 변에 속하는 링 픽셀은 테두리를 두지 않고 면(또는 투명)으로 남긴다.
+        if (isOpen(x, y, ring)) put(x, y, centerRGB);
+        else put(x, y, rgbOf(s.profile[ring], `${name}.profile[${ring}]`));
+      } else put(x, y, centerRGB);
     }
   }
   // 표식 — 좌상 코너 좌표를 4방 미러. 대칭이 깨질 방법이 없다.
@@ -201,6 +225,47 @@ function renderNinePatch(name, s) {
     for (const [px, py] of [[mx, my], [n - 1 - mx, my], [mx, n - 1 - my], [n - 1 - mx, n - 1 - my]]) put(px, py, rgb);
   }
   return { w: n, h: n, rgba };
+}
+
+// ── `glyph` 타입 — **공유 base 맵 + 표식**.
+//
+//    왜 sprite 로 안 되는가: 패드 16종은 *"같은 버튼인데 하나만 다르다"* 로 정의된 세트다
+//    (페이스 4 = 같은 링에 점 위치만 / 방향 4 = 같은 십자에 채운 팔만 / 숄더·트리거·스틱 = 좌우 미러).
+//    각 파일을 독립 ASCII 맵으로 두면 **같아야 하는 부분이 파일마다 손으로 베껴진다** —
+//    한 곳을 고치면 나머지가 낡고, 그것을 막을 대조 상대가 없다.
+//    base 를 한 곳에 두고 표식만 갈면 **family 가 구성으로 보장**되고, base 수정이 세트 전체에 전파된다.
+//
+//    RD 를 쓰지 않는 근거도 정확히 이 지점이다(글리프 파일럿 실측): `rd_fast` 는 `reference_images`
+//    를 지원하지 않으므로 *"이것과 같게, 하나만 다르게"* 를 표현할 방법이 **구조적으로 없다**.
+function renderGlyph(name, s, bases) {
+  const [w, h] = s.size;
+  const base = bases[s.base];
+  if (!base) die(`${name}: bases 에 없는 base '${s.base}'`);
+  if (base.length !== h) die(`${name}: base '${s.base}' 행 ${base.length} != 높이 ${h}`);
+  const rgba = Buffer.alloc(w * h * 4);
+  const pal = Object.assign({}, s.map_palette || {}, bases._palette || {});
+  const put = (x, y, key, where) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) die(`${name}: 캔버스 밖 (${x},${y})`);
+    const rgb = rgbOf(key, where);
+    if (!rgb) return;
+    const i = (y * w + x) * 4;
+    rgba[i] = rgb[0]; rgba[i + 1] = rgb[1]; rgba[i + 2] = rgb[2]; rgba[i + 3] = 255;
+  };
+  base.forEach((row, y) => {
+    if (row.length !== w) die(`${name}: base '${s.base}' 행 ${y} 폭 ${row.length} != ${w}`);
+    for (let x = 0; x < w; x++) {
+      const ch = row[x];
+      if (ch === '.') continue;
+      const key = pal[ch];
+      if (!key) die(`${name}: base 글자 '${ch}' 의 색 키가 없다 (map_palette/bases._palette)`);
+      // mirror 는 **맵 안에서만** 좌우 반전한다 — 도트 축 반전이라 픽셀 손실 0 (IMPL-162 전례).
+      put(s.mirror ? (w - 1 - x) : x, y, key, `${name}.base`);
+    }
+  });
+  for (const [mx, my, key] of (s.marks || [])) {
+    put(s.mirror ? (w - 1 - mx) : mx, my, key, `${name}.marks`);
+  }
+  return { w, h, rgba };
 }
 
 function renderSprite(name, s) {
@@ -225,7 +290,7 @@ function renderSprite(name, s) {
 
 // ─────────────────────────────────────────────────── 9패치 적합성 검사
 // 생성기가 보장한다고 믿지 않는다 — 보장의 근거는 코드이고 검사의 근거는 출력이다.
-function ninePatchAudit(name, img, c) {
+function ninePatchAudit(name, img, c, symmetry) {
   const { w, h, rgba } = img;
   const at = (x, y) => { const i = (y * w + x) * 4; return `${rgba[i]},${rgba[i + 1]},${rgba[i + 2]},${rgba[i + 3]}`; };
   let lr = 0, tb = 0;
@@ -233,8 +298,15 @@ function ninePatchAudit(name, img, c) {
     if (at(x, y) !== at(w - 1 - x, y)) lr++;
     if (at(x, y) !== at(x, h - 1 - y)) tb++;
   }
-  if (lr) fail('NP-SYM', `${name}: 좌우 비대칭 ${lr}px — 코너 4개가 같은 규격이 아니다`);
-  if (tb) fail('NP-SYM', `${name}: 상하 비대칭 ${tb}px — 〃`);
+  // 요구 축은 스펙이 선언한다. 기본 = 양축. 탭처럼 한 변이 열린 도상은 그 축을 면제하되
+  // **면제를 스펙에 적게** 한다 — 검사를 끄는 것이 아니라 무엇을 왜 빼는지 남기는 것이다.
+  const wantLR = symmetry !== 'tb' && symmetry !== 'none';
+  const wantTB = symmetry !== 'lr' && symmetry !== 'none';
+  if (wantLR && lr) fail('NP-SYM', `${name}: 좌우 비대칭 ${lr}px — 코너 4개가 같은 규격이 아니다`);
+  if (wantTB && tb) fail('NP-SYM', `${name}: 상하 비대칭 ${tb}px — 〃`);
+  // 면제한 축이 **실제로는 대칭이면** 선언이 낡았다는 뜻이다 (빈 유예를 남기지 않는다 — ISO 유예 전례).
+  if (!wantLR && lr === 0) fail('NP-SYM', `${name}: symmetry 가 좌우를 면제했는데 실측은 대칭이다 — 선언을 지워라`);
+  if (!wantTB && tb === 0) fail('NP-SYM', `${name}: symmetry 가 상하를 면제했는데 실측은 대칭이다 — 선언을 지워라`);
   // 변 가운데는 늘어나는 축으로 균일해야 한다. 상·하 변은 x 축으로, 좌·우 변은 y 축으로.
   let varCount = 0;
   for (let y = 0; y < c; y++) { const ref = at(c, y); for (let x = c; x < w - c; x++) if (at(x, y) !== ref) varCount++; }
@@ -253,22 +325,33 @@ function ninePatchAudit(name, img, c) {
 // ─────────────────────────────────────────────────── 주행
 const names = Object.keys(spec.frames);
 if (names.length === 0) die('frame_spec.json 에 프레임이 없다');
-if (!CHECK_ONLY) fs.mkdirSync(OUT_DIR, { recursive: true });
-console.log(`UI 프레임 ${CHECK_ONLY ? '대조' : '렌더'} — ${names.length}종 · 조달 대장 ${ledger.size}색  → ${path.relative(ROOT, OUT_DIR)}\n`);
+if (!CHECK_ONLY) for (const d of new Set(names.map((n) => dirOf(spec.frames[n])))) fs.mkdirSync(d, { recursive: true });
+console.log(`UI 프레임 ${CHECK_ONLY ? '대조' : '렌더'} — ${names.length}종 · 조달 대장 ${ledger.size}색\n`);
 
 let audited = 0;
 for (const name of names) {
   const s = spec.frames[name];
-  const img = s.type === 'ninepatch' ? renderNinePatch(name, s) : renderSprite(name, s);
-  const file = path.join(OUT_DIR, name + '.png');
+  const img = s.type === 'ninepatch' ? renderNinePatch(name, s)
+    : s.type === 'glyph' ? renderGlyph(name, s, spec.bases || {})
+    : renderSprite(name, s);
+  const file = path.join(dirOf(s), name + '.png');
   let ink = 0;
   for (let i = 0; i < img.w * img.h; i++) if (img.rgba[i * 4 + 3]) ink++;
 
   let audit = null;
-  if (s.type === 'ninepatch') { audit = ninePatchAudit(name, img, s.corner); audited++; }
+  if (s.type === 'ninepatch') { audit = ninePatchAudit(name, img, s.corner, s.symmetry); audited++; }
+  // 표기는 **요구된 축만** 본다 — 면제된 축의 비대칭을 NG 로 찍으면 로그가 거짓말을 한다
+  // (합격인데 NG 로 보이는 줄이 생기면 다음 독자가 그것을 결함으로 읽는다).
+  const symTag = s.type !== 'ninepatch' ? '' : (() => {
+    const wantLR = s.symmetry !== 'tb' && s.symmetry !== 'none';
+    const wantTB = s.symmetry !== 'lr' && s.symmetry !== 'none';
+    const bad = (wantLR ? audit.lr : 0) + (wantTB ? audit.tb : 0);
+    const note = s.symmetry ? ` (${s.symmetry} 축만 — ${(s.open_sides || []).join(',') || '선언'} 면제)` : '';
+    return `${bad === 0 ? 'OK' : 'NG'}${note}`;
+  })();
   const tag = s.type === 'ninepatch'
-    ? `${img.w}×${img.h} 코너 ${s.corner} · 잉크 ${ink} · 대칭 ${audit.lr + audit.tb === 0 ? 'OK' : 'NG'} · 변균일 ${audit.varCount + audit.cVar === 0 ? 'OK' : 'NG'}`
-    : `${img.w}×${img.h} 스프라이트 · 잉크 ${ink}`;
+    ? `${img.w}×${img.h} 코너 ${s.corner} · 잉크 ${ink} · 대칭 ${symTag} · 변균일 ${audit.varCount + audit.cVar === 0 ? 'OK' : 'NG'}`
+    : `${img.w}×${img.h} ${s.type === 'glyph' ? `글리프 base=${s.base}${s.mirror ? ' (미러)' : ''}` : '스프라이트'} · 잉크 ${ink}`;
 
   if (CHECK_ONLY) {
     if (!fs.existsSync(file)) { fail('DEF', `${name}.png 부재 — 정의만 있고 실물이 없다`); continue; }
@@ -292,8 +375,11 @@ for (const name of names) {
 }
 
 // 정의에 없는 실물 = 유령 파일. 프레임 디렉토리는 이 도구 전속이므로 남는 것이 있으면 알린다.
-if (fs.existsSync(OUT_DIR)) {
-  const stray = fs.readdirSync(OUT_DIR).filter((f) => f.endsWith('.png') && !names.includes(f.replace(/\.png$/, '')));
+// **`frames/` 만 이 도구 전속이다.** `glyphs/` 는 패드 16종 등 남의 산출물이 함께 사는
+// 디렉토리라 유령 검사를 돌리면 그쪽을 전부 유령으로 잡는다 — 검사 범위는 소유 범위여야 한다.
+if (fs.existsSync(DEFAULT_DIR)) {
+  const owned = new Set(names.filter((n) => dirOf(spec.frames[n]) === DEFAULT_DIR));
+  const stray = fs.readdirSync(DEFAULT_DIR).filter((f) => f.endsWith('.png') && !owned.has(f.replace(/\.png$/, '')));
   for (const f of stray) fail('DEF', `정의에 없는 실물: ${f} — 스펙에 적거나 지운다`);
 }
 
