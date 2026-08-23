@@ -1,0 +1,302 @@
+#!/usr/bin/env node
+/*
+ * UI 프레임 파라메트릭 렌더러 — `frame_spec.json` → `godot/assets/ui/frames/*.png`
+ *
+ * 소유: 에셋 트랙 (`tools/assets/`) · 신설 IMPL-311
+ * 전례: `icon_draw.js`(IMPL-215) / `swatch_gen.js`(IMPL-139) — **재현되는 것만 커밋한다.**
+ *
+ * ── 왜 이 도구가 있는가 (RD 파일럿 실측이 정했다).
+ *    9패치는 **기하 계약**이다. ①코너가 규격 px 여야 하고 ②변 가운데는 늘어나는 축으로
+ *    균일해야 하며 ③코너 4개가 같은 규격이어야 한다. RD 3회차 6장 실측에서 최선작조차
+ *    좌우 불일치 1584px · 변 가운데 불균일 10~11% 였다 — 확산 모델에는 "정확히 16px" 이나
+ *    "이 열은 저 열과 같다" 를 표현하는 층위가 없다.
+ *
+ *    파라메트릭은 그 셋을 **구성으로** 보장한다: 동심 링으로 칠하면 4방 대칭이 공짜이고,
+ *    변 가운데는 링 프로파일 그 자체라 균일이 정의상 성립한다. 표식은 좌상 코너 좌표로만
+ *    받아 4방 미러로 칠하므로 대칭이 깨질 방법이 없다.
+ *
+ * ── `--check` 가 하는 일
+ *    ⓐ 정의↔실물 바이트 대조 (누가 PNG 만 손대면 정의가 낡는다 — `icon_draw.js` 와 같은 축)
+ *    ⓑ **9패치 적합성 검사** — 위 ①②③을 실물 픽셀에서 재측정한다. 생성기가 보장한다고
+ *      믿지 않는다: 보장의 근거는 코드이고 검사의 근거는 출력이다. 둘이 갈리면 검사가 이긴다.
+ *
+ * ── 한계 (검증한 척하지 않는다)
+ *    본 도구는 **색이 조달 대장 안인지 보지 않는다.** 그 축은 별 검사 소관이며, 프레임은
+ *    아이콘 디렉토리 밖이라 `icon_check.js` PAL 이 닿지 않는다 — `--check` 가 팔레트 키
+ *    사용만 강제하고(스펙에 hex 를 직접 못 쓴다) 키→색 대응의 대장 소속은 아래 LEDGER 축이 본다.
+ *    도상이 보기 좋은지도 보지 않는다 — 그것은 눈 소관이다.
+ *
+ * 사용:  node tools/assets/frame_gen.js           (렌더)
+ *        node tools/assets/frame_gen.js --check    (대조만 · 불일치 시 exit 1)
+ */
+'use strict';
+const zlib = require('zlib');
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.resolve(__dirname, '..', '..');
+const OUT_DIR = path.join(ROOT, 'godot', 'assets', 'ui', 'frames');
+const SPEC = path.join(__dirname, 'frame_spec.json');
+const PAL_DIR = path.join(ROOT, 'godot', 'assets', 'palettes');
+const DOC_DIR = path.join(ROOT, 'docs', 'assets');
+
+// 파일을 쓰는 도구는 "몰랐으면 안 쓴다" — `bgm_gen.js --only` 가 조용히 무시돼 실물 18개를
+// 덮은 사고(IMPL-280)와 같은 기제를 막는다.
+const KNOWN = new Set(['--check']);
+const bad = process.argv.slice(2).filter((a) => a.startsWith('-') && !KNOWN.has(a));
+if (bad.length) {
+  console.error(`FATAL: 미지의 플래그 ${bad.join(' ')} — 알려진 것은 ${[...KNOWN].join(' ')}`);
+  process.exit(2);
+}
+const CHECK_ONLY = process.argv.includes('--check');
+
+let fails = 0;
+const fail = (axis, msg) => { fails++; console.log(`  ✗ ${axis}  ${msg}`); };
+function die(msg) { console.error('FATAL: ' + msg); process.exit(2); }
+
+// ─────────────────────────────────────────────────── 조달 대장 (색값 보유 0)
+// 이 파일도 색상값을 하나도 갖지 않는다 — `icon_check.js`·`swatch_gen.js` 와 같은 규율.
+const toHex = (r, g, b) => '#' + [r, g, b].map((v) => v.toString(16).toUpperCase().padStart(2, '0')).join('');
+function gplHexes(file) {
+  const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+  if (lines[0].trim() !== 'GIMP Palette') die(`${path.basename(file)}: 첫 행이 'GIMP Palette' 가 아니다`);
+  const out = [];
+  for (const line of lines.slice(1)) {
+    if (!line.trim() || line.startsWith('#') || /^(Name|Columns):/.test(line)) continue;
+    const m = line.match(/^\s*(\d{1,3})\s+(\d{1,3})\s+(\d{1,3})\t(.+)$/);
+    if (m) out.push(toHex(Number(m[1]), Number(m[2]), Number(m[3])));
+  }
+  return out;
+}
+function canonHexes(sectionNum) {
+  const docs = fs.readdirSync(DOC_DIR).filter((f) => /^팔레트_정본_v.*\.md$/.test(f));
+  if (docs.length !== 1) die(`팔레트 정본이 ${docs.length}개다 (정확히 1개여야 한다)`);
+  const lines = fs.readFileSync(path.join(DOC_DIR, docs[0]), 'utf8').split(/\r?\n/);
+  const start = lines.findIndex((l) => new RegExp(`^## ${sectionNum}\\.`).test(l));
+  if (start < 0) die(`정본에 §${sectionNum} 절이 없다`);
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) if (/^## \d/.test(lines[i])) { end = i; break; }
+  const hexes = lines.slice(start, end).join('\n').match(/#[0-9A-Fa-f]{6}/g) || [];
+  if (hexes.length === 0) die(`정본 §${sectionNum} 에서 hex 를 못 읽었다 — 표 구조가 바뀌었는가`);
+  return hexes.map((h) => h.toUpperCase());
+}
+const ledger = new Set([
+  ...gplHexes(path.join(PAL_DIR, 'master_60.gpl')),
+  ...canonHexes(5),
+]);
+if (ledger.size === 0) die('조달 대장이 비었다 — 팔레트 실물·정본 확인 필요');
+
+// ─────────────────────────────────────────────────── PNG 입출력
+function crc32(buf) {
+  let c, t = crc32.t;
+  if (!t) {
+    t = crc32.t = [];
+    for (let i = 0; i < 256; i++) { c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[i] = c >>> 0; }
+  }
+  c = 0xffffffff;
+  for (const b of buf) c = t[(c ^ b) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+function chunk(type, data) {
+  const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+  const td = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+  const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td));
+  return Buffer.concat([len, td, crc]);
+}
+function encodePNG(w, h, rgba) {
+  const stride = w * 4;
+  const raw = Buffer.alloc(h * (stride + 1));
+  for (let y = 0; y < h; y++) {
+    raw[y * (stride + 1)] = 0;
+    rgba.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8; ihdr[9] = 6;
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', zlib.deflateSync(raw, { level: 9 })),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+// 되읽기는 실물 PNG 를 다시 디코드해서 한다 — 인코더가 자기 출력을 비교하면 대조가 아니다.
+function decodeRGBA(file, w, h) {
+  const buf = fs.readFileSync(file);
+  if (buf.readUInt32BE(0) !== 0x89504e47) die(`${file}: PNG 아님`);
+  const parts = [];
+  let o = 8, gw = 0, gh = 0, ctype = -1;
+  while (o + 8 <= buf.length) {
+    const len = buf.readUInt32BE(o);
+    const type = buf.toString('ascii', o + 4, o + 8);
+    const data = buf.slice(o + 8, o + 8 + len);
+    if (type === 'IHDR') { gw = data.readUInt32BE(0); gh = data.readUInt32BE(4); ctype = data[9]; }
+    if (type === 'IDAT') parts.push(data);
+    if (type === 'IEND') break;
+    o += 12 + len;
+  }
+  if (gw !== w || gh !== h) return { mismatch: `치수 ${gw}x${gh} != ${w}x${h}` };
+  if (ctype !== 6) return { mismatch: `color type ${ctype} != 6(RGBA)` };
+  const idat = zlib.inflateSync(Buffer.concat(parts));
+  const stride = w * 4;
+  const px = Buffer.alloc(h * stride);
+  let prev = Buffer.alloc(stride);
+  for (let y = 0; y < h; y++) {
+    const f = idat[y * (stride + 1)];
+    const cur = Buffer.from(idat.slice(y * (stride + 1) + 1, (y + 1) * (stride + 1)));
+    for (let i = 0; i < stride; i++) {
+      const a = i >= 4 ? cur[i - 4] : 0, b = prev[i], c = i >= 4 ? prev[i - 4] : 0;
+      let v = cur[i];
+      if (f === 1) v += a; else if (f === 2) v += b; else if (f === 3) v += (a + b) >> 1;
+      else if (f === 4) { const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c); v += (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c); }
+      else if (f !== 0) die(`${file}: 미지의 필터 ${f}`);
+      cur[i] = v & 0xff;
+    }
+    cur.copy(px, y * stride);
+    prev = cur;
+  }
+  return { px };
+}
+
+// ─────────────────────────────────────────────────── 렌더
+const spec = JSON.parse(fs.readFileSync(SPEC, 'utf8'));
+const PAL = spec.palette;
+for (const [k, v] of Object.entries(PAL)) {
+  if (!/^#[0-9A-F]{6}$/.test(v)) die(`palette ${k}: 색 형식 아님 (${v})`);
+  if (!ledger.has(v)) die(`palette ${k} ${v}: 조달 대장 밖 — 대장(master_60 + 정본 §5) 안에서만 고른다`);
+}
+function rgbOf(key, where) {
+  if (key === '.') return null;
+  const hex = PAL[key];
+  if (!hex) die(`${where}: palette 에 없는 색 키 '${key}'`);
+  return [1, 3, 5].map((i) => parseInt(hex.substr(i, 2), 16));
+}
+
+function renderNinePatch(name, s) {
+  const n = s.size, c = s.corner;
+  if (!Number.isInteger(n) || !Number.isInteger(c)) die(`${name}: size·corner 가 정수 아님`);
+  // 코너 2개가 캔버스를 넘으면 늘림 구간이 없다 — 9패치가 아니라 그냥 그림이다.
+  if (2 * c >= n) die(`${name}: 코너 ${c}×2 >= 변 ${n} — 늘림 구간이 없다`);
+  if (s.profile.length > c) die(`${name}: 프로파일 ${s.profile.length}겹 > 코너 ${c} — 링이 코너를 넘는다`);
+  const rgba = Buffer.alloc(n * n * 4);
+  const put = (x, y, rgb) => {
+    if (!rgb) return;
+    const i = (y * n + x) * 4;
+    rgba[i] = rgb[0]; rgba[i + 1] = rgb[1]; rgba[i + 2] = rgb[2]; rgba[i + 3] = 255;
+  };
+  // 동심 링 — ring k = 캔버스 경계로부터 체비셰프 거리 k. 4방 대칭이 구성으로 성립한다.
+  const depth = s.profile.length;
+  const centerRGB = s.center ? rgbOf(s.center, `${name}.center`) : null;
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const ring = Math.min(x, y, n - 1 - x, n - 1 - y);
+      if (ring < depth) put(x, y, rgbOf(s.profile[ring], `${name}.profile[${ring}]`));
+      else put(x, y, centerRGB);
+    }
+  }
+  // 표식 — 좌상 코너 좌표를 4방 미러. 대칭이 깨질 방법이 없다.
+  for (const [mx, my, key] of (s.marks || [])) {
+    if (mx < 0 || my < 0 || mx >= c || my >= c) die(`${name}: 표식 (${mx},${my}) 이 코너 구역 0..${c - 1} 밖이다`);
+    const rgb = rgbOf(key, `${name}.marks`);
+    for (const [px, py] of [[mx, my], [n - 1 - mx, my], [mx, n - 1 - my], [n - 1 - mx, n - 1 - my]]) put(px, py, rgb);
+  }
+  return { w: n, h: n, rgba };
+}
+
+function renderSprite(name, s) {
+  const [w, h] = s.size;
+  const rows = s.map;
+  if (rows.length !== h) die(`${name}: 맵 행 ${rows.length} != 높이 ${h}`);
+  const rgba = Buffer.alloc(w * h * 4);
+  rows.forEach((r, y) => {
+    if (r.length !== w) die(`${name}: 맵 행 ${y} 폭 ${r.length} != ${w}`);
+    for (let x = 0; x < w; x++) {
+      const ch = r[x];
+      if (ch === '.') continue;
+      const key = s.map_palette[ch];
+      if (!key) die(`${name}: map_palette 에 없는 글자 '${ch}' (행 ${y} 열 ${x})`);
+      const rgb = rgbOf(key, `${name}.map`);
+      const i = (y * w + x) * 4;
+      rgba[i] = rgb[0]; rgba[i + 1] = rgb[1]; rgba[i + 2] = rgb[2]; rgba[i + 3] = 255;
+    }
+  });
+  return { w, h, rgba };
+}
+
+// ─────────────────────────────────────────────────── 9패치 적합성 검사
+// 생성기가 보장한다고 믿지 않는다 — 보장의 근거는 코드이고 검사의 근거는 출력이다.
+function ninePatchAudit(name, img, c) {
+  const { w, h, rgba } = img;
+  const at = (x, y) => { const i = (y * w + x) * 4; return `${rgba[i]},${rgba[i + 1]},${rgba[i + 2]},${rgba[i + 3]}`; };
+  let lr = 0, tb = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (at(x, y) !== at(w - 1 - x, y)) lr++;
+    if (at(x, y) !== at(x, h - 1 - y)) tb++;
+  }
+  if (lr) fail('NP-SYM', `${name}: 좌우 비대칭 ${lr}px — 코너 4개가 같은 규격이 아니다`);
+  if (tb) fail('NP-SYM', `${name}: 상하 비대칭 ${tb}px — 〃`);
+  // 변 가운데는 늘어나는 축으로 균일해야 한다. 상·하 변은 x 축으로, 좌·우 변은 y 축으로.
+  let varCount = 0;
+  for (let y = 0; y < c; y++) { const ref = at(c, y); for (let x = c; x < w - c; x++) if (at(x, y) !== ref) varCount++; }
+  for (let y = h - c; y < h; y++) { const ref = at(c, y); for (let x = c; x < w - c; x++) if (at(x, y) !== ref) varCount++; }
+  for (let x = 0; x < c; x++) { const ref = at(x, c); for (let y = c; y < h - c; y++) if (at(x, y) !== ref) varCount++; }
+  for (let x = w - c; x < w; x++) { const ref = at(x, c); for (let y = c; y < h - c; y++) if (at(x, y) !== ref) varCount++; }
+  if (varCount) fail('NP-TILE', `${name}: 변 가운데 불균일 ${varCount}px — 늘리면 변화가 드러난다`);
+  // 늘림 구간의 중앙 면도 균일해야 한다 (센터는 양축으로 늘어난다).
+  let cVar = 0;
+  const cRef = at(c, c);
+  for (let y = c; y < h - c; y++) for (let x = c; x < w - c; x++) if (at(x, y) !== cRef) cVar++;
+  if (cVar) fail('NP-TILE', `${name}: 중앙 면 불균일 ${cVar}px — 양축으로 늘어나는 자리다`);
+  return { lr, tb, varCount, cVar };
+}
+
+// ─────────────────────────────────────────────────── 주행
+const names = Object.keys(spec.frames);
+if (names.length === 0) die('frame_spec.json 에 프레임이 없다');
+if (!CHECK_ONLY) fs.mkdirSync(OUT_DIR, { recursive: true });
+console.log(`UI 프레임 ${CHECK_ONLY ? '대조' : '렌더'} — ${names.length}종 · 조달 대장 ${ledger.size}색  → ${path.relative(ROOT, OUT_DIR)}\n`);
+
+let audited = 0;
+for (const name of names) {
+  const s = spec.frames[name];
+  const img = s.type === 'ninepatch' ? renderNinePatch(name, s) : renderSprite(name, s);
+  const file = path.join(OUT_DIR, name + '.png');
+  let ink = 0;
+  for (let i = 0; i < img.w * img.h; i++) if (img.rgba[i * 4 + 3]) ink++;
+
+  let audit = null;
+  if (s.type === 'ninepatch') { audit = ninePatchAudit(name, img, s.corner); audited++; }
+  const tag = s.type === 'ninepatch'
+    ? `${img.w}×${img.h} 코너 ${s.corner} · 잉크 ${ink} · 대칭 ${audit.lr + audit.tb === 0 ? 'OK' : 'NG'} · 변균일 ${audit.varCount + audit.cVar === 0 ? 'OK' : 'NG'}`
+    : `${img.w}×${img.h} 스프라이트 · 잉크 ${ink}`;
+
+  if (CHECK_ONLY) {
+    if (!fs.existsSync(file)) { fail('DEF', `${name}.png 부재 — 정의만 있고 실물이 없다`); continue; }
+    const got = decodeRGBA(file, img.w, img.h);
+    if (got.mismatch) { fail('DEF', `${name}.png ${got.mismatch}`); continue; }
+    let diff = 0;
+    for (let i = 0; i < img.w * img.h * 4; i++) if (got.px[i] !== img.rgba[i]) diff++;
+    if (diff) fail('DEF', `${name}.png 가 정의와 다르다 — 바이트 ${diff}개 어긋남 (한쪽만 고쳐졌다)`);
+    else console.log(`  ✓ ${name}.png  ${tag}`);
+  } else {
+    fs.writeFileSync(file, encodePNG(img.w, img.h, img.rgba));
+    console.log(`  → ${name}.png  ${tag}`);
+    const got = decodeRGBA(file, img.w, img.h);
+    if (got.mismatch) fail('DEF', `${name}.png 되읽기 ${got.mismatch}`);
+    else {
+      let diff = 0;
+      for (let i = 0; i < img.w * img.h * 4; i++) if (got.px[i] !== img.rgba[i]) diff++;
+      if (diff) fail('DEF', `${name}.png 되읽기 불일치 ${diff}바이트`);
+    }
+  }
+}
+
+// 정의에 없는 실물 = 유령 파일. 프레임 디렉토리는 이 도구 전속이므로 남는 것이 있으면 알린다.
+if (fs.existsSync(OUT_DIR)) {
+  const stray = fs.readdirSync(OUT_DIR).filter((f) => f.endsWith('.png') && !names.includes(f.replace(/\.png$/, '')));
+  for (const f of stray) fail('DEF', `정의에 없는 실물: ${f} — 스펙에 적거나 지운다`);
+}
+
+console.log('');
+if (fails) { console.log(`FRAME_GEN FAIL fails=${fails}`); process.exit(1); }
+console.log(`FRAME_GEN ${CHECK_ONLY ? 'PASS' : 'OK'} frames=${names.length} ninepatch_audited=${audited}`);
