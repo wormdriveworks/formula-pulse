@@ -1,722 +1,724 @@
-key,ko
-ui.symbol.slipstream,슬립스트림
-ui.symbol.braking,브레이킹
-ui.symbol.line,라인
-ui.symbol.pulse,펄스
-ui.symbol.trouble,트러블
-ui.symbol.chance,찬스
-ui.stage.metroNight,메트로 나이트
-ui.circuit.mn1,하버 프런트
-ui.circuit.mn2,크로스타운
-ui.circuit.mn3,올드 쿼터
-ui.circuit.mn4,그랜드 서큘러
-ui.sector.mn1s1,하버 대로
-ui.sector.mn1s2,창고 지구 시케인
-ui.sector.mn1s3,베이사이드 커브
-ui.sector.mn1s4,피니시 스트레치
-ui.sector.mn2s1,고가 하이웨이
-ui.sector.mn2s2,인터체인지 램프
-ui.sector.mn2s3,교차로 시케인
-ui.sector.mn2s4,리버사이드 대로
-ui.sector.mn2s5,스타디움 앞 직선
-ui.sector.mn3s1,골목 에스
-ui.sector.mn3s2,전차 궤도 구간
-ui.sector.mn3s3,강변 지하차도
-ui.sector.mn3s4,시계탑 광장 헤어핀
-ui.sector.mn4s1,개선 대로
-ui.sector.mn4s2,서큘러 스위프
-ui.sector.mn4s3,관청가 시케인
-ui.sector.mn4s4,구시가 접속부
-ui.sector.mn4s5,그랜드 피니시
-ui.sectorAttr.straight,스트레이트
-ui.sectorAttr.technical,테크니컬
-ui.sectorAttr.sweeper,스위퍼
-ui.sectorAttr.hazard,해저드
-ui.sectorAttr.battleZone,배틀 존
-ui.sectorAttr.pulseSection,펄스 섹션
-ui.team.axion,악시온
-ui.team.vulka,불카
-ui.team.gryphon,그리폰
-ui.team.silvertrail,실버트레일
-ui.team.cometworks,코멧 웍스
-ui.rival.lorentz,빅터 로렌츠
-ui.rival.maro,셀린 마로
-ui.rival.diaz,라몬 디아스
-ui.rival.volkova,키라 볼코바
-ui.rival.holloway,에드가 홀로웨이
-ui.rival.bianca,비앙카 그리폰
-ui.rival.sherwood,카이 셔우드
-ui.rival.jude,주드 오카포
-ui.race.fillerName,No.{number} 머신
-ui.race.playerName,플레이어
-raceLog.gpStart01,{circuit} — 그리드 정렬 완료.
-raceLog.sectorStart01,랩 {lap} 섹터 {sector} 진입.
-raceLog.overtakeSuccess01,{target} 추월. 포지션 {rank}.
-raceLog.defendSuccess01,{target}의 공세를 막아냈다.
-raceLog.defendFail01,{target}에게 자리를 내줬다.
-raceLog.troubleHit01,머신 이상. 섀시 {amount}.
-raceLog.stableSector01,안정 주행. 차지 +{amount}.
-raceLog.duelStartOvertake01,추월 듀얼 — 상대 {target}.
-raceLog.duelStartDefense01,방어 듀얼 — 상대 {target}.
-raceLog.duelWin01,듀얼 승리. 차지 +{amount}.
-raceLog.duelLoseOvertake01,듀얼 패배. 섀시 {amount}.
-raceLog.duelLoseDefense01,듀얼 패배. 피추월.
-raceLog.chanceProc01,결정적 순간이 열린다.
-raceLog.chanceDuel01,찬스 3매치 — 즉시 듀얼.
-raceLog.momentum01,흐름을 탔다. 전방 +{amount}.
-raceLog.aiRetire01,{target} 리타이어.
-raceLog.playerRetire01,섀시 한계. 리타이어.
-raceLog.gpFinish01,체커. 최종 {rank}위.
-raceLog.timeout01,머신이 코너에 진입해버렸다.
-vane.brief.sector01,섹터 {sector}. 변수 감시 중.
-vane.brief.provisional01,전개 후보 산출.
-vane.brief.holdRespin01,후보 고정. 잔여 재연산.
-vane.brief.negate01,트러블 변수 소거.
-vane.brief.timeout01,궤도 재계산. 계속합니다.
-vane.brief.duel01,결판 국면. 연산 집중.
-raceLog.resonanceEnter01,미승인 출력이 감지된다.
-raceLog.resonanceProc01,레조넌스 — 출력이 넘친다.
-ui.eventCategory.c1,정비·머신
-ui.eventCategory.c2,크레딧·스폰서
-ui.eventCategory.c3,관계·조우
-ui.eventCategory.c4,무대 환경
-ui.eventCategory.c5,무드·플레이버
-ui.event.tempPitOpen,임시 피트 개방
-ui.event.scrapRecovery,폐부품 수거
-ui.event.theoAllnighter,테오의 밤샘 정비
-ui.event.surfaceData,노면 데이터 보정
-ui.event.usedPartsMarket,중고 소모품 장터
-ui.event.controlAccess,제어계 접근 시도
-ui.event.exposureDeal,소액 노출 계약
-ui.event.fanSigning,팬 사인회
-ui.event.shootSupport,촬영 협조
-ui.event.leagueRaffle,리그 경품 추첨
-ui.event.mediaColumn,미디어 기고
-ui.event.expoSponsor,전시 협찬
-ui.event.paddockEncounter,패독 조우
-ui.event.rankFriction,순위 인접 신경전
-ui.event.duelRecall,정면 승부 회고
-ui.event.veteranAdvice,노장의 조언
-ui.event.successorGaze,후계자의 시선
-ui.event.numberTwoCheck,2번의 견제
-ui.event.crewChatter,크루 잡담
-ui.event.teamDinner,팀 저녁 식사
-ui.event.weatherBrief,기상 브리핑
-ui.event.circuitWalk,서킷 답사
-ui.event.rivalData,라이벌 데이터 열람
-ui.event.gridRumor,그리드 소문
-ui.event.gridNightscape,그리드 야경
-ui.event.fanLetter,팬레터
-ui.event.oldPoster,옛 포스터 발견
-ui.event.vaneQuestion,베인의 질문
-ui.event.mnNightMarket,나이트 마켓
-ui.event.mnLocalBroadcast,로컬 방송 인터뷰
-ui.event.mnRepairAlley,정비 골목
-ui.event.mnNeonFestival,네온 축제
-ui.eventVariant.rankFrictionJudeAdjacent,바로 앞자리의 시선
-ui.eventVariant.rankFrictionDefault,스쳐 지나가는 눈빛
-ui.eventVariant.controlAccessAct2,잠긴 영역의 신호
-ui.eventVariant.controlAccessDefault,점검 목록의 빈칸
-ui.eventVariant.exposureDealFront,선두권을 향한 제안
-ui.eventVariant.exposureDealDefault,작은 지면의 제안
-ui.eventVariant.neonFestivalReturning,돌아온 개막
-ui.eventVariant.neonFestivalDefault,첫 개막의 야경
-ui.eventVariant.vaneQuestionStage2,조금 더 긴 질문
-ui.eventVariant.vaneQuestionDefault,짧은 질문
-ui.facility.g1,텔레메트리 아카이브
-ui.facility.g2,크루 라운지
-ui.facility.g3,세컨드 워크벤치
-ui.facility.g4,스폰서 부스
-ui.tuning.t1,파워트레인
-ui.tuning.t2,브레이크
-ui.tuning.t3,라인 컨트롤
-ui.tuning.t4,섀시 보강
-ui.tuning.t5,펄스 드라이브 정밀화
-ui.tuning.t6,임팩트 스트럭처
-ui.overhaul.ovT1,노스윈드 인테이크
-ui.overhaul.ovT2,리버스 텔레메트리
-ui.overhaul.ovT3,콜드 스타트
-ui.overhaul.ovT4,라스트 랩 서지
-ui.overhaul.ovS1,경량 모노코크
-ui.overhaul.ovS2,강화 임팩트 링
-ui.overhaul.ovS3,하이 레이크 셋업
-ui.overhaul.ovS4,롱런 패키지
-ui.overhaul.ovP1,프론트 윙 Mk-II
-ui.overhaul.ovP2,리어 디퓨저 Mk-II
-ui.overhaul.ovP3,펄스 코일 확장
-ui.overhaul.ovP4,리인포스드 셀
-ui.skill.sh1,프리시전 홀드
-ui.skill.sh2,풀 스윕
-ui.skill.sh3,스냅샷
-ui.skill.sh4,웜업 스핀
-ui.skill.sc1,노이즈 필터
-ui.skill.sc2,리커버리 라우팅
-ui.skill.sc3,슬립스트림 링크
-ui.skill.sc4,라인 트레이스
-ui.skill.sa1,풀 스로틀
-ui.skill.sa2,펄스 리커버
-ui.skill.sa3,하드 브레이킹
-ui.skill.sa4,오버토크
-ui.skill.si1,임팩트 가드
-ui.skill.si2,섀시 실드
-ui.skill.si3,카운터 스티어
-ui.skill.si4,서바이벌 셀
-ui.crew.marta,마르타 이베르센
-ui.crew.theo,테오 콜리어
-ui.crew.nadia,나디아 리스
-ui.crew.oscar,오스카 브란트
-ui.crew.sasha,사샤 린드
-ui.sponsor.sp1,안정 계약
-ui.sponsor.sp2,공세 계약
-ui.sponsor.sp3,대결 계약
-ui.sponsor.sp4,명성 계약
-ui.relation.kinship,동기
-ui.relation.succession,계승
-ui.relation.throne,왕좌
-ui.relation.reunion,재회
-ui.relation.successionMaro,계승 — 셀린
-ui.consumable.p1,리페어 키트
-ui.consumable.p2,이머전시 실런트
-ui.consumable.p3,쿨런트 차지
-vane.brief.sector02,섹터 {sector}. 변수 정리했습니다.
-vane.brief.sector03,섹터 {sector}. 준비됐습니다.
-vane.brief.duel02,결판 국면입니다. 갑니다.
-vane.brief.duel03,결판. 제가 맞추겠습니다.
-vane.brief.resonance01,방금 출력은… 제 제어가 아닙니다.
-vane.brief.resonance02,또 그 출력입니다. 원인 미상.
-vane.brief.resonance03,"그 출력, 이제 읽힙니다."
-ui.vnSlot.seasonOpen,시즌 개막
-ui.vnSlot.seasonClose,시즌 결산
-ui.vnSlot.tourBrief,투어 브리핑
-ui.vnSlot.tourMilestone,투어 종료 회상
-ui.vnSlot.act1,1막 그리드의 노이즈
-ui.vnSlot.act2,2막 북풍
-ui.vnSlot.act3,3막 브레이킹 포인트
-ui.vnSlot.act4,4막 휠투휠
-ui.vnSlot.origin,기원 공개
-ui.vnSlot.epilogue,에필로그
-ui.milestoneVn.actTransition,막 전이
-ui.milestoneVn.crewJoin,크루 합류
-ui.milestoneVn.originClue,기원 단서
-ui.milestoneVn.generalFeat,성취 회상
-ui.race.positionFormat,P{rank}/{total}
-ui.race.lapSectorFormat,LAP {lap}/{laps} · S{sector}/{sectors}
-ui.race.gaugeFront,전방
-ui.race.gaugeRear,후방
-ui.race.hold,홀드
-ui.race.respin,리스핀
-ui.race.chargeIntervene,차지 개입
-ui.race.confirm,확정
-ui.race.spin,스핀
-ui.race.skillSlotFormat,S{index}
-ui.race.costFormat,◆{cost}
-ui.race.chassisLabel,섀시
-ui.race.chassisFormat,{value}
-ui.race.chargeLabel,차지
-ui.race.chargeFormat,{value}/{cap}
-ui.race.consumableEmpty,―
-ui.race.consumableFilled,▣
-ui.race.menu,≡
-ui.race.timerFormat,{value}
-ui.race.resonanceBanner,레조넌스
-ui.race.locked,잠금
-ui.race.speakerRelay,중계
-ui.race.actionWithCost,{label} {cost}
-ui.title.gameTitle,FORMULA PULSE
-ui.title.subtitle,SPIN THE GRID
-ui.title.continueRun,계속하기
-ui.title.newCareer,새 커리어
-ui.title.archive,기록실
-ui.title.options,옵션
-ui.title.quit,종료
-ui.title.versionFormat,v{version}
-ui.save.header,커리어 선택
-ui.save.back,뒤로
-ui.save.slotFormat,슬롯 {index}
-ui.save.empty,빈 슬롯
-ui.save.progressFormat,시즌 {season} · 투어 {tour} · 제{race}전
-ui.save.hintNew,새 커리어를 시작할 슬롯을 고르세요.
-ui.save.hintContinue,이어할 커리어를 고르세요.
-ui.gpResult.header,그랑프리 결산
-ui.gpResult.finalRank,최종 순위
-ui.gpResult.tourPoints,투어 포인트
-ui.gpResult.prize,상금
-ui.gpResult.finishBonus,완주 보너스
-ui.gpResult.carryOver,이월
-ui.gpResult.rankFormat,P{rank}
-ui.gpResult.retired,리타이어 — 투어 탈락
-ui.gpResult.pointsFormat,+{points}
-ui.gpResult.creditFormat,{amount} Cr
-ui.gpResult.carryFormat,섀시 {chassis} · 차지 {charge}
-ui.gpResult.next,다음으로
-ui.gpResult.toTourReport,투어 결산으로
-ui.gpResult.saved,저장됨
-ui.recap.header,간이 정산
-ui.recap.summaryFormat,직전 P{rank} · 투어 포인트 +{points}
-ui.recap.creditsFormat,{amount} Cr
-ui.recap.fieldRepair,필드 정비
-ui.recap.consumableHeaderFormat,소모품 보충 {held}/{cap}
-ui.recap.consumableBuyFormat,{item} {amount} Cr
-ui.recap.deckHeaderFormat,덱 교체 {used}/{slots}
-ui.recap.deckEntryFormat,{mark} {skill}
-ui.recap.deckEquipped,●
-ui.recap.deckUnequipped,○
-ui.recap.deckNoSkill,해금된 스킬 없음
-ui.recap.next,다음 대회로
-ui.recap.repairCostFormat,이번 {now} Cr → 다음 {next} Cr
-ui.recap.chassisFormat,섀시 {now}% → {after}%
-ui.recap.chassisNowFormat,섀시 {now}%
-ui.tourReport.header,투어 결산
-ui.tourReport.block1,투어 종합 순위
-ui.tourReport.block2,챔피언십 포인트
-ui.tourReport.block3,수입
-ui.tourReport.block4,펄스 차지 환전
-ui.tourReport.block5,차지 소멸
-ui.tourReport.block6,주행 데이터
-ui.tourReport.rankFormat,P{rank}
-ui.tourReport.pointsFormat,{points}
-ui.tourReport.creditFormat,{amount} Cr
-ui.tourReport.dataFormat,{amount} DP
-ui.tourReport.dropoutNote,탈락 — 완주 보너스 미지급 · 순위 보상 축소
-ui.tourReport.chargeExpired,잔여 차지는 투어 경계에서 소멸합니다.
-ui.tourReport.toGarage,개러지로
+key,ko,en,ja
+ui.symbol.slipstream,슬립스트림,Slipstream,スリップストリーム
+ui.symbol.braking,브레이킹,Braking,ブレーキング
+ui.symbol.line,라인,Line,ライン
+ui.symbol.pulse,펄스,Pulse,パルス
+ui.symbol.trouble,트러블,Trouble,トラブル
+ui.symbol.chance,찬스,Chance,チャンス
+ui.stage.metroNight,메트로 나이트,Metro Night,メトロナイト
+ui.circuit.mn1,하버 프런트,Harbor Front,ハーバーフロント
+ui.circuit.mn2,크로스타운,Crosstown,クロスタウン
+ui.circuit.mn3,올드 쿼터,Old Quarter,オールドクォーター
+ui.circuit.mn4,그랜드 서큘러,Grand Circular,グランドサーキュラー
+ui.sector.mn1s1,하버 대로,Harbor Boulevard,ハーバー大通り
+ui.sector.mn1s2,창고 지구 시케인,Warehouse District Chicane,倉庫街シケイン
+ui.sector.mn1s3,베이사이드 커브,Bayside Curve,ベイサイドカーブ
+ui.sector.mn1s4,피니시 스트레치,Finish Stretch,フィニッシュストレッチ
+ui.sector.mn2s1,고가 하이웨이,Elevated Highway,高架ハイウェイ
+ui.sector.mn2s2,인터체인지 램프,Interchange Ramp,インターチェンジランプ
+ui.sector.mn2s3,교차로 시케인,Crossroads Chicane,交差点シケイン
+ui.sector.mn2s4,리버사이드 대로,Riverside Boulevard,リバーサイド大通り
+ui.sector.mn2s5,스타디움 앞 직선,Stadium Straight,スタジアム前ストレート
+ui.sector.mn3s1,골목 에스,Alley S-Curve,路地のS字
+ui.sector.mn3s2,전차 궤도 구간,Tram Track Section,路面電車軌道区間
+ui.sector.mn3s3,강변 지하차도,Riverside Underpass,川沿いアンダーパス
+ui.sector.mn3s4,시계탑 광장 헤어핀,Clocktower Square Hairpin,時計塔広場ヘアピン
+ui.sector.mn4s1,개선 대로,Triumph Avenue,記念大通り
+ui.sector.mn4s2,서큘러 스위프,Circular Sweep,サーキュラースイープ
+ui.sector.mn4s3,관청가 시케인,Government Quarter Chicane,官庁街シケイン
+ui.sector.mn4s4,구시가 접속부,Old Town Link,旧市街接続部
+ui.sector.mn4s5,그랜드 피니시,Grand Finish,グランドフィニッシュ
+ui.sectorAttr.straight,스트레이트,Straight,ストレート
+ui.sectorAttr.technical,테크니컬,Technical,テクニカル
+ui.sectorAttr.sweeper,스위퍼,Sweeper,スイーパー
+ui.sectorAttr.hazard,해저드,Hazard,ハザード
+ui.sectorAttr.battleZone,배틀 존,Battle Zone,バトルゾーン
+ui.sectorAttr.pulseSection,펄스 섹션,Pulse Section,パルスセクション
+ui.team.axion,악시온,Axion,アクシオン
+ui.team.vulka,불카,Vulka,ヴルカ
+ui.team.gryphon,그리폰,Gryphon,グリフォン
+ui.team.silvertrail,실버트레일,Silvertrail,シルバートレイル
+ui.team.cometworks,코멧 웍스,Comet Works,コメットワークス
+ui.rival.lorentz,빅터 로렌츠,Viktor Lorenz,ヴィクター・ローレンツ
+ui.rival.maro,셀린 마로,Celine Marceau,セリーヌ・マルソー
+ui.rival.diaz,라몬 디아스,Ramon Diaz,ラモン・ディアス
+ui.rival.volkova,키라 볼코바,Kira Volkova,キラ・ヴォルコワ
+ui.rival.holloway,에드가 홀로웨이,Edgar Holloway,エドガー・ホロウェイ
+ui.rival.bianca,비앙카 그리폰,Bianca Gryphon,ビアンカ・グリフォン
+ui.rival.sherwood,카이 셔우드,Kai Sherwood,カイ・シャーウッド
+ui.rival.jude,주드 오카포,Jude Okafor,ジュード・オカフォー
+ui.race.fillerName,No.{number} 머신,No.{number} Machine,No.{number} マシン
+ui.race.playerName,플레이어,Player,プレイヤー
+raceLog.gpStart01,{circuit} — 그리드 정렬 완료.,{circuit} — grid set.,{circuit} — グリッド整列完了。
+raceLog.sectorStart01,랩 {lap} 섹터 {sector} 진입.,"Lap {lap}, Sector {sector}.",ラップ{lap} セクター{sector}進入。
+raceLog.overtakeSuccess01,{target} 추월. 포지션 {rank}.,Overtook {target}. Position {rank}.,{target}を抜く。ポジション{rank}。
+raceLog.defendSuccess01,{target}의 공세를 막아냈다.,Held off {target}.,{target}の攻勢を防いだ。
+raceLog.defendFail01,{target}에게 자리를 내줬다.,Lost the position to {target}.,{target}にポジションを譲った。
+raceLog.troubleHit01,머신 이상. 섀시 {amount}.,Machine fault. Chassis {amount}.,マシン異常。シャシー{amount}。
+raceLog.stableSector01,안정 주행. 차지 +{amount}.,Clean running. Charge +{amount}.,安定走行。チャージ+{amount}。
+raceLog.duelStartOvertake01,추월 듀얼 — 상대 {target}.,Overtake duel — {target}.,追い抜きデュエル — 相手{target}。
+raceLog.duelStartDefense01,방어 듀얼 — 상대 {target}.,Defense duel — {target}.,防御デュエル — 相手{target}。
+raceLog.duelWin01,듀얼 승리. 차지 +{amount}.,Duel won. Charge +{amount}.,デュエル勝利。チャージ+{amount}。
+raceLog.duelLoseOvertake01,듀얼 패배. 섀시 {amount}.,Duel lost. Chassis {amount}.,デュエル敗北。シャシー{amount}。
+raceLog.duelLoseDefense01,듀얼 패배. 피추월.,Duel lost. Overtaken.,デュエル敗北。抜かれた。
+raceLog.chanceProc01,결정적 순간이 열린다.,A decisive moment opens.,決定的な瞬間が開く。
+raceLog.chanceDuel01,찬스 3매치 — 즉시 듀얼.,Chance three-match — duel now.,チャンス3マッチ — 即時デュエル。
+raceLog.momentum01,흐름을 탔다. 전방 +{amount}.,Momentum caught. Front +{amount}.,流れに乗った。前方+{amount}。
+raceLog.aiRetire01,{target} 리타이어.,{target} retires.,{target} リタイア。
+raceLog.playerRetire01,섀시 한계. 리타이어.,Chassis limit. Retired.,シャシー限界。リタイア。
+raceLog.gpFinish01,체커. 최종 {rank}위.,Chequered flag. Final P{rank}.,チェッカー。最終{rank}位。
+raceLog.timeout01,머신이 코너에 진입해버렸다.,The machine entered the corner regardless.,マシンはそのままコーナーへ進入した。
+vane.brief.sector01,섹터 {sector}. 변수 감시 중.,Sector {sector}. Variables under watch.,セクター{sector}。変数監視中。
+vane.brief.provisional01,전개 후보 산출.,Development candidates computed.,展開候補 算出。
+vane.brief.holdRespin01,후보 고정. 잔여 재연산.,Candidate locked. Remainder recomputed.,候補固定。残余 再演算。
+vane.brief.negate01,트러블 변수 소거.,Trouble variable cleared.,トラブル変数 消去。
+vane.brief.timeout01,궤도 재계산. 계속합니다.,Trajectory recomputed. Continuing.,軌道 再計算。継続します。
+vane.brief.duel01,결판 국면. 연산 집중.,Decisive phase. Computation focused.,決着局面。演算集中。
+raceLog.resonanceEnter01,미승인 출력이 감지된다.,Unsanctioned output detected.,未承認の出力を検知。
+raceLog.resonanceProc01,레조넌스 — 출력이 넘친다.,Resonance — output overflows.,レゾナンス — 出力があふれる。
+ui.eventCategory.c1,정비·머신,Service & Machine,整備・マシン
+ui.eventCategory.c2,크레딧·스폰서,Credits & Sponsors,クレジット・スポンサー
+ui.eventCategory.c3,관계·조우,Relations & Encounters,関係・遭遇
+ui.eventCategory.c4,무대 환경,Stage Environment,ステージ環境
+ui.eventCategory.c5,무드·플레이버,Mood & Flavor,ムード・フレーバー
+ui.event.tempPitOpen,임시 피트 개방,Temporary Pit Opened,臨時ピット開放
+ui.event.scrapRecovery,폐부품 수거,Scrap Parts Salvage,廃部品の回収
+ui.event.theoAllnighter,테오의 밤샘 정비,Theo's All-Nighter,テオの徹夜整備
+ui.event.surfaceData,노면 데이터 보정,Surface Data Calibration,路面データ補正
+ui.event.usedPartsMarket,중고 소모품 장터,Used Consumables Market,中古消耗品の市
+ui.event.controlAccess,제어계 접근 시도,Control System Access Attempt,制御系へのアクセス試行
+ui.event.exposureDeal,소액 노출 계약,Small Exposure Deal,小口の露出契約
+ui.event.fanSigning,팬 사인회,Fan Signing,ファンサイン会
+ui.event.shootSupport,촬영 협조,Shoot Support,撮影協力
+ui.event.leagueRaffle,리그 경품 추첨,League Prize Draw,リーグ景品抽選
+ui.event.mediaColumn,미디어 기고,Media Column,メディア寄稿
+ui.event.expoSponsor,전시 협찬,Expo Sponsorship,展示協賛
+ui.event.paddockEncounter,패독 조우,Paddock Encounter,パドックでの遭遇
+ui.event.rankFriction,순위 인접 신경전,Adjacent-Rank Friction,順位隣接の神経戦
+ui.event.duelRecall,정면 승부 회고,Recalling a Head-On Fight,正面勝負の回想
+ui.event.veteranAdvice,노장의 조언,A Veteran's Advice,ベテランの助言
+ui.event.successorGaze,후계자의 시선,The Heir's Gaze,後継者の視線
+ui.event.numberTwoCheck,2번의 견제,The No.2's Check,2番からの圧力
+ui.event.crewChatter,크루 잡담,Crew Chatter,クルーの雑談
+ui.event.teamDinner,팀 저녁 식사,Team Dinner,チームの夕食
+ui.event.weatherBrief,기상 브리핑,Weather Briefing,気象ブリーフィング
+ui.event.circuitWalk,서킷 답사,Circuit Walk,サーキット下見
+ui.event.rivalData,라이벌 데이터 열람,Rival Data Review,ライバルデータの閲覧
+ui.event.gridRumor,그리드 소문,Grid Rumor,グリッドのうわさ
+ui.event.gridNightscape,그리드 야경,Grid at Night,グリッドの夜景
+ui.event.fanLetter,팬레터,Fan Letter,ファンレター
+ui.event.oldPoster,옛 포스터 발견,An Old Poster,古いポスターの発見
+ui.event.vaneQuestion,베인의 질문,VEIN's Question,ヴェインの質問
+ui.event.mnNightMarket,나이트 마켓,Night Market,ナイトマーケット
+ui.event.mnLocalBroadcast,로컬 방송 인터뷰,Local Broadcast Interview,地元放送のインタビュー
+ui.event.mnRepairAlley,정비 골목,Repair Alley,整備の路地
+ui.event.mnNeonFestival,네온 축제,Neon Festival,ネオン祭
+ui.eventVariant.rankFrictionJudeAdjacent,바로 앞자리의 시선,The Gaze One Place Ahead,すぐ前の席からの視線
+ui.eventVariant.rankFrictionDefault,스쳐 지나가는 눈빛,A Passing Glance,すれ違う視線
+ui.eventVariant.controlAccessAct2,잠긴 영역의 신호,A Signal from the Locked Area,施錠領域からの信号
+ui.eventVariant.controlAccessDefault,점검 목록의 빈칸,A Blank in the Checklist,点検表の空欄
+ui.eventVariant.exposureDealFront,선두권을 향한 제안,An Offer for the Front Runners,先頭集団への提案
+ui.eventVariant.exposureDealDefault,작은 지면의 제안,An Offer of a Small Column,小さな紙面の提案
+ui.eventVariant.neonFestivalReturning,돌아온 개막,"The Opening, Returned",戻ってきた開幕
+ui.eventVariant.neonFestivalDefault,첫 개막의 야경,First Opening Night,初開幕の夜景
+ui.eventVariant.vaneQuestionStage2,조금 더 긴 질문,A Slightly Longer Question,少し長い質問
+ui.eventVariant.vaneQuestionDefault,짧은 질문,A Short Question,短い質問
+ui.facility.g1,텔레메트리 아카이브,Telemetry Archive,テレメトリーアーカイブ
+ui.facility.g2,크루 라운지,Crew Lounge,クルーラウンジ
+ui.facility.g3,세컨드 워크벤치,Second Workbench,セカンドワークベンチ
+ui.facility.g4,스폰서 부스,Sponsor Booth,スポンサーブース
+ui.tuning.t1,파워트레인,Powertrain,パワートレイン
+ui.tuning.t2,브레이크,Brakes,ブレーキ
+ui.tuning.t3,라인 컨트롤,Line Control,ラインコントロール
+ui.tuning.t4,섀시 보강,Chassis Reinforcement,シャシー補強
+ui.tuning.t5,펄스 드라이브 정밀화,Pulse Drive Refinement,パルスドライブ精密化
+ui.tuning.t6,임팩트 스트럭처,Impact Structure,インパクトストラクチャー
+ui.overhaul.ovT1,노스윈드 인테이크,Northwind Intake,ノースウィンドインテーク
+ui.overhaul.ovT2,리버스 텔레메트리,Reverse Telemetry,リバーステレメトリー
+ui.overhaul.ovT3,콜드 스타트,Cold Start,コールドスタート
+ui.overhaul.ovT4,라스트 랩 서지,Last Lap Surge,ラストラップサージ
+ui.overhaul.ovS1,경량 모노코크,Lightweight Monocoque,軽量モノコック
+ui.overhaul.ovS2,강화 임팩트 링,Reinforced Impact Ring,強化インパクトリング
+ui.overhaul.ovS3,하이 레이크 셋업,High Rake Setup,ハイレーキセットアップ
+ui.overhaul.ovS4,롱런 패키지,Long Run Package,ロングランパッケージ
+ui.overhaul.ovP1,프론트 윙 Mk-II,Front Wing Mk-II,フロントウイング Mk-II
+ui.overhaul.ovP2,리어 디퓨저 Mk-II,Rear Diffuser Mk-II,リアディフューザー Mk-II
+ui.overhaul.ovP3,펄스 코일 확장,Pulse Coil Expansion,パルスコイル拡張
+ui.overhaul.ovP4,리인포스드 셀,Reinforced Cell,リインフォースドセル
+ui.skill.sh1,프리시전 홀드,Precision Hold,プレシジョンホールド
+ui.skill.sh2,풀 스윕,Full Sweep,フルスイープ
+ui.skill.sh3,스냅샷,Snapshot,スナップショット
+ui.skill.sh4,웜업 스핀,Warm-up Spin,ウォームアップスピン
+ui.skill.sc1,노이즈 필터,Noise Filter,ノイズフィルター
+ui.skill.sc2,리커버리 라우팅,Recovery Routing,リカバリールーティング
+ui.skill.sc3,슬립스트림 링크,Slipstream Link,スリップストリームリンク
+ui.skill.sc4,라인 트레이스,Line Trace,ライントレース
+ui.skill.sa1,풀 스로틀,Full Throttle,フルスロットル
+ui.skill.sa2,펄스 리커버,Pulse Recover,パルスリカバー
+ui.skill.sa3,하드 브레이킹,Hard Braking,ハードブレーキング
+ui.skill.sa4,오버토크,Overtorque,オーバートルク
+ui.skill.si1,임팩트 가드,Impact Guard,インパクトガード
+ui.skill.si2,섀시 실드,Chassis Shield,シャシーシールド
+ui.skill.si3,카운터 스티어,Counter Steer,カウンターステア
+ui.skill.si4,서바이벌 셀,Survival Cell,サバイバルセル
+ui.crew.marta,마르타 이베르센,Marta Iversen,マルタ・イーヴェルセン
+ui.crew.theo,테오 콜리어,Theo Collier,テオ・コリアー
+ui.crew.nadia,나디아 리스,Nadia Reese,ナディア・リース
+ui.crew.oscar,오스카 브란트,Oskar Brandt,オスカル・ブラント
+ui.crew.sasha,사샤 린드,Sasha Lind,サーシャ・リンド
+ui.sponsor.sp1,안정 계약,Stability Contract,安定契約
+ui.sponsor.sp2,공세 계약,Offensive Contract,攻勢契約
+ui.sponsor.sp3,대결 계약,Showdown Contract,対決契約
+ui.sponsor.sp4,명성 계약,Prestige Contract,名声契約
+ui.relation.kinship,동기,Peer,同期
+ui.relation.succession,계승,Succession,継承
+ui.relation.throne,왕좌,Throne,王座
+ui.relation.reunion,재회,Reunion,再会
+ui.relation.successionMaro,계승 — 셀린,Succession — Celine,継承 — セリーヌ
+ui.consumable.p1,리페어 키트,Repair Kit,リペアキット
+ui.consumable.p2,이머전시 실런트,Emergency Sealant,エマージェンシーシーラント
+ui.consumable.p3,쿨런트 차지,Coolant Charge,クーラントチャージ
+vane.brief.sector02,섹터 {sector}. 변수 정리했습니다.,Sector {sector}. Variables sorted.,セクター{sector}。変数を整理しました。
+vane.brief.sector03,섹터 {sector}. 준비됐습니다.,Sector {sector}. We are ready.,セクター{sector}。準備できました。
+vane.brief.duel02,결판 국면입니다. 갑니다.,Decisive phase. Going in.,決着局面です。行きます。
+vane.brief.duel03,결판. 제가 맞추겠습니다.,The decision. I will line it up.,決着です。私が合わせます。
+vane.brief.resonance01,방금 출력은… 제 제어가 아닙니다.,That output just now… not from my control.,今の出力は…私の制御ではありません。
+vane.brief.resonance02,또 그 출력입니다. 원인 미상.,That output again. Cause unknown.,またあの出力です。原因不明。
+vane.brief.resonance03,"그 출력, 이제 읽힙니다.",That output — I can read it now.,あの出力、今は読めます。
+ui.vnSlot.seasonOpen,시즌 개막,Season Opening,シーズン開幕
+ui.vnSlot.seasonClose,시즌 결산,Season Closing,シーズン決算
+ui.vnSlot.tourBrief,투어 브리핑,Tour Briefing,ツアーブリーフィング
+ui.vnSlot.tourMilestone,투어 종료 회상,End-of-Tour Recall,ツアー終了の回想
+ui.vnSlot.act1,1막 그리드의 노이즈,Act 1: Noise on the Grid,第1幕グリッドのノイズ
+ui.vnSlot.act2,2막 북풍,Act 2: North Wind,第2幕北風
+ui.vnSlot.act3,3막 브레이킹 포인트,Act 3: Breaking Point,第3幕ブレイキングポイント
+ui.vnSlot.act4,4막 휠투휠,Act 4: Wheel to Wheel,第4幕ホイールトゥホイール
+ui.vnSlot.origin,기원 공개,Origin Revealed,起源の開示
+ui.vnSlot.epilogue,에필로그,Epilogue,エピローグ
+ui.milestoneVn.actTransition,막 전이,Act Transition,幕の転換
+ui.milestoneVn.crewJoin,크루 합류,Crew Joins,クルー加入
+ui.milestoneVn.originClue,기원 단서,Origin Clue,起源の手がかり
+ui.milestoneVn.generalFeat,성취 회상,Achievement Recall,達成の回想
+ui.race.positionFormat,P{rank}/{total},P{rank}/{total},P{rank}/{total}
+ui.race.lapSectorFormat,LAP {lap}/{laps} · S{sector}/{sectors},LAP {lap}/{laps} · S{sector}/{sectors},LAP {lap}/{laps} · S{sector}/{sectors}
+ui.race.gaugeFront,전방,Front,前方
+ui.race.gaugeRear,후방,Rear,後方
+ui.race.hold,홀드,Hold,ホールド
+ui.race.respin,리스핀,Re-spin,リスピン
+ui.race.chargeIntervene,차지 개입,Charge Intervene,チャージ介入
+ui.race.confirm,확정,Confirm,確定
+ui.race.spin,스핀,Spin,スピン
+ui.race.skillSlotFormat,S{index},S{index},S{index}
+ui.race.costFormat,◆{cost},◆{cost},◆{cost}
+ui.race.chassisLabel,섀시,Chassis,シャシー
+ui.race.chassisFormat,{value},{value},{value}
+ui.race.chargeLabel,차지,Charge,チャージ
+ui.race.chargeFormat,{value}/{cap},{value}/{cap},{value}/{cap}
+ui.race.consumableEmpty,―,―,―
+ui.race.consumableFilled,▣,▣,▣
+ui.race.menu,≡,≡,≡
+ui.race.timerFormat,{value},{value},{value}
+ui.race.resonanceBanner,레조넌스,Resonance,レゾナンス
+ui.race.locked,잠금,Locked,ロック
+ui.race.speakerRelay,중계,Relay,実況
+ui.race.actionWithCost,{label} {cost},{label} {cost},{label} {cost}
+ui.title.gameTitle,FORMULA PULSE,FORMULA PULSE,FORMULA PULSE
+ui.title.subtitle,SPIN THE GRID,SPIN THE GRID,SPIN THE GRID
+ui.title.continueRun,계속하기,Continue,つづきから
+ui.title.newCareer,새 커리어,New Career,新規キャリア
+ui.title.archive,기록실,Records Room,記録室
+ui.title.options,옵션,Options,オプション
+ui.title.quit,종료,Quit,終了
+ui.title.versionFormat,v{version},v{version},v{version}
+ui.save.header,커리어 선택,Select Career,キャリア選択
+ui.save.back,뒤로,Back,戻る
+ui.save.slotFormat,슬롯 {index},Slot {index},スロット {index}
+ui.save.empty,빈 슬롯,Empty Slot,空きスロット
+ui.save.progressFormat,시즌 {season} · 투어 {tour} · 제{race}전,Season {season} · Tour {tour} · Race {race},シーズン{season} · ツアー{tour} · 第{race}戦
+ui.save.hintNew,새 커리어를 시작할 슬롯을 고르세요.,Choose a slot to start a new career.,新しいキャリアを始めるスロットを選んでください。
+ui.save.hintContinue,이어할 커리어를 고르세요.,Choose a career to continue.,続けるキャリアを選んでください。
+ui.gpResult.header,그랑프리 결산,Grand Prix Results,グランプリ決算
+ui.gpResult.finalRank,최종 순위,Final Position,最終順位
+ui.gpResult.tourPoints,투어 포인트,Tour Points,ツアーポイント
+ui.gpResult.prize,상금,Prize,賞金
+ui.gpResult.finishBonus,완주 보너스,Finish Bonus,完走ボーナス
+ui.gpResult.carryOver,이월,Carry Over,繰り越し
+ui.gpResult.rankFormat,P{rank},P{rank},P{rank}
+ui.gpResult.retired,리타이어 — 투어 탈락,Retired — out of the tour,リタイア — ツアー脱落
+ui.gpResult.pointsFormat,+{points},+{points},+{points}
+ui.gpResult.creditFormat,{amount} Cr,{amount} Cr,{amount} Cr
+ui.gpResult.carryFormat,섀시 {chassis} · 차지 {charge},Chassis {chassis} · Charge {charge},シャシー{chassis} · チャージ{charge}
+ui.gpResult.next,다음으로,Next,次へ
+ui.gpResult.toTourReport,투어 결산으로,To Tour Results,ツアー決算へ
+ui.gpResult.saved,저장됨,Saved,保存しました
+ui.recap.header,간이 정산,Quick Settlement,簡易精算
+ui.recap.summaryFormat,직전 P{rank} · 투어 포인트 +{points},Last race P{rank} · Tour Points +{points},直前 P{rank} · ツアーポイント +{points}
+ui.recap.creditsFormat,{amount} Cr,{amount} Cr,{amount} Cr
+ui.recap.fieldRepair,필드 정비,Field Service,フィールドサービス
+ui.recap.consumableHeaderFormat,소모품 보충 {held}/{cap},Consumables {held}/{cap},消耗品の補充 {held}/{cap}
+ui.recap.consumableBuyFormat,{item} {amount} Cr,{item} {amount} Cr,{item} {amount} Cr
+ui.recap.deckHeaderFormat,덱 교체 {used}/{slots},Deck Change {used}/{slots},デッキ変更 {used}/{slots}
+ui.recap.deckEntryFormat,{mark} {skill},{mark} {skill},{mark} {skill}
+ui.recap.deckEquipped,●,●,●
+ui.recap.deckUnequipped,○,○,○
+ui.recap.deckNoSkill,해금된 스킬 없음,No skills unlocked,解放済みスキルなし
+ui.recap.next,다음 대회로,To Next Grand Prix,次のグランプリへ
+ui.recap.repairCostFormat,이번 {now} Cr → 다음 {next} Cr,Now {now} Cr → Next {next} Cr,今回 {now} Cr → 次回 {next} Cr
+ui.recap.chassisFormat,섀시 {now}% → {after}%,Chassis {now}% → {after}%,シャシー {now}% → {after}%
+ui.recap.chassisNowFormat,섀시 {now}%,Chassis {now}%,シャシー {now}%
+ui.tourReport.header,투어 결산,Tour Results,ツアー決算
+ui.tourReport.block1,투어 종합 순위,Tour Standing,ツアー総合順位
+ui.tourReport.block2,챔피언십 포인트,Championship Points,チャンピオンシップポイント
+ui.tourReport.block3,수입,Income,収入
+ui.tourReport.block4,펄스 차지 환전,Pulse Charge Exchange,パルスチャージ換金
+ui.tourReport.block5,차지 소멸,Charge Expiry,チャージ消滅
+ui.tourReport.block6,주행 데이터,Drive Data,走行データ
+ui.tourReport.rankFormat,P{rank},P{rank},P{rank}
+ui.tourReport.pointsFormat,{points},{points},{points}
+ui.tourReport.creditFormat,{amount} Cr,{amount} Cr,{amount} Cr
+ui.tourReport.dataFormat,{amount} DP,{amount} DP,{amount} DP
+ui.tourReport.dropoutNote,탈락 — 완주 보너스 미지급 · 순위 보상 축소,Out — no finish bonus · reduced position reward,脱落 — 完走ボーナスなし · 順位報酬は縮小
+ui.tourReport.chargeExpired,잔여 차지는 투어 경계에서 소멸합니다.,Remaining charge expires at the tour boundary.,残りのチャージはツアー境界で消滅します。
+ui.tourReport.toGarage,개러지로,To Garage,ガレージへ
 ui.save.cardFormat,"{label}
+{body}","{label}
+{body}","{label}
 {body}"
-ui.confirm.irreversible,이 행동은 되돌릴 수 없습니다.
-ui.confirm.ok,확인
-ui.confirm.cancel,취소
-ui.hub.garageTitle,개러지
-ui.hub.amountFormat,{amount}
-ui.hub.progressFormat,시즌 {season} · 투어 {tour} · 제{race}전
-ui.hub.back,개러지로
-ui.hub.depart,다음 투어 출발
-ui.hub.lockedByCrew," — {crew} 합류 시"
-ui.hub.stRepair,정비 베이
-ui.hub.stTuning,튜닝 벤치
-ui.hub.stStrategy,전략실
-ui.hub.stRecords,기록실
-ui.hub.stSponsor,스폰서 데스크
-ui.hub.stFacility,시설 확장
-ui.hub.stOverhaul,시즌 오버홀
-ui.hub.stRecruit,크루 영입
-ui.repairBay.title,정비 베이
-ui.repairBay.fullRepair,전면 정비
-ui.repairBay.perChFormat,섀시 1당 {amount} Cr
-ui.repairBay.freeLineNote,투어 개시 시 {line}까지 무상 복원됩니다.
-ui.repairBay.run,실행
-ui.repairBay.totalCostFormat,총비용 {amount} Cr
-ui.repairBay.chassisFormat,섀시 {now}% → {after}%
-ui.repairBay.chassisNowFormat,섀시 {now}%
-ui.tuningBench.title,튜닝 벤치
-ui.tuningBench.buy,강화
-ui.tuningBench.maxed,최대 단계
-ui.tuningBench.stepFilled,●
-ui.tuningBench.stepEmpty,○
-ui.tuningBench.costFormat,{amount} DP
-ui.tuningBench.redistribute,재배분
-ui.strategy.title,전략실
-ui.strategy.tierFormat,스킬 티어 {tier}
-ui.strategy.tierLockedFormat,스킬 티어 {tier} — 개방: {condition}
-ui.strategy.openFirstPodium,첫 포디움
-ui.strategy.openFirstGpWin,첫 그랑프리 우승
-ui.strategy.equip,장착
-ui.strategy.unequip,해제
-ui.strategy.unlockFormat,해금 {amount} DP
-ui.strategy.unlockConfirm,{skill} 스킬을 해금합니다.
-ui.strategy.deckHeaderFormat,덱 {used}/{slots}
-ui.strategy.expandFormat,슬롯 확장 {amount} DP
-ui.records.title,기록실
-ui.records.tabRivals,라이벌 파일
-ui.records.tabCareer,통산 기록
-ui.records.tabArchive,아카이브
-ui.records.dpTotalFormat,생애 누적 {amount} DP
-ui.records.archiveEmpty,기록된 이벤트가 아직 없습니다.
-ui.sponsorDesk.title,스폰서 데스크
-ui.sponsorDesk.slotFormat,계약 {used}/{slots}
-ui.sponsorDesk.incomeFormat,정기 {regular} Cr · 보너스 {bonus} Cr
-ui.sponsorDesk.sign,체결
-ui.sponsorDesk.signed,계약 중
-ui.sponsorDesk.signConfirm,{sponsor} 계약을 체결합니다.
-ui.facilityPanel.title,시설 확장
-ui.facilityPanel.buy,구매
-ui.facilityPanel.owned,보유
-ui.facilityPanel.buyConfirm,{facility} 시설을 확장합니다.
-ui.overhaulScreen.title,시즌 오버홀
-ui.overhaulScreen.gradeFormat,시즌 P{rank} — 슬롯 {slots} · 후보 {candidates}
-ui.overhaulScreen.confirm,오버홀 확정
-ui.overhaulScreen.installConfirm,{overhaul} 오버홀을 확정합니다.
-ui.hub.stationLockedFormat,{station} — {crew} 합류 시
-ui.records.relationFormat,{axis} {stage}단계
-ui.duel.playerFormat,No.{number}
-ui.duel.namedFormat,No.{number} {name}
-ui.duel.overtake,추월 듀얼
-ui.duel.defense,방어 듀얼
-ui.duel.boost,부스트 투입
-ui.duel.boostFilled,◆
-ui.duel.boostEmpty,◇
-ui.seasonResult.headerFormat,시즌 {season} 결산
-ui.seasonResult.rowFormat,P{rank} {name} — {points}
-ui.seasonResult.summaryFormat,챔피언십 P{rank} · {points}점
-ui.seasonResult.champion,시즌 챔피언
-ui.seasonResult.epilogue,2연속 챔피언 — 에필로그 개방
-ui.seasonResult.carryOn,시즌 마감 — 다음 시즌으로 이어집니다.
-ui.seasonResult.toOverhaul,시즌 오버홀로
-ui.eventNode.proceed,계속
-ui.eventNode.rewardFormat,+{amount}
-ui.eventNode.rewardChassisFormat,섀시 +{amount}
-ui.eventNode.rare,희귀
-ui.vn.skip,스킵 ▶▶
-ui.vn.speakerVane,베인
-ui.vn.speakerMarta,마르타
-ui.vn.speakerTheo,테오
-ui.vn.speakerNarration,
-ui.vn.placeholderLine01,…통신 채널 연결. 브리핑을 시작한다.
-ui.vn.calendarTitle,리그 공식 발표 — 시즌 캘린더
-ui.vn.calendarRowFormat,투어 {tour} — {stage}
-ui.vn.calendarAnchorFormat,투어 {tour} — {stage} ★
-ui.records.replay,재생
-ui.options.header,옵션
-ui.options.tabGameplay,게임플레이
-ui.options.tabAccessibility,연출·접근성
-ui.options.tabAudioVideo,화면·사운드
-ui.options.tabControls,조작
-ui.options.tabLanguage,언어
-ui.options.o1,화면 셰이크
-ui.options.o2,플래시
-ui.options.o3,패드 진동
-ui.options.o4,릴 정지 속도
-ui.options.o5,개입 창 타이머
-ui.options.o5Notice,시간 제한이 없어지며 빠른 결정 보너스는 발생하지 않게 됩니다.
-ui.options.o6,타이머 수치 표시
-ui.options.o7,텍스트 크기
-ui.options.o8,UI 스케일
-ui.options.o9,색각 대응
-ui.options.o10,VN 자동 진행 속도
-ui.options.o11,언어
-ui.options.o12,씬 패널 모션
-ui.options.o13,마스터 볼륨
-ui.options.o14,BGM 볼륨
-ui.options.o15,SFX 볼륨
-ui.options.stepStandard,표준
-ui.options.stepReduced,감소
-ui.options.stepOff,끔
-ui.options.stepOn,켬
-ui.options.stepFast,고속
-ui.options.stepInstant,일괄 정지
-ui.options.stepTimerBase,기본
-ui.options.stepTimer15,×1.5
-ui.options.stepTimer20,×2
-ui.options.stepTimerOff,비활성
-ui.options.stepScale100,100%
-ui.options.stepScale110,110%
-ui.options.stepScale115,115%
-ui.options.stepScale125,125%
-ui.options.stepScale130,130%
-ui.options.stepPaletteBase,기본
-ui.options.stepPaletteAlt,대체 팔레트
-ui.options.stepSlow,느림
-ui.options.stepNormal,보통
-ui.options.stepFastText,빠름
-ui.options.stepKorean,한국어
-ui.options.volumeFormat,{value}
-ui.options.stepPrev,◀
-ui.options.stepNext,▶
-ui.options.resetDefaults,기본값 복원
-ui.options.close,닫기
-ui.options.controlsNote,조작 리매핑은 주요 키 한정으로 제공 예정입니다. 현재 매핑 — 스핀·확정 Space / 홀드 1·2·3 / 리스핀 R / 차지 개입 C / 일시정지 Esc
-ui.pause.resume,재개
-ui.pause.options,옵션
-ui.pause.achievements,업적
-ui.pause.toTitle,타이틀로
-ui.pause.saveNotice,진행은 최근 저장 지점 기준입니다.
-ui.pause.countFormat,{count}
-ui.tip.currencyTitle,재화 안내
-ui.tip.currencyBody,크레딧은 정비·소모품에 쓰는 회전 재화입니다. 주행 데이터는 스킬·시설에 쓰는 축적 재화입니다.
-ui.tip.dismiss,확인
-ui.options.stepStillCut,정지 컷
-ui.stage.azureCoast,아주르 코스트
-ui.circuit.ac1,리비에라 런
-ui.sector.ac1s1,코스트 하이웨이
-ui.sector.ac1s2,팜 커브
-ui.sector.ac1s3,비치프런트
-ui.sector.ac1s4,마리나 게이트
-ui.circuit.ac2,케이프 브레이커
-ui.sector.ac2s1,노스 쇼어 직선
-ui.sector.ac2s2,곶 회전
-ui.sector.ac2s3,크로스윈드 구간
-ui.sector.ac2s4,사우스 런
-ui.sector.ac2s5,등대 코너
-ui.circuit.ac3,마리나 서킷
-ui.sector.ac3s1,항만 시케인
-ui.sector.ac3s2,방파제 대로
-ui.sector.ac3s3,요트 하버 유턴
-ui.sector.ac3s4,씨사이드 스위프
-ui.circuit.ac4,그랑 아주르
-ui.sector.ac4s1,그랑 스트레이트
-ui.sector.ac4s2,오션 뷰 벤드
-ui.sector.ac4s3,클리프 시케인
-ui.sector.ac4s4,터널 출구
-ui.sector.ac4s5,하버 피니시
-ui.event.acWindWarning,해풍 경보
-ui.event.acResortSponsor,리조트 스폰서 데이
-ui.event.acBeachEncounter,비치 조우
-ui.event.acSaltWash,해염 세척
-ui.stage.altaRidge,알타 리지
-ui.circuit.ar1,포트힐 클라임
-ui.sector.ar1s1,산기슭 오르막
-ui.sector.ar1s2,포레스트 에스
-ui.sector.ar1s3,올드 브리지 협로
-ui.sector.ar1s4,고원 마을 직선
-ui.circuit.ar2,헤어핀 밸리
-ui.sector.ar2s1,제1 헤어핀군
-ui.sector.ar2s2,제2 헤어핀군
-ui.sector.ar2s3,절벽 가드레일 구간
-ui.sector.ar2s4,밸리 플로어
-ui.sector.ar2s5,계곡 출구 브레이킹 존
-ui.circuit.ar3,릿지라인
-ui.sector.ar3s1,능선 고속 리듬
-ui.sector.ar3s2,고도 구간
-ui.sector.ar3s3,터널 관통
-ui.sector.ar3s4,다운힐 에스
-ui.circuit.ar4,서밋 패스
-ui.sector.ar4s1,관문 시케인
-ui.sector.ar4s2,파노라마 벤드
-ui.sector.ar4s3,절개지 낙석 구간
-ui.sector.ar4s4,서밋 헤어핀
-ui.sector.ar4s5,다운힐 피니시
-ui.event.arAltitudeCheck,고지 적응 점검
-ui.event.arLodgeRest,산장 휴식
-ui.event.arOldPass,옛 고갯길
-ui.event.arRescueCheer,산악 구조대 격려
-ui.stage.mirageFlat,미라지 플랫
-ui.circuit.mf1,듄 크로싱
-ui.sector.mf1s1,사구 횡단로
-ui.sector.mf1s2,모래 유입 구간
-ui.sector.mf1s3,와디 벤드
-ui.sector.mf1s4,캠프 게이트 직선
-ui.circuit.mf2,솔트 플랫
-ui.sector.mf2s1,솔트 스트레이트
-ui.sector.mf2s2,미러 라인
-ui.sector.mf2s3,열파 구간
-ui.sector.mf2s4,플랫 커브
-ui.sector.mf2s5,그리드 피니시
-ui.circuit.mf3,캐니언 런
-ui.sector.mf3s1,협곡 진입 에스
-ui.sector.mf3s2,암벽 협로
-ui.sector.mf3s3,그늘 협곡
-ui.sector.mf3s4,캐니언 출구
-ui.circuit.mf4,그레이트 미라지
-ui.sector.mf4s1,호라이즌 스트레이트
-ui.sector.mf4s2,모래폭풍 상습 구간
-ui.sector.mf4s3,폐허 시케인
-ui.sector.mf4s4,선셋 벤드
-ui.sector.mf4s5,오아시스 피니시
-ui.event.mfSandstormWarning,모래폭풍 경보
-ui.event.mfOasisCamp,오아시스 캠프
-ui.event.mfDocumentary,횡단 다큐 촬영
-ui.event.mfMirageSighting,신기루 목격담
-ui.stage.pulseDome,펄스 돔
-ui.circuit.pd1,이그니션
-ui.sector.pd1s1,돔 메인 스트레이트
-ui.sector.pd1s2,제1 뱅크
-ui.sector.pd1s3,인필드 스위프
-ui.sector.pd1s4,피니시 뱅크
-ui.circuit.pd2,벨로시티
-ui.sector.pd2s1,백스트레이트
-ui.sector.pd2s2,하이 뱅크
-ui.sector.pd2s3,크로스오버 직선
-ui.sector.pd2s4,세컨드 뱅크
-ui.sector.pd2s5,라인 교차 피니시
-ui.circuit.pd3,크루서블
-ui.sector.pd3s1,인필드 시케인군
-ui.sector.pd3s2,조명 전환 구간
-ui.sector.pd3s3,돔 터널 섹션
-ui.sector.pd3s4,스타디움 헤어핀
-ui.circuit.pd4,더 제니스
-ui.sector.pd4s1,메인 스트레이트
-ui.sector.pd4s2,챔피언 시케인
-ui.sector.pd4s3,하이 뱅크
-ui.sector.pd4s4,터널 명암 구간
-ui.sector.pd4s5,제니스 코너
-ui.event.pdMediaDay,미디어 데이
-ui.event.pdLeagueGala,리그 갈라
-ui.event.pdCeremonyRehearsal,세리머니 리허설
-ui.event.pdPitWalk,피트 워크
-raceLog.consumableUse01,{item} 사용.
-ui.milestone.firstFinish,첫 완주
-ui.milestone.firstPoint,첫 포인트
-ui.milestone.firstPodium,첫 포디움
-ui.milestone.firstGpWin,첫 그랑프리 우승
-ui.milestone.firstTourWin,첫 투어 우승
-ui.milestone.seasonChampion,시즌 챔피언
-ui.milestone.lorentzBeat,로렌츠 첫 격파
-ui.milestone.beatLorentz,로렌츠 첫 선착
-ui.milestone.beatMaro,마로 첫 선착
-ui.milestone.beatDiaz,디아스 첫 선착
-ui.milestone.beatVolkova,볼코바 첫 선착
-ui.milestone.beatHolloway,홀로웨이 첫 선착
-ui.milestone.beatBianca,비앙카 첫 선착
-ui.milestone.beatSherwood,셔우드 첫 선착
-ui.milestone.beatJude,주드 첫 선착
-ui.achievement.firstFinish,첫 완주
-ui.achievement.firstPoint,첫 포인트
-ui.achievement.firstPodium,첫 포디움
-ui.achievement.firstGpWin,첫 그랑프리 우승
-ui.achievement.firstTourWin,첫 투어 우승
-ui.achievement.seasonChampion,시즌 챔피언
-ui.achievement.doubleChampion,더블 챔피언
-ui.achievement.grandSlam,그랜드 슬램
-ui.achievement.perfectSeason,퍼펙트 시즌
-ui.achievement.allCircuits,전 서킷 제패
-ui.achievement.beatLorentz,로렌츠 첫 선착
-ui.achievement.beatMaro,마로 첫 선착
-ui.achievement.beatDiaz,디아스 첫 선착
-ui.achievement.beatVolkova,볼코바 첫 선착
-ui.achievement.beatHolloway,홀로웨이 첫 선착
-ui.achievement.beatBianca,비앙카 첫 선착
-ui.achievement.beatSherwood,셔우드 첫 선착
-ui.achievement.beatJude,주드 첫 선착
-ui.achievement.beatLorentzGp,왕좌를 넘다
-ui.achievement.relationThrone,대등
-ui.achievement.relationReunion,재회의 끝
-ui.achievement.relationKinship,호적수
-ui.achievement.relationSuccession,계승
-ui.achievement.relationSuccessionMaro,두 번째 계승
-ui.achievement.firstDuelWin,첫 듀얼 승리
-ui.achievement.duel10Wins,듀얼 통산 10승
-ui.achievement.cleanGp,무트러블 그랑프리
-ui.achievement.chanceThreeMatch,찬스 3매치
-ui.achievement.noInterventionWin,무개입 우승
-ui.achievement.finalLapComeback,최종 랩 역전 우승
-ui.achievement.crewComplete,크루 완성
-ui.achievement.allSkills,전 스킬 해금
-ui.achievement.deckSlots5,덱 슬롯 5
-ui.achievement.allFacilities,개러지 완성
-ui.achievement.rivalFiles,라이벌 파일 완성
-ui.achievement.l3Throne,왕좌의 목격
-ui.achievement.l3Reunion,재회의 목격
-ui.achievement.l3Kinship,역전의 목격
-ui.achievement.scriptedP2,왕좌의 코앞
-ui.achievement.header,업적
-ui.achievement.tabCareer,커리어
-ui.achievement.tabRival,라이벌
-ui.achievement.tabDriving,드라이빙
-ui.achievement.tabGarage,개러지
-ui.achievement.tabArchive,아카이브
-ui.achievement.summaryFormat,달성 {done} / {total} ({percent}%)
-ui.achievement.hiddenSlot,???
-ui.achievement.progressFormat,{current} / {threshold}
-ui.achievement.markDone,달성
-ui.achievement.markPending,미달성
-ui.achievement.seasonFormat,시즌 {season}
-ui.achievement.seasonUnknown,—
-ui.achievement.serviceUnlinked,도전과제 미연동 — 게임 내 달성 기록은 그대로 유지됩니다.
-ui.achievement.close,닫기
-ui.title.achievements,업적
-ui.tutorial.spin,본 유닛 대기. 전개 후보 산출 — 개시 입력 요청.
-ui.tutorial.hold,후보 고정 가능. 유지 항목을 지목하십시오.
-ui.tutorial.respin,잔여 항목 재연산. 턴당 1회. 비용 차지 1.
-ui.tutorial.charge,차지 2 소모. 트러블 변수 소거. 권장 — 없음.
-ui.tutorial.confirm,잠정 결과 = 전개 후보. 확정 시 사건화.
-ui.tutorial.skip,건너뛰기
-ui.tutorial.stepFormat,{current}/{total}
-vn.act1.beat01,개러지. 차고 한 칸과 머신 한 대.
-vn.act1.beat02,노스윈드 개러지에 남은 건 이게 전부다.
-vn.act1.beat03,그래도 굴러갑니다. 어제 밤새 확인했어요.
-vn.act1.beat04,섀시 코드 NW-01. 이름은 보레아스.
-vn.act1.beat05,채권 정리 과정에서 헐값에 건졌다.
-vn.act1.beat06,관제 유닛에 신호가 들어온다.
-vn.act1.beat07,본 유닛 기동. 식별자 = 베인.
-vn.act1.beat08,주행 이력 조회 실패. 참조 데이터 없음.
-vn.act1.beat09,…방금 뭐라고 한 거예요?
-vn.act1.beat10,이 팀처럼 아무것도 없다는 뜻이지.
-vn.act1.beat11,카 넘버 13. 아무도 달지 않는 번호다.
-vn.act1.beat12,그러니 아무도 우리를 보지 않는다.
-vn.act1.react1,좋다. 그 손으로 몰아라.
-vn.act1.react2,저는 그 번호 마음에 들어요.
-vn.act1.react3,묻지 마라. 답은 트랙에 있다.
-vn.act2.beat01,포디움에서 내려온 뒤의 피트.
-vn.act2.beat02,표시판에 우리 팀 이름이 떴어요.
-vn.act2.beat03,노스윈드. 세 번째 자리에.
-vn.act2.beat04,그 표시판에 오랜만에 올랐다.
-vn.act2.beat05,패독의 시선이 이쪽을 향한다.
-vn.act2.beat06,이제 저쪽도 이 번호를 적어둘 거다.
-vn.act2.beat07,보레아스가 무슨 뜻인지 아세요?
-vn.act2.beat08,북풍의 신이래요. 찾아봤습니다.
-vn.act2.beat09,…누가 그런 이름을 붙였을까.
-vn.act2.beat10,명명 기록 조회 실패. 접근 권한 없음.
-vn.act2.beat11,그런 것도 막혀 있어요?
-vn.act2.beat12,해당 영역은 조회 대상 밖입니다.
-vn.act3.beat01,투어 종합 1위. 트로피는 없다.
-vn.act3.beat02,투어 하나를 가져왔다.
-vn.act3.beat03,팩토리 팀들 사이에서요.
-vn.act3.beat04,저쪽 계산에는 없던 결과다.
-vn.act3.beat05,대회 4전 누적 = 예측 분포 이탈.
-vn.act3.beat06,이탈 원인 미상. 재현 조건 불명.
-vn.act3.beat07,재현될 필요는 없다.
-vn.act3.beat08,한 코너면 된다.
-vn.act3.beat09,마르타가 화이트보드에 코너 하나를 그린다.
-vn.act3.beat10,저쪽은 랩 전체를 계산한다.
-vn.act3.beat11,우리는 그중 한 순간만 가져오면 된다.
-vn.act3.beat12,해당 접근의 성립 조건 산출 중.
-vn.act3.react1,그 얼굴이면 됐다.
-vn.act3.react2,여기냐. 눈은 나쁘지 않군.
-vn.act3.react3,시선 방향 기록. 우선순위 갱신합니다.
-vn.act4.beat01,로렌츠보다 앞서 체커를 받은 날의 개러지.
-vn.act4.beat02,1번보다 먼저 들어왔어요. 진짜로요.
-vn.act4.beat03,한 대회다. 챔피언십은 저쪽이 위다.
-vn.act4.beat04,그래도 나란히 달렸어요. 마지막 랩까지.
-vn.act4.beat05,…그래. 나란히 달렸다.
-vn.act4.beat06,최종 랩 전 구간 접촉 거리 유지 확인.
-vn.act4.beat07,20년 전에 이 팀이 원한 게 그거다.
-vn.act4.beat08,왕을 밟는 게 아니라 옆에 서는 것.
-vn.act4.beat09,이제 섰는데요.
-vn.act4.beat10,미완성인 채로 섰다. 그게 더 낫다.
-vn.act4.beat11,정의 불명 항목. 학습 대상으로 등록합니다.
-vn.act4.react1,오늘은 그걸로 됐다.
-vn.act4.react2,저도 봤어요. 전부 다요.
-vn.origin.beat01,개러지의 문이 닫힌다.
-vn.origin.beat02,보레아스를 어디서 건졌는지 말했지.
-vn.origin.beat03,누가 만들었는지는 말하지 않았다.
-vn.origin.beat04,악시온 다이내믹스다.
-vn.origin.beat05,…저쪽이 이걸 만들었다고요?
-vn.origin.beat06,만들었다. 그리고 버렸다.
-vn.origin.beat07,같은 입력에 같은 출력 — 저쪽 신조다.
-vn.origin.beat08,이 관제 유닛은 그 신조를 못 지켰다.
-vn.origin.beat09,미승인 출력 기록 확인. 재현 검증 실패.
-vn.origin.beat10,검증을 맡은 테스트 드라이버가 있었다.
-vn.origin.beat11,빅터 로렌츠다.
-vn.origin.beat12,…그 사람이요?
-vn.origin.beat13,완전한 제어로는 열리지 않았다.
-vn.origin.beat14,결함으로 보고했고 저쪽은 폐기했다.
-vn.origin.beat15,그 판단은 저쪽 세계에서는 옳았다.
-vn.origin.beat16,우리는 제어하지 않았다. 그게 전부다.
-vn.epilogue.beat01,두 번째 시즌의 결산이 끝난 개러지.
-vn.epilogue.beat02,연속 두 번이에요. 기록실에 남았어요.
-vn.epilogue.beat03,더블 챔피언. 이제 둘이다.
-vn.epilogue.beat04,로렌츠 쪽은요?
-vn.epilogue.beat05,그대로다. 빼앗는 칭호가 아니다.
-vn.epilogue.beat06,벽에는 20년 전 팀 사진이 걸려 있다.
-vn.epilogue.beat07,이 팀은 한 번 죽었다가 여기까지 왔다.
-vn.epilogue.beat08,다음은 네 차례겠지.
-vn.epilogue.beat09,제가요?
-vn.epilogue.beat10,언젠가는 그렇게 된다.
-vn.epilogue.beat11,다음 시즌 참조 데이터 = 두 시즌분.
-vn.epilogue.beat12,이번에는 조회에 실패하지 않습니다.
-vn.epilogue.react1,이거 지금 받으라는 거예요?
-vn.epilogue.react2,그 사진에 없는 얼굴이 둘이다.
-vn.reunion.beat01,알타 리지. 고지대의 얇은 공기.
-vn.reunion.beat02,여기 예선이 제일 어렵다던데요.
-vn.reunion.beat03,실버트레일이 이 무대에 강하다.
-vn.reunion.beat04,실버트레일이면 셔우드 씨네요.
-vn.reunion.beat05,그 이름은 여기서 꺼내지 마라.
-vnChoice.act1.opt1,[스티어링을 고쳐 쥔다]
-vnChoice.act1.opt2,[13번을 손으로 덮는다]
-vnChoice.act1.opt3,[마르타를 본다]
-vnChoice.act3.opt1,[고개를 끄덕인다]
-vnChoice.act3.opt2,[코너 하나를 짚는다]
-vnChoice.act3.opt3,[베인의 파형을 본다]
-vnChoice.act4.opt1,[헬멧을 내려놓는다]
-vnChoice.act4.opt2,[테오의 어깨를 친다]
-vnChoice.epilogue.opt1,[테오에게 공구를 건넨다]
-vnChoice.epilogue.opt2,[벽의 사진을 본다]
+ui.confirm.irreversible,이 행동은 되돌릴 수 없습니다.,This action cannot be undone.,この操作は取り消せません。
+ui.confirm.ok,확인,OK,確認
+ui.confirm.cancel,취소,Cancel,キャンセル
+ui.hub.garageTitle,개러지,Garage,ガレージ
+ui.hub.amountFormat,{amount},{amount},{amount}
+ui.hub.progressFormat,시즌 {season} · 투어 {tour} · 제{race}전,Season {season} · Tour {tour} · Race {race},シーズン{season} · ツアー{tour} · 第{race}戦
+ui.hub.back,개러지로,To Garage,ガレージへ
+ui.hub.depart,다음 투어 출발,Depart for Next Tour,次のツアーへ出発
+ui.hub.lockedByCrew," — {crew} 합류 시"," — on {crew} joining"," — {crew}加入時"
+ui.hub.stRepair,정비 베이,Service Bay,整備ベイ
+ui.hub.stTuning,튜닝 벤치,Tuning Bench,チューニングベンチ
+ui.hub.stStrategy,전략실,Strategy Room,戦略室
+ui.hub.stRecords,기록실,Records Room,記録室
+ui.hub.stSponsor,스폰서 데스크,Sponsor Desk,スポンサーデスク
+ui.hub.stFacility,시설 확장,Facility Expansion,施設拡張
+ui.hub.stOverhaul,시즌 오버홀,Season Overhaul,シーズンオーバーホール
+ui.hub.stRecruit,크루 영입,Crew Recruitment,クルー登用
+ui.repairBay.title,정비 베이,Service Bay,整備ベイ
+ui.repairBay.fullRepair,전면 정비,Full Service,フルサービス
+ui.repairBay.perChFormat,섀시 1당 {amount} Cr,{amount} Cr per chassis point,シャシー1あたり {amount} Cr
+ui.repairBay.freeLineNote,투어 개시 시 {line}까지 무상 복원됩니다.,Restored free up to {line} at tour start.,ツアー開始時に {line} まで無償で回復します。
+ui.repairBay.run,실행,Run,実行
+ui.repairBay.totalCostFormat,총비용 {amount} Cr,Total {amount} Cr,総費用 {amount} Cr
+ui.repairBay.chassisFormat,섀시 {now}% → {after}%,Chassis {now}% → {after}%,シャシー {now}% → {after}%
+ui.repairBay.chassisNowFormat,섀시 {now}%,Chassis {now}%,シャシー {now}%
+ui.tuningBench.title,튜닝 벤치,Tuning Bench,チューニングベンチ
+ui.tuningBench.buy,강화,Upgrade,強化
+ui.tuningBench.maxed,최대 단계,Max Level,最大段階
+ui.tuningBench.stepFilled,●,●,●
+ui.tuningBench.stepEmpty,○,○,○
+ui.tuningBench.costFormat,{amount} DP,{amount} DP,{amount} DP
+ui.tuningBench.redistribute,재배분,Redistribute,再配分
+ui.strategy.title,전략실,Strategy Room,戦略室
+ui.strategy.tierFormat,스킬 티어 {tier},Skill Tier {tier},スキルティア {tier}
+ui.strategy.tierLockedFormat,스킬 티어 {tier} — 개방: {condition},Skill Tier {tier} — opens: {condition},スキルティア {tier} — 開放: {condition}
+ui.strategy.openFirstPodium,첫 포디움,First Podium,初ポディウム
+ui.strategy.openFirstGpWin,첫 그랑프리 우승,First Grand Prix Win,初グランプリ優勝
+ui.strategy.equip,장착,Equip,装備
+ui.strategy.unequip,해제,Unequip,解除
+ui.strategy.unlockFormat,해금 {amount} DP,Unlock {amount} DP,解放 {amount} DP
+ui.strategy.unlockConfirm,{skill} 스킬을 해금합니다.,Unlock the skill {skill}.,{skill} スキルを解放します。
+ui.strategy.deckHeaderFormat,덱 {used}/{slots},Deck {used}/{slots},デッキ {used}/{slots}
+ui.strategy.expandFormat,슬롯 확장 {amount} DP,Expand Slot {amount} DP,スロット拡張 {amount} DP
+ui.records.title,기록실,Records Room,記録室
+ui.records.tabRivals,라이벌 파일,Rival Files,ライバルファイル
+ui.records.tabCareer,통산 기록,Career Records,通算記録
+ui.records.tabArchive,아카이브,Archive,アーカイブ
+ui.records.dpTotalFormat,생애 누적 {amount} DP,Lifetime {amount} DP,生涯累計 {amount} DP
+ui.records.archiveEmpty,기록된 이벤트가 아직 없습니다.,No events recorded yet.,記録されたイベントはまだありません。
+ui.sponsorDesk.title,스폰서 데스크,Sponsor Desk,スポンサーデスク
+ui.sponsorDesk.slotFormat,계약 {used}/{slots},Contracts {used}/{slots},契約 {used}/{slots}
+ui.sponsorDesk.incomeFormat,정기 {regular} Cr · 보너스 {bonus} Cr,Regular {regular} Cr · Bonus {bonus} Cr,定期 {regular} Cr · ボーナス {bonus} Cr
+ui.sponsorDesk.sign,체결,Sign,締結
+ui.sponsorDesk.signed,계약 중,Under Contract,契約中
+ui.sponsorDesk.signConfirm,{sponsor} 계약을 체결합니다.,Sign the {sponsor} contract.,{sponsor} 契約を締結します。
+ui.facilityPanel.title,시설 확장,Facility Expansion,施設拡張
+ui.facilityPanel.buy,구매,Purchase,購入
+ui.facilityPanel.owned,보유,Owned,保有
+ui.facilityPanel.buyConfirm,{facility} 시설을 확장합니다.,Expand the {facility} facility.,{facility} 施設を拡張します。
+ui.overhaulScreen.title,시즌 오버홀,Season Overhaul,シーズンオーバーホール
+ui.overhaulScreen.gradeFormat,시즌 P{rank} — 슬롯 {slots} · 후보 {candidates},Season P{rank} — Slots {slots} · Candidates {candidates},シーズン P{rank} — スロット {slots} · 候補 {candidates}
+ui.overhaulScreen.confirm,오버홀 확정,Confirm Overhaul,オーバーホール確定
+ui.overhaulScreen.installConfirm,{overhaul} 오버홀을 확정합니다.,Confirm the {overhaul} overhaul.,{overhaul} オーバーホールを確定します。
+ui.hub.stationLockedFormat,{station} — {crew} 합류 시,{station} — on {crew} joining,{station} — {crew}加入時
+ui.records.relationFormat,{axis} {stage}단계,{axis} Stage {stage},{axis} 第{stage}段階
+ui.duel.playerFormat,No.{number},No.{number},No.{number}
+ui.duel.namedFormat,No.{number} {name},No.{number} {name},No.{number} {name}
+ui.duel.overtake,추월 듀얼,Overtake Duel,追い抜きデュエル
+ui.duel.defense,방어 듀얼,Defense Duel,防御デュエル
+ui.duel.boost,부스트 투입,Commit Boost,ブースト投入
+ui.duel.boostFilled,◆,◆,◆
+ui.duel.boostEmpty,◇,◇,◇
+ui.seasonResult.headerFormat,시즌 {season} 결산,Season {season} Results,シーズン{season} 決算
+ui.seasonResult.rowFormat,P{rank} {name} — {points},P{rank} {name} — {points},P{rank} {name} — {points}
+ui.seasonResult.summaryFormat,챔피언십 P{rank} · {points}점,Championship P{rank} · {points} pts,チャンピオンシップ P{rank} · {points}点
+ui.seasonResult.champion,시즌 챔피언,Season Champion,シーズンチャンピオン
+ui.seasonResult.epilogue,2연속 챔피언 — 에필로그 개방,Back-to-back champion — epilogue unlocked,2連続チャンピオン — エピローグ開放
+ui.seasonResult.carryOn,시즌 마감 — 다음 시즌으로 이어집니다.,Season closed — carrying on to the next season.,シーズン終了 — 次のシーズンへ続きます。
+ui.seasonResult.toOverhaul,시즌 오버홀로,To Season Overhaul,シーズンオーバーホールへ
+ui.eventNode.proceed,계속,Continue,続ける
+ui.eventNode.rewardFormat,+{amount},+{amount},+{amount}
+ui.eventNode.rewardChassisFormat,섀시 +{amount},Chassis +{amount},シャシー +{amount}
+ui.eventNode.rare,희귀,Rare,レア
+ui.vn.skip,스킵 ▶▶,Skip ▶▶,スキップ ▶▶
+ui.vn.speakerVane,베인,VEIN,ヴェイン
+ui.vn.speakerMarta,마르타,Marta,マルタ
+ui.vn.speakerTheo,테오,Theo,テオ
+ui.vn.speakerNarration,,,
+ui.vn.placeholderLine01,…통신 채널 연결. 브리핑을 시작한다.,…Channel open. The briefing begins.,…通信チャネル接続。ブリーフィングを始める。
+ui.vn.calendarTitle,리그 공식 발표 — 시즌 캘린더,League Announcement — Season Calendar,リーグ公式発表 — シーズンカレンダー
+ui.vn.calendarRowFormat,투어 {tour} — {stage},Tour {tour} — {stage},ツアー{tour} — {stage}
+ui.vn.calendarAnchorFormat,투어 {tour} — {stage} ★,Tour {tour} — {stage} ★,ツアー{tour} — {stage} ★
+ui.records.replay,재생,Replay,再生
+ui.options.header,옵션,Options,オプション
+ui.options.tabGameplay,게임플레이,Gameplay,ゲームプレイ
+ui.options.tabAccessibility,연출·접근성,Presentation & Access,演出・アクセシビリティ
+ui.options.tabAudioVideo,화면·사운드,Display & Sound,画面・サウンド
+ui.options.tabControls,조작,Controls,操作
+ui.options.tabLanguage,언어,Language,言語
+ui.options.o1,화면 셰이크,Screen Shake,画面シェイク
+ui.options.o2,플래시,Flash,フラッシュ
+ui.options.o3,패드 진동,Pad Vibration,パッド振動
+ui.options.o4,릴 정지 속도,Reel Stop Speed,リール停止速度
+ui.options.o5,개입 창 타이머,Intervention Window Timer,介入ウィンドウのタイマー
+ui.options.o5Notice,시간 제한이 없어지며 빠른 결정 보너스는 발생하지 않게 됩니다.,The time limit is removed and the quick-decision bonus no longer occurs.,制限時間がなくなり、迅速な判断ボーナスは発生しなくなります。
+ui.options.o6,타이머 수치 표시,Show Timer Value,タイマー数値の表示
+ui.options.o7,텍스트 크기,Text Size,文字サイズ
+ui.options.o8,UI 스케일,UI Scale,UIスケール
+ui.options.o9,색각 대응,Color Vision Support,色覚サポート
+ui.options.o10,VN 자동 진행 속도,VN Auto-Advance Speed,VN自動進行の速度
+ui.options.o11,언어,Language,言語
+ui.options.o12,씬 패널 모션,Scene Panel Motion,シーンパネルのモーション
+ui.options.o13,마스터 볼륨,Master Volume,マスター音量
+ui.options.o14,BGM 볼륨,BGM Volume,BGM音量
+ui.options.o15,SFX 볼륨,SFX Volume,SFX音量
+ui.options.stepStandard,표준,Standard,標準
+ui.options.stepReduced,감소,Reduced,軽減
+ui.options.stepOff,끔,Off,オフ
+ui.options.stepOn,켬,On,オン
+ui.options.stepFast,고속,Fast,高速
+ui.options.stepInstant,일괄 정지,Instant Stop,一括停止
+ui.options.stepTimerBase,기본,Default,標準
+ui.options.stepTimer15,×1.5,×1.5,×1.5
+ui.options.stepTimer20,×2,×2,×2
+ui.options.stepTimerOff,비활성,Disabled,無効
+ui.options.stepScale100,100%,100%,100%
+ui.options.stepScale110,110%,110%,110%
+ui.options.stepScale115,115%,115%,115%
+ui.options.stepScale125,125%,125%,125%
+ui.options.stepScale130,130%,130%,130%
+ui.options.stepPaletteBase,기본,Default,標準
+ui.options.stepPaletteAlt,대체 팔레트,Alternate Palette,代替パレット
+ui.options.stepSlow,느림,Slow,遅い
+ui.options.stepNormal,보통,Normal,普通
+ui.options.stepFastText,빠름,Fast,速い
+ui.options.stepKorean,한국어,한국어,한국어
+ui.options.volumeFormat,{value},{value},{value}
+ui.options.stepPrev,◀,◀,◀
+ui.options.stepNext,▶,▶,▶
+ui.options.resetDefaults,기본값 복원,Restore Defaults,初期値に戻す
+ui.options.close,닫기,Close,閉じる
+ui.options.controlsNote,조작 리매핑은 주요 키 한정으로 제공 예정입니다. 현재 매핑 — 스핀·확정 Space / 홀드 1·2·3 / 리스핀 R / 차지 개입 C / 일시정지 Esc,Remapping will be offered for primary keys only. Current mapping — Spin·Confirm Space / Hold 1·2·3 / Re-spin R / Charge Intervene C / Pause Esc,操作のリマップは主要キーに限り提供予定です。現在の割り当て — スピン・確定 Space / ホールド 1・2・3 / リスピン R / チャージ介入 C / 一時停止 Esc
+ui.pause.resume,재개,Resume,再開
+ui.pause.options,옵션,Options,オプション
+ui.pause.achievements,업적,Achievements,実績
+ui.pause.toTitle,타이틀로,To Title,タイトルへ
+ui.pause.saveNotice,진행은 최근 저장 지점 기준입니다.,Progress is based on the last save point.,進行は直近のセーブ地点が基準です。
+ui.pause.countFormat,{count},{count},{count}
+ui.tip.currencyTitle,재화 안내,Currency Guide,通貨ガイド
+ui.tip.currencyBody,크레딧은 정비·소모품에 쓰는 회전 재화입니다. 주행 데이터는 스킬·시설에 쓰는 축적 재화입니다.,Credits are the rotating currency for service and consumables. Drive Data is the accumulating currency for skills and facilities.,クレジットは整備・消耗品に使う回転型の通貨です。走行データはスキル・施設に使う蓄積型の通貨です。
+ui.tip.dismiss,확인,OK,確認
+ui.options.stepStillCut,정지 컷,Still Cut,静止カット
+ui.stage.azureCoast,아주르 코스트,Azure Coast,アズールコースト
+ui.circuit.ac1,리비에라 런,Riviera Run,リビエララン
+ui.sector.ac1s1,코스트 하이웨이,Coast Highway,コーストハイウェイ
+ui.sector.ac1s2,팜 커브,Palm Curve,パームカーブ
+ui.sector.ac1s3,비치프런트,Beachfront,ビーチフロント
+ui.sector.ac1s4,마리나 게이트,Marina Gate,マリーナゲート
+ui.circuit.ac2,케이프 브레이커,Cape Breaker,ケープブレイカー
+ui.sector.ac2s1,노스 쇼어 직선,North Shore Straight,ノースショア直線
+ui.sector.ac2s2,곶 회전,Cape Turn,岬の旋回
+ui.sector.ac2s3,크로스윈드 구간,Crosswind Section,クロスウィンド区間
+ui.sector.ac2s4,사우스 런,South Run,サウスラン
+ui.sector.ac2s5,등대 코너,Lighthouse Corner,灯台コーナー
+ui.circuit.ac3,마리나 서킷,Marina Circuit,マリーナサーキット
+ui.sector.ac3s1,항만 시케인,Harbor Chicane,港湾シケイン
+ui.sector.ac3s2,방파제 대로,Breakwater Boulevard,防波堤大通り
+ui.sector.ac3s3,요트 하버 유턴,Yacht Harbor U-Turn,ヨットハーバーUターン
+ui.sector.ac3s4,씨사이드 스위프,Seaside Sweep,シーサイドスイープ
+ui.circuit.ac4,그랑 아주르,Grand Azur,グラン・アズール
+ui.sector.ac4s1,그랑 스트레이트,Grand Straight,グランストレート
+ui.sector.ac4s2,오션 뷰 벤드,Ocean View Bend,オーシャンビューベンド
+ui.sector.ac4s3,클리프 시케인,Cliff Chicane,クリフシケイン
+ui.sector.ac4s4,터널 출구,Tunnel Exit,トンネル出口
+ui.sector.ac4s5,하버 피니시,Harbor Finish,ハーバーフィニッシュ
+ui.event.acWindWarning,해풍 경보,Sea Wind Warning,海風警報
+ui.event.acResortSponsor,리조트 스폰서 데이,Resort Sponsor Day,リゾートスポンサーデー
+ui.event.acBeachEncounter,비치 조우,Beach Encounter,ビーチでの遭遇
+ui.event.acSaltWash,해염 세척,Salt Wash,塩分洗浄
+ui.stage.altaRidge,알타 리지,Alta Ridge,アルタリッジ
+ui.circuit.ar1,포트힐 클라임,Porthill Climb,ポートヒルクライム
+ui.sector.ar1s1,산기슭 오르막,Foothill Climb,山麓の登り
+ui.sector.ar1s2,포레스트 에스,Forest S-Curve,フォレストS字
+ui.sector.ar1s3,올드 브리지 협로,Old Bridge Narrows,オールドブリッジ狭路
+ui.sector.ar1s4,고원 마을 직선,Plateau Village Straight,高原の村 直線
+ui.circuit.ar2,헤어핀 밸리,Hairpin Valley,ヘアピンバレー
+ui.sector.ar2s1,제1 헤어핀군,First Hairpin Cluster,第1ヘアピン群
+ui.sector.ar2s2,제2 헤어핀군,Second Hairpin Cluster,第2ヘアピン群
+ui.sector.ar2s3,절벽 가드레일 구간,Cliffside Guardrail Section,崖のガードレール区間
+ui.sector.ar2s4,밸리 플로어,Valley Floor,バレーフロア
+ui.sector.ar2s5,계곡 출구 브레이킹 존,Valley Exit Braking Zone,谷の出口 ブレーキングゾーン
+ui.circuit.ar3,릿지라인,Ridgeline,リッジライン
+ui.sector.ar3s1,능선 고속 리듬,Ridge Rhythm,尾根の高速リズム
+ui.sector.ar3s2,고도 구간,Altitude Section,高度区間
+ui.sector.ar3s3,터널 관통,Tunnel Run-Through,トンネル貫通
+ui.sector.ar3s4,다운힐 에스,Downhill S-Curve,ダウンヒルS字
+ui.circuit.ar4,서밋 패스,Summit Pass,サミットパス
+ui.sector.ar4s1,관문 시케인,Gateway Chicane,関門シケイン
+ui.sector.ar4s2,파노라마 벤드,Panorama Bend,パノラマベンド
+ui.sector.ar4s3,절개지 낙석 구간,Rockfall Cutting,切通しの落石区間
+ui.sector.ar4s4,서밋 헤어핀,Summit Hairpin,サミットヘアピン
+ui.sector.ar4s5,다운힐 피니시,Downhill Finish,ダウンヒルフィニッシュ
+ui.event.arAltitudeCheck,고지 적응 점검,Altitude Adaptation Check,高地適応の点検
+ui.event.arLodgeRest,산장 휴식,Lodge Rest,山荘での休憩
+ui.event.arOldPass,옛 고갯길,The Old Pass,古い峠道
+ui.event.arRescueCheer,산악 구조대 격려,Mountain Rescue Cheer,山岳救助隊の激励
+ui.stage.mirageFlat,미라지 플랫,Mirage Flat,ミラージュフラット
+ui.circuit.mf1,듄 크로싱,Dune Crossing,デューンクロッシング
+ui.sector.mf1s1,사구 횡단로,Dune Crossing Road,砂丘の横断路
+ui.sector.mf1s2,모래 유입 구간,Sand Drift Section,砂の流入区間
+ui.sector.mf1s3,와디 벤드,Wadi Bend,ワジベンド
+ui.sector.mf1s4,캠프 게이트 직선,Camp Gate Straight,キャンプゲート直線
+ui.circuit.mf2,솔트 플랫,Salt Flat,ソルトフラット
+ui.sector.mf2s1,솔트 스트레이트,Salt Straight,ソルトストレート
+ui.sector.mf2s2,미러 라인,Mirror Line,ミラーライン
+ui.sector.mf2s3,열파 구간,Heat Haze Section,熱波区間
+ui.sector.mf2s4,플랫 커브,Flat Curve,フラットカーブ
+ui.sector.mf2s5,그리드 피니시,Grid Finish,グリッドフィニッシュ
+ui.circuit.mf3,캐니언 런,Canyon Run,キャニオンラン
+ui.sector.mf3s1,협곡 진입 에스,Canyon Entry S-Curve,峡谷進入のS字
+ui.sector.mf3s2,암벽 협로,Rock Wall Narrows,岩壁の狭路
+ui.sector.mf3s3,그늘 협곡,Shaded Gorge,日陰の峡谷
+ui.sector.mf3s4,캐니언 출구,Canyon Exit,キャニオン出口
+ui.circuit.mf4,그레이트 미라지,Great Mirage,グレートミラージュ
+ui.sector.mf4s1,호라이즌 스트레이트,Horizon Straight,ホライズンストレート
+ui.sector.mf4s2,모래폭풍 상습 구간,Sandstorm Belt,砂嵐の常襲区間
+ui.sector.mf4s3,폐허 시케인,Ruins Chicane,廃墟シケイン
+ui.sector.mf4s4,선셋 벤드,Sunset Bend,サンセットベンド
+ui.sector.mf4s5,오아시스 피니시,Oasis Finish,オアシスフィニッシュ
+ui.event.mfSandstormWarning,모래폭풍 경보,Sandstorm Warning,砂嵐警報
+ui.event.mfOasisCamp,오아시스 캠프,Oasis Camp,オアシスキャンプ
+ui.event.mfDocumentary,횡단 다큐 촬영,Crossing Documentary Shoot,横断ドキュメンタリー撮影
+ui.event.mfMirageSighting,신기루 목격담,Mirage Sighting,蜃気楼の目撃談
+ui.stage.pulseDome,펄스 돔,The Pulse Dome,パルスドーム
+ui.circuit.pd1,이그니션,Ignition,イグニッション
+ui.sector.pd1s1,돔 메인 스트레이트,Dome Main Straight,ドームメインストレート
+ui.sector.pd1s2,제1 뱅크,First Bank,第1バンク
+ui.sector.pd1s3,인필드 스위프,Infield Sweep,インフィールドスイープ
+ui.sector.pd1s4,피니시 뱅크,Finish Bank,フィニッシュバンク
+ui.circuit.pd2,벨로시티,Velocity,ベロシティ
+ui.sector.pd2s1,백스트레이트,Back Straight,バックストレート
+ui.sector.pd2s2,하이 뱅크,High Bank,ハイバンク
+ui.sector.pd2s3,크로스오버 직선,Crossover Straight,クロスオーバー直線
+ui.sector.pd2s4,세컨드 뱅크,Second Bank,セカンドバンク
+ui.sector.pd2s5,라인 교차 피니시,Line Cross Finish,ライン交差フィニッシュ
+ui.circuit.pd3,크루서블,Crucible,クルーシブル
+ui.sector.pd3s1,인필드 시케인군,Infield Chicane Cluster,インフィールドシケイン群
+ui.sector.pd3s2,조명 전환 구간,Lighting Shift Section,照明転換区間
+ui.sector.pd3s3,돔 터널 섹션,Dome Tunnel Section,ドームトンネル区間
+ui.sector.pd3s4,스타디움 헤어핀,Stadium Hairpin,スタジアムヘアピン
+ui.circuit.pd4,더 제니스,The Zenith,ザ・ゼニス
+ui.sector.pd4s1,메인 스트레이트,Main Straight,メインストレート
+ui.sector.pd4s2,챔피언 시케인,Champion Chicane,チャンピオンシケイン
+ui.sector.pd4s3,하이 뱅크,High Bank,ハイバンク
+ui.sector.pd4s4,터널 명암 구간,Tunnel Light-Dark Section,トンネルの明暗区間
+ui.sector.pd4s5,제니스 코너,Zenith Corner,ゼニスコーナー
+ui.event.pdMediaDay,미디어 데이,Media Day,メディアデー
+ui.event.pdLeagueGala,리그 갈라,League Gala,リーグガラ
+ui.event.pdCeremonyRehearsal,세리머니 리허설,Ceremony Rehearsal,セレモニーリハーサル
+ui.event.pdPitWalk,피트 워크,Pit Walk,ピットウォーク
+raceLog.consumableUse01,{item} 사용.,{item} used.,{item} 使用。
+ui.milestone.firstFinish,첫 완주,First Finish,初完走
+ui.milestone.firstPoint,첫 포인트,First Point,初ポイント
+ui.milestone.firstPodium,첫 포디움,First Podium,初ポディウム
+ui.milestone.firstGpWin,첫 그랑프리 우승,First Grand Prix Win,初グランプリ優勝
+ui.milestone.firstTourWin,첫 투어 우승,First Tour Win,初ツアー優勝
+ui.milestone.seasonChampion,시즌 챔피언,Season Champion,シーズンチャンピオン
+ui.milestone.lorentzBeat,로렌츠 첫 격파,First Win over Lorenz,ローレンツ初撃破
+ui.milestone.beatLorentz,로렌츠 첫 선착,First Finish ahead of Lorenz,ローレンツに初先着
+ui.milestone.beatMaro,마로 첫 선착,First Finish ahead of Marceau,マルソーに初先着
+ui.milestone.beatDiaz,디아스 첫 선착,First Finish ahead of Diaz,ディアスに初先着
+ui.milestone.beatVolkova,볼코바 첫 선착,First Finish ahead of Volkova,ヴォルコワに初先着
+ui.milestone.beatHolloway,홀로웨이 첫 선착,First Finish ahead of Holloway,ホロウェイに初先着
+ui.milestone.beatBianca,비앙카 첫 선착,First Finish ahead of Bianca,ビアンカに初先着
+ui.milestone.beatSherwood,셔우드 첫 선착,First Finish ahead of Sherwood,シャーウッドに初先着
+ui.milestone.beatJude,주드 첫 선착,First Finish ahead of Jude,ジュードに初先着
+ui.achievement.firstFinish,첫 완주,First Finish,初完走
+ui.achievement.firstPoint,첫 포인트,First Point,初ポイント
+ui.achievement.firstPodium,첫 포디움,First Podium,初ポディウム
+ui.achievement.firstGpWin,첫 그랑프리 우승,First Grand Prix Win,初グランプリ優勝
+ui.achievement.firstTourWin,첫 투어 우승,First Tour Win,初ツアー優勝
+ui.achievement.seasonChampion,시즌 챔피언,Season Champion,シーズンチャンピオン
+ui.achievement.doubleChampion,더블 챔피언,Double Champion,ダブルチャンピオン
+ui.achievement.grandSlam,그랜드 슬램,Grand Slam,グランドスラム
+ui.achievement.perfectSeason,퍼펙트 시즌,Perfect Season,パーフェクトシーズン
+ui.achievement.allCircuits,전 서킷 제패,All Circuits Conquered,全サーキット制覇
+ui.achievement.beatLorentz,로렌츠 첫 선착,First Finish ahead of Lorenz,ローレンツに初先着
+ui.achievement.beatMaro,마로 첫 선착,First Finish ahead of Marceau,マルソーに初先着
+ui.achievement.beatDiaz,디아스 첫 선착,First Finish ahead of Diaz,ディアスに初先着
+ui.achievement.beatVolkova,볼코바 첫 선착,First Finish ahead of Volkova,ヴォルコワに初先着
+ui.achievement.beatHolloway,홀로웨이 첫 선착,First Finish ahead of Holloway,ホロウェイに初先着
+ui.achievement.beatBianca,비앙카 첫 선착,First Finish ahead of Bianca,ビアンカに初先着
+ui.achievement.beatSherwood,셔우드 첫 선착,First Finish ahead of Sherwood,シャーウッドに初先着
+ui.achievement.beatJude,주드 첫 선착,First Finish ahead of Jude,ジュードに初先着
+ui.achievement.beatLorentzGp,왕좌를 넘다,Past the Throne,王座を越える
+ui.achievement.relationThrone,대등,On Equal Terms,対等
+ui.achievement.relationReunion,재회의 끝,The End of the Reunion,再会の果て
+ui.achievement.relationKinship,호적수,Worthy Rival,好敵手
+ui.achievement.relationSuccession,계승,Succession,継承
+ui.achievement.relationSuccessionMaro,두 번째 계승,The Second Succession,二度目の継承
+ui.achievement.firstDuelWin,첫 듀얼 승리,First Duel Win,初デュエル勝利
+ui.achievement.duel10Wins,듀얼 통산 10승,Ten Duel Wins,デュエル通算10勝
+ui.achievement.cleanGp,무트러블 그랑프리,Trouble-Free Grand Prix,ノートラブルのグランプリ
+ui.achievement.chanceThreeMatch,찬스 3매치,Chance Three-Match,チャンス3マッチ
+ui.achievement.noInterventionWin,무개입 우승,Win Without Intervening,無介入での優勝
+ui.achievement.finalLapComeback,최종 랩 역전 우승,Final-Lap Comeback Win,最終ラップ逆転優勝
+ui.achievement.crewComplete,크루 완성,Full Crew,クルー完成
+ui.achievement.allSkills,전 스킬 해금,All Skills Unlocked,全スキル解放
+ui.achievement.deckSlots5,덱 슬롯 5,Five Deck Slots,デッキスロット5
+ui.achievement.allFacilities,개러지 완성,Garage Complete,ガレージ完成
+ui.achievement.rivalFiles,라이벌 파일 완성,Rival Files Complete,ライバルファイル完成
+ui.achievement.l3Throne,왕좌의 목격,Witness to the Throne,王座の目撃
+ui.achievement.l3Reunion,재회의 목격,Witness to the Reunion,再会の目撃
+ui.achievement.l3Kinship,역전의 목격,Witness to the Turnaround,逆転の目撃
+ui.achievement.scriptedP2,왕좌의 코앞,A Step from the Throne,王座の目前
+ui.achievement.header,업적,Achievements,実績
+ui.achievement.tabCareer,커리어,Career,キャリア
+ui.achievement.tabRival,라이벌,Rivals,ライバル
+ui.achievement.tabDriving,드라이빙,Driving,ドライビング
+ui.achievement.tabGarage,개러지,Garage,ガレージ
+ui.achievement.tabArchive,아카이브,Archive,アーカイブ
+ui.achievement.summaryFormat,달성 {done} / {total} ({percent}%),Earned {done} / {total} ({percent}%),達成 {done} / {total} ({percent}%)
+ui.achievement.hiddenSlot,???,???,???
+ui.achievement.progressFormat,{current} / {threshold},{current} / {threshold},{current} / {threshold}
+ui.achievement.markDone,달성,Earned,達成
+ui.achievement.markPending,미달성,Not Earned,未達成
+ui.achievement.seasonFormat,시즌 {season},Season {season},シーズン{season}
+ui.achievement.seasonUnknown,—,—,—
+ui.achievement.serviceUnlinked,도전과제 미연동 — 게임 내 달성 기록은 그대로 유지됩니다.,Achievements not linked — in-game records are kept as they are.,実績は未連携 — ゲーム内の達成記録はそのまま保持されます。
+ui.achievement.close,닫기,Close,閉じる
+ui.title.achievements,업적,Achievements,実績
+ui.tutorial.spin,본 유닛 대기. 전개 후보 산출 — 개시 입력 요청.,This unit standing by. Development candidates computed — input requested to begin.,本ユニット待機。展開候補 算出 — 開始入力を要請。
+ui.tutorial.hold,후보 고정 가능. 유지 항목을 지목하십시오.,Candidates can be locked. Designate the items to keep.,候補の固定が可能。維持する項目を指定してください。
+ui.tutorial.respin,잔여 항목 재연산. 턴당 1회. 비용 차지 1.,Remaining items recomputed. Once per turn. Cost: charge 1.,残余項目を再演算。ターンにつき1回。費用チャージ1。
+ui.tutorial.charge,차지 2 소모. 트러블 변수 소거. 권장 — 없음.,Charge 2 consumed. Trouble variable cleared. Recommendation — none.,チャージ2を消費。トラブル変数を消去。推奨 — なし。
+ui.tutorial.confirm,잠정 결과 = 전개 후보. 확정 시 사건화.,Provisional result = development candidate. On confirmation it becomes event.,暫定結果 = 展開候補。確定で事件化。
+ui.tutorial.skip,건너뛰기,Skip,スキップ
+ui.tutorial.stepFormat,{current}/{total},{current}/{total},{current}/{total}
+vn.act1.beat01,개러지. 차고 한 칸과 머신 한 대.,"The garage. One bay, one machine.",ガレージ。車庫ひとつ、マシン一台。
+vn.act1.beat02,노스윈드 개러지에 남은 건 이게 전부다.,This is all that is left of Northwind.,ノースウィンドに残ったのはこれで全部だ。
+vn.act1.beat03,그래도 굴러갑니다. 어제 밤새 확인했어요.,It still runs. I checked it all last night.,それでも走ります。昨夜ずっと確認しました。
+vn.act1.beat04,섀시 코드 NW-01. 이름은 보레아스.,Chassis code NW-01. The name is Boreas.,シャシーコード NW-01。名はボレアス。
+vn.act1.beat05,채권 정리 과정에서 헐값에 건졌다.,Pulled cheap out of a debt settlement.,債権整理の過程で安値で拾った。
+vn.act1.beat06,관제 유닛에 신호가 들어온다.,A signal reaches the control unit.,管制ユニットに信号が入る。
+vn.act1.beat07,본 유닛 기동. 식별자 = 베인.,This unit online. Identifier = VEIN.,本ユニット起動。識別子 = ヴェイン。
+vn.act1.beat08,주행 이력 조회 실패. 참조 데이터 없음.,Drive history lookup failed. No reference data.,走行履歴の照会に失敗。参照データなし。
+vn.act1.beat09,…방금 뭐라고 한 거예요?,…What did it just say?,…今、なんて言ったんですか?
+vn.act1.beat10,이 팀처럼 아무것도 없다는 뜻이지.,It means it has nothing. Like this team.,このチームと同じで何もないという意味だ。
+vn.act1.beat11,카 넘버 13. 아무도 달지 않는 번호다.,Car number 13. Nobody runs it.,カーナンバー13。誰も付けない番号だ。
+vn.act1.beat12,그러니 아무도 우리를 보지 않는다.,So nobody is watching us.,だから誰もこちらを見ない。
+vn.act1.react1,좋다. 그 손으로 몰아라.,Good. Drive with those hands.,いい。その手で走らせろ。
+vn.act1.react2,저는 그 번호 마음에 들어요.,I like that number.,僕はその番号、気に入ってます。
+vn.act1.react3,묻지 마라. 답은 트랙에 있다.,Do not ask. The answer is on the track.,聞くな。答えはトラックにある。
+vn.act2.beat01,포디움에서 내려온 뒤의 피트.,"The pit, just down from the podium.",ポディウムから降りた後のピット。
+vn.act2.beat02,표시판에 우리 팀 이름이 떴어요.,Our team name was up on the board.,表示板にうちのチーム名が出ました。
+vn.act2.beat03,노스윈드. 세 번째 자리에.,Northwind. In third place.,ノースウィンド。3番目に。
+vn.act2.beat04,그 표시판에 오랜만에 올랐다.,It has been a long time on that board.,あの表示板に久しぶりに載った。
+vn.act2.beat05,패독의 시선이 이쪽을 향한다.,The paddock turns its eyes this way.,パドックの視線がこちらを向く。
+vn.act2.beat06,이제 저쪽도 이 번호를 적어둘 거다.,Now they will write this number down.,これで向こうもこの番号を書き留める。
+vn.act2.beat07,보레아스가 무슨 뜻인지 아세요?,Do you know what Boreas means?,ボレアスの意味、知ってますか?
+vn.act2.beat08,북풍의 신이래요. 찾아봤습니다.,The god of the north wind. I looked it up.,北風の神だそうです。調べました。
+vn.act2.beat09,…누가 그런 이름을 붙였을까.,…Who gave it a name like that.,…誰がそんな名を付けたのか。
+vn.act2.beat10,명명 기록 조회 실패. 접근 권한 없음.,Naming record lookup failed. No access rights.,命名記録の照会に失敗。アクセス権限なし。
+vn.act2.beat11,그런 것도 막혀 있어요?,Even that is blocked?,そんなところまで塞がれてるんですか?
+vn.act2.beat12,해당 영역은 조회 대상 밖입니다.,That area is outside the lookup scope.,当該領域は照会対象の外です。
+vn.act3.beat01,투어 종합 1위. 트로피는 없다.,First in the tour standing. No trophy.,ツアー総合1位。トロフィーはない。
+vn.act3.beat02,투어 하나를 가져왔다.,We took a tour.,ツアーを一つ取った。
+vn.act3.beat03,팩토리 팀들 사이에서요.,In among the factory teams.,ファクトリーチームの中で。
+vn.act3.beat04,저쪽 계산에는 없던 결과다.,A result their math did not hold.,向こうの計算にはなかった結果だ。
+vn.act3.beat05,대회 4전 누적 = 예측 분포 이탈.,4-race total = outside expected distribution.,大会4戦の累積 = 予測分布から逸脱。
+vn.act3.beat06,이탈 원인 미상. 재현 조건 불명.,Cause unknown. Reproduction conditions unclear.,逸脱原因は不明。再現条件も不明。
+vn.act3.beat07,재현될 필요는 없다.,It does not need to be reproduced.,再現される必要はない。
+vn.act3.beat08,한 코너면 된다.,One corner is enough.,一つのコーナーで足りる。
+vn.act3.beat09,마르타가 화이트보드에 코너 하나를 그린다.,Marta draws a single corner on the board.,マルタがホワイトボードにコーナーを一つ描く。
+vn.act3.beat10,저쪽은 랩 전체를 계산한다.,They calculate the whole lap.,向こうはラップ全体を計算する。
+vn.act3.beat11,우리는 그중 한 순간만 가져오면 된다.,We only need to take one moment of it.,こちらはその中の一瞬だけ取ればいい。
+vn.act3.beat12,해당 접근의 성립 조건 산출 중.,Computing the conditions for that approach.,当該方式の成立条件を算出中。
+vn.act3.react1,그 얼굴이면 됐다.,That face is enough.,その顔なら十分だ。
+vn.act3.react2,여기냐. 눈은 나쁘지 않군.,"Here, then. Your eyes are not bad.",ここか。目は悪くないな。
+vn.act3.react3,시선 방향 기록. 우선순위 갱신합니다.,Gaze direction logged. Updating priorities.,視線方向を記録。優先順位を更新します。
+vn.act4.beat01,로렌츠보다 앞서 체커를 받은 날의 개러지.,"The garage, the day the flag came first.",ローレンツより先着した日のガレージ。
+vn.act4.beat02,1번보다 먼저 들어왔어요. 진짜로요.,We came in ahead of No.1. Really.,1番より先に入りました。本当に。
+vn.act4.beat03,한 대회다. 챔피언십은 저쪽이 위다.,One race. The championship is still theirs.,一大会だ。チャンピオンシップは向こうが上だ。
+vn.act4.beat04,그래도 나란히 달렸어요. 마지막 랩까지.,We still ran side by side. To the last lap.,それでも並んで走りました。最終ラップまで。
+vn.act4.beat05,…그래. 나란히 달렸다.,…Yes. Side by side.,…そうだ。並んで走った。
+vn.act4.beat06,최종 랩 전 구간 접촉 거리 유지 확인.,Contact distance held through the final lap.,最終ラップ全区間で接触距離の維持を確認。
+vn.act4.beat07,20년 전에 이 팀이 원한 게 그거다.,That is what this team wanted 20 years ago.,20年前にこのチームが望んだのはそれだ。
+vn.act4.beat08,왕을 밟는 게 아니라 옆에 서는 것.,Not to step on the king. To stand beside.,王を踏むのではなく、隣に立つこと。
+vn.act4.beat09,이제 섰는데요.,We are standing there now.,もう立ってますよ。
+vn.act4.beat10,미완성인 채로 섰다. 그게 더 낫다.,We stood there unfinished. That is better.,未完成のまま立った。その方がいい。
+vn.act4.beat11,정의 불명 항목. 학습 대상으로 등록합니다.,Undefined item. Registered for learning.,定義不明の項目。学習対象として登録します。
+vn.act4.react1,오늘은 그걸로 됐다.,"For today, that is enough.",今日はそれでいい。
+vn.act4.react2,저도 봤어요. 전부 다요.,I saw it too. All of it.,僕も見ました。全部。
+vn.origin.beat01,개러지의 문이 닫힌다.,The garage door closes.,ガレージの扉が閉まる。
+vn.origin.beat02,보레아스를 어디서 건졌는지 말했지.,I told you where Boreas was pulled from.,ボレアスをどこで拾ったかは話した。
+vn.origin.beat03,누가 만들었는지는 말하지 않았다.,Who built it was never said.,誰が造ったかは話していない。
+vn.origin.beat04,악시온 다이내믹스다.,Axion Dynamics.,アクシオン・ダイナミクスだ。
+vn.origin.beat05,…저쪽이 이걸 만들었다고요?,…They built this?,…向こうがこれを造ったんですか?
+vn.origin.beat06,만들었다. 그리고 버렸다.,They built it. Then discarded it.,造った。そして捨てた。
+vn.origin.beat07,같은 입력에 같은 출력 — 저쪽 신조다.,"Same input, same output — that is their creed.",同じ入力に同じ出力 — 向こうの信条だ。
+vn.origin.beat08,이 관제 유닛은 그 신조를 못 지켰다.,This control unit could not keep that creed.,この管制ユニットはその信条を守れなかった。
+vn.origin.beat09,미승인 출력 기록 확인. 재현 검증 실패.,Unsanctioned output logged. Retest failed.,未承認出力の記録を確認。再現検証は失敗。
+vn.origin.beat10,검증을 맡은 테스트 드라이버가 있었다.,There was a test driver assigned to verify.,検証を担ったテストドライバーがいた。
+vn.origin.beat11,빅터 로렌츠다.,Viktor Lorenz.,ヴィクター・ローレンツだ。
+vn.origin.beat12,…그 사람이요?,…That one?,…あの人が?
+vn.origin.beat13,완전한 제어로는 열리지 않았다.,Perfect control never opened it.,完全な制御では開かなかった。
+vn.origin.beat14,결함으로 보고했고 저쪽은 폐기했다.,"Reported as a defect, and discarded.",欠陥として報告され、向こうは廃棄した。
+vn.origin.beat15,그 판단은 저쪽 세계에서는 옳았다.,"In their world, that call was correct.",その判断は向こうの世界では正しかった。
+vn.origin.beat16,우리는 제어하지 않았다. 그게 전부다.,We did not control it. That is all.,こちらは制御しなかった。それが全部だ。
+vn.epilogue.beat01,두 번째 시즌의 결산이 끝난 개러지.,"The garage, the second season settled.",二度目のシーズンの決算が終わったガレージ。
+vn.epilogue.beat02,연속 두 번이에요. 기록실에 남았어요.,Two in a row. It is in the Records Room.,連続で二度です。記録室に残りました。
+vn.epilogue.beat03,더블 챔피언. 이제 둘이다.,Double Champion. There are two now.,ダブルチャンピオン。これで二人だ。
+vn.epilogue.beat04,로렌츠 쪽은요?,And Lorenz?,ローレンツの方は?
+vn.epilogue.beat05,그대로다. 빼앗는 칭호가 아니다.,Unchanged. It is not a title that is taken.,そのままだ。奪う称号ではない。
+vn.epilogue.beat06,벽에는 20년 전 팀 사진이 걸려 있다.,A team photo from 20 years back hangs there.,壁には20年前のチーム写真が掛かっている。
+vn.epilogue.beat07,이 팀은 한 번 죽었다가 여기까지 왔다.,This team died once and came this far.,このチームは一度死んでここまで来た。
+vn.epilogue.beat08,다음은 네 차례겠지.,Next will be your turn.,次はそちらの番だろう。
+vn.epilogue.beat09,제가요?,Me?,僕が?
+vn.epilogue.beat10,언젠가는 그렇게 된다.,One day it will be so.,いつかそうなる。
+vn.epilogue.beat11,다음 시즌 참조 데이터 = 두 시즌분.,Next season reference data = two seasons.,次シーズンの参照データ = 二シーズン分。
+vn.epilogue.beat12,이번에는 조회에 실패하지 않습니다.,This time the lookup will not fail.,今回は照会に失敗しません。
+vn.epilogue.react1,이거 지금 받으라는 거예요?,Am I meant to take this now?,これ、今受け取れってことですか?
+vn.epilogue.react2,그 사진에 없는 얼굴이 둘이다.,Two faces are missing from that photo.,その写真にない顔が二つある。
+vn.reunion.beat01,알타 리지. 고지대의 얇은 공기.,Alta Ridge. Thin air at altitude.,アルタリッジ。高地の薄い空気。
+vn.reunion.beat02,여기 예선이 제일 어렵다던데요.,They say qualifying here is the hardest.,ここの予選が一番難しいそうです。
+vn.reunion.beat03,실버트레일이 이 무대에 강하다.,Silvertrail is strong on this stage.,シルバートレイルはこの舞台に強い。
+vn.reunion.beat04,실버트레일이면 셔우드 씨네요.,Silvertrail — that means Sherwood.,シルバートレイルならシャーウッドさんですね。
+vn.reunion.beat05,그 이름은 여기서 꺼내지 마라.,Do not bring up that name here.,その名はここで出すな。
+vnChoice.act1.opt1,[스티어링을 고쳐 쥔다],[Regrip the wheel],[ステアリングを握り直す]
+vnChoice.act1.opt2,[13번을 손으로 덮는다],[Cover the 13 by hand],[13番を手で覆う]
+vnChoice.act1.opt3,[마르타를 본다],[Look at Marta],[マルタを見る]
+vnChoice.act3.opt1,[고개를 끄덕인다],[Nod],[うなずく]
+vnChoice.act3.opt2,[코너 하나를 짚는다],[Point at one corner],[コーナーを一つ指す]
+vnChoice.act3.opt3,[베인의 파형을 본다],[Watch the waveform],[ヴェインの波形を見る]
+vnChoice.act4.opt1,[헬멧을 내려놓는다],[Set the helmet down],[ヘルメットを置く]
+vnChoice.act4.opt2,[테오의 어깨를 친다],[Clap Theo on the shoulder],[テオの肩をたたく]
+vnChoice.epilogue.opt1,[테오에게 공구를 건넨다],[Hand Theo a tool],[テオに工具を渡す]
+vnChoice.epilogue.opt2,[벽의 사진을 본다],[Look at the wall photo],[壁の写真を見る]
