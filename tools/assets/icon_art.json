@@ -2,18 +2,22 @@
   "_doc": "손 작화 아이콘 원도의 도상 정의. 한 칸 = 한 픽셀. '.' = 투명. 나머지 글자는 palette 의 키.",
   "_why": "RD 생성이 실패한 도상은 손으로 그린다. 그 손 작화를 PNG 바이트로만 남기면 다음 편집자가 도상을 읽을 수 없고 재현도 못 한다 — 그래서 도상을 텍스트로 두고 PNG 를 파생시킨다. `icon_draw.js --check` 가 둘이 갈리지 않았는지 본다(대장 §9-⑬ '대조는 값이 두 곳에 있을 때만 성립한다').",
   "_limit": "여기 없는 아이콘(RD 산출물)은 대조 대상이 아니다. 본 파일은 손 작화분 전속이다.",
-
   "_16px": "이하 `*_16` 은 16×16 원도 세트(IMPL-215). 32px 원도의 축약이지 별개 도상이 아니다 — 실루엣·색 계열을 그대로 잇고 부속 디테일만 뗀다. 기계 축소(정수 2:1)와 RD 재생성은 둘 다 실측으로 기각했다(회신문 참조).",
-
   "_attr16": "이하 `attr_*_16` 은 섹터 속성 6종의 16px 원도(IMPL-223). 발주 근거 = 주력 실측 `ATTR_RENDER_SCALE=0.5000` — 현행도 16 논리px 로 표시되므로 위계는 이미 갈려 있고, 바뀌는 것은 그 16px 이 작화된 것이냐 2:1 니어리스트가 버린 절반이냐다.",
-
   "attr_straight_16": {
     "size": 16,
     "note": "직선로 + 원근 소실점. 32px 의 노면 계조는 버리고 **테두리·면·중앙 파선 3층**만 남긴다 — 축소가 지우던 것이 정확히 이 파선이다",
-    "palette": { "D": "#12A6C4", "C": "#3FE0F5", "L": "#A8F6FF" },
+    "palette": {
+      "D": "#12A6C4",
+      "C": "#3FE0F5",
+      "L": "#A8F6FF"
+    },
     "layers": [
       {
-        "origin": [0, 3],
+        "origin": [
+          0,
+          3
+        ],
         "map": [
           "......DDDD......",
           "......DCCD......",
@@ -30,14 +34,18 @@
       }
     ]
   },
-
   "attr_technical_16": {
     "size": 16,
     "note": "지그재그 시케인 — 3굽이. 32px 는 굽이 4개이나 16px 에서 4굽이는 굽이당 3행이 되어 지그재그가 톱니로 읽힌다. 굽이를 하나 줄여 각 굽이에 4행을 준다",
-    "palette": { "M": "#3FE0F5" },
+    "palette": {
+      "M": "#3FE0F5"
+    },
     "layers": [
       {
-        "origin": [0, 2],
+        "origin": [
+          0,
+          2
+        ],
         "map": [
           "..........MMMM..",
           ".........MMMM...",
@@ -56,14 +64,18 @@
       }
     ]
   },
-
   "attr_sweeper_16": {
     "size": 16,
     "note": "고속 커브 호 — 좌하 두껍고 우상 얇게 테이퍼. **끝단 테이퍼를 살려 그렸다**(IMPL-214 가 32px 에서 연결한 그 끝단) — 주력의 파편 재판정이 겨눌 대상이 16px 판에 실재해야 판정이 성립한다",
-    "palette": { "M": "#6FA8FF" },
+    "palette": {
+      "M": "#6FA8FF"
+    },
     "layers": [
       {
-        "origin": [0, 2],
+        "origin": [
+          0,
+          2
+        ],
         "map": [
           "............MMM.",
           "..........MMM...",
@@ -81,14 +93,19 @@
       }
     ]
   },
-
   "attr_hazard_16": {
     "size": 16,
     "note": "갈라진 노면 — **한 판을 가르는 지그재그 균열**(IMPL-230 재작화). 구 도상은 어긋난 슬래브 6장이었는데 주력 실배치 판독이 *\"블록 격자로 읽혀 요철까지는 가지만 해저드로 바로 오지 않는다 — 6종 중 유일\"* 로 돌려주었다. **격자는 규칙이고 해저드는 파손이다** — 규칙적 반복이 오히려 의미를 지웠으므로, 반복을 버리고 **불규칙한 갈라짐 하나**를 도상으로 세웠다. 32px 의 낙하 점열은 그대로 버린다(16px 에서 1~2px 점은 파편과 구별되지 않는다)",
-    "palette": { "M": "#3FE0F5", "S": "#5B646F" },
+    "palette": {
+      "M": "#3FE0F5",
+      "S": "#5B646F"
+    },
     "layers": [
       {
-        "origin": [0, 3],
+        "origin": [
+          0,
+          3
+        ],
         "map": [
           "..MMMMM.MMMMMM..",
           "..MMMMM.MMMMMM..",
@@ -104,14 +121,18 @@
       }
     ]
   },
-
   "attr_battle_zone_16": {
     "size": 16,
     "note": "마주 미는 두 화살표 (D10 §5.3 확정 도상 — 방향 반전 금지. IMPL-162 가 32px 에서 바깥을 향해 나온 것을 반쪽씩 반전해 고쳤다). 중앙 4px 틈이 '존' 이다",
-    "palette": { "M": "#3FE0F5" },
+    "palette": {
+      "M": "#3FE0F5"
+    },
     "layers": [
       {
-        "origin": [1, 4],
+        "origin": [
+          1,
+          4
+        ],
         "map": [
           "..M..",
           "..MM.",
@@ -125,7 +146,10 @@
         ]
       },
       {
-        "origin": [10, 4],
+        "origin": [
+          10,
+          4
+        ],
         "mirror": true,
         "map": [
           "..M..",
@@ -141,14 +165,18 @@
       }
     ]
   },
-
   "attr_pulse_section_16": {
     "size": 16,
     "note": "차오르는 충전 파형 — 막대 3개(5·8·11행). 32px 와 같은 3성분·같은 증가 방향. 막대 폭 4 · 틈 1 을 유지하면 16px 폭에 정확히 든다(4+1+4+1+4 = 14)",
-    "palette": { "M": "#3FE0F5" },
+    "palette": {
+      "M": "#3FE0F5"
+    },
     "layers": [
       {
-        "origin": [0, 3],
+        "origin": [
+          0,
+          3
+        ],
         "map": [
           "...........MMMM.",
           "...........MMMM.",
@@ -165,14 +193,20 @@
       }
     ]
   },
-
   "currency_credit_16": {
     "size": 16,
     "note": "원형 칩 — 실루엣 1차 구분(D10 §5.2). 32px 의 테두리 눈금은 16px 에서 사라지므로 대각 광택띠만 남긴다",
-    "palette": { "D": "#D98A12", "M": "#FFBF3D", "S": "#FF9A3C" },
+    "palette": {
+      "D": "#D98A12",
+      "M": "#FFBF3D",
+      "S": "#FF9A3C"
+    },
     "layers": [
       {
-        "origin": [0, 0],
+        "origin": [
+          0,
+          0
+        ],
         "map": [
           ".....DDDDDD.....",
           "...DDMMMMMMDD...",
@@ -192,14 +226,22 @@
       }
     ]
   },
-
   "currency_data_16": {
     "size": 16,
     "note": "사각 카트리지 — 원형 칩과 실루엣으로 갈린다. 상단 단자 핀 + 라벨 홈 2요소만 남긴다",
-    "palette": { "L": "#3FE0F5", "M": "#12A6C4", "P": "#C7D0D8", "G": "#2D343D", "K": "#4E5661" },
+    "palette": {
+      "L": "#3FE0F5",
+      "M": "#12A6C4",
+      "P": "#C7D0D8",
+      "G": "#2D343D",
+      "K": "#4E5661"
+    },
     "layers": [
       {
-        "origin": [2, 1],
+        "origin": [
+          2,
+          1
+        ],
         "map": [
           "LLLLLLLLLLLL",
           "LMMPPPPPPMML",
@@ -219,14 +261,20 @@
       }
     ]
   },
-
   "achv_career_16": {
     "size": 16,
     "note": "월계관 + 체커 플래그. 32px 의 잎맥은 16px 에서 뭉치므로 월계는 두 팔 곡선으로만 남긴다",
-    "palette": { "D": "#7A4408", "M": "#E2620F", "C": "#FFBF3D" },
+    "palette": {
+      "D": "#7A4408",
+      "M": "#E2620F",
+      "C": "#FFBF3D"
+    },
     "layers": [
       {
-        "origin": [0, 2],
+        "origin": [
+          0,
+          2
+        ],
         "map": [
           "..D..........D..",
           "..MD.CDCDCD.DM..",
@@ -243,18 +291,23 @@
       }
     ]
   },
-
   "achv_rival_16": {
     "size": 16,
     "note": "32px 재작업분(서로를 향한 두 헬멧)의 축약. 헬멧 7×12 × 2 · 좌 시안 · 우 주황",
     "palette": {
-      "D": "#0A5A6E", "M": "#12A6C4",
-      "d": "#7A4408", "m": "#E2620F",
-      "R": "#2A211A", "G": "#2D343D"
+      "D": "#0A5A6E",
+      "M": "#12A6C4",
+      "d": "#7A4408",
+      "m": "#E2620F",
+      "R": "#2A211A",
+      "G": "#2D343D"
     },
     "layers": [
       {
-        "origin": [1, 2],
+        "origin": [
+          1,
+          2
+        ],
         "map": [
           "..DDD..",
           ".DMMMD.",
@@ -271,7 +324,10 @@
         ]
       },
       {
-        "origin": [8, 2],
+        "origin": [
+          8,
+          2
+        ],
         "mirror": true,
         "map": [
           "..ddd..",
@@ -290,14 +346,19 @@
       }
     ]
   },
-
   "achv_driving_16": {
     "size": 16,
     "note": "스티어링 휠 — 32px 의 주행 라인·기교 표현을 16px 에서는 림+스포크 골격만 남긴다",
-    "palette": { "M": "#3FE0F5", "D": "#373E48" },
+    "palette": {
+      "M": "#3FE0F5",
+      "D": "#373E48"
+    },
     "layers": [
       {
-        "origin": [0, 1],
+        "origin": [
+          0,
+          1
+        ],
         "map": [
           ".....MMMMMM.....",
           "...MMMMMMMMMM...",
@@ -317,14 +378,19 @@
       }
     ]
   },
-
   "achv_garage_16": {
     "size": 16,
     "note": "콤비네이션 렌치 1개 — **오픈엔드 조(위) + 박스엔드 링(아래) + 샤프트**. 세로로 세운 이유는 16px 에서 대각선이 계단으로 부서져 공구 머리가 사라지기 때문이다(구 도상의 실패 원인). 조 = 위로 열린 홈 · 링 = 투명 구멍",
-    "palette": { "M": "#12A6C4", "L": "#3FE0F5" },
+    "palette": {
+      "M": "#12A6C4",
+      "L": "#3FE0F5"
+    },
     "layers": [
       {
-        "origin": [0, 1],
+        "origin": [
+          0,
+          1
+        ],
         "map": [
           "....LL....LL....",
           "....LL....LL....",
@@ -343,14 +409,20 @@
       }
     ]
   },
-
   "achv_archive_16": {
     "size": 16,
     "note": "색인 탭 + 서랍 손잡이. 탭이 카트리지(단자 핀)와 실루엣을 가른다 — 둘 다 사각이라 이 축이 판별이다",
-    "palette": { "M": "#3FE0F5", "L": "#C7D0D8", "H": "#2B3239" },
+    "palette": {
+      "M": "#3FE0F5",
+      "L": "#C7D0D8",
+      "H": "#2B3239"
+    },
     "layers": [
       {
-        "origin": [0, 1],
+        "origin": [
+          0,
+          1
+        ],
         "map": [
           "....MM..MM..M...",
           "....MM..MM..M...",
@@ -369,14 +441,20 @@
       }
     ]
   },
-
   "achv_hidden_16": {
     "size": 16,
     "note": "빈 배지 + 물음표. 대비를 일부러 낮게 둔다 — 이 도상의 목적은 판독이 아니라 은닉이다(D09 §5.5)",
-    "palette": { "D": "#1C222A", "M": "#2B3239", "Q": "#7A838E" },
+    "palette": {
+      "D": "#1C222A",
+      "M": "#2B3239",
+      "Q": "#7A838E"
+    },
     "layers": [
       {
-        "origin": [0, 1],
+        "origin": [
+          0,
+          1
+        ],
         "map": [
           "......DDDD......",
           "....DDMMMMDD....",
@@ -396,14 +474,20 @@
       }
     ]
   },
-
   "speaker_relay_16": {
     "size": 16,
     "note": "방송 마이크 — 그릴 + 요크 + 스탠드. 32px 의 삼각대는 16px 에서 다리가 1px 로 흩어지므로 받침으로 바꾼다",
-    "palette": { "M": "#8B949F", "G": "#5B646F", "S": "#2E6FA8" },
+    "palette": {
+      "M": "#8B949F",
+      "G": "#5B646F",
+      "S": "#2E6FA8"
+    },
     "layers": [
       {
-        "origin": [0, 1],
+        "origin": [
+          0,
+          1
+        ],
         "map": [
           ".......MM.......",
           "......MMMM......",
@@ -423,14 +507,21 @@
       }
     ]
   },
-
   "speaker_filler_16": {
     "size": 16,
     "note": "제네릭 헬멧 정면 — 무채색·발광 없음(사양서 §6.5). 라이벌 헬멧(측면·유채)과 시점·색으로 갈린다",
-    "palette": { "D": "#2B3239", "M": "#4E5661", "R": "#373E48", "G": "#242A33" },
+    "palette": {
+      "D": "#2B3239",
+      "M": "#4E5661",
+      "R": "#373E48",
+      "G": "#242A33"
+    },
     "layers": [
       {
-        "origin": [0, 1],
+        "origin": [
+          0,
+          1
+        ],
         "map": [
           ".....DDDDDD.....",
           "...DDMMMMMMDD...",
@@ -449,18 +540,25 @@
       }
     ]
   },
-
   "achv_rival": {
     "size": 32,
     "note": "라이벌 = 서로를 향한 두 헬멧 측면. 좌 시안 · 우 주황. 세로 19행(구 11행) — 32px 슬롯을 채운다.",
     "palette": {
-      "D": "#0A5A6E", "M": "#12A6C4", "L": "#3FE0F5",
-      "d": "#7A4408", "m": "#E2620F", "l": "#FF9A3C",
-      "R": "#2A211A", "G": "#2D343D"
+      "D": "#0A5A6E",
+      "M": "#12A6C4",
+      "L": "#3FE0F5",
+      "d": "#7A4408",
+      "m": "#E2620F",
+      "l": "#FF9A3C",
+      "R": "#2A211A",
+      "G": "#2D343D"
     },
     "layers": [
       {
-        "origin": [3, 6],
+        "origin": [
+          3,
+          6
+        ],
         "comment": "좌 헬멧 — 오른쪽(중앙)을 향한다",
         "map": [
           "....DDDD....",
@@ -485,7 +583,10 @@
         ]
       },
       {
-        "origin": [17, 6],
+        "origin": [
+          17,
+          6
+        ],
         "mirror": true,
         "comment": "우 헬멧 — 좌 헬멧의 좌우 반전. 도트 축 반전이라 픽셀 손실 0 (IMPL-162 전례)",
         "map": [
@@ -547,6 +648,325 @@
           "...MMMMMMMMMMMMMM...",
           "....MMMMMMMMMMMM....",
           "......MMMMMMMM......"
+        ]
+      }
+    ]
+  },
+  "speaker_crew_16": {
+    "size": 16,
+    "note": "크루 미니 초상 (D09 §3.3 피트 무전) — 버스트업 정면. 좌우 완전 대칭 · 머리·얼굴 8행 + 목 1행 + 칼라·작업복 4행. 헤드셋을 얹지 않은 것이 판단이다: 16px 에서 머리를 가로지르는 띠는 헬멧 끈으로 읽혀 `speaker_filler_16`(정면 헬멧)에 **가까워진다** — 무전을 표시하려다 위계를 지운다. 무전은 자리(피드)가 이미 말한다",
+    "palette": {
+      "H": "#6A737E",
+      "E": "#1C222A",
+      "S": "#F0C9A8",
+      "K": "#C08A5E",
+      "T": "#4A545D",
+      "A": "#8FB8C4"
+    },
+    "layers": [
+      {
+        "origin": [
+          1,
+          1
+        ],
+        "map": [
+          "....HHHHHH....",
+          "...HHHHHHHH...",
+          "...HSSSSSSH...",
+          "...SSESSESS...",
+          "...SSSSSSSS...",
+          "...SSSSSSSS...",
+          "....SSSSSS....",
+          ".....SSSS.....",
+          "......KK......",
+          "....AAAAAA....",
+          "..TTTTAATTTT..",
+          ".TTTTTAATTTTT.",
+          ".TTTTTTTTTTTT."
+        ]
+      }
+    ]
+  },
+  "_speakers": [
+    "이하 `speaker_crew_16`·`speaker_rival_*_16` = 로그 피드 화자 표지 잔여 2종 (총괄 판정 ⑧ · 사용자 승인 · IMPL-317).",
+    "**[가안] 계상**이다 — D10 §5.5 는 화자 아이콘을 2종(마이크·공용 헬멧)으로 고정하고 C-B2 가 신설을 금지한다.",
+    "이 둘은 D09 §3.3 이 **초상·배지**로 규정한 축이라 그 조항의 대상이 아니라는 것이 판정의 요지이며,",
+    "업적 6종 P-9 전례와 같은 절차로 신설했다(진성 미계상 → 총괄 확인 → [가안] → D10 차기 개정 계상 동기).",
+    "",
+    "배지가 **8파일인 이유**: D09 §3.3 이 배지를 위계 담지자로 두는데(초상 > 넘버 배지 > 공용 헬멧)",
+    "**번호 없는 배지는 필러('공용 헬멧 + 카 넘버')와 표기 구조가 같아져 위계가 2층으로 붕괴**한다.",
+    "그래서 총괄 판정이 B안(번호 포함)을 채택했고, 번호는 네임드 8인 각자의 것이다(D03 결정 #13).",
+    "파일명이 **데이터 id 키**인 것은 대장 §4.5 리버리 전례다 — 엔트런트 데이터에서 경로를 바로 유도한다.",
+    "번호를 파일명에 쓰면 번호가 바뀔 때 파일명이 거짓이 된다."
+  ],
+  "speaker_rival_ai_lorentz_16": {
+    "size": 16,
+    "note": "네임드 카 넘버 배지 — No.1 (빅터 로렌츠 · 악시온 에이스 · 디펜딩 챔피언). 판 기하는 8종 공유이고 **번호만 갈린다** — 1자리는 숫자 5폭을 x5..9 에 두어 대칭축(7.5)에서 0.5px 좌편향한다 — 짝수 판에 홀수 폭 글립을 넣으면 피할 수 없고, 폭을 바꾸면 2자리 판과 글립이 갈린다",
+    "palette": {
+      "P": "#9EA7B1",
+      "D": "#1C222A"
+    },
+    "layers": [
+      {
+        "origin": [
+          0,
+          0
+        ],
+        "map": [
+          "................",
+          "................",
+          "..PPPPPPPPPPPP..",
+          ".PPPPPPPPPPPPPP.",
+          ".PPPPPPDPPPPPPP.",
+          ".PPPPPDDPPPPPPP.",
+          ".PPPPPPDPPPPPPP.",
+          ".PPPPPPDPPPPPPP.",
+          ".PPPPPPDPPPPPPP.",
+          ".PPPPPPDPPPPPPP.",
+          ".PPPPPPDPPPPPPP.",
+          ".PPPPPDDDPPPPPP.",
+          ".PPPPPPPPPPPPPP.",
+          "..PPPPPPPPPPPP..",
+          "................",
+          "................"
+        ]
+      }
+    ]
+  },
+  "speaker_rival_ai_maro_16": {
+    "size": 16,
+    "note": "네임드 카 넘버 배지 — No.2 (셀린 마로 · 악시온 세컨드). 판 기하는 8종 공유이고 **번호만 갈린다** — 1자리는 숫자 5폭을 x5..9 에 두어 대칭축(7.5)에서 0.5px 좌편향한다 — 짝수 판에 홀수 폭 글립을 넣으면 피할 수 없고, 폭을 바꾸면 2자리 판과 글립이 갈린다",
+    "palette": {
+      "P": "#9EA7B1",
+      "D": "#1C222A"
+    },
+    "layers": [
+      {
+        "origin": [
+          0,
+          0
+        ],
+        "map": [
+          "................",
+          "................",
+          "..PPPPPPPPPPPP..",
+          ".PPPPPPPPPPPPPP.",
+          ".PPPPPDDDPPPPPP.",
+          ".PPPPDPPPDPPPPP.",
+          ".PPPPPPPPDPPPPP.",
+          ".PPPPPPPPDPPPPP.",
+          ".PPPPPPPDPPPPPP.",
+          ".PPPPPPDPPPPPPP.",
+          ".PPPPPDPPPPPPPP.",
+          ".PPPPDDDDDPPPPP.",
+          ".PPPPPPPPPPPPPP.",
+          "..PPPPPPPPPPPP..",
+          "................",
+          "................"
+        ]
+      }
+    ]
+  },
+  "speaker_rival_ai_sherwood_16": {
+    "size": 16,
+    "note": "네임드 카 넘버 배지 — No.24 (카이 셔우드 · 실버트레일 에이스 · 전 노스윈드). 판 기하는 8종 공유이고 **번호만 갈린다** — 2자리는 5+2+2+5 = 12 로 판 내부를 꽉 채우고 대칭축 7.5 에 정확히 걸린다",
+    "palette": {
+      "P": "#9EA7B1",
+      "D": "#1C222A"
+    },
+    "layers": [
+      {
+        "origin": [
+          0,
+          0
+        ],
+        "map": [
+          "................",
+          "................",
+          "..PPPPPPPPPPPP..",
+          ".PPPPPPPPPPPPPP.",
+          ".PPDDDPPPPPPDPP.",
+          ".PDPPPDPPPPDDPP.",
+          ".PPPPPDPPPPDDPP.",
+          ".PPPPPDPPPDPDPP.",
+          ".PPPPDPPPDPPDPP.",
+          ".PPPDPPPPDDDDDP.",
+          ".PPDPPPPPPPPDPP.",
+          ".PDDDDDPPPPPDPP.",
+          ".PPPPPPPPPPPPPP.",
+          "..PPPPPPPPPPPP..",
+          "................",
+          "................"
+        ]
+      }
+    ]
+  },
+  "speaker_rival_ai_jude_16": {
+    "size": 16,
+    "note": "네임드 카 넘버 배지 — No.77 (주드 오카포 · 코멧 웍스 루키). 판 기하는 8종 공유이고 **번호만 갈린다** — 2자리는 5+2+2+5 = 12 로 판 내부를 꽉 채우고 대칭축 7.5 에 정확히 걸린다",
+    "palette": {
+      "P": "#9EA7B1",
+      "D": "#1C222A"
+    },
+    "layers": [
+      {
+        "origin": [
+          0,
+          0
+        ],
+        "map": [
+          "................",
+          "................",
+          "..PPPPPPPPPPPP..",
+          ".PPPPPPPPPPPPPP.",
+          ".PDDDDDPPDDDDDP.",
+          ".PPPPPDPPPPPPDP.",
+          ".PPPPPDPPPPPPDP.",
+          ".PPPPDPPPPPPDPP.",
+          ".PPPPDPPPPPPDPP.",
+          ".PPPDPPPPPPDPPP.",
+          ".PPPDPPPPPPDPPP.",
+          ".PPPDPPPPPPDPPP.",
+          ".PPPPPPPPPPPPPP.",
+          "..PPPPPPPPPPPP..",
+          "................",
+          "................"
+        ]
+      }
+    ]
+  },
+  "speaker_rival_ai_diaz_16": {
+    "size": 16,
+    "note": "네임드 카 넘버 배지 — No.18 (라몬 디아스 · 불카 에이스). 판 기하는 8종 공유이고 **번호만 갈린다** — 2자리는 5+2+2+5 = 12 로 판 내부를 꽉 채우고 대칭축 7.5 에 정확히 걸린다",
+    "palette": {
+      "P": "#9EA7B1",
+      "D": "#1C222A"
+    },
+    "layers": [
+      {
+        "origin": [
+          0,
+          0
+        ],
+        "map": [
+          "................",
+          "................",
+          "..PPPPPPPPPPPP..",
+          ".PPPPPPPPPPPPPP.",
+          ".PPPDPPPPPDDDPP.",
+          ".PPDDPPPPDPPPDP.",
+          ".PPPDPPPPDPPPDP.",
+          ".PPPDPPPPPDDDPP.",
+          ".PPPDPPPPPDDDPP.",
+          ".PPPDPPPPDPPPDP.",
+          ".PPPDPPPPDPPPDP.",
+          ".PPDDDPPPPDDDPP.",
+          ".PPPPPPPPPPPPPP.",
+          "..PPPPPPPPPPPP..",
+          "................",
+          "................"
+        ]
+      }
+    ]
+  },
+  "speaker_rival_ai_volkova_16": {
+    "size": 16,
+    "note": "네임드 카 넘버 배지 — No.81 (키라 볼코바 · 불카 세컨드). 판 기하는 8종 공유이고 **번호만 갈린다** — 2자리는 5+2+2+5 = 12 로 판 내부를 꽉 채우고 대칭축 7.5 에 정확히 걸린다",
+    "palette": {
+      "P": "#9EA7B1",
+      "D": "#1C222A"
+    },
+    "layers": [
+      {
+        "origin": [
+          0,
+          0
+        ],
+        "map": [
+          "................",
+          "................",
+          "..PPPPPPPPPPPP..",
+          ".PPPPPPPPPPPPPP.",
+          ".PPDDDPPPPPDPPP.",
+          ".PDPPPDPPPDDPPP.",
+          ".PDPPPDPPPPDPPP.",
+          ".PPDDDPPPPPDPPP.",
+          ".PPDDDPPPPPDPPP.",
+          ".PDPPPDPPPPDPPP.",
+          ".PDPPPDPPPPDPPP.",
+          ".PPDDDPPPPDDDPP.",
+          ".PPPPPPPPPPPPPP.",
+          "..PPPPPPPPPPPP..",
+          "................",
+          "................"
+        ]
+      }
+    ]
+  },
+  "speaker_rival_ai_holloway_16": {
+    "size": 16,
+    "note": "네임드 카 넘버 배지 — No.5 (에드가 홀로웨이 · 그리폰 에이스). 판 기하는 8종 공유이고 **번호만 갈린다** — 1자리는 숫자 5폭을 x5..9 에 두어 대칭축(7.5)에서 0.5px 좌편향한다 — 짝수 판에 홀수 폭 글립을 넣으면 피할 수 없고, 폭을 바꾸면 2자리 판과 글립이 갈린다",
+    "palette": {
+      "P": "#9EA7B1",
+      "D": "#1C222A"
+    },
+    "layers": [
+      {
+        "origin": [
+          0,
+          0
+        ],
+        "map": [
+          "................",
+          "................",
+          "..PPPPPPPPPPPP..",
+          ".PPPPPPPPPPPPPP.",
+          ".PPPPDDDDDPPPPP.",
+          ".PPPPDPPPPPPPPP.",
+          ".PPPPDPPPPPPPPP.",
+          ".PPPPDDDDPPPPPP.",
+          ".PPPPPPPPDPPPPP.",
+          ".PPPPPPPPDPPPPP.",
+          ".PPPPDPPPDPPPPP.",
+          ".PPPPPDDDPPPPPP.",
+          ".PPPPPPPPPPPPPP.",
+          "..PPPPPPPPPPPP..",
+          "................",
+          "................"
+        ]
+      }
+    ]
+  },
+  "speaker_rival_ai_bianca_16": {
+    "size": 16,
+    "note": "네임드 카 넘버 배지 — No.51 (비앙카 그리폰 · 그리폰 세컨드). 판 기하는 8종 공유이고 **번호만 갈린다** — 2자리는 5+2+2+5 = 12 로 판 내부를 꽉 채우고 대칭축 7.5 에 정확히 걸린다",
+    "palette": {
+      "P": "#9EA7B1",
+      "D": "#1C222A"
+    },
+    "layers": [
+      {
+        "origin": [
+          0,
+          0
+        ],
+        "map": [
+          "................",
+          "................",
+          "..PPPPPPPPPPPP..",
+          ".PPPPPPPPPPPPPP.",
+          ".PDDDDDPPPPDPPP.",
+          ".PDPPPPPPPDDPPP.",
+          ".PDPPPPPPPPDPPP.",
+          ".PDDDDPPPPPDPPP.",
+          ".PPPPPDPPPPDPPP.",
+          ".PPPPPDPPPPDPPP.",
+          ".PDPPPDPPPPDPPP.",
+          ".PPDDDPPPPDDDPP.",
+          ".PPPPPPPPPPPPPP.",
+          "..PPPPPPPPPPPP..",
+          "................",
+          "................"
         ]
       }
     ]

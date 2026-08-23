@@ -180,7 +180,12 @@ function decodeRGBA(file, n) {
 // ─────────────────────────────────────────────────────────── 주행
 const art = JSON.parse(fs.readFileSync(ART, 'utf8'));
 const names = Object.keys(art).filter((k) => !k.startsWith('_'));
-if (names.length === 0) die(`${path.basename(ART)} 에 도상이 없다`);
+// 시안 원장이 빈 것은 오류가 아니다 — **판정 대기 도상이 없다는 상태**다.
+// 유입 원장이 비면 그건 사고이므로 갈라 다룬다.
+if (names.length === 0) {
+  if (PROPOSAL) { console.log('판정 대기 도상 없음 — 시안 원장이 비어 있다.\n\nICON_DRAW_PROPOSAL PASS icons=0'); process.exit(0); }
+  die(`${path.basename(ART)} 에 도상이 없다`);
+}
 if (!CHECK_ONLY) fs.mkdirSync(OUT_DIR, { recursive: true });
 
 console.log(`${PROPOSAL ? '시안' : '손 작화 아이콘'} ${CHECK_ONLY ? '대조' : '렌더'} — ${names.length}종  → ${path.relative(ROOT, OUT_DIR)}\n`);
