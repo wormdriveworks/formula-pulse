@@ -70,7 +70,7 @@ param_deck_slots_max,3
 param_deck_expand_dp1,70
 param_deck_expand_dp2,110
 param_deck_expand_dp3,160
-param_hold_total_cap_per_turn,2
+param_hold_total_cap_per_turn,3
 param_sponsor_slots_base,1
 param_sponsor_slots_with_g4,2
 param_vane_stage2_dp,290
@@ -94,3 +94,9 @@ param_haptic_l2_sec,0.15
 param_cheer_retrigger_sec,1
 param_audio_virtual_channels,3
 param_audio_retrigger_gate_sec,0.2
+param_skill_advance_mult,3.0
+param_skill_pulse_mult,4
+param_skill_defense_mult,2.5
+param_skill_defense_duel_add,30
+param_skill_boost_per_judgment,40
+param_skill_chassis_floor,7

@@ -39,6 +39,7 @@ func _init() -> void:
 	_run_v5_anchor_binding()
 	_run_v6_id_hygiene()
 	_run_v7_forbidden_vocab()
+	_run_v7_self_test()
 	_run_v8_key_grammar()
 	_run_contamination_scan()
 	_run_architecture_scan()
@@ -1010,10 +1011,83 @@ func _run_v7_forbidden_vocab() -> void:
 		for language in _config["string_language_columns"]:
 			var value := String(_strings[key].get(language, ""))
 			checked += 1
-			for term in _config["v7_terms"]:
-				if value.contains(String(term)):
+			# 어휘 목록은 **언어별**이다 (내러티브 4차 §6-E). 일문에서 `リール`·`スピン`·
+			# `ホールド` 는 UI 층 정식 용어이면서 동시에 발화 층 금칙 후보의 가타카나형이므로,
+			# 국문 목록 하나로는 일문 발화 도메인에서 **통과만 찍는다** — 열을 등재하고
+			# 어휘를 확장하지 않으면 검사가 도는 것과 보는 것이 갈린다.
+			for term in _config["v7_terms"].get(language, []):
+				if _contains_term(value, String(term)):
 					_warn("V7", "'%s' (%s): candidate term '%s' — D04 트랙 검토 대상" % [key, language, term])
 	_report("V7", "forbidden vocab (warn-only)", checked, before_fail, before_warn)
+
+
+# 라틴 어휘는 **단어 경계**로 본다. 부분 문자열로 잡으면 `threshold` 가 `hold` 로,
+# `spinning` 이 `spin` 으로 걸려 경고가 소음이 된다 — 소음이 쌓인 경고는 읽히지 않고,
+# 읽히지 않는 경고는 없는 것과 같다(V7 은 D04 트랙의 판단 입력이지 기계 판정이 아니다).
+# CJK 는 단어 경계가 문자 경계와 다르므로 부분 문자열이 옳다.
+func _contains_term(value: String, term: String) -> bool:
+	var latin := true
+	for index in range(term.length()):
+		if term.unicode_at(index) > 0x7F:
+			latin = false
+			break
+	if not latin:
+		return value.contains(term)
+	var from := 0
+	while true:
+		var at := value.findn(term, from)
+		if at < 0:
+			return false
+		var before_ok := at == 0 or not _is_word_char(value.unicode_at(at - 1))
+		var after_index := at + term.length()
+		var after_ok := after_index >= value.length() or not _is_word_char(value.unicode_at(after_index))
+		if before_ok and after_ok:
+			return true
+		from = at + 1
+	return false
+
+
+# ── V7S: V7 판정 논리 자기 검사 (차단형) ──
+#
+# V7 의 **판정**은 경고형이어야 한다(작법 판단 = D04 소관 · 불변규칙 7). 그런데 그 결과
+# **V7 이 얼마나 시끄러워졌는지는 종료코드가 구분하지 못한다** — 단어 경계 판정을 부분
+# 문자열로 되돌리면 `threshold` 가 `hold` 로 걸려 경고가 소음이 되고, 읽히지 않는 경고는
+# 없는 것과 같은데도 빌드는 녹색이다(돌연변이 F3 미검출로 실측).
+#
+# 그래서 **내용 판정과 검사기 자신의 판정 논리를 가른다.** 어느 문면이 금칙인지는 D04 가
+# 판단하고(경고), 판정 논리가 규격대로 작동하는지는 기계가 판단한다(차단). 컴파일 게이트가
+# 자기 성공 토큰의 부재를 실패로 보는 것과 같은 자리다 — 검사는 자기 자신을 검사하지 못한다.
+func _run_v7_self_test() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	# [입력, 어휘, 기대]
+	var cases := [
+		["Candidate locked. Recompute.", "hold", false],
+		["threshold reached", "hold", false],          # 부분 문자열 판정이면 여기서 걸린다
+		["household data", "hold", false],
+		["Hold the second reel.", "hold", true],       # 대소문자 무시
+		["spinning up", "spin", false],
+		["Spin the Grid", "spin", true],
+		["reeling in", "reel", false],
+		["the reel stops", "reel", true],
+		["決着局面。リール集中。", "リール", true],        # CJK = 부분 문자열이 옳다
+		["決着局面。演算集中。", "リール", false],
+		["확률 분포", "확률", true],
+		["연산 분포", "확률", false],
+	]
+	for case in cases:
+		checked += 1
+		var actual := _contains_term(String(case[0]), String(case[1]))
+		if actual != bool(case[2]):
+			_fail("V7S", "'%s' × '%s': %s (기대 %s)"
+				% [case[0], case[1], str(actual), str(case[2])])
+	_report("V7S", "V7 term matcher self-test", checked, before_fail, before_warn)
+
+
+func _is_word_char(code: int) -> bool:
+	return (code >= 48 and code <= 57) or (code >= 65 and code <= 90) \
+		or (code >= 97 and code <= 122) or code == 95
 
 
 # ── V8 스트링 키 문법: camelCase 세그먼트·`.` 구분자 전속 (D12 §8.1 결정 #9) ──

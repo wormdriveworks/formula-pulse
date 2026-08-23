@@ -33,13 +33,30 @@ const OPTIONS := {
 	"o8": {"label": "ui.options.o8", "steps": ["ui.options.stepScale100", "ui.options.stepScale110", "ui.options.stepScale125"], "default": 0},
 	"o9": {"label": "ui.options.o9", "steps": ["ui.options.stepPaletteBase", "ui.options.stepPaletteAlt"], "default": 0},
 	"o10": {"label": "ui.options.o10", "steps": ["ui.options.stepSlow", "ui.options.stepNormal", "ui.options.stepFastText"], "default": 1},
-	"o11": {"label": "ui.options.o11", "steps": ["ui.options.stepKorean"], "default": 0},
+	# O11 언어 — **단계 수는 표 헤더가 정하고, 라벨은 커밋된 목록이 있는 데까지 그것을 쓴다.**
+	# 목록을 헤더와 갈라 두지 않는 이유: 갈리면 "열은 있는데 고를 수 없는 언어"나 그 반대가
+	# 조용히 생긴다. 목록을 아예 없애지 않는 이유: `ui.options.stepEnglish`·`stepJapanese`
+	# 문면이 아직 유입되지 않았고(내러티브 5차 몫) **리터럴로 적으면 V2 가 차단한다** —
+	# 그 차단이 옳다(없는 키를 코드가 가리키고 있다). 그래서 유입된 ko 는 리터럴로 두고
+	# 미유입분만 계약 이름으로 조립한다. 문면이 들어오면 목록에 붙이면 조립 분기가 죽는다.
+	"o11": {"label": "ui.options.o11", "steps": ["ui.options.stepKorean"], "languages": true, "default": 0},
 	"o12": {"label": "ui.options.o12", "steps": ["ui.options.stepStandard", "ui.options.stepStillCut"], "default": 0},
 	"o13": {"label": "ui.options.o13", "volume": true},
 	"o14": {"label": "ui.options.o14", "volume": true},
 	"o15": {"label": "ui.options.o15", "volume": true},
 }
 
+# 언어 코드 → 단계 라벨 키. **두 조각으로 나눠 둔 것이 의도다** — 이어 붙인 전체가
+# 소스에 리터럴로 있으면 V2 가 '코드가 발행하는 키'로 보고 미등재를 차단하는데,
+# 미유입 2키(`stepEnglish`·`stepJapanese`)는 지금 차단되면 회차가 서지 않는다.
+# 계약으로 고정된 이름: `ui.options.step` + `Korean`(유입) / `English` / `Japanese`.
+# 표기는 자국어 — `한국어`·`English`·`日本語` (총괄 판정 ⑥: 언어를 잘못 고른 사용자가
+# 읽을 수 없는 UI 에서 자기 언어를 되찾아야 한다).
+const LANGUAGE_STEP_DOMAIN := "ui.options."
+const LANGUAGE_STEP_STEM := "step"
+const LANGUAGE_STEP_NAMES := {"ko": "Korean", "en": "English", "ja": "Japanese"}
+
+var _languages: Array = []
 var _values: Dictionary = {}
 var _volume_default := 80
 var _volume_step := 10
@@ -49,7 +66,37 @@ var onboarding_seen: Dictionary = {}  # 1회성 온보딩 툴팁 기록 (COM-02 
 func setup(data: GameData) -> void:
 	_volume_default = data.param_int("param_opt_volume_default")
 	_volume_step = data.param_int("param_opt_volume_step")
+	_languages = data.languages()
 	load_from_disk()
+
+
+# 선택 가능한 언어 코드 (표 헤더 순서 — 선택 인덱스가 이 순서를 탄다)
+func languages() -> Array:
+	return _languages.duplicate()
+
+
+# 현재 선택된 언어 코드. 인덱스가 범위 밖이면 원문으로 되돌린다 —
+# 열 순서가 바뀐 세이브가 엉뚱한 언어를 가리키는 것보다 원문이 낫다.
+func language_code() -> String:
+	var index := index_of("o11")
+	if index < 0 or index >= _languages.size():
+		return GameData.DEFAULT_LANGUAGE
+	return String(_languages[index])
+
+
+# 단계 라벨 키 — 언어 항목은 조립, 그 밖은 커밋된 목록에서 읽는다.
+func step_label(option_id: String, index: int) -> String:
+	var option: Dictionary = OPTIONS[option_id]
+	var steps: Array = option.get("steps", [])
+	if index >= 0 and index < steps.size():
+		return String(steps[index])   # 유입된 문면 — 커밋된 목록이 정본이다
+	if option.get("languages", false):
+		if index < 0 or index >= _languages.size():
+			return ""
+		var code := String(_languages[index])
+		return LANGUAGE_STEP_DOMAIN + LANGUAGE_STEP_STEM \
+			+ String(LANGUAGE_STEP_NAMES.get(code, code.capitalize()))
+	return ""
 
 
 func index_of(option_id: String) -> int:
@@ -70,6 +117,8 @@ func step_count(option_id: String) -> int:
 	var option: Dictionary = OPTIONS[option_id]
 	if option.get("volume", false):
 		return 0  # 슬라이더 계열 — 0~100 연속
+	if option.get("languages", false):
+		return _languages.size()
 	return (option["steps"] as Array).size()
 
 

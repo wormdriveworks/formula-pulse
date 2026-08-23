@@ -86,6 +86,16 @@ func setup(game_data: GameData, services: PlatformServices = null, audio_host: N
 		sink.bind_dispatcher(audio)
 	apply_volume_options()
 	apply_haptic_options()
+	apply_language()
+
+
+# O11 언어 → 스트링 표. **볼륨·햅틱과 같은 자리다** — 코어는 옵션 저장소(화면 층)를
+# 읽을 수 없으므로 세션이 옮긴다. `setup()` 에서 부르는 것이 요건이다: 여기서 부르지 않으면
+# 저장된 선택이 **다음 전환 때까지 적용되지 않아** 재시작마다 원문으로 돌아간다.
+func apply_language() -> bool:
+	if data == null or options == null:
+		return false
+	return data.set_language(options.language_code())
 
 
 # O3 진동 감쇠 → 디스패처. **볼륨과 같은 자리다** — 코어는 옵션 저장소(화면 층)를 읽을 수 없다.

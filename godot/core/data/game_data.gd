@@ -13,6 +13,9 @@ var tables_override_dir := ""
 const STRUCTURES_DIR := "res://data/structures/"
 const STRINGS_PATH := "res://data/strings/strings.csv"
 
+# 원문 언어 (D15 §4.1 — 한국어가 원문). 선택 가능한 세트는 표 헤더에서 읽는다.
+const DEFAULT_LANGUAGE := "ko"
+
 var params: Dictionary = {}            # param_* id -> float
 var symbols: Array[Dictionary] = []    # symbol_distribution 행 (릴별 확률 포함)
 var match_effects: Dictionary = {}     # symbol_id -> {match_count(int) -> 효과 행}
@@ -73,6 +76,7 @@ var scripted_losses: Dictionary = {}   # 필패 스크립트 id -> 구조 JSON (
 var manifest: Dictionary = {}          # 적재 대상 선언 (V2가 전 id를 참조 검사)
 var grid: Dictionary = {}              # 구조 JSON
 var strings := StringTable.new()
+var language := DEFAULT_LANGUAGE
 
 var _load_ok := true
 
@@ -83,8 +87,9 @@ func is_ok() -> bool:
 	return _load_ok
 
 
-func load_all() -> bool:
+func load_all(initial_language := DEFAULT_LANGUAGE) -> bool:
 	_load_ok = true
+	language = initial_language
 	_load_params()
 	_load_symbols()
 	_load_match_effects()
@@ -107,9 +112,30 @@ func load_all() -> bool:
 	_load_vn_beats()
 	grid = _load_json(STRUCTURES_DIR + "grid_debug.json")
 	season_calendar = _load_json(STRUCTURES_DIR + "season_calendar.json")
-	if not strings.load_file(STRINGS_PATH):
+	if not strings.load_file(STRINGS_PATH, language):
 		_load_ok = false
 	return _load_ok
+
+
+# 언어 전환 — 스트링 표만 다시 읽는다 (수치·구조는 언어와 무관하다).
+# `load_all()` 을 다시 부르지 않는 이유: 표 30여 종을 재적재하면 진행 중 참조가 갈리고,
+# 언어는 표의 **열 선택**일 뿐이라 재적재할 것이 없다.
+# 반환 false = 미등재 언어(요청을 무시하고 현행 유지) — 전환 실패가 무문면 화면보다 낫다.
+func set_language(code: String) -> bool:
+	if code == language:
+		return true
+	if not strings.languages().has(code):
+		push_error("GameData: unknown language '%s'" % code)
+		return false
+	if not strings.load_file(STRINGS_PATH, code):
+		return false
+	language = code
+	return true
+
+
+# 선택 가능한 언어 = 스트링 표 헤더 (D15 §4.1 EA 세트 = ko·en·ja 의 물리적 실체)
+func languages() -> Array:
+	return strings.languages()
 
 
 # 콘텐츠 적재는 매니페스트 선언 전속 — 디렉토리 스캔을 쓰지 않는다.

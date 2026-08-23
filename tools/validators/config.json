@@ -4,7 +4,9 @@
  "structures_dir": "godot/data/structures",
  "strings_csv": "godot/data/strings/strings.csv",
  "string_language_columns": [
-  "ko"
+  "ko",
+  "en",
+  "ja"
  ],
  "code_dir": "godot",
  "core_dir": "godot/core",
@@ -703,14 +705,32 @@
   "vnChoice.",
   "vn."
  ],
- "v7_terms": [
-  "FP",
-  "확률",
-  "슬롯",
-  "스핀",
-  "홀드",
-  "릴"
- ],
+ "v7_terms": {
+  "ko": [
+   "FP",
+   "확률",
+   "슬롯",
+   "스핀",
+   "홀드",
+   "릴"
+  ],
+  "en": [
+   "FP",
+   "probability",
+   "slot",
+   "spin",
+   "hold",
+   "reel"
+  ],
+  "ja": [
+   "FP",
+   "確率",
+   "スロット",
+   "スピン",
+   "ホールド",
+   "リール"
+  ]
+ },
  "key_regex": "^[a-z][a-zA-Z0-9]*(\\.[a-z][a-zA-Z0-9]*){1,2}$",
  "v4_whitelist_marker": "V4-except",
  "contamination_patterns": [

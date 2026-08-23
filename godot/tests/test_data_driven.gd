@@ -11,7 +11,7 @@
 extends SceneTree
 
 const FIXTURE_DIR := "res://tests/fixtures/tables/"
-const MIN_CHECKS := 55
+const MIN_CHECKS := 69
 
 var _failures := 0
 var _checked := 0
@@ -24,6 +24,7 @@ func _init() -> void:
 	_reel_columns_are_distinct()
 	_save_layer_reads_data()
 	_new_consumers_read_data()
+	_skill_layer_reads_data()
 	print("")
 	if _checked < MIN_CHECKS:
 		print("DATA_DRIVEN_TEST_FAIL checks=%d < 하한 %d (스위트 축소·로드 실패 의심)" % [_checked, MIN_CHECKS])
@@ -370,3 +371,93 @@ func _new_consumers_read_data() -> void:
 	else:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(options_path))
 	_ok("신규 소비부 경로에서 침묵 기본값 0", data.is_ok())
+
+
+# ── 스킬 층 (21차 신설 — 발주 ④ `skills.csv` 픽스처 유무 재확인) ──
+#
+# **없었다.** 20차의 스킬 검사는 기대값을 전부 `GameData` 에서 읽으므로
+# `charge_cost` 를 `2` 로 못 박아도, 배수를 `1.5` 로 못 박아도 통과한다(자기 일관성).
+# 20차 돌연변이 E1(`charge -= 0`)이 잡은 것은 **차감의 부재**이고 **하드코딩된 정답**은
+# 아니다 — 그 구멍은 원리적으로 이 스위트만 닫는다. 픽스처는 비용을 전 종 5로,
+# 투어 상한을 4·3으로, 배수를 3.0·4·2.5·30·40·7 로 갈아 끼운다.
+func _skill_layer_reads_data() -> void:
+	var data := _fixture_data()
+	var default_data := _default_data()
+	if data == null or default_data == null:
+		return
+	# 픽스처가 실제로 다르다 (같아지면 아래 전 검사가 조용히 무의미해진다)
+	_ok("스킬 픽스처가 기본과 다르다",
+		CsvTable.to_int(String(data.skills["skill_sa1"]["charge_cost"]))
+			!= CsvTable.to_int(String(default_data.skills["skill_sa1"]["charge_cost"])),
+		"fixture=%s default=%s" % [data.skills["skill_sa1"]["charge_cost"],
+			default_data.skills["skill_sa1"]["charge_cost"]])
+	var engine := RaceEngine.new()
+	engine.setup(data, _rng(4321))
+	engine.deck_carry_in = ["skill_sa1"]
+	engine.start_gp()
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = data.param_int("param_charge_cap")
+	var before := engine.charge
+	_ok("스킬 투입 성립 (픽스처)", bool(engine.use_skill("skill_sa1").get("ok", false)))
+	var cost := CsvTable.to_int(String(data.skills["skill_sa1"]["charge_cost"]))
+	_ok("스킬 비용 = 픽스처 값", before - engine.charge == cost,
+		"delta=%d fixture=%d" % [before - engine.charge, cost])
+	_ok("스킬 비용이 리터럴 2가 아니다", before - engine.charge != 2,
+		"delta=%d" % (before - engine.charge))
+	# 배수 — 변조 값이 픽스처를 따라오는가
+	_eq_float("SA1 배수 = 픽스처 값",
+		float(engine.skill_mods.get(RaceEngine.MOD_ADVANCE_MULT, 0.0)),
+		data.param("param_skill_advance_mult"))
+	_ok("SA1 배수가 리터럴 1.5가 아니다",
+		absf(float(engine.skill_mods.get(RaceEngine.MOD_ADVANCE_MULT, 0.0)) - 1.5) > 0.0001)
+	# 재회전 총량 상한 — 픽스처 3 (기본 2)
+	var cap_engine := RaceEngine.new()
+	cap_engine.setup(data, _rng(4322))
+	cap_engine.deck_carry_in = ["skill_sh2"]
+	cap_engine.start_gp()
+	cap_engine.begin_turn()
+	cap_engine.spin()
+	cap_engine.charge = 99
+	var granted := 0
+	while bool(cap_engine.use_skill("skill_sh2").get("ok", false)):
+		granted += 1
+		if granted > 9:
+			break
+	_ok("재회전 총량 상한 = 픽스처 값", granted == data.param_int("param_hold_total_cap_per_turn"),
+		"granted=%d fixture=%d" % [granted, data.param_int("param_hold_total_cap_per_turn")])
+	_ok("총량 상한이 리터럴 2가 아니다", granted != 2, "granted=%d" % granted)
+	# 투어 상한 — 픽스처 SH4 = 4회 (기본 2회)
+	var uses_engine := RaceEngine.new()
+	uses_engine.setup(data, _rng(4323))
+	uses_engine.deck_carry_in = ["skill_sh4"]
+	uses_engine.start_gp()
+	var limit := CsvTable.to_int(String(data.skills["skill_sh4"]["uses_per_tour"]))
+	var used := 0
+	for attempt in range(limit + 3):
+		uses_engine.begin_turn()
+		uses_engine.spin()
+		uses_engine.charge = uses_engine.data.param_int("param_charge_cap")
+		if bool(uses_engine.use_skill("skill_sh4").get("ok", false)):
+			used += 1
+		uses_engine.provisional = ["symbol_pulse", "symbol_pulse", "symbol_pulse"]
+		uses_engine.confirm(0.0)
+	_ok("투어 상한 = 픽스처 값", used == limit, "used=%d fixture=%d" % [used, limit])
+	_ok("투어 상한이 리터럴 2가 아니다", used != 2, "used=%d" % used)
+	# 섀시 최저 잔존 — 픽스처 7 (기본 1)
+	var floor_engine := RaceEngine.new()
+	floor_engine.setup(data, _rng(4324))
+	floor_engine.deck_carry_in = ["skill_si4"]
+	floor_engine.start_gp()
+	floor_engine.begin_turn()
+	floor_engine.spin()
+	floor_engine.charge = 99
+	floor_engine.chassis = 2.0
+	floor_engine.provisional = ["symbol_trouble", "symbol_trouble", "symbol_trouble"]
+	_ok("SI4 투입 성립 (픽스처)", bool(floor_engine.use_skill("skill_si4").get("ok", false)))
+	floor_engine.confirm(0.0)
+	_eq_float("SI4 최저 = 픽스처 값", floor_engine.chassis,
+		data.param("param_skill_chassis_floor"))
+	_ok("SI4 최저가 리터럴 1이 아니다", absf(floor_engine.chassis - 1.0) > 0.0001,
+		"chassis=%f" % floor_engine.chassis)
+	_ok("픽스처 주행에서 침묵 기본값 0", data.is_ok())

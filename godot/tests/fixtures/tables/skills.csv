@@ -1,0 +1,17 @@
+id,name_key,skill_tier,charge_cost,uses_per_tour,unlock_dp,family,effect
+skill_sh1,ui.skill.sh1,1,5,0,30,hold,precision_hold
+skill_sc1,ui.skill.sc1,1,5,0,30,convert,trouble_to_line
+skill_sa1,ui.skill.sa1,1,5,0,30,amplify,advance_x15
+skill_si1,ui.skill.si1,1,5,0,30,insure,duel_penalty_waive
+skill_sh4,ui.skill.sh4,1,0,4,30,hold,warmup_spin
+skill_sa2,ui.skill.sa2,1,5,0,30,amplify,pulse_yield_x2
+skill_sh2,ui.skill.sh2,2,5,0,55,hold,full_sweep
+skill_sc4,ui.skill.sc4,2,5,0,55,convert,line_to_slipstream
+skill_sa3,ui.skill.sa3,2,5,0,55,amplify,defense_x15_duel12
+skill_si2,ui.skill.si2,2,5,0,55,insure,trouble_chassis_zero
+skill_si3,ui.skill.si3,2,5,0,55,insure,trouble_rear_zero
+skill_sc2,ui.skill.sc2,2,5,0,55,convert,trouble_to_pulse
+skill_sh3,ui.skill.sh3,3,5,0,75,hold,snapshot
+skill_sc3,ui.skill.sc3,3,5,0,75,convert,symbol_clone
+skill_sa4,ui.skill.sa4,3,5,0,75,amplify,overtorque_boost16
+skill_si4,ui.skill.si4,3,5,3,75,insure,survival_cell

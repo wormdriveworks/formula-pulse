@@ -33,9 +33,10 @@ func _init() -> void:
 	_untouched_slots()
 	_applied_on_screen_bind()
 	_consumers_route()
+	_language_consumption()
 	print("")
-	if _checked < 20:
-		print("UI_OPTIONS_FAIL checks=%d < 하한 20 (스위트 축소 의심)" % _checked)
+	if _checked < 54:
+		print("UI_OPTIONS_FAIL checks=%d < 하한 54 (스위트 축소 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -192,3 +193,88 @@ func _ok(label: String, condition: bool, detail: String = "") -> void:
 		return
 	_failures += 1
 	print("  [FAIL] %s%s" % [label, (" — " + detail) if detail != "" else ""])
+
+
+# ── ⑤ O11 언어 소비부 (21차 신설 — 발주 ②) ──
+#
+# **데이터는 있는데 도달할 수 없었다** (내러티브 4차 §6-B 실독): 3중 절단 —
+# `load_file` 언어 인자 없음 · O11 단계 1개 · 저장·재적재 경로 부재.
+# O9 팔레트와 같은 형태의 결함이다("설정은 켜지는데 화면은 그대로")이므로 같은 스위트에 둔다.
+func _language_consumption() -> void:
+	var data := GameData.new()
+	if not data.load_all():
+		_ok("⑤ 데이터 적재", false)
+		return
+	# 선택 가능한 언어 = 표 헤더. 손으로 적은 목록이 아니라는 것이 요건이다.
+	var languages: Array = data.languages()
+	_ok("⑤ 언어 = 표 헤더에서 온다", languages == ["ko", "en", "ja"], str(languages))
+	_ok("⑤ 개시 언어 = 원문", data.language == GameData.DEFAULT_LANGUAGE, data.language)
+	# 전환이 **문면을 실제로 바꾸는가.** 인자가 통과했다는 것으로는 부족하다 —
+	# `load_file` 은 언어 인자를 무시해도 true 를 돌려준다(초판 상태가 정확히 그랬다).
+	var probe_key := "ui.options.o11"
+	var ko_text := data.strings.text(probe_key)
+	_ok("⑤ 전환 성립: en", data.set_language("en"))
+	var en_text := data.strings.text(probe_key)
+	_ok("⑤ en 문면이 갈린다", en_text != ko_text, "%s vs %s" % [en_text, ko_text])
+	_ok("⑤ 전환 성립: ja", data.set_language("ja"))
+	var ja_text := data.strings.text(probe_key)
+	_ok("⑤ ja 문면이 갈린다", ja_text != ko_text and ja_text != en_text, ja_text)
+	_ok("⑤ 전환 후 언어 상태 갱신", data.language == "ja", data.language)
+	# 미등재 언어는 거부하고 **현행을 유지한다** — 무문면 화면보다 낫다.
+	_ok("⑤ 미등재 언어 거부", not data.set_language("zh"))
+	_ok("⑤ 거부 후 현행 유지", data.language == "ja" and data.strings.text(probe_key) == ja_text)
+	_ok("⑤ 원문 복귀", data.set_language("ko") and data.strings.text(probe_key) == ko_text)
+	# 미등재 언어로 **개시**하는 경로는 `GameData.set_language` 의 사전 검사를 타지 않는다 —
+	# `load_all(초기언어)` 가 곧바로 `StringTable.load_file` 로 간다. 두 관문이 겹쳐 있어
+	# 한쪽을 지워도 다른 쪽이 가려 주는 상태였고(돌연변이 F8 미검출), 이 축이 그 경로를 직접 본다.
+	var bogus := GameData.new()
+	_ok("⑤ 미등재 초기 언어 적재 거부", not bogus.load_all("zh"))
+	_ok("⑤ 거부가 침묵 통과로 새지 않는다", not bogus.is_ok())
+	# 옵션 저장소 — 단계 수가 헤더에서 오고, 인덱스가 코드로 번역된다.
+	# **디스크를 건드리는 축이다** (`set_index` 가 즉시 저장한다) — 원래 값을 떠 두고
+	# 끝에서 되돌린다. 검사가 기기 설정을 남기면 다음 스위트가 그 상태에서 출발한다.
+	var store := OptionsStore.new()
+	store.setup(data)
+	var saved_index := store.index_of("o11")
+	_ok("⑤ O11 단계 수 = 언어 수", store.step_count("o11") == languages.size(),
+		"%d" % store.step_count("o11"))
+	for index in range(languages.size()):
+		store.set_index("o11", index)
+		_ok("⑤ 인덱스 %d → 코드 %s" % [index, languages[index]],
+			store.language_code() == String(languages[index]), store.language_code())
+		var label := store.step_label("o11", index)
+		_ok("⑤ 단계 라벨 비공란: %s" % languages[index], label != "", label)
+	# 범위 밖 인덱스(열 순서가 바뀐 구설정) → 원문. 엉뚱한 언어보다 원문이 낫다.
+	# **값을 여럿 쓴다** — 하나만 보면 `index % size` 같은 잘못된 구현이 우연히 0(=ko)으로
+	# 접혀 통과한다(돌연변이 F6 이 정확히 그 형태였다). 음수도 함께 본다.
+	for bad_index in [99, 100, 101, -1, -4]:
+		store.set_index("o11", bad_index)
+		_ok("⑤ 범위 밖 인덱스 %d → 원문" % bad_index,
+			store.language_code() == GameData.DEFAULT_LANGUAGE, store.language_code())
+	store.set_index("o11", 0)
+	# 세션 창구 — 코어는 옵션 저장소를 읽을 수 없으므로 세션이 옮긴다.
+	# `setup()` 에서 부르지 않으면 저장된 선택이 재시작마다 원문으로 돌아간다.
+	var session := RunSession.new()
+	session.setup(data)
+	session.options.set_index("o11", languages.find("ja"))
+	_ok("⑤ 세션 경유 전환", session.apply_language())
+	_ok("⑤ 세션 전환이 표에 도달", session.data.language == "ja", session.data.language)
+	# 재개시 모사 — 저장된 인덱스를 그대로 둔 채 새 세션을 세우면 그 언어로 서야 한다.
+	# **새 `GameData` 를 준다.** 위에서 이미 "ja" 로 바뀐 인스턴스를 재사용하면
+	# `setup()` 이 언어를 옮기지 않아도 검사가 통과한다 — 자기 충족 단언이었고
+	# 돌연변이 F5(`setup` 에서 `apply_language()` 제거)가 그것을 드러냈다.
+	var fresh := GameData.new()
+	_ok("⑤ 재개시용 데이터 적재", fresh.load_all())
+	_ok("⑤ 새 인스턴스는 원문에서 출발", fresh.language == GameData.DEFAULT_LANGUAGE)
+	var reopened := RunSession.new()
+	reopened.setup(fresh)
+	_ok("⑤ 재개시가 저장된 언어로 선다", reopened.data.language == "ja", reopened.data.language)
+	# 기기 설정·표 상태 원복 — 저장소는 디스크를, `data` 는 자기 표 상태를 되돌린다.
+	# (`reopened` 는 `fresh` 를 쥐고 있으므로 `data` 는 따로 되돌려야 한다.)
+	reopened.options.set_index("o11", saved_index)
+	reopened.apply_language()
+	data.set_language(String(data.languages()[saved_index]))
+	_ok("⑤ 검사 전 상태로 원복", reopened.options.index_of("o11") == saved_index
+		and data.language == String(data.languages()[saved_index])
+		and fresh.language == String(fresh.languages()[saved_index]),
+		"index=%d data=%s fresh=%s" % [reopened.options.index_of("o11"), data.language, fresh.language])

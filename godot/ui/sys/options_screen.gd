@@ -200,6 +200,10 @@ func _shift(option_id: String, direction: int, value: Label, notice: Label) -> v
 	# 볼륨도 같은 성격이다 — 버스는 옵션을 스스로 읽지 못한다(O13~O15).
 	session.apply_volume_options()
 	session.apply_haptic_options()   # O3 진동 감쇠도 같은 자리다
+	# O11 언어도 같은 성격이다 — 스트링 표는 옵션을 스스로 읽지 못한다.
+	# 전환은 즉시 반영되지만 **이미 세워진 라벨은 스스로 갱신되지 않는다**:
+	# 화면 전체 재문면화는 화면 층 몫이고, 이 화면은 아래 `_refresh_value` 로 자기 값만 고친다.
+	session.apply_language()
 	sfx("ui_toggle")   # SE-U05 토글·슬라이더 — 단계 이동과 볼륨 이동이 같은 축이다
 	_refresh_value(option_id, value, notice)
 
@@ -213,8 +217,9 @@ func _refresh_value(option_id: String, value: Label, notice: Label) -> void:
 		var volume_text := s.text("ui.options.volumeFormat", {"value": index})
 		value.text = volume_text
 	else:
-		var steps: Array = option["steps"]
-		value.text = s.text(String(steps[index]))
+		# 단계 라벨은 **저장소 경유**다 — O11 은 목록이 표 헤더에서 오므로 화면이
+		# `option["steps"]` 를 직접 읽으면 그 항목에서 키가 없어 죽는다.
+		value.text = s.text(store.step_label(option_id, index))
 	if notice != null:
 		# O5 비활성 = 마지막 단 (타이머 부재 → 모멘텀 조건 불성립 — D05 무개정 성립)
 		notice.visible = index == store.step_count(option_id) - 1

@@ -115,8 +115,8 @@ func _process(_delta: float) -> bool:
 	_tutorial_callout_placement()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 319:
-		print("UI_SCREENS_FAIL checks=%d < 하한 319 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 332:
+		print("UI_SCREENS_FAIL checks=%d < 하한 332 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1257,6 +1257,18 @@ const ANCH_PAIR_HEAD := 'const ANCH_PAIR_PROPERTIES := ['
 const ANCH_PAIR_EXACT := '"grow_horizontal","grow_vertical","offset_left","offset_right","offset_top","offset_bottom",'
 
 
+# 등재 언어 = D15 §4.1 EA 세트(한국어 원문·영어·일본어)의 물리적 실체.
+# 순서가 계약이다 — O11 선택 인덱스가 표 헤더 순서를 탄다 (options_store.language_code()).
+const LANGUAGE_COLUMNS_EXPECTED := ["ko", "en", "ja"]
+
+
+func _strings_header() -> Array:
+	var rows := CsvTable.load_rows(GameData.STRINGS_PATH)
+	if rows.is_empty():
+		return []
+	return Dictionary(rows[0]).keys()
+
+
 func _anch_check_present() -> void:
 	var source := FileAccess.get_file_as_string(VALIDATOR_SOURCE)
 	_ok("검증기 원본 적재", not source.is_empty())
@@ -1325,6 +1337,40 @@ func _anch_check_present() -> void:
 	_ok("act_vn tone 도메인 강제(공란 허용)",
 		String(act_spec.get("tone", "")) == "enum_optional:calm,tense", str(act_spec))
 	_ok("act_vn order 범위 강제", String(act_spec.get("order", "")) == "int:1,9", str(act_spec))
+	# ── 언어 열 등재 + V7 어휘 대장 (총괄 판정 ④ · 21차) ──
+	#
+	# **여기가 "등재만 하면 통과만 찍는다"의 방어 자리다.** 열 등재는 V3·V7 을 죽이지 않고
+	# **보는 범위만** 넓히므로, 되돌려도 두 검사는 녹색으로 계속 돈다 — 종료코드가
+	# 구분하지 못하는 자리가 `vnChoice.` 규칙 행과 같다.
+	var language_columns: Array = Array(Dictionary(config).get("string_language_columns", []))
+	_ok("언어 열 등재 = 표 헤더 (ko·en·ja)", language_columns == LANGUAGE_COLUMNS_EXPECTED,
+		str(language_columns))
+	# 설정과 실물 표의 **양방향** 대조 — 열을 늘리고 등재를 잊거나 그 반대가 조용히 성립한다.
+	var header: Array = _strings_header()
+	_ok("표 헤더 = key + 등재 언어", header == ([StringTable.KEY_COLUMN] + language_columns),
+		"header=%s config=%s" % [str(header), str(language_columns)])
+	# 어휘 목록은 **언어별**이다. 국문 목록 하나로는 일문 발화 도메인에서 통과만 찍는다
+	# (내러티브 4차 §6-E — `リール`·`スピン`·`ホールド` 가 가타카나형 금칙 후보다).
+	var terms: Dictionary = Dictionary(config).get("v7_terms", {})
+	_ok("v7 어휘 = 언어별 대장", terms.size() == language_columns.size(), str(terms.keys()))
+	var korean_terms: Array = Array(terms.get("ko", []))
+	_ok("v7 국문 어휘 비공란", korean_terms.size() >= 6, str(korean_terms.size()))
+	for language in language_columns:
+		var list: Array = Array(terms.get(language, []))
+		_ok("v7 어휘 등재: %s" % language, terms.has(language))
+		# 계수를 묶어 둔다 — 한 언어만 비면 그 언어에서 검사가 사실상 꺼진다.
+		_ok("v7 어휘 계수 일치: %s" % language, list.size() == korean_terms.size(),
+			"%d vs %d" % [list.size(), korean_terms.size()])
+	# 라틴 어휘의 단어 경계 판정 — 부분 문자열로 되돌리면 `threshold` 가 `hold` 로 걸려
+	# 경고가 소음이 되고, 읽히지 않는 경고는 없는 것과 같다.
+	_ok("V7 단어 경계 판정 실재", source.contains("func _contains_term("))
+	_ok("V7 단어 문자 판정 실재", source.contains("func _is_word_char("))
+	_ok("V7 = 경고형 유지 (불변규칙 7)", not source.contains('_warn("V7") and _fail("V7"'))
+	# V7S = **검사기 자신의 판정 논리** 자기 검사(차단형). 내용 판정은 경고형이라
+	# 소음이 늘어도 종료코드가 녹색인데(돌연변이 F3 실측), 판정 논리의 고장은 기계 사안이다.
+	_ok("V7S 자기 검사 정의 실재", source.contains("func _run_v7_self_test("))
+	_ok("V7S 자기 검사 등록(호출) 실재", source.contains("\t_run_v7_self_test()"))
+	_ok("V7S = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("V7S"'))
 
 
 # `ANCH_PAIR_PROPERTIES` 목록 본문만 떼어 공백을 지운 형태. 항목이 하나라도 늘거나
