@@ -124,7 +124,7 @@ C:\SDKs\godot\Godot_v4.7.1-stable_win64_console.exe  ← CLI 전용 (실측 검�
 내러티브 턴제 레이싱 로그라이트. 슬롯 릴로 섹터를 주파하고, 자원으로 무작위성을 통제한다.
 설계 문서 **D01~D16 전량 확정** 상태이며, 본 리포지토리는 **구현 단계** 전용이다.
 
-- **단일 진실 원천:** `docs/master_plan_v2_90.md`
+- **단일 진실 원천:** `docs/master_plan_v2_91.md`
 - **설계 정본:** `docs/design/` (21개 파일 — **읽기 전용. 수정 금지**)
 - **구현 결정 로그:** `docs/decisions/impl_log.md`
 - **현재 마일스톤:** MS-3 Steam EA (D15 §1.1) — 착수 프롬프트 = `prompts/MS3_kickoff.md` (양 레인 공용)
