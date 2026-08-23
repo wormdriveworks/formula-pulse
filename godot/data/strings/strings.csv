@@ -61,6 +61,7 @@ raceLog.duelStartDefense01,방어 듀얼 — 상대 {target}.,Defense duel — {
 raceLog.duelWin01,듀얼 승리. 차지 +{amount}.,Duel won. Charge +{amount}.,デュエル勝利。チャージ+{amount}。
 raceLog.duelLoseOvertake01,듀얼 패배. 섀시 {amount}.,Duel lost. Chassis {amount}.,デュエル敗北。シャシー{amount}。
 raceLog.duelLoseDefense01,듀얼 패배. 피추월.,Duel lost. Overtaken.,デュエル敗北。抜かれた。
+raceLog.duelLoseWaived01,듀얼 패배. 충격을 받아냈다.,Duel lost. The impact was absorbed.,デュエル敗北。衝撃を受け止めた。
 raceLog.chanceProc01,결정적 순간이 열린다.,A decisive moment opens.,決定的な瞬間が開く。
 raceLog.chanceDuel01,찬스 3매치 — 즉시 듀얼.,Chance three-match — duel now.,チャンス3マッチ — 即時デュエル。
 raceLog.momentum01,흐름을 탔다. 전방 +{amount}.,Momentum caught. Front +{amount}.,流れに乗った。前方+{amount}。
@@ -185,6 +186,7 @@ vane.brief.duel03,결판. 제가 맞추겠습니다.,The decision. I will line i
 vane.brief.resonance01,방금 출력은… 제 제어가 아닙니다.,That output just now… not from my control.,今の出力は…私の制御ではありません。
 vane.brief.resonance02,또 그 출력입니다. 원인 미상.,That output again. Cause unknown.,またあの出力です。原因不明。
 vane.brief.resonance03,"그 출력, 이제 읽힙니다.",That output — I can read it now.,あの出力、今は読めます。
+vane.brief.skillUse01,등록 루틴 적용. 변수 갱신.,Routine applied. Variables updated.,登録ルーチン適用。変数を更新。
 ui.vnSlot.seasonOpen,시즌 개막,Season Opening,シーズン開幕
 ui.vnSlot.seasonClose,시즌 결산,Season Closing,シーズン決算
 ui.vnSlot.tourBrief,투어 브리핑,Tour Briefing,ツアーブリーフィング
@@ -420,6 +422,8 @@ ui.options.stepSlow,느림,Slow,遅い
 ui.options.stepNormal,보통,Normal,普通
 ui.options.stepFastText,빠름,Fast,速い
 ui.options.stepKorean,한국어,한국어,한국어
+ui.options.stepEnglish,English,English,English
+ui.options.stepJapanese,日本語,日本語,日本語
 ui.options.volumeFormat,{value},{value},{value}
 ui.options.stepPrev,◀,◀,◀
 ui.options.stepNext,▶,▶,▶
@@ -510,13 +514,13 @@ ui.sector.mf3s4,캐니언 출구,Canyon Exit,キャニオン出口
 ui.circuit.mf4,그레이트 미라지,Great Mirage,グレートミラージュ
 ui.sector.mf4s1,호라이즌 스트레이트,Horizon Straight,ホライズンストレート
 ui.sector.mf4s2,모래폭풍 상습 구간,Sandstorm Belt,砂嵐の常襲区間
-ui.sector.mf4s3,폐허 시케인,Ruins Chicane,廃墟シケイン
+ui.sector.mf4s3,폐허 시케인,Ruins Chicane,廃虚シケイン
 ui.sector.mf4s4,선셋 벤드,Sunset Bend,サンセットベンド
 ui.sector.mf4s5,오아시스 피니시,Oasis Finish,オアシスフィニッシュ
 ui.event.mfSandstormWarning,모래폭풍 경보,Sandstorm Warning,砂嵐警報
 ui.event.mfOasisCamp,오아시스 캠프,Oasis Camp,オアシスキャンプ
 ui.event.mfDocumentary,횡단 다큐 촬영,Crossing Documentary Shoot,横断ドキュメンタリー撮影
-ui.event.mfMirageSighting,신기루 목격담,Mirage Sighting,蜃気楼の目撃談
+ui.event.mfMirageSighting,신기루 목격담,Mirage Sighting,ミラージュの目撃談
 ui.stage.pulseDome,펄스 돔,The Pulse Dome,パルスドーム
 ui.circuit.pd1,이그니션,Ignition,イグニッション
 ui.sector.pd1s1,돔 메인 스트레이트,Dome Main Straight,ドームメインストレート
@@ -652,7 +656,7 @@ vn.act2.beat12,해당 영역은 조회 대상 밖입니다.,That area is outside
 vn.act3.beat01,투어 종합 1위. 트로피는 없다.,First in the tour standing. No trophy.,ツアー総合1位。トロフィーはない。
 vn.act3.beat02,투어 하나를 가져왔다.,We took a tour.,ツアーを一つ取った。
 vn.act3.beat03,팩토리 팀들 사이에서요.,In among the factory teams.,ファクトリーチームの中で。
-vn.act3.beat04,저쪽 계산에는 없던 결과다.,A result their math did not hold.,向こうの計算にはなかった結果だ。
+vn.act3.beat04,저쪽 계산에는 없던 결과다.,A result their math never had.,向こうの計算にはなかった結果だ。
 vn.act3.beat05,대회 4전 누적 = 예측 분포 이탈.,4-race total = outside expected distribution.,大会4戦の累積 = 予測分布から逸脱。
 vn.act3.beat06,이탈 원인 미상. 재현 조건 불명.,Cause unknown. Reproduction conditions unclear.,逸脱原因は不明。再現条件も不明。
 vn.act3.beat07,재현될 필요는 없다.,It does not need to be reproduced.,再現される必要はない。
@@ -712,6 +716,9 @@ vn.reunion.beat02,여기 예선이 제일 어렵다던데요.,They say qualifyin
 vn.reunion.beat03,실버트레일이 이 무대에 강하다.,Silvertrail is strong on this stage.,シルバートレイルはこの舞台に強い。
 vn.reunion.beat04,실버트레일이면 셔우드 씨네요.,Silvertrail — that means Sherwood.,シルバートレイルならシャーウッドさんですね。
 vn.reunion.beat05,그 이름은 여기서 꺼내지 마라.,Do not bring up that name here.,その名はここで出すな。
+vn.seasonOpen.beat01,리그 캘린더가 붙는다. 무대 다섯.,The league calendar goes up. Five stages.,リーグカレンダーが出た。舞台は五つ。
+vn.seasonOpen.beat02,한 해가 종이 한 장이에요.,A whole year on one sheet of paper.,一年が紙一枚に収まってます。
+vn.seasonOpen.beat03,한 장이면 됐다. 순서대로 간다.,One sheet is enough. We go in order.,一枚で足りる。順に行く。
 vnChoice.act1.opt1,[스티어링을 고쳐 쥔다],[Regrip the wheel],[ステアリングを握り直す]
 vnChoice.act1.opt2,[13번을 손으로 덮는다],[Cover the 13 by hand],[13番を手で覆う]
 vnChoice.act1.opt3,[마르타를 본다],[Look at Marta],[マルタを見る]
