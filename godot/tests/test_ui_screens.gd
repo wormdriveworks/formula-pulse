@@ -115,8 +115,8 @@ func _process(_delta: float) -> bool:
 	_tutorial_callout_placement()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 317:
-		print("UI_SCREENS_FAIL checks=%d < 하한 317 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 319:
+		print("UI_SCREENS_FAIL checks=%d < 하한 319 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -982,6 +982,19 @@ func _save_indicator_wiring(data: GameData) -> void:
 	app.session.progress_saved.emit(true)
 	app._show("SYS-02", {})
 	_ok("화면 전환 후에도 표시 생존", indicator.visible and indicator.is_inside_tree())
+	# ⓓ-2 **그려지는가 — 형제 순서** (12차 실기 발견 · IMPL-312).
+	# 위 ⓓ 의 `visible and is_inside_tree()` 는 "보인다"의 증거가 아니다. 형제 순서가 곧
+	# 그리기 순서이고, 표시는 `_ready()` 에서 한 번 붙고 화면은 전이마다 **그 뒤에** 붙는다.
+	# 저장 지점 3곳(D09 §2.4)의 화면은 전부 전면 불투명 `Background` 를 깔기 때문에
+	# 표시는 **한 번도 보인 적이 없었다** — 그런데 ⓓ 는 그 상태에서도 통과했다.
+	# 그래서 축을 "가시 플래그"에서 **"덮이지 않는 자리"** 로 옮긴다.
+	var last_child: Node = app.get_child(app.get_child_count() - 1)
+	_ok("전환 후 표시가 라우터의 마지막 형제 (= 최상단 그리기)",
+		last_child == indicator, "last=%s" % last_child.name)
+	_ok("전환 후 표시 인덱스 > 현 화면 인덱스",
+		app._current != null and indicator.get_index() > app._current.get_index(),
+		"indicator=%d current=%d" % [indicator.get_index(),
+			-1 if app._current == null else app._current.get_index()])
 	# ⓔ **90° 계단 양자화** (총괄 판정 IMPL-294 ② · 19차 집행).
 	# 등속이면 서브픽셀 각도가 나오고, 그것은 도트 세계에서 이질적이다(D10 §2.2 귀결).
 	# 축은 **각도 집합**으로 본다 — "회전한다"만 보면 등속과 계단이 구분되지 않는다.
@@ -1197,15 +1210,26 @@ func _anchor_preset_placement(data: GameData) -> void:
 	app.queue_free()
 
 	# ⓔ 온보딩 팁 — CENTER_TOP. 트리 밖 호출 + 성장 BOTH 라 이미 옳다(대조군).
+	#
+	# **전제를 기계가 직접 세운다.** 팁은 1회성이고 그 기록은 `user://options.json` 이라
+	# **테스트 밖의 실플레이가 전제를 소모한다** — 12차 실기 회차 직후 이 축이 FAIL 했다
+	# (마운트 자체가 `mark_onboarding()` 을 타서 디스크까지 쓴다). 검사가 머신 상태에
+	# 의존하면 회귀가 아니라 날씨가 된다. 기록을 비우고 들어가 끝나고 되돌린다.
+	var seen_backup: Dictionary = session.options.onboarding_seen.duplicate(true)
+	session.options.onboarding_seen.clear()
 	var garage := _mount(GARAGE_SCENE, session)
-	if garage == null:
-		return
-	var tip := garage.get_node_or_null("OnboardingTip") as Control
-	_ok("전제: 온보딩 팁 표출", tip != null)
-	if tip != null:
-		_ok_centered_h("온보딩 팁", tip)
-	_unmount(garage)
-
+	if garage != null:
+		var tip := garage.get_node_or_null("OnboardingTip") as Control
+		_ok("전제: 온보딩 팁 표출", tip != null)
+		if tip != null:
+			_ok_centered_h("온보딩 팁", tip)
+		_unmount(garage)
+	else:
+		_ok("전제: 온보딩 팁 표출", false, "개러지 씬 로드 실패")
+		_ok("온보딩 팁 — 수평 중앙", false, "개러지 씬 로드 실패")
+	# 세션 밖 전역이라 디스크까지 돌려놓는다.
+	session.options.onboarding_seen = seen_backup
+	session.options.save_to_disk()
 
 # ── ⑬ ANCH 검사 실재 (총괄 판정 IMPL-233 ② 부대) ──
 #

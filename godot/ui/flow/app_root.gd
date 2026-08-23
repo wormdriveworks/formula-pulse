@@ -71,6 +71,15 @@ func _show(target: String, payload: Dictionary) -> void:
 	# 실측: RACE-01 이 독립 세션으로 GP 를 돌아 결산 화면이 빈 엔진을 봤다.
 	_current.session = session
 	add_child(_current)
+	# 저장 표시를 매 전이마다 맨 뒤로 되돌린다 — **형제 순서가 곧 그리기 순서다.**
+	# 표시는 `_ready()` 에서 한 번 붙고 화면은 전이마다 그 뒤에 붙으므로, 그대로 두면
+	# 화면이 표시를 덮는다. 저장 지점 3곳(D09 §2.4 — RACE-03·투어 경계·시즌 경계)의 화면은
+	# 전부 전면 불투명 `Background` 를 깔기 때문에 표시가 **한 번도 보인 적이 없다**
+	# (12차 실측: 전이 후 형제 인덱스 표시 18 < 화면 19 — 즉 화면이 표시 위에 온다. IMPL-312).
+	# `bind()` **앞**에 두는 것이 규칙이다: RACE-03 은 `_on_bound` 에서 저장하므로
+	# 순서를 뒤집으면 2.0초 중 앞부분이 화면 밑에서 소모된다.
+	if _save_indicator != null:
+		move_child(_save_indicator, -1)
 	_current.bind(session, payload)
 
 
