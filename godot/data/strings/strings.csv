@@ -228,6 +228,8 @@ ui.race.snapshotKeepOld,이전 후보,Previous candidate,前の候補
 ui.race.skillRejectedCharge,차지 부족,Not enough charge,チャージ不足
 ui.race.skillRejectedUses,이번 투어 사용 완료,No uses left this tour,今ツアーの使用回数なし
 ui.race.skillRejectedHoldCap,이번 턴 홀드 한도,Hold limit reached,今ターンのホールド上限
+ui.race.skillRejectedAlreadyHold,이미 홀드를 썼다,Hold already used,ホールドを使用済み
+ui.race.skillRejectedAlreadyMod,이미 적용된 수식,Already applied,既に適用済み
 ui.race.skillRejectedDuelTurn,섹터 턴 전용,Sector turns only,セクターターン専用
 ui.race.skillRejectedSectorTurn,듀얼 턴 전용,Duel turns only,デュエルターン専用
 ui.race.speakerRelay,중계,Relay,実況
@@ -381,6 +383,11 @@ ui.vn.skip,스킵 ▶▶,Skip ▶▶,スキップ ▶▶
 ui.vn.speakerVane,베인,VEIN,ヴェイン
 ui.vn.speakerMarta,마르타,Marta,マルタ
 ui.vn.speakerTheo,테오,Theo,テオ
+ui.vn.speakerSasha,사샤,Sasha,サーシャ
+ui.vn.speakerOscar,오스카,Oskar,オスカル
+ui.vn.speakerNadia,나디아,Nadia,ナディア
+ui.vn.speakerLorentz,로렌츠,Lorenz,ローレンツ
+ui.vn.speakerMaro,마로,Marceau,マルソー
 ui.vn.speakerNarration,,,
 ui.vn.placeholderLine01,…통신 채널 연결. 브리핑을 시작한다.,…Channel open. The briefing begins.,…通信チャネル接続。ブリーフィングを始める。
 ui.vn.calendarTitle,리그 공식 발표 — 시즌 캘린더,League Announcement — Season Calendar,リーグ公式発表 — シーズンカレンダー
@@ -724,6 +731,70 @@ vn.reunion.beat02,여기 예선이 제일 어렵다던데요.,They say qualifyin
 vn.reunion.beat03,실버트레일이 이 무대에 강하다.,Silvertrail is strong on this stage.,シルバートレイルはこの舞台に強い。
 vn.reunion.beat04,실버트레일이면 셔우드 씨네요.,Silvertrail — that means Sherwood.,シルバートレイルならシャーウッドさんですね。
 vn.reunion.beat05,그 이름은 여기서 꺼내지 마라.,Do not bring up that name here.,その名はここで出すな。
+vn.crewNadia.beat01,포디움 다음 날의 패독.,"The paddock, the day after the podium.",ポディウムの翌日のパドック。
+vn.crewNadia.beat02,노스윈드. 이제 부를 이름이 생긴 팀이죠.,Northwind. A team with a name to call now.,ノースウィンド。呼ぶ名のできたチームですね。
+vn.crewNadia.beat03,스폰서 셋이 13번을 물어봤습니다.,Three sponsors asked about number 13.,スポンサー3社が13番を尋ねました。
+vn.crewNadia.beat04,우리 예산으로는 당신을 못 쓴다.,Our budget cannot afford you.,こちらの予算では雇えない。
+vn.crewNadia.beat05,계약서는 제가 씁니다. 값은 나중에.,I will write the contracts. Pay me later.,契約書は私が書きます。代金は後で。
+vn.crewNadia.beat06,옆 개러지도 이쪽을 봐요. 주드요.,The next garage is watching too. Jude.,隣のガレージもこちらを見てます。ジュードが。
+vn.crewNadia.beat07,루키끼리는 서로를 제일 먼저 봐요.,Rookies notice each other first.,ルーキー同士は互いを一番早く見ます。
+vn.crewNadia.beat08,…저는 이 팀의 전성기를 봤어요.,…I saw this team at its height.,…私はこのチームの盛期を見ました。
+vn.crewNadia.beat09,그때 자리에 있었나.,You were there back then.,あの頃その場にいたのか。
+vn.crewOscar.beat01,개러지 문이 열려 있다. 낯선 남자가 있다.,The garage door is open. A stranger inside.,ガレージの扉が開いている。見知らぬ男がいる。
+vn.crewOscar.beat02,"이 펄스 드라이브, 뜯어봐도 됩니까.",May I open up this pulse drive?,このパルスドライブ、開けてもいいですか。
+vn.crewOscar.beat03,누구냐.,Who are you.,誰だ。
+vn.crewOscar.beat04,오스카 브란트. 파워트레인을 봅니다.,Oskar Brandt. I work on powertrains.,オスカル・ブラント。パワートレインを見ます。
+vn.crewOscar.beat05,합류하러 온 건 아닙니다. 구경입니다.,I did not come to join. I came to look.,加入に来たのではない。見物です。
+vn.crewOscar.beat06,소문 듣고 왔대요. 이긴다는 소문요.,He came for the rumor. That we win.,勝つといううわさを聞いて来たそうです。
+vn.crewOscar.beat07,이건 어디서도 본 적 없는 물건이다.,This is a thing I have seen nowhere else.,これはどこでも見たことのない物だ。
+vn.crewOscar.beat08,내가 없으면 당신들은 이걸 죽인다.,Without me you will kill it.,私がいなければこれを殺すことになる。
+vn.crewOscar.beat09,그 말은 계약서에 안 쓴다.,That line does not go in the contract.,その言葉は契約書に書かない。
+vn.crewSasha.beat01,악시온 피트 앞. 낯익은 얼굴이 서 있다.,Outside the Axion pit. A familiar face.,アクシオンのピット前。見慣れた顔が立っている。
+vn.crewSasha.beat02,사샤.,Sasha.,サーシャ。
+vn.crewSasha.beat03,오래됐네요.,It has been a while.,久しぶりですね。
+vn.crewSasha.beat04,그 뒤로 아무 말도 하지 않는다.,After that she says nothing.,その後は何も言わない。
+vn.crewSasha.beat05,저쪽에서 버린 걸 여기서 달리게 하네요.,What they discarded runs here.,向こうが捨てた物をここで走らせてますね。
+vn.crewSasha.beat06,달리고 있다. 그게 전부다.,It runs. That is all.,走っている。それが全部だ。
+vn.crewSasha.beat07,저쪽 보고서에는 못 쓰는 문장이에요.,That sentence cannot go in their report.,向こうの報告書には書けない文です。
+vn.crewSasha.beat08,데이터가 설명하지 못하는 걸 봤습니다.,I saw something the data cannot explain.,データが説明できないものを見ました。
+vn.crewSasha.beat09,그걸 분석할 자리는 여기뿐이더군요.,The only desk that can analyse it is here.,それを分析できる席はここだけでした。
+vn.crewSasha.beat10,자리는 비어 있었다. 늘.,The desk was empty. Always.,席は空いていた。ずっと。
+vn.clueLocked.beat01,제어계 업데이트 중. 테오가 손을 뗀다.,Mid control-system update. Theo lifts his hands.,制御系の更新中。テオが手を止める。
+vn.clueLocked.beat02,여기 안 열리는 영역이 있어요.,There is an area here that will not open.,ここ、開かない領域があります。
+vn.clueLocked.beat03,잠가 뒀나.,Did we lock it.,施錠しておいたのか。
+vn.clueLocked.beat04,우리가 만든 방화벽이 아니에요.,This is not a firewall we built.,僕たちが作った壁じゃありません。
+vn.clueLocked.beat05,…원래부터 있던 겁니다.,…It was here from the start.,…元からあったものです。
+vn.clueSilence.beat01,그리드 뒤편. 사샤가 보레아스를 보고 있다.,Behind the grid. Sasha is looking at Boreas.,グリッドの裏。サーシャがボレアスを見ている。
+vn.clueSilence.beat02,"저 사람, 저희 머신 아세요?",Does she know our machine?,あの人、うちのマシンを知ってます?
+vn.clueSilence.beat03,…그건 다룰 수 있는 물건이 아니야. 아무도.,…That is not a thing anyone can handle. No one.,…それは扱える物じゃない。誰にも。
+vn.clueSilence.beat04,그대로 자리를 뜬다.,She leaves without another word.,そのまま立ち去る。
+vn.clueSilence.beat05,묻지 마라. 저쪽도 답을 모른다.,Do not ask. They do not have the answer either.,聞くな。向こうも答えを知らない。
+vn.clueAxion.lorentz01,요행은 재현되지 않는다. 데이터가 증명할 거다.,A fluke does not reproduce. Data will prove it.,偶然は再現されない。データが証明する。
+vn.clueAxion.maro01,"…그 기체, 아직도 달리고 있었나.","…That machine. Still running, was it.",…あの機体、まだ走っていたのか。
+vn.featFinish.beat01,체커를 받은 뒤의 피트. 머신이 아직 뜨겁다.,The pit after the flag. The machine still hot.,チェッカー後のピット。マシンがまだ熱い。
+vn.featFinish.beat02,완주했어요. 끝까지 굴러갔어요.,We finished. All the way to the end.,完走しました。最後まで走りました。
+vn.featFinish.beat03,굴러갔다. 그게 오늘의 성과다.,It ran. That is today's result.,走った。それが今日の成果だ。
+vn.featFinish.beat04,순위는 안 보세요?,You are not looking at the position?,順位は見ないんですか?
+vn.featFinish.beat05,순위는 다음이다.,Position comes next.,順位は次だ。
+vn.featFinish.beat06,완주 기록 1건. 참조 데이터 갱신.,"Finish logged, one. Reference data updated.",完走記録1件。参照データを更新。
+vn.featFinish.beat07,이 팀의 첫 줄이다.,This is this team's first line.,このチームの最初の行だ。
+vn.featFinish.beat08,기록실에 남겠네요.,It will be in the Records Room.,記録室に残りますね。
+vn.featPoint.beat01,결과판. 노스윈드 옆에 숫자가 붙었다.,The result board. A number beside Northwind.,結果板。ノースウィンドの横に数字がついた。
+vn.featPoint.beat02,포인트예요. 0이 아니에요.,Points. Not zero anymore.,ポイントです。0じゃありません。
+vn.featPoint.beat03,표에 우리 줄이 생겼다.,We have a row on the table now.,表にこちらの行ができた。
+vn.featPoint.beat04,챔피언십 누적 갱신. 0에서 유효값.,Championship total updated. Zero to a value.,チャンピオンシップ累計を更新。0から有効値へ。
+vn.featPoint.beat05,이거 계속 쌓이는 거죠?,"These keep stacking, right?",これ、ずっと積まれるんですよね?
+vn.featPoint.beat06,쌓인다. 빠지지도 않는다.,They stack. They do not come off.,積まれる。抜かれもしない。
+vn.featPoint.beat07,그래서 처음이 제일 무겁다.,That is why the first one is heaviest.,だから最初が一番重い。
+vn.featPoint.beat08,가볍게 들었는데요.,I lifted it lightly though.,軽く持ちましたけど。
+vn.featTourWin.beat01,투어 결산판 앞. 종합 1위에 노스윈드.,Before the tour board. Northwind first overall.,ツアー決算板の前。総合1位にノースウィンド。
+vn.featTourWin.beat02,투어를 가져왔어요. 하나 통째로요.,We took a tour. A whole one.,ツアーを取りました。丸ごと一つ。
+vn.featTourWin.beat03,대회 넷을 합쳐 이겼다.,Four races added up to a win.,大会四つを合わせて勝った。
+vn.featTourWin.beat04,한 번 잘한 게 아니라는 뜻이다.,It means it was not one good day.,一度うまくいったのではないという意味だ。
+vn.featTourWin.beat05,팩토리 셋을 앞에 두고요.,With three factory teams ahead of us.,ファクトリー三つを前にしてです。
+vn.featTourWin.beat06,투어 종합 1위. 참조 사례 없음.,Tour standing first. No reference case.,ツアー総合1位。参照事例なし。
+vn.featTourWin.beat07,기록에는 없던 결과다.,A result the records did not have.,記録になかった結果だ。
+vn.featTourWin.beat08,다음 투어도 있어요.,There is another tour next.,次のツアーもありますよ。
 vn.seasonOpen.beat01,리그 캘린더가 붙는다. 무대 다섯.,The league calendar goes up. Five stages.,リーグカレンダーが出た。舞台は五つ。
 vn.seasonOpen.beat02,한 해가 종이 한 장이에요.,A whole year on one sheet of paper.,一年が紙一枚に収まってます。
 vn.seasonOpen.beat03,한 장이면 됐다. 순서대로 간다.,One sheet is enough. We go in order.,一枚で足りる。順に行く。
