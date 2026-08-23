@@ -211,6 +211,7 @@ ui.race.chargeIntervene,차지 개입,Charge Intervene,チャージ介入
 ui.race.confirm,확정,Confirm,確定
 ui.race.spin,스핀,Spin,スピン
 ui.race.skillSlotFormat,S{index},S{index},S{index}
+ui.race.skillUsesFormat,{remaining}/{limit},{remaining}/{limit},{remaining}/{limit}
 ui.race.costFormat,◆{cost},◆{cost},◆{cost}
 ui.race.chassisLabel,섀시,Chassis,シャシー
 ui.race.chassisFormat,{value},{value},{value}
@@ -222,6 +223,13 @@ ui.race.menu,≡,≡,≡
 ui.race.timerFormat,{value},{value},{value}
 ui.race.resonanceBanner,레조넌스,Resonance,レゾナンス
 ui.race.locked,잠금,Locked,ロック
+ui.race.snapshotKeepNew,새 후보,New candidate,新しい候補
+ui.race.snapshotKeepOld,이전 후보,Previous candidate,前の候補
+ui.race.skillRejectedCharge,차지 부족,Not enough charge,チャージ不足
+ui.race.skillRejectedUses,이번 투어 사용 완료,No uses left this tour,今ツアーの使用回数なし
+ui.race.skillRejectedHoldCap,이번 턴 홀드 한도,Hold limit reached,今ターンのホールド上限
+ui.race.skillRejectedDuelTurn,섹터 턴 전용,Sector turns only,セクターターン専用
+ui.race.skillRejectedSectorTurn,듀얼 턴 전용,Duel turns only,デュエルターン専用
 ui.race.speakerRelay,중계,Relay,実況
 ui.race.actionWithCost,{label} {cost},{label} {cost},{label} {cost}
 ui.title.gameTitle,FORMULA PULSE,FORMULA PULSE,FORMULA PULSE
