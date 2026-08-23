@@ -290,7 +290,7 @@ for (const name of names) {
     // ── 숫자 — 외곽선을 강제한다. 베이스가 어두울지 밝을지 모르는 자리에 놓이므로
     //    심색만으로는 판독이 배경에 좌우된다(AX-9 1번이 가늘어 안 읽힌 관측 · IMPL-335 ⓑ).
     if (op.digits) {
-      const { text, at, color, outline } = op.digits;
+      const { text, at, color, outline, covers } = op.digits;
       if (!/^[0-9]{1,3}$/.test(String(text))) die(`${name}: digits.text 는 1~3자리 숫자다 (${text})`);
       if (!Array.isArray(at) || at.length !== 2) die(`${name}: digits.at 은 [x,y] 다`);
       if (!outline) die(`${name}: digits 는 outline 선언을 요구한다 — 배경 명도를 모르는 자리다`);
@@ -316,6 +316,27 @@ for (const name of names) {
       }
       for (let i = 0; i < w * h; i++) if (glyph[i]) { if (mask[i]) { if (put(i, fg)) ink++; drawn++; } else out_of++; }
       if (out_of) fail(`${name}: 숫자 ${text} 의 ${out_of}px 가 실루엣 밖이다 — 좌표를 확인하라`);
+
+      // ── 덮기 검증 (`covers`) — 세컨드 리버리는 **기존 번호를 지우는 일**이 본체다.
+      //    외곽선이 결과적으로 옛 번호를 덮기는 하지만, **우연히 덮는 것과 계약으로 덮는 것은
+      //    다르다.** 폰트·자리·자릿수가 바뀌면 우연은 조용히 깨지고 차에 번호가 두 개 남는다.
+      //    그래서 옛 번호의 자리를 원장에 적고(총괄 판정 ② 눈 등재분) 전 픽셀이 불투명해졌는지
+      //    기계가 센다. 이것이 눈으로 읽은 좌표를 재현 계약 안에 넣는 방법이다.
+      if (covers) {
+        if (!Array.isArray(covers) || covers.length !== 4) die(`${name}: digits.covers 는 [x,y,w,h] 다`);
+        const [cx, cy, cw, chh] = covers;
+        let uncovered = 0, inMask = 0;
+        for (let y = cy; y < cy + chh; y++) for (let x = cx; x < cx + cw; x++) {
+          if (x < 0 || y < 0 || x >= w || y >= h) die(`${name}: covers 가 셀 밖으로 나간다`);
+          const i = y * w + x;
+          if (!mask[i]) continue;                    // 실루엣 밖은 덮을 것이 없다
+          inMask++;
+          if (out[i * 4 + 3] === 0) uncovered++;
+        }
+        if (inMask === 0) die(`${name}: covers 구획이 실루엣과 만나지 않는다 — 좌표가 틀렸다`);
+        if (uncovered) fail(`${name}: 옛 번호 자리 ${uncovered}/${inMask}px 가 덮이지 않았다 — 번호가 두 개 남는다`);
+        else console.log(`      · 덮기 검증 ${inMask}/${inMask}px (옛 번호 ${cw}×${chh} @(${cx},${cy}))`);
+      }
       console.log(`      · 번호 ${text} @(${at[0]},${at[1]}) ${drawn}px 심 + 외곽선`);
       continue;
     }

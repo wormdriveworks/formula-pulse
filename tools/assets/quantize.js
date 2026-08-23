@@ -179,6 +179,65 @@ for (const [k, v] of Object.entries(PATCH.palette || {})) {
   PPAL[k] = [1, 3, 5].map((i) => parseInt(v.substr(i, 2), 16));
 }
 const DST_TAG = path.basename(path.resolve(DST));
+// ── 숫자 3×5 (`digits` op) — 2026-08-23 신설 · IMPL-347.
+//
+// **왜 패치에 숫자가 들어오는가.** `vh8_behemoth_base_side` 가 정본 No.18 대신 **13** 을 달고
+// 나왔다(RD 에 `number 18` 을 넣고 받은 결과). 13 은 보레아스 번호이므로 서로 다른 두 차가
+// 같은 번호를 단다 — 정본 저촉이고 방치할 수 없다.
+//
+// **`pixel_patch.json` 의 "형태를 만드는 일은 패치가 아니다" 와 어긋나지 않는다.** 그 문장은
+// ax9 바퀴 시도에서 나왔고, 바퀴는 둥근 실루엣·상단광·허브를 눈으로 맞춰야 하는 **작화**였다.
+// 3×5 숫자는 **선언된 폰트에서 나오는 결정적 렌더**이고 덮기까지 기계가 센다(`covers`) —
+// 눈이 정하는 것은 자리 하나뿐이다. 판단의 축은 "손으로 그리는가"가 아니라 **"재현되는가"** 다.
+//
+// 폰트는 `overlay_gen.js` 와 같은 자형이다 — 같은 셀에서 같은 숫자가 두 자형으로 나오면
+// 세컨드 리버리를 얹었을 때 번호만 서체가 갈린다.
+const FONT35 = {
+  '0': ['###', '#.#', '#.#', '#.#', '###'],
+  '1': ['.#.', '##.', '.#.', '.#.', '###'],
+  '2': ['###', '..#', '###', '#..', '###'],
+  '3': ['###', '..#', '###', '..#', '###'],
+  '4': ['#.#', '#.#', '###', '..#', '..#'],
+  '5': ['###', '#..', '###', '..#', '###'],
+  '6': ['###', '#..', '###', '#.#', '###'],
+  '7': ['###', '..#', '..#', '..#', '..#'],
+  '8': ['###', '#.#', '###', '#.#', '###'],
+  '9': ['###', '#.#', '###', '..#', '..#'],
+};
+
+function applyDigits(name, w, h, put, d) {
+  const { text, at, color, outline, covers } = d;
+  if (!/^[0-9]{1,3}$/.test(String(text))) die(`patch ${name}: digits.text 는 1~3자리 숫자다 (${text})`);
+  if (!Array.isArray(at) || at.length !== 2) die(`patch ${name}: digits.at 은 [x,y] 다`);
+  if (!outline) die(`patch ${name}: digits 는 outline 선언을 요구한다 — 배경 명도를 모르는 자리다`);
+  if (!Array.isArray(covers) || covers.length !== 4) die(`patch ${name}: digits 는 covers [x,y,w,h] 선언을 요구한다 — 옛 번호를 덮는 것이 본체다`);
+  const glyph = new Set();
+  let gx = at[0];
+  for (const ch of String(text)) {
+    FONT35[ch].forEach((row, dy) => { [...row].forEach((c, dx) => { if (c === '#') glyph.add(`${gx + dx},${at[1] + dy}`); }); });
+    gx += 4;                                          // 3 + 1 공백
+  }
+  // 외곽선 먼저(8-이웃 한 겹), 그 위에 심색. 글리프 3×5 상자가 전부 불투명해진다.
+  const ring = new Set();
+  for (const k of glyph) {
+    const [x, y] = k.split(',').map(Number);
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const kk = `${x + dx},${y + dy}`;
+      if (!glyph.has(kk)) ring.add(kk);
+    }
+  }
+  for (const k of ring) { const [x, y] = k.split(',').map(Number); put(x, y, outline); }
+  for (const k of glyph) { const [x, y] = k.split(',').map(Number); put(x, y, color); }
+  // **덮기 검증** — 우연히 덮는 것과 계약으로 덮는 것은 다르다. 자형·자리·자릿수가 바뀌면
+  // 우연은 조용히 깨지고 차에 번호가 두 개 남는다.
+  const [cx, cy, cw, chh] = covers;
+  let uncovered = 0;
+  for (let y = cy; y < cy + chh; y++) for (let x = cx; x < cx + cw; x++) {
+    if (!glyph.has(`${x},${y}`) && !ring.has(`${x},${y}`)) uncovered++;
+  }
+  if (uncovered) die(`patch ${name}: 옛 번호 자리 ${uncovered}/${cw * chh}px 가 덮이지 않았다 — 번호가 두 개 남는다`);
+}
+
 function applyPatch(name, w, h, buf) {
   const spec = (PATCH.patches || {})[`${DST_TAG}/${name}`];
   if (!spec) return 0;
@@ -194,7 +253,8 @@ function applyPatch(name, w, h, buf) {
   for (const op of spec.ops || []) {
     if (op.rect) { const [x, y, rw, rh] = op.rect; for (let dy = 0; dy < rh; dy++) for (let dx = 0; dx < rw; dx++) put(x + dx, y + dy, op.color); }
     else if (op.set) { for (const [x, y] of op.set) put(x, y, op.color); }
-    else die(`patch ${name}: op 에 rect·set 이 없다`);
+    else if (op.digits) applyDigits(name, w, h, put, op.digits);
+    else die(`patch ${name}: op 에 rect·set·digits 가 없다`);
   }
   return touched;
 }
