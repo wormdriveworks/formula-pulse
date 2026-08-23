@@ -57,7 +57,7 @@ const COVERAGE_EXEMPT := [
 # 계수 대장은 그대로 둔다: 일문 열의 한자 집합이 바뀌면 검사가 실패해 재대조를 강제한다.
 const JOUYOU_PATH := "res://data/reference/jouyou_kanji.txt"
 const JA_KANJI_EXPECTED := 501          # 내러티브 5차 편입 후 실측 (4차 500 + 五枚虚衝 − 墟蜃楼)
-const JOUYOU_EXPECTED_COUNT := 2136     # D15 §4.3 확정 (표 파일은 `叱` 중복 1건 — 유일 계수로 센다)
+const JOUYOU_EXPECTED_COUNT := 2136     # D15 §4.3 확정 (데이터 행 유일 계수 — 주석 행 제외)
 
 # 헤더 순서 = 계약이다. O11 선택 인덱스가 이 순서를 탄다 (options_store.language_code()).
 const HEADER_CONTRACT := ["key", "ko", "en", "ja"]
@@ -97,8 +97,8 @@ func _ok(label: String, condition: bool, detail: String = "") -> void:
 
 func _report() -> void:
 	print("")
-	if _checked < 3080:
-		print("GLYPH_FAIL checks=%d < 하한 3080 (스위트 축소·폰트 적재 실패 의심)" % _checked)
+	if _checked < 3090:
+		print("GLYPH_FAIL checks=%d < 하한 3090 (스위트 축소·폰트 적재 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -341,13 +341,17 @@ func _jouyou_ledger() -> void:
 	var table := FileAccess.open(JOUYOU_PATH, FileAccess.READ)
 	var text := table.get_as_text()
 	table.close()
-	var allowed: Dictionary = {}
-	for index in range(text.length()):
-		var code := text.unicode_at(index)
-		if code >= 0x4E00 and code <= 0x9FFF:
-			allowed[code] = true
+	var allowed := _parse_jouyou(text)
 	_ok("⑤ 상용한자 표 계수 = D15 §4.3", allowed.size() == JOUYOU_EXPECTED_COUNT,
 		"actual=%d" % allowed.size())
+	# **주석 행이 표에 섞이지 않는가.** 22차 초판 파서는 파일 전체를 훑어 헤더 산문의
+	# 한자까지 세었고, 그 결과 "표에 `叱` 중복 1건"이라는 **틀린 보고**를 냈다
+	# (실제로는 헤더가 `𠮟`→`叱` 치환을 설명하며 그 글자를 두 번 적고 있었다).
+	# 그때는 무해했다 — 그 글자가 데이터에도 있었기 때문이다. 데이터에 없는 한자를
+	# 헤더가 언급하는 순간 **표가 조용히 허용 문자를 얻는다.** 자기 검사로 못박는다.
+	var probe := _parse_jouyou("# 헤더가 墟를 언급한다\n一二三\n")
+	_ok("⑤ 주석 행 제외 — 헤더 한자 미포함", not probe.has("墟".unicode_at(0)))
+	_ok("⑤ 주석 행 제외 — 데이터 한자 포함", probe.size() == 3, str(probe.size()))
 	# **판별 대조군** — 표가 실제로 가른다는 증거. 이것이 없으면 '상용 밖 0' 은
 	# "표가 전부를 허용한다"로도 성립한다(빈 판정의 전형).
 	_ok("⑤ 표가 상용 안을 통과시킨다: 一", allowed.has("一".unicode_at(0)))
@@ -366,6 +370,19 @@ func _jouyou_ledger() -> void:
 	var outside := _outside_of(kanji, allowed)
 	_checked += kanji.size()
 	_ok("⑤ 상용한자 밖 0", outside.is_empty(), _describe_missing(outside))
+
+
+# 표 파싱 — `#` 주석 행을 제외하고 데이터 행의 BMP CJK 만 모은다.
+func _parse_jouyou(text: String) -> Dictionary:
+	var allowed: Dictionary = {}
+	for line in text.split("\n"):
+		if String(line).begins_with("#"):
+			continue
+		for index in range(String(line).length()):
+			var code := String(line).unicode_at(index)
+			if code >= 0x4E00 and code <= 0x9FFF:
+				allowed[code] = true
+	return allowed
 
 
 # 집합 차 — 상용 밖 코드포인트 목록. 실사용과 자기 검사가 **같은 함수**를 탄다.

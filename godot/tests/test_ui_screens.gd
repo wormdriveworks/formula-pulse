@@ -118,8 +118,8 @@ func _process(_delta: float) -> bool:
 	_skill_snapshot_pairing(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 388:
-		print("UI_SCREENS_FAIL checks=%d < 하한 388 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 394:
+		print("UI_SCREENS_FAIL checks=%d < 하한 394 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1264,6 +1264,20 @@ const ANCH_PAIR_EXACT := '"grow_horizontal","grow_vertical","offset_left","offse
 # 순서가 계약이다 — O11 선택 인덱스가 표 헤더 순서를 탄다 (options_store.language_code()).
 const LANGUAGE_COLUMNS_EXPECTED := ["ko", "en", "ja"]
 
+const G4W_SOURCE := "res://tests/test_label_width.gd"
+
+
+func _count_of(source: String, needle: String) -> int:
+	var count := 0
+	var from := 0
+	while true:
+		var at := source.find(needle, from)
+		if at < 0:
+			return count
+		count += 1
+		from = at + 1
+	return count
+
 
 func _strings_header() -> Array:
 	var rows := CsvTable.load_rows(GameData.STRINGS_PATH)
@@ -1401,6 +1415,26 @@ func _anch_check_present() -> void:
 	_ok("vn_beats.slot_id = 필수 FK 유지",
 		String(beat_columns.get("slot_id", "")) == "fk:vn_slots.csv",
 		str(beat_columns.get("slot_id", "")))
+	# ── G4W 검사 실재 (게이트 G-4 · 23차) ──
+	#
+	# **스위트는 자기 단언의 삭제를 스스로 잡지 못한다** — 단언을 `true` 로 바꾸면 그 스위트는
+	# 그대로 녹색이다(돌연변이 H7 미검출로 실측). 검증기 검사에 대해 이미 하고 있는 일을
+	# 스위트에도 한다: 핵심 단언의 실재를 **다른 스위트**가 본다.
+	var g4w_source := FileAccess.get_file_as_string(G4W_SOURCE)
+	_ok("G4W 원본 적재", not g4w_source.is_empty(), G4W_SOURCE)
+	# **계수로 본다.** 문자열 실재만 보면 두 대장(키 대장·도메인 대장) 중 한쪽의 단언을
+	# 지워도 다른 쪽이 남아 통과한다 — 실측으로 확인했다(돌연변이 H7 초판 미검출).
+	# ANCH 짝 목록을 정확 계수로 못박은 것과 같은 이유다.
+	_ok("G4W 랩 대장 autowrap 단언 = 2건 (키 대장 + 도메인 대장)",
+		_count_of(g4w_source, "consumer.contains(\"autowrap_mode\")") == 2,
+		str(_count_of(g4w_source, "consumer.contains(\"autowrap_mode\")")))
+	for assertion in [
+			"func _self_test(",                        # 측정기 자기 검사
+			"func _coverage_accounting(",              # 판정 밖 키 0
+			"func _narrow_slot_inventory(",            # 정밀도 경계 공시
+			"_number_after_from(",                     # 대장 값 ↔ 원본 선언 묶음
+		]:
+		_ok("G4W 단언 실재: %s" % assertion, g4w_source.contains(assertion))
 
 
 # `ANCH_PAIR_PROPERTIES` 목록 본문만 떼어 공백을 지운 형태. 항목이 하나라도 늘거나
