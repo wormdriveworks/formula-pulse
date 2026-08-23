@@ -152,6 +152,7 @@ func begin_career(profile: int) -> void:
 # (D08 §8.1 "투어 종료 결산~차기 투어 브리핑 슬롯에서 공표").
 const ACT_VN_SLOT := "vnslot_tour_brief"
 const SEASON_OPEN_SLOT := "vnslot_season_open"
+const SEASON_CLOSE_SLOT := "vnslot_season_close"
 
 
 # 브리핑 슬롯에서 세울 VN 사슬을 NAR-01 페이로드로 꺼낸다 — 없으면 **빈 사전**(화면은 그대로
@@ -239,6 +240,13 @@ func season_open_payload(next_route: String, next_payload: Dictionary = {}) -> D
 	if season == null:
 		return {}
 	var vn_id := "vn_season_open_s%d" % season.season
+	# **시즌당 1회 가드.** 24차에 발화 지점이 HUB-01 **이탈**로 옮겨졌다(D09 §2.3 순서) —
+	# 그 자리는 투어 경계마다 지나가므로 가드 없이는 매 투어 개막이 뜬다.
+	# `vn_slots.per_season 1` 을 `trigger_vn` 이 보지 않으므로(시즌·마일스톤 상한만 본다)
+	# 발생 대장(`vn_seen`)으로 판정한다 — 세이브에 직렬화되고 스킵도 발생으로 세므로
+	# (발생 = 도달) 재개·스킵 어느 경로에서도 두 번 서지 않는다.
+	if narrative != null and narrative.vn_seen.has(vn_id):
+		return {}
 	var beats := _season_open_beats()
 	if beats.is_empty():
 		# 표 행 부재 — 캘린더만. 라인 폴백은 화면 소관이다.
@@ -252,9 +260,32 @@ func season_open_payload(next_route: String, next_payload: Dictionary = {}) -> D
 
 
 func _season_open_beats() -> Array:
+	return _boundary_beats(SEASON_OPEN_SLOT)
+
+
+# 시즌 엔딩 VN 페이로드 — 개막의 대칭. **캘린더 플래그는 붙지 않는다**(닫는 비트다).
+#
+# 발화 지점이 `begin_next_season()` **앞**이어야 하는 것이 규격이다: 슬롯의 `trigger` 가
+# `season_end` 이므로 엔딩은 **떠나는 시즌의 것**이고, `trigger_vn` 이 `season_vn_count` 를
+# 올리므로 전환 뒤에 발화하면 새 시즌의 상한을 잡아먹는다 (D08 §8.4 시즌당 계수).
+func season_close_payload(next_route: String, next_payload: Dictionary = {}) -> Dictionary:
+	if season == null:
+		return {}
+	var vn_id := "vn_season_close_s%d" % season.season
+	if narrative != null and narrative.vn_seen.has(vn_id):
+		return {}
+	var beats := _boundary_beats(SEASON_CLOSE_SLOT)
+	if beats.is_empty():
+		return {}   # 표 행 부재 = 발화 없음. 개막과 달리 캘린더 같은 잔여 목적이 없다.
+	return _beat_payload(String(beats[0]["id"]), next_route, next_payload, vn_id)
+
+
+# 경계 비트 조회 — 축도 무대도 갖지 않는 비트이므로 **무대에 빈 문자열**을 넘긴다.
+# 현재 무대를 넘기면 영구 미조회가 되고, 그 미조회는 화면에서 "문안이 없다"와 구분되지 않는다.
+func _boundary_beats(slot_id: String) -> Array:
 	if outgame == null or data == null:
 		return []
-	return data.vn_beats_for(SEASON_OPEN_SLOT, "",
+	return data.vn_beats_for(slot_id, "",
 		func(axis_id: String): return outgame.relation_stage(axis_id))
 
 
@@ -570,6 +601,15 @@ func close_season() -> Dictionary:
 func begin_next_season() -> void:
 	var next := season.season + 1
 	season.begin_season(next)
+	# **VN 시즌 상한 리셋 (24차 교정 — 차단급 잠복).** 이 한 줄이 없어 `param_vn_season_cap 15`
+	# 가 **커리어 전체 상한**으로 작동했다: `NarrativeService.begin_season()` 의 유일 호출처가
+	# `setup()`(커리어 개시 1회)이었고 계수는 세이브에 직렬화되므로 재로드로도 돌아오지 않았다.
+	# 시즌 1 이 정확히 15를 채운다(개막 1 + 브리핑 5 + 마일스톤 8 + 엔딩 1) — **시즌 2 개막부터
+	# VN 이 조용히 서지 않는 결함**이고, 조용하다는 것이 이 결함의 성질이다.
+	# 정본이 시즌당인 것은 세 곳이 말한다: D08 §8.4 표제("시즌 총 … 상한 15"·"시즌당 상한 8") ·
+	# `trigger_vn` 주석 · `test_narrative.gd` 의 읽기.
+	if narrative != null:
+		narrative.begin_season()
 	outgame.begin_tour()  # 시즌 첫 투어 개시 — 체증 리셋 + 무상 복원선 (D06 §3.3 "시즌 간 = 동일")
 
 

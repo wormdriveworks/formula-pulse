@@ -111,19 +111,23 @@ func _on_confirm() -> void:
 				(%ConfirmButton as Button).disabled = true
 				_rebuild_candidates()
 				return
-			# 시즌 체인 경유(SET-02 → HUB-08)면 다음 시즌을 개막하고 개막 VN 을 거쳐 개러지로.
-			# (시즌 엔딩 VN 은 이 사이에 삽입된다 — D09 §2.3 · 미결선)
+			# 시즌 체인 경유(SET-02 → HUB-08) = D09 §2.3 플로우맵의
+			# `HUB-08 → 시즌 엔딩 VN → HUB-01 → 다음 시즌 오프닝 VN` 구간이다.
 			#
-			# **개막 VN 의 유일 진입점이 커리어 개시 경로뿐이었다** — `vnslot_season_open` 의
-			# 데이터는 `trigger season_start`(매 시즌)인데 결선은 시즌 1 한 번뿐이라
-			# 데이터와 결선이 어긋난 상태였다(내러티브 5차 §4.4-2 실독). 문안을 시즌 무관
-			# 정경으로 쓴 근거가 여기서 결선 요구가 된다.
+			# **엔딩은 `begin_next_season()` 앞에서 발화한다** — 슬롯 `trigger` 가 `season_end`
+			# 이므로 엔딩은 **떠나는 시즌의 것**이고, `trigger_vn` 이 시즌 계수를 올리므로
+			# 전환 뒤에 두면 새 시즌의 상한을 잡아먹는다(D08 §8.4 시즌당 계수).
+			#
+			# **개막 VN 은 여기서 발화하지 않는다** — 정본이 HUB-01 **뒤**에 둔다(24차 판정 A안).
+			# 23차까지는 여기서 개막을 띄웠고, 엔딩이 붙으면 두 경계 비트가 개러지 완충 없이
+			# 연속 6라인으로 읽혀 닫힘과 열림이 같은 호흡에 들어간다(내러티브 6차 §4.2).
+			# 개막은 개러지 이탈 지점(`garage_screen._on_depart`)이 맡는다.
 			if _season_chain:
+				var closing := session.season_close_payload("HUB-01")
 				session.begin_next_season()
 				session.save_progress()  # 시즌 경계 저장 지점 (D09 §2.4)
-				var opening := session.season_open_payload("HUB-01")
-				if not opening.is_empty():
-					go("NAR-01", opening)
+				if not closing.is_empty():
+					go("NAR-01", closing)
 					return
 			go("HUB-01", {}))
 

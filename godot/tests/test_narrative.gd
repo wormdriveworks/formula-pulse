@@ -3,7 +3,7 @@
 # 실행: godot --headless --path godot --script tests/test_narrative.gd
 extends SceneTree
 
-const MIN_CHECKS := 163
+const MIN_CHECKS := 184
 
 var _failures := 0
 var _checked := 0
@@ -23,6 +23,7 @@ func _init() -> void:
 	_t7_line_speakers()
 	_t7_choice_data()
 	_beat_data()
+	_season_boundary_vn()
 	print("")
 	if _checked < MIN_CHECKS:
 		print("NARRATIVE_TEST_FAIL checks=%d < 하한 %d (스위트 축소·로드 실패 의심)" % [_checked, MIN_CHECKS])
@@ -632,3 +633,75 @@ func _beat_data() -> void:
 	var axis := data.relation_axis(String(beat["axis_id"]))
 	_ok("축 = 재회 (threshold1 = 2)", CsvTable.to_int(String(axis["threshold1"])) == 2,
 		String(axis["threshold1"]))
+
+
+# ── 시즌 경계 VN — 상한 리셋 · 엔딩 비트 · 발화 계수 (24차) ──
+#
+# **"조용히 안 뜨는" 결함이었다.** `param_vn_season_cap 15` 가 커리어 전체 상한으로
+# 작동했고 시즌 1 이 정확히 15를 채우므로(개막 1 + 브리핑 5 + 마일스톤 8 + 엔딩 1)
+# 시즌 2 개막부터 VN 이 서지 않았다. 종료코드·화면 어디에도 흔적이 없다 —
+# **미발화는 정상과 구분되지 않으므로 계수를 축으로 세운다.**
+func _season_boundary_vn() -> void:
+	var data := _new_data()
+	if data == null:
+		return
+	# ⓐ 엔딩 비트 데이터 — 개막과 동형
+	var stage_zero := func(_axis: String): return 0
+	var closing := data.vn_beats_for("vnslot_season_close", "", stage_zero)
+	_ok("엔딩 비트 = 빈 무대 질의로 조회", closing.size() == 1, str(closing.size()))
+	_ok("엔딩 비트 = 현재 무대 질의로는 미조회",
+		data.vn_beats_for("vnslot_season_close", "stage_metro_night", stage_zero).is_empty())
+	_ok("개막 질의에 엔딩 비트 미포함", data.vn_beats_for("vnslot_season_open", "", stage_zero)
+		.size() == 1)
+	if closing.size() == 1:
+		var closing_id := String(Dictionary(closing[0])["id"])
+		_ok("엔딩 비트 3라인", data.vn_beat_lines_for(closing_id).size() == 3)
+		_ok("엔딩 비트 톤 = calm", String(Dictionary(closing[0]).get("tone", "")) == "calm")
+		var slot := data.vn_slot(String(Dictionary(closing[0])["slot_id"]))
+		_ok("엔딩 슬롯 표제 실재 (아카이브 표제 자동 해소)",
+			not slot.is_empty() and data.strings.has_key(String(slot["name_key"])))
+	# ⓑ 상한 리셋 — 서비스 층
+	var service := _new_service()
+	var cap := data.param_int("param_vn_season_cap")
+	for index in range(cap):
+		service.trigger_vn("vn_fill_%d" % index, "vnslot_tour_brief", false)
+	_ok("상한 충전 = 대장 값", service.season_vn_count == cap, str(service.season_vn_count))
+	_ok("충전 후 발화 거부", not bool(service.trigger_vn("vn_over", "vnslot_season_open", false)
+		.get("occurred", false)))
+	service.begin_season()
+	_ok("경계 리셋 후 계수 0", service.season_vn_count == 0)
+	_ok("경계 리셋 후 발화 성립", bool(service.trigger_vn("vn_after", "vnslot_season_open", false)
+		.get("occurred", false)))
+	# ⓒ **발화 계수 축 — 세션을 시즌 2까지 몰아 개막이 실제로 서는가.**
+	# 서비스 층 리셋만 보면 `begin_next_season()` 이 그것을 부르는지는 보이지 않는다
+	# (결함이 정확히 그 자리였다 — 리셋 함수는 있고 호출이 없었다).
+	var session := RunSession.new()
+	session.setup(data)
+	session.begin_career(2)
+	var season_one := session.season.season
+	for index in range(cap):
+		session.narrative.trigger_vn("vn_s1_%d" % index, "vnslot_tour_brief", false)
+	_ok("시즌 1 상한 충전", session.narrative.season_vn_count == cap)
+	session.begin_next_season()
+	_ok("시즌 전환 성립", session.season.season == season_one + 1)
+	_ok("시즌 전환이 VN 계수를 리셋한다", session.narrative.season_vn_count == 0,
+		str(session.narrative.season_vn_count))
+	# 시즌 2 개막 페이로드가 실제로 서고, 그 발화가 등재되는가
+	var opening := session.season_open_payload("HUB-01")
+	_ok("시즌 2 개막 페이로드 발행", not opening.is_empty(), str(opening.keys()))
+	_ok("시즌 2 개막 3라인", Array(opening.get("line_keys", [])).size() == 3)
+	var fired: Dictionary = session.narrative.trigger_vn(String(opening["vn_id"]),
+		String(opening["slot_id"]), false)
+	_ok("시즌 2 개막 실발화", bool(fired.get("occurred", false)), str(fired))
+	# ⓓ 시즌당 1회 가드 — 발화 후에는 같은 시즌에서 다시 서지 않는다
+	_ok("발화 후 개막 재발행 0", session.season_open_payload("HUB-01").is_empty())
+	# ⓔ 엔딩도 같은 대칭 — 시즌당 1회 · 발화 후 소멸
+	var close_payload := session.season_close_payload("HUB-01")
+	_ok("엔딩 페이로드 발행", not close_payload.is_empty())
+	_ok("엔딩 vn_id = 시즌 인스턴스",
+		String(close_payload.get("vn_id", "")) == "vn_season_close_s%d" % session.season.season,
+		String(close_payload.get("vn_id", "")))
+	_ok("엔딩에 캘린더 플래그 없음", not bool(close_payload.get("calendar", false)))
+	session.narrative.trigger_vn(String(close_payload["vn_id"]),
+		String(close_payload["slot_id"]), false)
+	_ok("발화 후 엔딩 재발행 0", session.season_close_payload("HUB-01").is_empty())

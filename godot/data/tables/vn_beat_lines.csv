@@ -7,3 +7,6 @@ vnbline_reunion_alta_5,vnbeat_reunion_alta,5,ui.vn.speakerMarta,vn.reunion.beat0
 vnbline_season_open_1,vnbeat_season_open,1,ui.vn.speakerNarration,vn.seasonOpen.beat01
 vnbline_season_open_2,vnbeat_season_open,2,ui.vn.speakerTheo,vn.seasonOpen.beat02
 vnbline_season_open_3,vnbeat_season_open,3,ui.vn.speakerMarta,vn.seasonOpen.beat03
+vnbline_season_close_1,vnbeat_season_close,1,ui.vn.speakerNarration,vn.seasonClose.beat01
+vnbline_season_close_2,vnbeat_season_close,2,ui.vn.speakerTheo,vn.seasonClose.beat02
+vnbline_season_close_3,vnbeat_season_close,3,ui.vn.speakerMarta,vn.seasonClose.beat03

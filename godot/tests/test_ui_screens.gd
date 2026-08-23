@@ -118,8 +118,8 @@ func _process(_delta: float) -> bool:
 	_skill_snapshot_pairing(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 394:
-		print("UI_SCREENS_FAIL checks=%d < 하한 394 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 401:
+		print("UI_SCREENS_FAIL checks=%d < 하한 401 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1635,6 +1635,13 @@ func _act_vn_consumption(data: GameData) -> void:
 	var depart_session := RunSession.new()
 	depart_session.setup(data)
 	depart_session.begin_career(2)
+	# **개막을 먼저 소진시킨다 — 실 흐름과 같게.** 커리어 개시 경로(SYS-02)가 시즌 1 개막을
+	# 띄우므로 첫 개러지 이탈 시점에는 이미 발생 대장에 있다. 이 축의 대상은 막 VN 경유이고,
+	# 개막이 앞에 서 있으면 그 사슬의 첫 칸이 개막이 되어 다른 것을 재게 된다(24차 순서 변경분).
+	var seed_open := depart_session.season_open_payload("RACE-01")
+	if not seed_open.is_empty():
+		depart_session.narrative.trigger_vn(String(seed_open["vn_id"]),
+			String(seed_open["slot_id"]), false)
 	var garage := _mount(GARAGE_SCENE, depart_session)
 	var routed: Array = []
 	garage.navigate.connect(func(target: String, route_payload: Dictionary): routed.append([target, route_payload]))
@@ -2479,13 +2486,43 @@ func _season_open_wiring(data: GameData) -> void:
 		Array(next_opening.get("line_keys", [])).size() == 3)
 	var overhaul_source := FileAccess.get_file_as_string("res://ui/hub/overhaul_screen.gd")
 	_ok("⑳ 시즌 전환 진입점 원본 적재", not overhaul_source.is_empty())
-	_ok("⑳ 시즌 전환이 개막 창구를 부른다",
-		overhaul_source.contains("session.season_open_payload("))
-	_ok("⑳ 시즌 전환이 NAR-01 로 간다", overhaul_source.contains('go("NAR-01", opening)'))
-	# 개시 경로도 같은 창구를 쓴다 — 두 경로가 각자 조립하면 한쪽만 라인을 넘긴다
+	_ok("⑳ 시즌 전환이 NAR-01 로 간다", overhaul_source.contains('go("NAR-01", closing)'))
+	# 개시 경로도 같은 창구를 쓴다 — 두 경로가 각자 조립하면 한쪽만 라인을 넘긴다.
+	# 개시 경로는 **개막을 유지한다**: D09 §2.3 의 신규 분기는 HUB-01 을 지나지 않으므로
+	# 여기서 띄우지 않으면 시즌 1 개막이 어디에서도 서지 않는다(시즌 2+ 는 개러지 이탈이 맡는다).
 	var slot_source := FileAccess.get_file_as_string("res://ui/sys/save_slot_screen.gd")
 	_ok("⑳ 개시 경로도 같은 창구", slot_source.contains("session.season_open_payload("))
 	_ok("⑳ 개시 경로 인라인 조립 잔존 0", not slot_source.contains('"slot_id": "vnslot_season_open"'))
+	# ⓔ D09 §2.3 순서 (24차 판정 A안) — `HUB-08 → 엔딩 → HUB-01 → 개막`.
+	#
+	# **개막이 오버홀 화면에서 사라지고 개러지 이탈로 옮겨졌는가**를 두 원본으로 본다.
+	# 두 경계 비트가 연속 발화하면 닫힘과 열림이 같은 호흡에 들어가므로(내러티브 6차 §4.2)
+	# "엔딩이 있다"만으로는 부족하다 — **개막이 그 자리에 없어야** 순서가 성립한다.
+	var overhaul := FileAccess.get_file_as_string("res://ui/hub/overhaul_screen.gd")
+	_ok("⑳ 오버홀이 엔딩 창구를 부른다", overhaul.contains("session.season_close_payload("))
+	_ok("⑳ 오버홀에서 개막 발화 제거", not overhaul.contains("season_open_payload("),
+		"개막이 여기 남으면 엔딩과 연속 6라인이 된다")
+	# 엔딩은 `begin_next_season()` **앞**이어야 한다 — 슬롯 trigger 가 season_end 이고
+	# 전환 뒤면 새 시즌의 상한을 잡아먹는다. 소스 위치로 순서를 본다.
+	# 호출 순서는 **호출 형태로** 찾는다 — 주석 산문에도 같은 이름이 나오므로
+	# 이름만 찾으면 주석 위치를 재게 된다(초판이 그랬다: close=4718 vs advance=4276).
+	var close_at := overhaul.find("session.season_close_payload(")
+	var advance_at := overhaul.find("session.begin_next_season()")
+	_ok("⑳ 엔딩 조립이 시즌 전환보다 앞", close_at > 0 and advance_at > 0 and close_at < advance_at,
+		"close=%d advance=%d" % [close_at, advance_at])
+	var garage := FileAccess.get_file_as_string("res://ui/hub/garage_screen.gd")
+	_ok("⑳ 개러지 이탈이 개막 창구를 부른다", garage.contains("session.season_open_payload("))
+	var open_at := garage.find("season_open_payload(")
+	var brief_at := garage.find("take_brief_payload(")
+	_ok("⑳ 개막이 브리핑 앞에 사슬된다", open_at > brief_at and brief_at > 0,
+		"브리핑 조립 후 개막이 그것을 다음 목적지로 받는다")
+	# ⓕ 시즌당 1회 가드 — 개러지 이탈은 투어마다 지나간다
+	var guard_session := _fresh_session(data)
+	var first := guard_session.season_open_payload("RACE-01")
+	_ok("⑳ 첫 이탈에서 개막 발행", not first.is_empty())
+	guard_session.narrative.trigger_vn(String(first["vn_id"]), String(first["slot_id"]), false)
+	_ok("⑳ 발화 후 같은 시즌 재발행 0", guard_session.season_open_payload("RACE-01").is_empty(),
+		"가드가 없으면 투어마다 개막이 뜬다")
 	# ⓓ 아카이브 표제 — 비트가 원문 id 로 뜨지 않는가
 	var records := _mount(RECORDS_SCENE, session)
 	if records == null:
@@ -2504,6 +2541,9 @@ func _season_open_wiring(data: GameData) -> void:
 	_ok("⑳ 개막 비트 표제 = 시즌 개막",
 		String(records._vn_title("vnbeat_season_open")) == data.strings.text("ui.vnSlot.seasonOpen"),
 		String(records._vn_title("vnbeat_season_open")))
+	_ok("⑳ 엔딩 비트 표제 = 시즌 결산",
+		String(records._vn_title("vnbeat_season_close")) == data.strings.text("ui.vnSlot.seasonClose"),
+		String(records._vn_title("vnbeat_season_close")))
 	_ok("⑳ 재회 비트 표제 = 투어 브리핑",
 		String(records._vn_title("vnbeat_reunion_alta")) == data.strings.text("ui.vnSlot.tourBrief"),
 		String(records._vn_title("vnbeat_reunion_alta")))

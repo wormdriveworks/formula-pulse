@@ -112,6 +112,14 @@ func _on_depart() -> void:
 	# 투어 시작 VN — 플로우맵의 "개러지 → 투어 시작 VN → 다음 투어" 지점이다(D09 §2.3).
 	# HUB-01 은 **투어 경계에만** 서므로(대회 사이는 RUN-01/02 경유) 이 자리가 곧 브리핑 슬롯이다.
 	var act_vn := session.take_brief_payload("RACE-01")
+	# 시즌 오프닝 VN 은 정본이 **HUB-01 뒤**에 둔다(D09 §2.3 `HUB-01 → 다음 시즌 오프닝 VN`).
+	# 그래서 개막이 브리핑 **앞**에 붙는다 — 시즌의 머리이고, 그 뒤가 그 시즌 첫 투어의 브리핑이다.
+	# 시즌당 1회 가드는 세션이 쥐고 있다(발생 대장 — 이 자리는 투어마다 지나간다).
+	var opening := session.season_open_payload(
+		"NAR-01" if not act_vn.is_empty() else "RACE-01", act_vn)
+	if not opening.is_empty():
+		go("NAR-01", opening)
+		return
 	if not act_vn.is_empty():
 		go("NAR-01", act_vn)
 		return
