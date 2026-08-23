@@ -36,6 +36,7 @@ const ACHIEVEMENT_SCENE := "res://ui/sys/achievement_screen.tscn"
 const OPTIONS_SCENE := "res://ui/sys/options_screen.tscn"
 const RACE_SCENE := "res://ui/race/race_screen.tscn"
 const APP_ROOT_SCENE := "res://ui/flow/app_root.tscn"
+const APP_ROOT_SCENE_SCRIPT := "res://ui/flow/app_root.gd"
 # 패드 버튼 인덱스 — 엔진 실측분(IMPL-186). 검사도 화면과 같은 상수를 짐작하지 않는다.
 const PAD_A_INDEX := 0
 const PAD_X_INDEX := 2
@@ -108,12 +109,13 @@ func _process(_delta: float) -> bool:
 	_vn_choice_geometry(data)
 	_vn_last_line_input(data)
 	_input_handled_ordering()
+	_mouse_click_paths(data)
 	_act_vn_consumption(data)
 	_tutorial_callout_placement()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 301:
-		print("UI_SCREENS_FAIL checks=%d < 하한 301 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 308:
+		print("UI_SCREENS_FAIL checks=%d < 하한 308 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1981,3 +1983,104 @@ func _collect_gd(dir_path: String, out: Array[String]) -> void:
 			out.append(full)
 		entry = dir.get_next()
 	dir.list_dir_end()
+
+
+# ── ⑳ 마우스 클릭 경로 — 라우팅 전 화면 (사용자 실기 발견 · IMPL-301) ──
+#
+# **버튼이 화면에 있는 것과 눌리는 것은 다르다.** RACE-01 의 E08 3버튼은 `text` 와
+# `disabled` 만 관리되고 `pressed` 연결이 0건이어서 키보드·패드로만 살아 있었다 —
+# 마우스로는 죽어 있었고 사용자 실기가 그것을 잡았다. D09 §1.3 은 세 입력을 같은 조작
+# 집합으로 두므로 한 경로만 사는 것은 규격 위반이다.
+#
+# 축을 화면 하나가 아니라 **라우팅 대장 전건**에 둔다 — 전수 감사에서 18화면은 결선돼
+# 있었고 이 화면만 빠져 있었다. 다음에 어느 화면이 빠지든 여기서 걸린다.
+#
+# **면제는 명시 목록으로만.** 스킬 5슬롯은 인게임 소비부가 아직 없는 이월 트랙이고
+# (`ui.race.locked` 표기·상시 `disabled`), 그 사실을 목록으로 못박아 둔다. 목록을 넓히려면
+# 이 상수를 함께 고쳐야 한다 — ANCH 면제 목록과 같은 규율이다.
+const CLICK_EXEMPT := ["Skill1", "Skill2", "Skill3", "Skill4", "Skill5"]
+
+
+func _mouse_click_paths(data: GameData) -> void:
+	var routes: Dictionary = load(APP_ROOT_SCENE_SCRIPT).ROUTES
+	_ok("전제: 라우팅 대장 실재", routes.size() >= 19, "routes=%d" % routes.size())
+	# **화면마다 새 세션을 쓴다.** 하나를 공유하면 앞 화면이 1회성 상태를 소모해 뒤 검사가
+	# 무너진다(실측: HUB-01 을 세우자 온보딩 팁 기록이 소모돼 ⑫ⓔ 축이 FAIL 했다).
+	#
+	# **다만 옵션 저장소는 세션 밖이다** — `OptionsStore` 는 `user://` 에 얹힌 전역이고
+	# `mark_onboarding()` 이 즉시 디스크까지 쓴다. 새 세션으로는 격리되지 않으므로
+	# 1회성 기록을 떠 두고 감사 뒤에 되돌린다(검사가 남의 검사를 깨뜨리지 않게 한다).
+	var options := _fresh_session(data).options
+	var onboarding_snapshot: Dictionary = options.onboarding_seen.duplicate()
+	var audited := 0
+	var buttons_seen := 0
+	var dead: Array[String] = []
+	for route in routes:
+		var packed := load(String(routes[route])) as PackedScene
+		if packed == null:
+			dead.append("%s: 씬 로드 실패" % route)
+			continue
+		var session := _fresh_session(data)
+		if route == "RACE-03":
+			# 결과 화면은 살아 있는 엔진을 읽는다 — GP 를 열지 않으면 바인드가 중간에 끊긴다.
+			session.begin_gp()
+		var screen := packed.instantiate() as Control
+		screen.session = session
+		root.add_child(screen)
+		screen.bind(session, _audit_payload(String(route), data))
+		audited += 1
+		var buttons: Array[BaseButton] = []
+		_collect_buttons(screen, buttons)
+		buttons_seen += buttons.size()
+		for button in buttons:
+			if CLICK_EXEMPT.has(String(button.name)):
+				continue
+			var signal_name := "toggled" if button.toggle_mode else "pressed"
+			if button.get_signal_connection_list(signal_name).is_empty():
+				dead.append("%s/%s(%s)" % [route, button.name, signal_name])
+		root.remove_child(screen)
+		screen.queue_free()
+	options.onboarding_seen = onboarding_snapshot
+	options.save_to_disk()
+	_ok("전제: 전 화면 바인드 성립", audited == routes.size(),
+		"%d/%d" % [audited, routes.size()])
+	# 버튼이 0 이면 아래 단언이 공회전한다 — 계수를 먼저 세운다.
+	_ok("전제: 감사 대상 버튼 실재", buttons_seen > 100, "buttons=%d" % buttons_seen)
+	_ok("클릭 경로 — 전 화면 전 버튼", dead.is_empty(),
+		"부재 %d건: %s" % [dead.size(), ", ".join(dead)])
+
+	# ── 경로 등가: 마우스 클릭이 키보드·패드와 같은 결과를 내는가 (D09 §1.3) ──
+	# 연결이 있는 것과 같은 일을 하는 것은 다르다 — ⑥축이 액션·키보드·패드 3경로를 보므로
+	# 여기서 **네 번째 다리**를 같은 관측점(국면 이탈)으로 잇는다. 결과는 보지 않는다(불변규칙 5).
+	var click_session := _fresh_session(data)
+	var race := _mount(RACE_SCENE, click_session)
+	if race == null:
+		return
+	var confirm := race.get_node("%E08Confirm") as Button
+	_ok("마우스 — 전제: 확정 버튼 클릭 가능",
+		not confirm.disabled and not confirm.get_signal_connection_list("pressed").is_empty())
+	_ok("마우스 — 전제: T1 대기",
+		race.engine.turn_phase == RaceTypes.TurnPhase.T1_SECTOR_OPEN,
+		"phase=%d" % race.engine.turn_phase)
+	confirm.pressed.emit()
+	_ok("마우스 클릭 — 스핀 커밋 도달",
+		race.engine.turn_phase != RaceTypes.TurnPhase.T1_SECTOR_OPEN,
+		"phase=%d" % race.engine.turn_phase)
+	_unmount(race)
+
+
+# 바인드가 페이로드를 요구하는 화면만 최소분을 넘긴다 — 요구를 우회하는 것이 아니라
+# 감사가 진단 대신 남의 push_error 를 뒤집어쓰지 않게 하는 것이다.
+func _audit_payload(route: String, data: GameData) -> Dictionary:
+	if route != "RUN-02":
+		return {}
+	for event_id in data.events:
+		return {"occurrence": data.events[event_id]}
+	return {}
+
+
+func _collect_buttons(node: Node, out: Array[BaseButton]) -> void:
+	for child in node.get_children():
+		if child is BaseButton:
+			out.append(child)
+		_collect_buttons(child, out)

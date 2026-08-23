@@ -205,6 +205,19 @@ func _boot() -> void:
 		session.audio.set_paused(false))
 	_pause_overlay.quit_to_title.connect(func(): go("SYS-01", {}))
 	(%E14Menu as Button).pressed.connect(_open_pause)
+	# ── E08 행동 버튼의 클릭 경로 (IMPL-301 — 사용자 실기 발견) ──
+	#
+	# **버튼이 화면에 있는데 눌리지 않았다.** 이 셋은 `text` 와 `disabled` 만 관리되고
+	# `pressed` 연결이 0건이어서, 키보드·패드(액션 경유 `_unhandled_input`)로만 동작하고
+	# **마우스로는 죽어 있었다.** D09 §1.3 은 세 입력을 같은 조작 집합으로 두므로 한 경로만
+	# 사는 것은 규격 위반이다. 다른 18화면은 전건 결선돼 있었고 이 화면만 빠져 있었다
+	# (전수 감사 — UISCR ⑳ 가 그 감사를 상시화한다).
+	#
+	# **이중 발화는 생기지 않는다** — 포커스를 가진 Button 이 `ui_accept` 를 처리하면
+	# 뷰포트가 그 이벤트를 소비 처리하므로 `_unhandled_input` 까지 내려오지 않는다(실측 확인).
+	_e08_confirm.pressed.connect(_on_primary_action)
+	_e08_respin.pressed.connect(_on_respin)
+	_e08_charge.pressed.connect(_on_charge_intervene)
 	_collect_consumable_slots()
 	_apply_static_strings()
 	# TUT-01 — 첫 그랑프리 실주행 위 오버레이(§6 "별도 튜토리얼 스테이지 불신설").
