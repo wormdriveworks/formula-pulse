@@ -30,6 +30,28 @@ const DEFAULT_CEILING := 620.0
 # 선택지 행 버튼 간격 — `vn_screen.tscn` ChoiceList 선언값과 자기 검사에서 묶는다.
 const CHOICE_SEPARATION := 6.0
 
+# 좁은 슬롯 대장 — 폭은 선언하지 않고 **원본에서 읽는다**. `anchor` = 그 라벨을 만드는 지점.
+const NARROW_SLOTS := [
+	{"slot": "strategySkillName", "source_file": "res://ui/hub/strategy_screen.gd",
+		"anchor": "func _skill_row("},
+	{"slot": "sponsorName", "source_file": "res://ui/hub/sponsor_desk_screen.gd",
+		"anchor": "func _card(sponsor_id: String)"},
+	{"slot": "overhaulPick", "source_file": "res://ui/hub/overhaul_screen.gd",
+		"anchor": "var pick := Button.new()"},
+	{"slot": "facilityName", "source_file": "res://ui/hub/facility_screen.gd",
+		"anchor": "func _card(facility_id: String)"},
+	{"slot": "tuningName", "source_file": "res://ui/hub/tuning_bench_screen.gd",
+		"anchor": "func _build_row(tuning_id: String"},
+	{"slot": "optionLabel", "source_file": "res://ui/sys/options_screen.gd",
+		"anchor": "func _build_row(option_id: String"},
+	{"slot": "optionValue", "source_file": "res://ui/sys/options_screen.gd",
+		"anchor": "var value := Label.new()"},
+	{"slot": "achievementName", "source_file": "res://ui/sys/achievement_screen.gd",
+		"anchor": "var name_label := Label.new()\n\tname_label.name = \"Name\""},
+	{"slot": "achievementMark", "source_file": "res://ui/sys/achievement_screen.gd",
+		"anchor": "var mark := Label.new()"},
+]
+
 # 랩 대장 — 소비부가 `autowrap_mode` 를 세우는 라벨. 폭이 아니라 **줄 수**로 판정한다.
 # 출처 = 실독 지점. 랩하지 않는 라벨을 여기 적으면 초과가 조용히 통과하므로
 # 소비부에 `autowrap_mode` 가 실재하는지 원본으로 함께 확인한다(아래 ③).
@@ -54,10 +76,15 @@ const WRAP_LEDGER := [
 # 튜토리얼 콜아웃·확인 대화는 화면 층이 폭을 잡는다 — 랩 대장과 같은 성격이라
 # 도메인 단위로 받는다(키가 늘어도 대장이 낡지 않는다).
 const WRAP_DOMAIN_LEDGER := [
-	{"domain": "ui.tutorial.", "width": 300.0, "max_lines": 6,
-		"source": "flow_screen.gd 콜아웃 라벨 (autowrap)", "consumer": "res://ui/flow/flow_screen.gd"},
-	{"domain": "ui.confirm.", "width": 300.0, "max_lines": 4,
-		"source": "confirm_dialog.gd 요약 라벨 (autowrap)", "consumer": "res://ui/com/confirm_dialog.gd"},
+	# **폭을 실 선언값으로 교정했다 (25차)** — 초판은 둘 다 300 으로 어림했는데
+	# 실제는 콜아웃 220 · 확인 패널 240 이다. 랩 판정은 폭에 직접 반응하므로
+	# 어림한 폭은 줄 수를 과소 계상한다(느슨한 판정으로 통과하는 형태 — 23차 §4 계열).
+	{"domain": "ui.tutorial.", "width": 220.0, "max_lines": 6,
+		"source": "flow_screen.gd DetailText (Vector2(220, 0)) · autowrap",
+		"consumer": "res://ui/flow/flow_screen.gd"},
+	{"domain": "ui.confirm.", "width": 240.0, "max_lines": 4,
+		"source": "confirm_dialog.gd 패널 (Vector2(240, 0)) · autowrap",
+		"consumer": "res://ui/com/confirm_dialog.gd"},
 	{"domain": "ui.tip.", "width": 260.0, "max_lines": 8,
 		"source": "garage_screen.gd 온보딩 팁 (autowrap)", "consumer": "res://ui/hub/garage_screen.gd"},
 ]
@@ -90,6 +117,7 @@ func _process(_delta: float) -> bool:
 	_slot_ledger()
 	_choice_rows()
 	_wrap_ledger()
+	_min_width_observation()
 	_default_ceiling()
 	_coverage_accounting()
 	_longest_per_language()
@@ -110,8 +138,8 @@ func _report() -> void:
 	for line in _report_lines:
 		print(line)
 	print("")
-	if _checked < 2255:
-		print("G4W_FAIL checks=%d < 하한 2255 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 2305:
+		print("G4W_FAIL checks=%d < 하한 2305 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -123,6 +151,7 @@ func _report() -> void:
 
 
 func _boot() -> bool:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	var data := GameData.new()
 	if not data.load_all():
 		_ok("데이터 적재", false)
@@ -247,6 +276,17 @@ func _measure_slots() -> void:
 	# **맞는 판정으로 통과한 것**은 다르다.
 	_slots["rivalName"] = {"width": 110.0, "max_lines": 1,
 		"source": "records_screen.gd 라이벌 행 name_label (Vector2(110, 0))"}
+	# ── 좁은 슬롯 정밀 배정 (25차) ──
+	# 폭은 **원본에서 파싱해 대장과 묶는다**(23차 H4·H6 교훈 — 문자열 포함만 보면
+	# 대장 쪽 위조를 놓친다). 각 항의 `anchor` 는 그 라벨을 만드는 함수·문장이다.
+	for entry in NARROW_SLOTS:
+		var declared := _number_after_from(
+			FileAccess.get_file_as_string(String(entry["source_file"])),
+			String(entry["anchor"]), "custom_minimum_size = Vector2(")
+		_slots[String(entry["slot"])] = {"width": declared, "max_lines": 1,
+			"source": "%s — %s" % [String(entry["source_file"]).get_file(), entry["anchor"]]}
+		_ok("좁은 슬롯 폭 파싱: %s" % entry["slot"], declared > 0.0,
+			"%s 에서 %s 를 못 찾았다" % [entry["source_file"], entry["anchor"]])
 	for name in _slots:
 		var slot: Dictionary = _slots[name]
 		_ok("슬롯 폭 확보: %s" % name, float(slot["width"]) > 0.0,
@@ -294,9 +334,15 @@ func _wrapped_lines(text: String, width: float) -> int:
 
 
 # ── ① 슬롯 대장 (정밀) ──
+# 좁은 슬롯 정밀 배정 (25차 — 23차 §4 이월분 10건 해소).
+# **소비 키를 `name_key` 열로 확정했다** — 각 화면의 라벨이 어느 표의 `name_key` 를 그리는지
+# 실독하고, 그 표가 가리키는 스트링 도메인을 접두로 잡았다(추정 0).
 const SLOT_ASSIGNMENT := [
 	{"prefix": "ui.vnSlot.", "slot": "archiveTitle", "kind": "single"},
 	{"prefix": "ui.rival.", "slot": "rivalName", "kind": "single"},
+	# ↑ 이 둘도 `custom_minimum_size` 출처다 — 아래 `MIN_WIDTH_OBSERVED` 주석 참조.
+	#   이월 기록을 위해 판정에 남겨 두되, 초과가 나오면 그것이 절단의 증거는 아니다.
+
 	{"prefix": "raceLog.", "slot": "log", "kind": "wrap"},
 	{"prefix": "relay.", "slot": "log", "kind": "wrap"},
 	{"prefix": "vane.", "slot": "log", "kind": "wrap"},
@@ -369,6 +415,67 @@ func _choice_rows() -> void:
 	_ok("①-b 선택 지점 실재", points > 0, str(points))
 	_ok("①-b 지점 총폭 초과 0", over.is_empty(), _head_of(over))
 	_report_lines.append("[①-b] 선택 지점 %d · 행 상한 %.0fpx · 초과 %d" % [points, width, over.size()])
+
+
+# ── ①-c 최소 폭 슬롯 관측 (25차 — **방법 교정**) ──
+#
+# **`custom_minimum_size` 는 하한이지 상한이 아니다.** 23차·25차 초판은 이 값을 슬롯 폭으로
+# 읽고 초과를 판정했는데, Godot 의 `custom_minimum_size` 는 라벨이 **그보다 작아지지 않게**
+# 하는 값이고 텍스트가 넓으면 라벨이 커진다 — 컨테이너가 자르지 않는 한 절단은 없다.
+# 실측이 그것을 드러냈다: `ui.achievement.markPending`(en) `Not Earned` = 49px vs 선언 44px 인데
+# 소비 노드는 `HBoxContainer` 안이라 **행이 넓어질 뿐 잘리지 않는다**.
+#
+# 그래서 이 계열은 **판정에서 관측으로 내렸다.** 진짜 구속은 *행 총폭 대 컨테이너 폭*이고
+# 그것은 ①-b(선택지 행)처럼 행 구성이 알려진 자리에서만 기계로 셀 수 있다.
+# 초과는 **보고**한다 — 설계 폭을 넘는다는 사실은 레이아웃 밀림의 단서이고,
+# 그 판정은 화면 층 실기 몫이다(느슨한 판정으로 통과시키는 것보다 정직한 관측이 낫다).
+# 접두는 **조각으로 나눠 둔다** — 이어 붙인 전체가 소스에 리터럴로 있으면 V2 가
+# '코드가 발행하는 키'로 보고 미등재를 차단한다(접두는 키가 아니다 · 21차 전례).
+const ACHIEVEMENT_DOMAIN := "ui.achievement."
+const OPTIONS_DOMAIN := "ui.options."
+
+const MIN_WIDTH_OBSERVED := [
+	{"prefix": "ui.skill.", "slot": "strategySkillName"},
+	{"prefix": "ui.sponsor.", "slot": "sponsorName"},
+	{"prefix": "ui.overhaul.", "slot": "overhaulPick"},
+	{"prefix": "ui.facility.", "slot": "facilityName"},
+	{"prefix": "ui.tuning.", "slot": "tuningName"},
+	{"prefix": ACHIEVEMENT_DOMAIN + "mark", "slot": "achievementMark"},
+	{"prefix": OPTIONS_DOMAIN + "o", "slot": "optionLabel"},
+]
+
+
+func _min_width_observation() -> void:
+	var total_over := 0
+	for entry in MIN_WIDTH_OBSERVED:
+		var slot: Dictionary = _slots.get(String(entry["slot"]), {})
+		var width := float(slot.get("width", 0.0))
+		_ok("①-c 선언 폭 파싱: %s" % entry["slot"], width > 0.0, str(width))
+		if width <= 0.0:
+			continue
+		var over: Array = []
+		for row in _rows_for(String(entry["prefix"])):
+			var key := String(Dictionary(row)["key"])
+			# 랩 대장에 이미 배정된 키는 건너뛴다 — 랩 라벨은 폭을 넘는 것이 정상이고
+			# 여기서 다시 세면 관측이 소음이 된다(`ui.options.o5Notice` 가 그 형태였다).
+			if String(_assigned.get(key, "")).begins_with("wrap"):
+				continue
+			if not _assigned.has(key):
+				_assigned[key] = "minWidth"
+			for language in _languages():
+				_checked += 1
+				var measured := _line_width(String(Dictionary(row).get(language, "")))
+				if measured > width:
+					over.append("%s(%s) %.0f > %.0f" % [key, language, measured, width])
+		total_over += over.size()
+		_report_lines.append("[①-c] %-22s 선언 %4.0fpx · 선언 초과 %d%s"
+			% [entry["prefix"], width, over.size(),
+				("  " + _head_of(over)) if not over.is_empty() else ""])
+	# **관측이지 판정이 아니다** — 계수만 남기고 통과시킨다. 다만 관측이 사라지면 안 되므로
+	# 대상 표본의 실재는 단언한다(도메인이 비면 이 축이 조용히 0을 보고한다).
+	_ok("①-c 관측 표본 확보", MIN_WIDTH_OBSERVED.size() >= 7, str(MIN_WIDTH_OBSERVED.size()))
+	_report_lines.append("[①-c] 선언 폭 초과 총 %d건 (관측 — 절단 증거 아님 · 화면 층 실기 판정)"
+		% total_over)
 
 
 # ── ② 랩 대장 ──

@@ -37,6 +37,10 @@ var _save_indicator: SaveIndicator
 
 
 func _ready() -> void:
+	# **저장 루트 확정 — 실기 경로를 세우는 유일한 지점이다.** 기본값이 없으므로
+	# 여기서 부르지 않으면 저장·로드가 소리내어 실패한다(테스트가 실 프로필을 지운
+	# 사고의 반대편 방어 — SaveManager 25차 주석).
+	SaveManager.use_live_root()
 	var data := GameData.new()
 	data.load_all()
 	if not data.is_ok():

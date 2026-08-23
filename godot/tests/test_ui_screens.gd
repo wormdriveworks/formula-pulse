@@ -64,6 +64,7 @@ var _settle_choice: Control
 
 func _process(_delta: float) -> bool:
 	_frame += 1
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차 · 멱등)
 	var data := GameData.new()
 	if not data.load_all():
 		print("UI_SCREENS_FAIL data load")
@@ -118,8 +119,8 @@ func _process(_delta: float) -> bool:
 	_skill_snapshot_pairing(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 401:
-		print("UI_SCREENS_FAIL checks=%d < 하한 401 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 441:
+		print("UI_SCREENS_FAIL checks=%d < 하한 441 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1206,6 +1207,12 @@ func _anchor_preset_placement(data: GameData) -> void:
 	# ⓓ 라우터가 세운 화면 — 캔버스 전면을 덮는가 (FULL_RECT · add_child 이전 호출)
 	var app := (load(APP_ROOT_SCENE) as PackedScene).instantiate() as Control
 	root.add_child(app)
+	# **저장 루트가 실기로 되돌아가지 않는가 (25차 · 거동 축).** 원본 검사는 "앱 부팅이
+	# 실기 루트를 세운다"까지만 보고 **언제 효과가 나는지**는 보지 못한다 — 이 축이
+	# `app_root` 를 실제로 세우므로 그 `_ready()` 가 격리 루트를 덮으면 이후 스위트의
+	# 저장이 실 프로필로 간다(게이트 밖 바이트 대조가 그것을 잡았다).
+	_ok("㉑ 앱 부팅이 격리 루트를 덮지 않는다", SaveManager.is_test_root(),
+		"use_live_root() 는 이미 잡힌 루트에 양보해야 한다")
 	_ok("전제: 캔버스 규격", app._current.get_parent_area_size() == CANVAS,
 		str(app._current.get_parent_area_size()))
 	_ok_fills_parent("라우터 화면 FULL_RECT", app._current)
@@ -1265,6 +1272,42 @@ const ANCH_PAIR_EXACT := '"grow_horizontal","grow_vertical","offset_left","offse
 const LANGUAGE_COLUMNS_EXPECTED := ["ko", "en", "ja"]
 
 const G4W_SOURCE := "res://tests/test_label_width.gd"
+const UISCR_SOURCE := "res://tests/test_ui_screens.gd"
+
+
+# a 에 있고 b 에 없는 항목 (미훅 목록 산출)
+func _missing_from(a: Array, b: Array) -> Array:
+	var out: Array = []
+	for item in a:
+		if not b.has(item):
+			out.append(item)
+	return out
+
+
+func _test_sources() -> Array:
+	var out: Array = []
+	var dir := DirAccess.open("res://tests")
+	if dir == null:
+		return out
+	dir.list_dir_begin()
+	var entry := dir.get_next()
+	while entry != "":
+		if entry.ends_with(".gd"):
+			out.append("res://tests/" + entry)
+		entry = dir.get_next()
+	dir.list_dir_end()
+	out.sort()
+	return out
+
+
+# 주석 행(`#` 로 시작)을 제외한 계수 — 문서 주석의 같은 이름을 세지 않는다.
+func _count_of_code(source: String, needle: String) -> int:
+	var count := 0
+	for line in source.split("\n"):
+		if String(line).strip_edges().begins_with("#"):
+			continue
+		count += _count_of(String(line), needle)
+	return count
 
 
 func _count_of(source: String, needle: String) -> int:
@@ -1415,6 +1458,70 @@ func _anch_check_present() -> void:
 	_ok("vn_beats.slot_id = 필수 FK 유지",
 		String(beat_columns.get("slot_id", "")) == "fk:vn_slots.csv",
 		str(beat_columns.get("slot_id", "")))
+	# ── 저장 루트 훅 전수 (25차 · 차단급) ──
+	#
+	# **실피해가 먼저 있었다** — 게이트가 실 프로필의 진행 세이브를 지우고 백업을 덮었다.
+	# 훅을 만든 것만으로는 재발이 막히지 않는다: **한 하네스가 부르지 않으면 그 하네스가
+	# 실 프로필을 다시 지운다.** 그러므로 "세이브·옵션·세션을 만지는 하네스는 전부 훅을
+	# 탄다"를 계수로 못박는다. 새 스위트를 추가하는 사람이 이 축에서 먼저 걸린다.
+	var save_touching: Array = []
+	var hooked: Array = []
+	for path in _test_sources():
+		var harness := FileAccess.get_file_as_string(String(path))
+		# 세이브 루트에 닿는 형태 — 세션 생성도 포함한다(`setup()` 이 옵션을 적재한다).
+		var touches := harness.contains("SaveManager.") or harness.contains("RunSession.new()") \
+			or harness.contains("OptionsStore.new()") or harness.contains("save_progress(")
+		if not touches:
+			continue
+		save_touching.append(String(path).get_file())
+		if harness.contains("SaveManager.use_test_root()"):
+			hooked.append(String(path).get_file())
+	_ok("㉑ 세이브 접촉 하네스 수집", save_touching.size() >= 10, str(save_touching.size()))
+	_ok("㉑ 전 하네스가 격리 훅을 탄다", hooked.size() == save_touching.size(),
+		"미훅 = %s" % str(_missing_from(save_touching, hooked)))
+	# 실기 루트를 세우는 곳은 **앱 부팅 한 곳뿐**이어야 한다 — 하네스가 실기 루트를
+	# 부르면 훅이 있으나 마나다.
+	for path in _test_sources():
+		# **이 검사기 자신은 제외한다** — 금지 문자열을 대장에 적어야 하므로 필연적으로
+		# 그것을 담고 있고, 자기를 세면 항상 자기가 걸린다(GLYPH 잠재 원도 대장 전례).
+		if String(path) == UISCR_SOURCE:
+			continue
+		var harness := FileAccess.get_file_as_string(String(path))
+		_ok("㉑ 하네스가 실기 루트를 부르지 않는다: %s" % String(path).get_file(),
+			not harness.contains("use_live_root()"))
+	# **복구 경로까지 함께 사라지는 형태를 못박는다 (총괄 증보 · 내러티브 7차 실측).**
+	# 재발화가 `progress.json` 과 `progress.bak.json` 을 **함께** 덮었다 — 1차와 복구가
+	# 동시에 소진되면 가드는 탐지만 하고 되돌릴 것이 없다. 그래서 격리가 프로필 파일
+	# **전부**를 덮는지, 백업 경로도 같은 루트를 타는지 값으로 확인한다.
+	var isolated := SaveManager.progress_path(2)
+	var isolated_backup := SaveManager.backup_path(2)
+	var isolated_snapshot := SaveManager.snapshot_path(2)
+	for pair in [["진행", isolated], ["백업", isolated_backup], ["스냅숏", isolated_snapshot]]:
+		_ok("㉑ %s 경로가 격리 루트 안" % pair[0],
+			String(pair[1]).begins_with(SaveManager.TEST_ROOT), String(pair[1]))
+	# 세 파일이 서로 달라야 한다 — 겹치면 한 번의 저장이 복구본을 덮는다(정본 규약).
+	_ok("㉑ 진행·백업·스냅숏 경로 상이", SaveManager.paths_are_distinct()
+		and isolated != isolated_backup and isolated != isolated_snapshot)
+	var boot := FileAccess.get_file_as_string("res://ui/flow/app_root.gd")
+	_ok("㉑ 앱 부팅이 실기 루트를 세운다", boot.contains("SaveManager.use_live_root()"))
+	# 기본값 부재가 방어의 핵이다 — 상수 기본값이 생기면 미호출이 조용해진다.
+	var manager := FileAccess.get_file_as_string("res://core/save/save_manager.gd")
+	_ok("㉑ 저장 루트 기본값 부재", manager.contains('static var _root: String = ""'),
+		"기본값이 서면 훅 미호출이 소리를 잃는다")
+	_ok("㉑ 미설정 시 경고", manager.contains('push_error("SaveManager: save root unset'))
+	# 옵션 파일도 같은 루트를 탄다 — 21차에 실 옵션 파일을 쓴 축이 있었다
+	var store := FileAccess.get_file_as_string("res://ui/flow/options_store.gd")
+	# **계수로 본다** — 호출이 3곳(존재 확인·읽기·쓰기)이라 한 곳만 훅 밖으로 빼도
+	# 문자열은 남는다(돌연변이 J4 초판 미검출 · H7 과 같은 형태).
+	# 주석 행은 세지 않는다 — 문서 주석에도 같은 이름이 나온다(23차 상용한자 파서와 같은 함정:
+	# **주석은 데이터가 아니다**. 그때는 내 계수기가 헤더 산문의 한자를 셌다).
+	_ok("㉑ 옵션 경로 훅 경유 = 3곳",
+		_count_of_code(store, "SaveManager.options_path()") == 3,
+		str(_count_of_code(store, "SaveManager.options_path()")))
+	_ok("㉑ 옵션 경로 상수 직참조 잔존 0", not store.contains("SaveManager.OPTIONS_PATH"))
+	_ok("㉑ 옵션 경로 리터럴 우회 잔존 0", not store.contains('"user://options.json"'),
+		"훅 밖 리터럴은 실 옵션 파일을 쓴다")
+
 	# ── G4W 검사 실재 (게이트 G-4 · 23차) ──
 	#
 	# **스위트는 자기 단언의 삭제를 스스로 잡지 못한다** — 단언을 `true` 로 바꾸면 그 스위트는

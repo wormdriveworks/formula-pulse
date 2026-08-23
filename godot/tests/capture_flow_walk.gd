@@ -25,6 +25,7 @@ var _done := false
 
 
 func _initialize() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	var args := OS.get_cmdline_user_args()
 	if args.is_empty():
 		printerr("WALK_FAIL 출력 디렉토리 미지정")

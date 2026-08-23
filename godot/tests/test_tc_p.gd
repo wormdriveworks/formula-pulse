@@ -10,6 +10,7 @@ var _checked := 0
 
 
 func _init() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	_configure()
 	_clean_profiles()
 	_tc_p8_corruption_recovery()

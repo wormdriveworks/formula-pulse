@@ -30,6 +30,7 @@ var _frame := 0
 
 
 func _process(_delta: float) -> bool:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	_frame += 1
 	if _frame < 2:
 		return false

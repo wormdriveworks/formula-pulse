@@ -41,6 +41,7 @@ var _failures := 0
 
 
 func _init() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	var by_channel := _expected_ids()
 	if by_channel.is_empty():
 		print("AUDIO_ASSET_FAIL sound_map.csv 에서 행을 읽지 못했다")

@@ -34,6 +34,7 @@ var _gp_counter := 0
 
 
 func _init() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	_parse_args()
 	_data = GameData.new()
 	if not _data.load_all():

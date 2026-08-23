@@ -10,6 +10,7 @@ var _checked := 0
 
 
 func _init() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	_d08_vn_slot_values()
 	_tc_o4_vn_skip_and_replay()
 	_vane_stage_filter()

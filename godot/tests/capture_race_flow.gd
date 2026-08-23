@@ -38,6 +38,7 @@ var _plan: Array = [
 
 
 func _initialize() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	_started_msec = Time.get_ticks_msec()
 	var args := OS.get_cmdline_user_args()
 	if args.is_empty():

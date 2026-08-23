@@ -7,6 +7,7 @@ var _checked := 0
 
 
 func _init() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	_d13_event_values()
 	_condition_dsl()
 	_occurrence_rate()

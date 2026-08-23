@@ -18,6 +18,7 @@ var _checked := 0
 
 
 func _init() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	_fixture_actually_differs()
 	_engine_reads_data()
 	_outgame_reads_data()
@@ -346,7 +347,7 @@ func _new_consumers_read_data() -> void:
 		"chassis=%f" % engine.chassis)
 	# 옵션 파라미터 (픽스처 60·25 · 기본 80·10) — 기기 옵션 파일은 백업 후 원복한다
 	# (주력 머신에서 이 스위트를 돌려도 기기 설정이 지워지지 않아야 한다)
-	var options_path := SaveManager.OPTIONS_PATH
+	var options_path := SaveManager.options_path()
 	var backup_text := ""
 	var had_options := FileAccess.file_exists(options_path)
 	if had_options:

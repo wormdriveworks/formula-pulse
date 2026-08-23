@@ -1,7 +1,7 @@
 # 옵션 상태 저장소 — D09 §6.1 O1~O15 (+O12) · §6.4 탭 구조.
 #
 # **기기별 구성이며 프로필 밖이다** (D12 §7.1 구성 분리) — 경로는 세이브 정책 층의
-# `SaveManager.OPTIONS_PATH` 상수를 승계한다. 세이브 데이터가 아니므로 백업 회전·
+# `SaveManager.options_path()` 를 승계한다 — 저장 루트 재지정 훅을 함께 탄다. 세이브 데이터가 아니므로 백업 회전·
 # 마이그레이션 대상이 아니고, SaveService 를 경유하지 않는다.
 #
 # 저장하는 것은 **선택 인덱스**다 — 단계의 실효 수치(타이머 배율 등)는 core_params 경유로
@@ -129,9 +129,9 @@ func reset_onboarding() -> void:
 
 # ── 디스크 (기기별 — 프로필 밖) ──
 func load_from_disk() -> void:
-	if not FileAccess.file_exists(SaveManager.OPTIONS_PATH):
+	if not FileAccess.file_exists(SaveManager.options_path()):
 		return
-	var file := FileAccess.open(SaveManager.OPTIONS_PATH, FileAccess.READ)
+	var file := FileAccess.open(SaveManager.options_path(), FileAccess.READ)
 	if file == null:
 		return
 	var parsed: Variant = JSON.parse_string(file.get_as_text())
@@ -142,7 +142,7 @@ func load_from_disk() -> void:
 
 
 func save_to_disk() -> void:
-	var file := FileAccess.open(SaveManager.OPTIONS_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(SaveManager.options_path(), FileAccess.WRITE)
 	if file == null:
 		push_error("OptionsStore: cannot write options file")
 		return

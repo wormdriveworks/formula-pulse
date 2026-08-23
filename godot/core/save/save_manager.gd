@@ -10,12 +10,63 @@ extends RefCounted
 # 마이그레이션 기준이 갈라져, 새로 쓴 세이브가 매 로드마다 구버전으로 취급된다.
 const SCHEMA_VERSION := SaveService.SCHEMA_VERSION
 
-const PROFILE_DIR_FORMAT := "user://profile_%d/"
+const PROFILE_DIR_NAME_FORMAT := "profile_%d/"
 const PROGRESS_FILENAME := "progress.json"
 const BACKUP_FILENAME := "progress.bak.json"
 const SNAPSHOT_FILENAME := "suspend.json"
 const QUARANTINE_FILENAME := "suspend.bad.json"
-const OPTIONS_PATH := "user://options.json"   # 기기별 — 프로필 밖 (D12 §7.1 구성 분리)
+const OPTIONS_FILENAME := "options.json"   # 기기별 — 프로필 밖 (D12 §7.1 구성 분리)
+
+# ── 저장 루트 (25차 신설 — 차단급) ──
+#
+# **실피해가 먼저 있었다**: 게이트가 실 프로필의 진행 세이브를 지우고 백업을 덮었다
+# (주력 13차 실증 — 슬롯 2 커리어 소실). 원인은 테스트가 실기와 **같은 `user://` 루트**를
+# 쓴 것이고, 그것을 막을 자리가 없었다.
+#
+# **기본값을 두지 않는다.** 안전한 기본값(예: 항상 테스트 루트)은 실기를 망가뜨리고,
+# 편한 기본값(항상 `user://`)은 지금의 사고다. 그래서 **미설정 = 경로 없음**으로 두어
+# 아무도 부르지 않으면 저장·로드가 **소리내어 실패**한다 — 이 파일이 프로필 개수에
+# 이미 쓰고 있는 방식과 같다("미설정 상태의 저장·로드는 실패하게 해 우회를 소리나게 만든다").
+const LIVE_ROOT := "user://"
+const TEST_ROOT := "user://test_profiles/"
+
+static var _root: String = ""
+
+
+# 실기 루트 — **부르는 곳은 앱 부팅 한 곳**이다 (`app_root`).
+static func use_live_root() -> void:
+	# **이미 잡힌 루트를 덮지 않는다.** 하네스가 `app_root.tscn` 을 실제로 세우는 축이 있어
+	# (UISCR 단독 부팅·SEAL-E) 그 `_ready()` 가 격리 루트를 실기로 되돌렸다 — 게이트 밖
+	# 바이트 대조가 그것을 잡았다(실 프로필 `profile_2` 재변조 실측). 앱은 **아무도 잡지
+	# 않았을 때만** 실기 루트를 주장한다.
+	if not _root.is_empty():
+		return
+	_root = LIVE_ROOT
+
+
+# 격리 루트 — 테스트·캡처 하네스 전속. 디렉토리를 함께 보장한다.
+static func use_test_root() -> void:
+	if _root == TEST_ROOT:
+		return   # 멱등 — `_process` 하네스가 프레임마다 불러도 비용 0
+	_root = TEST_ROOT
+	var absolute := ProjectSettings.globalize_path(TEST_ROOT)
+	if not DirAccess.dir_exists_absolute(absolute):
+		DirAccess.make_dir_recursive_absolute(absolute)
+
+
+static func root() -> String:
+	if _root.is_empty():
+		push_error("SaveManager: save root unset - call use_live_root() or use_test_root()")
+	return _root
+
+
+static func is_test_root() -> bool:
+	return _root == TEST_ROOT
+
+
+static func options_path() -> String:
+	var base := root()
+	return "" if base.is_empty() else base + OPTIONS_FILENAME
 
 # 프로필 개수는 데이터 창구(D12 §7.1 '확정 기준값')에서 온다. 정적 층에 붙잡아 두는 이유:
 # 범위 강제를 호출부 재량에 맡기면 아무도 부르지 않아(실측: 호출부 0건) 범위 밖 프로필
@@ -28,7 +79,8 @@ static func configure(data: GameData) -> void:
 
 
 static func profile_dir(profile_index: int) -> String:
-	return PROFILE_DIR_FORMAT % profile_index
+	var base := root()
+	return "" if base.is_empty() else base + (PROFILE_DIR_NAME_FORMAT % profile_index)
 
 
 static func progress_path(profile_index: int) -> String:

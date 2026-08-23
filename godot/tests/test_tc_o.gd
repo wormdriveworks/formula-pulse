@@ -9,6 +9,7 @@ var _checked := 0
 
 
 func _init() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	_d13_outgame_values()
 	_tc_o1_facilities()
 	_tc_o2_tuning_and_overhaul()

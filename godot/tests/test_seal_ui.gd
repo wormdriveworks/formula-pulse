@@ -37,6 +37,7 @@ var _started_msec := 0
 
 
 func _initialize() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	_started_msec = Time.get_ticks_msec()
 	Engine.time_scale = TIME_SCALE
 	_data = GameData.new()

@@ -13,6 +13,7 @@ var _checked := 0
 
 
 func _init() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	_d13_anchor_values()
 	_tc_c1_state_machine_closure()
 	_tc_c2_turn_sequence()
@@ -42,8 +43,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 2230:
-		print("TC_C_TEST_FAIL checks=%d < 하한 2230 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 2235:
+		print("TC_C_TEST_FAIL checks=%d < 하한 2235 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -2272,6 +2273,9 @@ func _slot_progression_wired() -> void:
 	_ok("미등재 GP 슬롯 조회가 is_ok를 내린다", not strict.data.is_ok())
 	strict.transition_errors = 0
 
+const REJECT_KEY_DOMAIN := "ui.race."
+
+
 # ── 스킬 소비부 (D05 §5.4·§6.1 · D07 §4.2 · D13 별첨A §4.2) ──
 #
 # 원칙 = **표에 적힌 것이 실제로 일어나는가.** 16종을 이름으로 나열하는 대신
@@ -2305,6 +2309,20 @@ func _skill_effect_ledger() -> void:
 	for effect in RaceEngine.SKILL_EFFECT_IDS:
 		_ok("엔진 effect '%s' 가 표에 실재한다 (죽은 코드 0)" % effect,
 			table_effects.has(effect))
+	# ── 거부 사유 문면 경계 (총괄 증보 ④) ──
+	#
+	# 봉인 침묵 3사유는 **문면을 두지 않는 것이 최종형**이다(사유가 잠정 결과의 내용에
+	# 의존하므로 문면이 곧 결과 누출이다 — 불변규칙 5). 대장의 실재와, 그 사유에 대응하는
+	# 문면 키가 **표에 없음**을 함께 못박는다: 문면이 유입되면 이 축이 실패하고
+	# 그때가 판정을 다시 받을 시점이다(두 방향 대장).
+	_ok("봉인 침묵 사유 대장 = 3종", RaceEngine.SEAL_SILENT_ERRORS.size() == 3,
+		str(RaceEngine.SEAL_SILENT_ERRORS))
+	for code in RaceEngine.SEAL_SILENT_ERRORS:
+		var suffix := String(code).replace("_", " ").capitalize().replace(" ", "")
+		# 접두를 조각으로 나눈다 — 이어 붙인 전체가 리터럴로 있으면 V2 가 '코드가 발행하는
+		# 키'로 보고 미등재를 차단한다(접두는 키가 아니다 · 21차·25차 전례).
+		var key := REJECT_KEY_DOMAIN + "skillRejected" + suffix
+		_ok("봉인 침묵 사유 문면 부재: %s" % code, not engine.data.strings.has_key(key), key)
 	_ok("스킬 16종 (D07 §4.2)", engine.data.skills.size() == 16,
 		"size=%d" % engine.data.skills.size())
 	# 계열 4타입 × 4종 (D05 §6.1 확정) — 한 계열이 통째로 비면 개입 타입 하나가 사문화된다
@@ -2357,7 +2375,7 @@ func _skill_gates() -> void:
 	# 중복 투입 거부 — 배수는 누적이 아니라 설정이므로 두 번째는 차지만 태운다
 	var twice := engine.charge
 	var duplicate: Dictionary = engine.use_skill("skill_sa1")
-	_ok("동일 변조 중복 투입 거부", String(duplicate.get("error", "")) == "already")
+	_ok("동일 변조 중복 투입 거부", String(duplicate.get("error", "")) == "already_mod")
 	_ok("중복 거부 시 차지 무변경", engine.charge == twice)
 	_ok("중복 거부 시 사용 계수 무변경", int(engine.skill_uses.get("skill_sa1", 0)) == 1)
 	# 투어 상한 — uses_per_tour > 0 인 2종(SH4 2회 · SI4 1회)이 실제로 소진된다
@@ -2496,7 +2514,7 @@ func _skill_hold_family() -> void:
 	_ok("SH4 후 기본 홀드 성립", bool(warm.hold_respin([0, 1]).get("ok", false)))
 	_ok("SH4 후 기본 홀드 비용 0", warm.charge == warm_before, "charge=%d" % warm.charge)
 	_ok("SH4 는 홀드를 이미 쓴 뒤에는 거부",
-		String(warm.use_skill_check("skill_sh4").get("error", "")) == "already")
+		String(warm.use_skill_check("skill_sh4").get("error", "")) == "already_hold")
 	# 대조군 — SH4 없이는 기본 홀드가 유상이다
 	var paid := _new_engine(864)
 	paid.start_gp()

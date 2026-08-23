@@ -56,7 +56,13 @@ const COVERAGE_EXEMPT := [
 # (KANJIDIC2 grade 1~8 도출 · `𠮟`→`叱` 치환) 22차에 `res://` 로 이동해 실대조가 돈다.
 # 계수 대장은 그대로 둔다: 일문 열의 한자 집합이 바뀌면 검사가 실패해 재대조를 강제한다.
 const JOUYOU_PATH := "res://data/reference/jouyou_kanji.txt"
-const JA_KANJI_EXPECTED := 501          # 내러티브 5차 편입 후 실측 (4차 500 + 五枚虚衝 − 墟蜃楼)
+# **정확 계수 핀을 하한으로 내렸다 (25차).** 그 핀은 *표가 없던 시절의 트립와이어*였다 —
+# 집합이 바뀌면 실패해서 상용한자 재대조를 강제하는 것이 일이었다. 22차에 표가 유입되며
+# **재대조가 매 실행 무조건 돌게 됐으므로**(아래 `⑤ 상용한자 밖 0`) 핀은 안전을 더하지 않고
+# 마찰만 남긴다: `strings.csv` 는 공유 파일이라 타 레인이 문안 1행을 올리는 순간 내 게이트가
+# 붉어지는데 그것은 결함이 아니다(실측 — 25차에 `専` 1자로 502가 됐고 상용 밖은 0이었다).
+# 하한은 유지한다 — 파서가 죽어 집합이 비는 것은 여전히 잡아야 한다.
+const JA_KANJI_FLOOR := 502             # 내러티브 7차 편입 후 실측 (5차 501 + 스킬 문면 `専`)
 const JOUYOU_EXPECTED_COUNT := 2136     # D15 §4.3 확정 (데이터 행 유일 계수 — 주석 행 제외)
 
 # 헤더 순서 = 계약이다. O11 선택 인덱스가 이 순서를 탄다 (options_store.language_code()).
@@ -75,6 +81,7 @@ var _coverage: Dictionary = {}   # 원도 이름 → {codepoint: true}
 
 
 func _init() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	if not _load_strings():
 		_report()
 		return
@@ -329,9 +336,10 @@ func _jouyou_ledger() -> void:
 			var code := value.unicode_at(index)
 			if code >= 0x4E00 and code <= 0x9FFF:
 				kanji[code] = true
-	_ok("⑤ 일문 한자 계수 = 부록 B 대장", kanji.size() == JA_KANJI_EXPECTED,
-		"actual=%d ledger=%d — 집합이 바뀌었으면 상용한자 재대조가 필요하다"
-			% [kanji.size(), JA_KANJI_EXPECTED])
+	_ok("⑤ 일문 한자 계수 ≥ 하한", kanji.size() >= JA_KANJI_FLOOR,
+		"actual=%d floor=%d — 집합이 줄었다면 일문 열 적재가 깨진 것이다"
+			% [kanji.size(), JA_KANJI_FLOOR])
+	print("  [측정] 일문 한자 유일 %d자 (하한 %d) · 상용 밖 판정은 아래" % [kanji.size(), JA_KANJI_FLOOR])
 	# **'표를 기다리는' 분기는 만료했다.** 21차에는 표가 없어 부재를 정당한 상태로 두었지만
 	# 이제 표가 커밋돼 있으므로 부재는 회귀다 — 경로 오타·파일 이동이 검사를 조용히
 	# '대조 보류'로 내려앉히는 것을 막는다(그 상태에서도 스위트는 녹색이었다).

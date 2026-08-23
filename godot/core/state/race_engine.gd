@@ -24,6 +24,13 @@ const MOD_FREE_HOLD := "free_hold"                      # SH4 기본 홀드 비�
 
 # 엔진이 소비하는 effect 식별자 전량 — `skills.csv` effect 열과 **양방향** 대조 대상이다.
 # 표에 있고 여기 없으면 죽은 스킬(눌러도 아무 일이 없다) · 여기 있고 표에 없으면 죽은 코드.
+# 거부 사유 중 **문면을 두지 않는 것** (총괄 판정 · 증보 ④).
+# 이 셋은 사유가 **잠정 결과의 내용에 의존**한다 — "무효화할 트러블이 없다"·"그 릴은 그 심볼이
+# 아니다"·"두 릴이 이미 같다". 문면으로 말하는 순간 릴 정지 연출 전에 결과가 새므로
+# (불변규칙 5) **소리 거부만 남기고 문면은 두지 않는 것이 최종형**이다.
+# 20차가 `use_skill_check` 에서 인자 의존 조건을 일부러 보지 않은 것과 같은 근거다.
+const SEAL_SILENT_ERRORS := ["no_trouble", "symbol", "same"]
+
 const SKILL_EFFECT_IDS := [
 	"precision_hold", "full_sweep", "snapshot", "warmup_spin",
 	"trouble_to_line", "trouble_to_pulse", "symbol_clone", "line_to_slipstream",
@@ -584,7 +591,9 @@ func _skill_precondition(effect: String) -> String:
 				return "respin_cap"
 		"warmup_spin":
 			if skill_mods.has(MOD_FREE_HOLD) or hold_used:
-				return "already"   # 기본 홀드를 이미 썼으면 감면할 대상이 없다
+				# **`already_mod` 와 갈라 둔다 (총괄 증보 ③).** 이쪽은 "기본 홀드를 이미 썼다"이고
+				# 저쪽은 "이 효과가 이미 걸려 있다"다 — 한 문면으로 둘을 말하면 한쪽이 거짓이 된다.
+				return "already_hold"
 		"trouble_to_line", "trouble_to_pulse", "line_to_slipstream", "symbol_clone":
 			if provisional.size() != 3:
 				return "no_provisional"
@@ -592,43 +601,43 @@ func _skill_precondition(effect: String) -> String:
 			if current_turn_is_duel:
 				return "duel_turn"
 			if skill_mods.has(MOD_ADVANCE_MULT):
-				return "already"
+				return "already_mod"
 		"pulse_yield_x2":
 			if current_turn_is_duel:
 				return "duel_turn"
 			if skill_mods.has(MOD_PULSE_MULT):
-				return "already"
+				return "already_mod"
 		"defense_x15_duel12":
 			# 한 스킬이 두 턴 종류에서 각기 다른 절반을 쓴다 (별첨A §4.2 "방어 효과 ×1.5 +
 			# 방어 듀얼 판정 +12") — 어느 쪽도 도달 불가가 아니므로 턴 종류로 거부하지 않는다.
 			if current_turn_is_duel:
 				if skill_mods.has(MOD_DEFENSE_DUEL_ADD):
-					return "already"
+					return "already_mod"
 			elif skill_mods.has(MOD_DEFENSE_MULT):
-				return "already"
+				return "already_mod"
 		"overtorque_boost16":
 			if not current_turn_is_duel:
 				return "sector_turn"
 			if skill_mods.has(MOD_BOOST_PER):
-				return "already"
+				return "already_mod"
 		"duel_penalty_waive":
 			if not current_turn_is_duel:
 				return "sector_turn"
 			if skill_mods.has(MOD_DUEL_PENALTY_WAIVED):
-				return "already"
+				return "already_mod"
 		"trouble_chassis_zero":
 			if current_turn_is_duel:
 				return "duel_turn"
 			if skill_mods.has(MOD_TROUBLE_CHASSIS_ZERO):
-				return "already"
+				return "already_mod"
 		"trouble_rear_zero":
 			if current_turn_is_duel:
 				return "duel_turn"
 			if skill_mods.has(MOD_TROUBLE_REAR_ZERO):
-				return "already"
+				return "already_mod"
 		"survival_cell":
 			if skill_mods.has(MOD_CHASSIS_FLOOR):
-				return "already"
+				return "already_mod"
 		_:
 			return "effect"
 	return ""

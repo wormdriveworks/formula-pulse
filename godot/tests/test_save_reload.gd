@@ -6,6 +6,7 @@ const SNAPSHOT_PATH := "user://test_suspend_snapshot.json"
 
 
 func _init() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	var failures := 0
 	failures += _test_reel_reproduction()
 	failures += _test_checksum_guard()

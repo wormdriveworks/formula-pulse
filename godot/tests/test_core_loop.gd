@@ -18,6 +18,7 @@ const EXPECTED_SETTLE_ORDER := [
 
 
 func _init() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	var failures := 0
 	failures += _check_settle_order()
 	failures += _run_gp(42, false)

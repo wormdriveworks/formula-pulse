@@ -25,6 +25,7 @@ const LATIN_WIDE := "WWWWWWWWWWWWWWWWWWWWWW"                      # 반각 22자
 
 
 func _init() -> void:
+	SaveManager.use_test_root()   # 저장 격리 — 실 프로필 무접촉 (25차)
 	print("MEASURE_FONTS 전각 22자 기준")
 	for label in FONTS:
 		var entry: Array = FONTS[label]
