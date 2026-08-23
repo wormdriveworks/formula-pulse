@@ -10,6 +10,27 @@ extends RefCounted
 
 const PLAYER_ID := "player"
 
+# 턴 스코프 스킬 변조 키 (D13 별첨A §4.2 효과 수치의 적용 지점)
+const MOD_ADVANCE_MULT := "advance_mult"                # SA1 전진 효과 배수
+const MOD_PULSE_MULT := "pulse_mult"                    # SA2 펄스 차지 생산 배수
+const MOD_DEFENSE_MULT := "defense_mult"                # SA3 방어 효과 배수
+const MOD_DEFENSE_DUEL_ADD := "defense_duel_add"        # SA3 방어 듀얼 판정 가산
+const MOD_BOOST_PER := "boost_per"                      # SA4 부스트 차지당 보정 대체
+const MOD_DUEL_PENALTY_WAIVED := "duel_penalty_waived"  # SI1 듀얼 패배 페널티 면제
+const MOD_TROUBLE_CHASSIS_ZERO := "trouble_chassis_zero"  # SI2
+const MOD_TROUBLE_REAR_ZERO := "trouble_rear_zero"        # SI3
+const MOD_CHASSIS_FLOOR := "chassis_floor"              # SI4 섀시 최저 잔존
+const MOD_FREE_HOLD := "free_hold"                      # SH4 기본 홀드 비용 면제
+
+# 엔진이 소비하는 effect 식별자 전량 — `skills.csv` effect 열과 **양방향** 대조 대상이다.
+# 표에 있고 여기 없으면 죽은 스킬(눌러도 아무 일이 없다) · 여기 있고 표에 없으면 죽은 코드.
+const SKILL_EFFECT_IDS := [
+	"precision_hold", "full_sweep", "snapshot", "warmup_spin",
+	"trouble_to_line", "trouble_to_pulse", "symbol_clone", "line_to_slipstream",
+	"advance_x15", "pulse_yield_x2", "defense_x15_duel12", "overtorque_boost16",
+	"duel_penalty_waive", "trouble_chassis_zero", "trouble_rear_zero", "survival_cell",
+]
+
 var data: GameData
 var rng: RngService
 
@@ -78,6 +99,18 @@ var duel_opponent: String = ""
 var current_turn_is_duel: bool = false
 var _armed_duel: int = RaceTypes.DuelType.NONE
 
+# ── 스킬 (D05 §6.1 "스킬은 개입 4타입의 데이터 인스턴스" · D07 §4.2 · D13 별첨A §4.2) ──
+# 신규 개입 타입을 만들지 않는다. 효과 수치는 전량 D13 창구(core_params 전사)이며
+# 심볼 치환·복제는 이미 서 있는 symbol_match_effects 를 그대로 타므로
+# 별첨A 의 "게이지 부가 +11 G"(SC1)·"게이지 차 +13 G"(SC4)는 **치환의 귀결**이고 가산이 아니다.
+var deck_carry_in: Array = []           # 세션 층 주입 — 정본은 아웃게임 상태
+var skill_uses_carry_in: Dictionary = {}
+var deck: Array = []                    # 이 GP 의 장착 덱 스냅숏
+var skill_uses: Dictionary = {}         # skill id -> 이 **투어** 사용 횟수 (경계 리셋 = 아웃게임)
+var respin_count: int = 0               # 턴당 재회전 총량 — 기본 홀드 + 홀드 계열 스킬 합산
+var skill_mods: Dictionary = {}         # 턴 스코프 변조 (MOD_* 키) — 한 키로 리셋·직렬화
+var snapshot_previous: Array = []       # SH3 — 재회전 직전 잠정 결과 (택1 대기 중에만 비지 않음)
+
 # 레조넌스 섹터 오버레이 (D08 §3.7 · D13 별첨A §6.6)
 # 추첨은 투어 층 소관(투어 개막 1회 · resonance 스트림) — 엔진은 주입된 슬롯을 소비한다.
 # 위치는 진입 전까지 어떤 출력 경로에도 노출하지 않는다 (R6 위치 비공개).
@@ -134,6 +167,8 @@ func start_gp() -> Array:
 		chassis = data.param("param_chassis_max")
 	charge = 0
 	consumables_held = consumables_carry_in.duplicate()
+	deck = deck_carry_in.duplicate()
+	skill_uses = skill_uses_carry_in.duplicate()   # 투어 스코프 — GP 개시가 리셋 지점이 아니다
 	trouble_shield_charges = 0
 	wear_reduction = 0.0
 	front_gauge = 0.0
@@ -307,6 +342,9 @@ func begin_turn() -> Dictionary:
 	hold_used = false
 	negated_troubles = 0
 	duel_boost = 0
+	respin_count = 0
+	skill_mods = {}
+	snapshot_previous = []
 	return info
 
 
@@ -362,8 +400,15 @@ func _enter_phase(phase: int) -> void:
 	phase_log.append(phase)
 
 
-func _roll_reel(reel_index: int) -> String:
+func _roll_reel(reel_index: int, exclude_trouble := false) -> String:
 	var weights := reel_weights(reel_index)
+	if exclude_trouble:
+		# SH1 프리시전 홀드 — 트러블 가중 0 (별첨A §4.2 "0.18 → 0 재정규화").
+		# pick_weighted 가 가중 합으로 나누므로 **0 대입 자체가 재정규화**다: 남은 5분류의
+		# 비례는 유지되고 합만 0.82 가 된다. 확률 표를 따로 두면 그 표가 분포와 갈린다.
+		for index in range(data.symbols.size()):
+			if String(data.symbols[index]["id"]) == RaceTypes.SYMBOL_TROUBLE:
+				weights[index] = 0.0
 	var picked := rng.pick_weighted("reel", weights)
 	return String(data.symbols[picked]["id"])
 
@@ -421,12 +466,21 @@ func hold_respin(keep_indices: Array) -> Dictionary:
 		return {"ok": false, "error": "phase"}
 	if hold_used:
 		return {"ok": false, "error": "limit"}
-	var cost := data.param_int("param_charge_hold_cost")
+	# 홀드 계열 총량 가드 (D07 §4.2 · 별첨A §4.2) — 기본 홀드 + 스킬 홀드 **합산** 상한.
+	# D05 §5.4 의 "턴당 1회"(기본 액션 자체의 한도)는 무개정이고, 그 취지(무한 리롤 방지)를
+	# 스킬 층까지 넓힌 것이 이 상한이다. 두 카운터를 겹쳐 두는 이유: 스킬이 상한을 먼저
+	# 소진했을 때 기본 홀드도 막혀야 하는데 hold_used 만으로는 그것이 표현되지 않는다.
+	if respin_count >= data.param_int("param_hold_total_cap_per_turn"):
+		return {"ok": false, "error": "respin_cap"}
+	# SH4 웜업 스핀 — 이번 턴 기본 홀드의 차지 비용 0 (별첨A §4.2 "기본 홀드 비용 1 → 0")
+	var cost := 0 if bool(skill_mods.get(MOD_FREE_HOLD, false)) \
+		else data.param_int("param_charge_hold_cost")
 	if charge < cost:
 		return {"ok": false, "error": "charge"}
 	charge -= cost
 	hold_used = true
 	hold_uses += 1
+	respin_count += 1
 	for reel_index in range(3):
 		if not keep_indices.has(reel_index):
 			provisional[reel_index] = _roll_reel(reel_index)
@@ -460,6 +514,276 @@ func add_duel_boost() -> Dictionary:
 	return {"ok": true}
 
 
+# ── T4 개입 창 · 스킬 투입 (D05 §5.4 "스킬 사용" · §6.1 · D07 §4.2 · D13 별첨A §4.2) ──
+#
+# 진입로는 하나다. 기본 개입 3종(홀드·차지·부스트)이 각자 메서드를 갖는 것은 그것들이
+# **고정 의미의 기본 액션**이기 때문이고, 스킬은 4타입의 데이터 인스턴스이므로
+# 인스턴스 수만큼 메서드를 늘리면 표에 행을 더하는 일이 코드 개정을 부른다(데이터 드리븐 위반).
+#
+# 반환 계약 = 기본 개입과 동형: {"ok": bool, "error": String, "events": Array}.
+# 거부 시 비용·횟수·상태는 **전부 무변경**이다 — 부분 소비가 남으면 UI 가 재시도할 수 없다.
+#
+# `args` 는 타입별로만 읽는다: 홀드 계열 = {"keep": [릴 인덱스]} · 변환 계열 = {"target": 릴}
+# (SC3 은 {"target": 릴, "donor": 인접 릴}). 증폭·보험 계열은 인자를 쓰지 않는다.
+func use_skill(skill_id: String, args: Dictionary = {}) -> Dictionary:
+	var gate := use_skill_check(skill_id)
+	if not bool(gate.get("ok", false)):
+		return gate
+	var row := data.skill(skill_id)
+	var effect := String(row["effect"]).strip_edges()
+	var applied := _apply_skill(effect, args)
+	if not bool(applied.get("ok", false)):
+		return applied
+	charge -= CsvTable.to_int(String(row["charge_cost"]))
+	skill_uses[skill_id] = int(skill_uses.get(skill_id, 0)) + 1
+	# 발화 문면은 이번 회차 미유입(strings.csv 배타 창구) — 회신 §5 키 목록으로 보고한다.
+	# 빈 배열을 돌려주는 것이 없는 키를 참조하는 것보다 낫다(V6 는 참조를 검사한다).
+	return {"ok": true, "events": [], "family": String(row["family"]), "effect": effect}
+
+
+# 인자와 무관한 성립 조건 조회 — 투입 없이 판정한다(버튼 활성 판정용).
+# 관문을 조회와 투입이 각자 구현하면 "버튼은 켜지는데 눌리지 않는" 상태가 생기므로
+# use_skill 도 이 함수를 통과한 뒤에만 효과를 적용한다 — 판정은 한 곳뿐이다.
+func use_skill_check(skill_id: String) -> Dictionary:
+	if turn_phase != RaceTypes.TurnPhase.T4_INTERVENTION:
+		return {"ok": false, "error": "phase"}
+	if not deck.has(skill_id):
+		return {"ok": false, "error": "deck"}   # 해금만으로는 못 쓴다 — 장착이 조건 (D07 §4.1)
+	var row := data.skill(skill_id)
+	if row.is_empty():
+		return {"ok": false, "error": "unknown"}
+	var limit := CsvTable.to_int(String(row["uses_per_tour"]))
+	if limit > 0 and int(skill_uses.get(skill_id, 0)) >= limit:
+		return {"ok": false, "error": "uses"}
+	if charge < CsvTable.to_int(String(row["charge_cost"])):
+		return {"ok": false, "error": "charge"}
+	var blocked := _skill_precondition(String(row["effect"]).strip_edges())
+	if not blocked.is_empty():
+		return {"ok": false, "error": blocked}
+	return {"ok": true}
+
+
+# 타입별 성립 조건. **인자 의존 조건(대상 심볼·고정 릴 수)은 여기서 보지 않는다** —
+# 미리 보려면 인자가 필요하고 인자는 UI 가 모으는 중이라는 실용적 이유가 하나,
+# **봉인**(불변규칙 5)이 둘이다: "SC1 을 누를 수 있는가"가 트러블 유무로 갈리면
+# 버튼 상태가 곧 결과 상관 신호가 되어 릴 정지 연출 전에 결과를 흘린다.
+# 여기 조건들은 전부 잠정 결과의 **내용과 무관**하다(창·덱·차지·횟수·턴 종류·자릿수).
+#
+# **효과가 이번 턴에 도달할 수 없으면 거부한다** — 차지만 태우고
+# 아무 일도 없는 투입을 허용하면 그것이 곧 무비용 통제의 반대편 결함이다.
+# 듀얼 턴은 정산 ①~⑤ 를 돌지 않으므로(_settle_duel) 그 단계에 붙는 효과가 도달하지 않고,
+# 섹터 턴에는 부스트·듀얼 판정이 존재하지 않는다.
+func _skill_precondition(effect: String) -> String:
+	match effect:
+		"precision_hold", "full_sweep", "snapshot":
+			if provisional.size() != 3:
+				return "no_provisional"
+			if respin_count >= data.param_int("param_hold_total_cap_per_turn"):
+				return "respin_cap"
+		"warmup_spin":
+			if skill_mods.has(MOD_FREE_HOLD) or hold_used:
+				return "already"   # 기본 홀드를 이미 썼으면 감면할 대상이 없다
+		"trouble_to_line", "trouble_to_pulse", "line_to_slipstream", "symbol_clone":
+			if provisional.size() != 3:
+				return "no_provisional"
+		"advance_x15":
+			if current_turn_is_duel:
+				return "duel_turn"
+			if skill_mods.has(MOD_ADVANCE_MULT):
+				return "already"
+		"pulse_yield_x2":
+			if current_turn_is_duel:
+				return "duel_turn"
+			if skill_mods.has(MOD_PULSE_MULT):
+				return "already"
+		"defense_x15_duel12":
+			# 한 스킬이 두 턴 종류에서 각기 다른 절반을 쓴다 (별첨A §4.2 "방어 효과 ×1.5 +
+			# 방어 듀얼 판정 +12") — 어느 쪽도 도달 불가가 아니므로 턴 종류로 거부하지 않는다.
+			if current_turn_is_duel:
+				if skill_mods.has(MOD_DEFENSE_DUEL_ADD):
+					return "already"
+			elif skill_mods.has(MOD_DEFENSE_MULT):
+				return "already"
+		"overtorque_boost16":
+			if not current_turn_is_duel:
+				return "sector_turn"
+			if skill_mods.has(MOD_BOOST_PER):
+				return "already"
+		"duel_penalty_waive":
+			if not current_turn_is_duel:
+				return "sector_turn"
+			if skill_mods.has(MOD_DUEL_PENALTY_WAIVED):
+				return "already"
+		"trouble_chassis_zero":
+			if current_turn_is_duel:
+				return "duel_turn"
+			if skill_mods.has(MOD_TROUBLE_CHASSIS_ZERO):
+				return "already"
+		"trouble_rear_zero":
+			if current_turn_is_duel:
+				return "duel_turn"
+			if skill_mods.has(MOD_TROUBLE_REAR_ZERO):
+				return "already"
+		"survival_cell":
+			if skill_mods.has(MOD_CHASSIS_FLOOR):
+				return "already"
+		_:
+			return "effect"
+	return ""
+
+
+func _apply_skill(effect: String, args: Dictionary) -> Dictionary:
+	match effect:
+		"precision_hold":
+			return _skill_respin(args, 2, true)
+		"full_sweep":
+			return _skill_respin({"keep": []}, 0, false)
+		"snapshot":
+			# 재회전과 택1 은 두 걸음이다 — 한 호출에 합치면 UI 가 두 후보를 나란히 놓을 자리가
+			# 없고, "무엇과 무엇 중 고르는지"를 못 보여주면 SH3 의 효과 자체가 성립하지 않는다.
+			var previous := provisional.duplicate()
+			var outcome := _skill_respin(args, -1, false)
+			if bool(outcome.get("ok", false)):
+				snapshot_previous = previous
+			return outcome
+		"warmup_spin":
+			skill_mods[MOD_FREE_HOLD] = true
+			return {"ok": true}
+		"trouble_to_line":
+			return _convert_symbol(args, RaceTypes.SYMBOL_TROUBLE, RaceTypes.SYMBOL_LINE)
+		"trouble_to_pulse":
+			return _convert_symbol(args, RaceTypes.SYMBOL_TROUBLE, RaceTypes.SYMBOL_PULSE)
+		"line_to_slipstream":
+			return _convert_symbol(args, RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_SLIPSTREAM)
+		"symbol_clone":
+			return _clone_symbol(args)
+		"advance_x15":
+			skill_mods[MOD_ADVANCE_MULT] = data.param("param_skill_advance_mult")
+			return {"ok": true}
+		"pulse_yield_x2":
+			skill_mods[MOD_PULSE_MULT] = data.param("param_skill_pulse_mult")
+			return {"ok": true}
+		"defense_x15_duel12":
+			if current_turn_is_duel:
+				skill_mods[MOD_DEFENSE_DUEL_ADD] = data.param("param_skill_defense_duel_add")
+			else:
+				skill_mods[MOD_DEFENSE_MULT] = data.param("param_skill_defense_mult")
+			return {"ok": true}
+		"overtorque_boost16":
+			skill_mods[MOD_BOOST_PER] = data.param("param_skill_boost_per_judgment")
+			return {"ok": true}
+		"duel_penalty_waive":
+			skill_mods[MOD_DUEL_PENALTY_WAIVED] = true
+			return {"ok": true}
+		"trouble_chassis_zero":
+			skill_mods[MOD_TROUBLE_CHASSIS_ZERO] = true
+			return {"ok": true}
+		"trouble_rear_zero":
+			skill_mods[MOD_TROUBLE_REAR_ZERO] = true
+			return {"ok": true}
+		"survival_cell":
+			skill_mods[MOD_CHASSIS_FLOOR] = true
+			return {"ok": true}
+	push_error("RaceEngine: unknown skill effect '%s'" % effect)
+	return {"ok": false, "error": "effect"}
+
+
+# 홀드 계열 공통 재회전. required_keep = 고정 릴 수 강제(-1 = 자유).
+func _skill_respin(args: Dictionary, required_keep: int, exclude_trouble: bool) -> Dictionary:
+	var keep: Array = []
+	for value in args.get("keep", []):
+		var index := int(value)
+		if index < 0 or index > 2 or keep.has(index):
+			return {"ok": false, "error": "keep"}
+		keep.append(index)
+	if required_keep >= 0 and keep.size() != required_keep:
+		return {"ok": false, "error": "keep"}
+	if keep.size() >= 3:
+		return {"ok": false, "error": "keep"}   # 재회전 대상 0 = 무효과 투입
+	for reel_index in range(3):
+		if not keep.has(reel_index):
+			provisional[reel_index] = _roll_reel(reel_index, exclude_trouble)
+	respin_count += 1
+	_resync_negated()
+	return {"ok": true}
+
+
+# 변환 계열 — 지정 릴의 심볼을 교체한다. 대상 심볼이 아니면 거부(무효과 투입 방지).
+func _convert_symbol(args: Dictionary, from_symbol: String, to_symbol: String) -> Dictionary:
+	var target := int(args.get("target", -1))
+	if target < 0 or target > 2:
+		return {"ok": false, "error": "target"}
+	if String(provisional[target]) != from_symbol:
+		return {"ok": false, "error": "symbol"}
+	provisional[target] = to_symbol
+	_resync_negated()
+	return {"ok": true}
+
+
+# SC3 슬립스트림 링크 — 인접 릴의 심볼을 복제한다 (별첨A §4.2 "인접 릴 심볼 복제").
+func _clone_symbol(args: Dictionary) -> Dictionary:
+	var target := int(args.get("target", -1))
+	var donor := int(args.get("donor", -1))
+	if target < 0 or target > 2 or donor < 0 or donor > 2:
+		return {"ok": false, "error": "target"}
+	if absi(target - donor) != 1:
+		return {"ok": false, "error": "adjacent"}
+	if String(provisional[target]) == String(provisional[donor]):
+		return {"ok": false, "error": "same"}   # 이미 같다 = 무효과 투입
+	provisional[target] = provisional[donor]
+	_resync_negated()
+	return {"ok": true}
+
+
+# 차지 개입은 **개수**로 무효화를 적립한다(어느 릴인지 기억하지 않는다 — D05 §5.4 문면).
+# 그 뒤 변환·재회전이 트러블 수를 줄이면 적립분이 실재 트러블보다 많아져 정산에서
+# 음수 트러블이 나온다. 적립분을 잔존 트러블로 절단해 대장을 맞춘다 —
+# 절단이 아니라 소거로 처리하면 이미 지불한 2차지가 조용히 사라진다.
+func _resync_negated() -> void:
+	negated_troubles = mini(negated_troubles, _count_symbol(RaceTypes.SYMBOL_TROUBLE))
+
+
+# SH3 스냅샷 택1 — keep_new=false 면 재회전 직전 후보로 되돌린다.
+func choose_snapshot(keep_new: bool) -> Dictionary:
+	if turn_phase != RaceTypes.TurnPhase.T4_INTERVENTION:
+		return {"ok": false, "error": "phase"}
+	if snapshot_previous.is_empty():
+		return {"ok": false, "error": "no_snapshot"}
+	if not keep_new:
+		provisional = snapshot_previous.duplicate()
+		_resync_negated()
+	snapshot_previous = []
+	return {"ok": true}
+
+
+# UI 창구 (D09 §3.3 E09 스킬 슬롯) — 화면이 표를 다시 읽거나 가용 조건을 재구현하지 않도록
+# 렌더링에 필요한 것을 한 번에 돌려준다. 조건이 두 곳에 있으면 언젠가 갈라진다.
+# uses_left = -1 은 "투어 상한 없음"이다(0 은 '소진'이므로 무제한과 같은 값을 쓸 수 없다).
+func skill_slots() -> Array:
+	var slots: Array = []
+	for entry in deck:
+		var skill_id := String(entry)
+		if not data.skills.has(skill_id):
+			push_error("RaceEngine: deck holds unknown skill '%s'" % skill_id)
+			continue
+		var row: Dictionary = data.skills[skill_id]
+		var limit := CsvTable.to_int(String(row["uses_per_tour"]))
+		var used := int(skill_uses.get(skill_id, 0))
+		var probe := use_skill_check(skill_id)
+		slots.append({
+			"id": skill_id,
+			"name_key": String(row["name_key"]),
+			"family": String(row["family"]),
+			"effect": String(row["effect"]).strip_edges(),
+			"charge_cost": CsvTable.to_int(String(row["charge_cost"])),
+			"uses_per_tour": limit,
+			"uses_left": -1 if limit <= 0 else maxi(limit - used, 0),
+			"usable": bool(probe.get("ok", false)),
+			"reason": String(probe.get("error", "")),
+		})
+	return slots
+
+
 # 확정 (T4 → T5 번역 → T6 정산). remaining_ratio = 잔여 시간 비율 (여유 구간 = 모멘텀)
 func confirm(remaining_ratio: float) -> Array:
 	if turn_phase != RaceTypes.TurnPhase.T4_INTERVENTION:
@@ -474,6 +798,11 @@ func confirm(remaining_ratio: float) -> Array:
 		events.append_array(_settle_duel())
 	else:
 		events.append_array(_settle_sector(momentum))
+	# SI4 서바이벌 셀 — 이번 턴 섀시 최저 잔존 (별첨A §4.2 "섀시 최저 1").
+	# 리타이어 판정(_after_settlement) **직전** 한 곳에 둔다: 섀시를 깎는 경로가
+	# 단계 ①(트러블)과 단계 ⑥(듀얼 패배) 둘이므로 어느 한 단계 안에 넣으면 다른 쪽이 바닥을 뚫는다.
+	if bool(skill_mods.get(MOD_CHASSIS_FLOOR, false)):
+		chassis = maxf(chassis, data.param("param_skill_chassis_floor"))
 	_after_settlement(events)
 	return events
 
@@ -508,6 +837,11 @@ func _settle_sector(momentum: bool) -> Array:
 					trouble_turns += 1
 					var effect := _match_effect(RaceTypes.SYMBOL_TROUBLE, trouble_count)
 					var chassis_delta := CsvTable.to_float(String(effect["chassis"])) * hazard_wear
+					if bool(skill_mods.get(MOD_TROUBLE_CHASSIS_ZERO, false)):
+						# SI2 섀시 실드 — 섀시 소모 0 (별첨A §4.2 · 후방 게이지 가산은 유지).
+						# 소모품 실드(반감)보다 **먼저** 0으로 만든다: 깎을 것이 없는데
+						# 실드 적립분을 소비하면 다음 트러블용 보험이 조용히 사라진다.
+						chassis_delta = 0.0
 					if chassis_delta < 0.0 and trouble_shield_charges > 0:
 						# P2 이머전시 실런트: 다음 트러블 1회 섀시 소모 반감 (D13 §3.6 −50%)
 						trouble_shield_charges -= 1
@@ -515,12 +849,19 @@ func _settle_sector(momentum: bool) -> Array:
 					if chassis_delta < 0.0:
 						chassis_delta *= (1.0 - wear_reduction)
 					chassis += chassis_delta
-					rear_gauge += CsvTable.to_float(String(effect["rear_gauge"])) * gauge_mult
+					var trouble_rear := CsvTable.to_float(String(effect["rear_gauge"])) * gauge_mult
+					if bool(skill_mods.get(MOD_TROUBLE_REAR_ZERO, false)):
+						trouble_rear = 0.0   # SI3 카운터 스티어 (섀시 소모는 유지 — SI2 와 상보)
+					rear_gauge += trouble_rear
 					events.append(_ev("T5", "raceLog.troubleHit01", {"amount": chassis_delta}))
 			RaceTypes.SettleStage.STAGE_2_RESOURCE:
 				var pulse_count := _count_symbol(RaceTypes.SYMBOL_PULSE)
 				if pulse_count > 0:
-					_gain_charge(CsvTable.to_int(String(_match_effect(RaceTypes.SYMBOL_PULSE, pulse_count)["charge"])))
+					# SA2 펄스 리커버 — **펄스 심볼의 생산**만 배수다(별첨A §4.2 문면).
+					# 안정 완주 +1·듀얼 승리 보너스는 심볼 생산이 아니므로 곱하지 않는다.
+					var pulse_charge := float(CsvTable.to_int(String(
+						_match_effect(RaceTypes.SYMBOL_PULSE, pulse_count)["charge"])))
+					_gain_charge(int(round(pulse_charge * float(skill_mods.get(MOD_PULSE_MULT, 1.0)))))
 				if not trouble_fired:
 					var stable_gain := data.param_int("param_charge_stable_sector")
 					_gain_charge(stable_gain)
@@ -529,16 +870,26 @@ func _settle_sector(momentum: bool) -> Array:
 			RaceTypes.SettleStage.STAGE_3_DEFENSE:
 				var braking_count := _count_symbol(RaceTypes.SYMBOL_BRAKING)
 				if braking_count > 0:
-					rear_gauge += CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_BRAKING, braking_count)["rear_gauge"])) * gauge_mult
+					# SA3 하드 브레이킹 — 브레이킹 효과는 후방 게이지 **감산**이므로
+					# 배수를 곱하면 감산이 커진다(방어 강화). 부호를 뒤집지 않는다.
+					rear_gauge += CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_BRAKING, braking_count)["rear_gauge"])) \
+						* gauge_mult * float(skill_mods.get(MOD_DEFENSE_MULT, 1.0))
 			RaceTypes.SettleStage.STAGE_4_ADVANCE:
+				# SA1 풀 스로틀 — "이번 턴 전진 효과 ×1.5"(별첨A §4.2).
+				# **[가안] 적용 범위 = 심볼 유래 전진분 전속**이며 모멘텀 보너스는 제외한다.
+				# 근거: ⓐ별첨A 문면의 '전진 효과'는 정산 ④ 심볼 항이고 모멘텀은 D05 §7.3
+				# 타이머 보너스로 소관이 다르다 ⓑD14 §8.3 ③ 매트릭스의 판정 기준이
+				# "개입 후에도 모멘텀 델타 불변"이라 모멘텀을 곱하면 그 기준 자체가 깨진다.
+				# 정본이 침묵하는 지점이므로 총괄 판정 대상으로 회신에 올린다.
+				var advance_mult := float(skill_mods.get(MOD_ADVANCE_MULT, 1.0))
 				var slip_count := _count_symbol(RaceTypes.SYMBOL_SLIPSTREAM)
 				if slip_count > 0:
-					front_gauge += CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_SLIPSTREAM, slip_count)["front_gauge"])) * gauge_mult
+					front_gauge += CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_SLIPSTREAM, slip_count)["front_gauge"])) * gauge_mult * advance_mult
 				var line_count := _count_symbol(RaceTypes.SYMBOL_LINE)
 				if line_count > 0:
 					var line_effect := _match_effect(RaceTypes.SYMBOL_LINE, line_count)
-					front_gauge += CsvTable.to_float(String(line_effect["front_gauge"])) * gauge_mult
-					rear_gauge += CsvTable.to_float(String(line_effect["rear_gauge"])) * gauge_mult
+					front_gauge += CsvTable.to_float(String(line_effect["front_gauge"])) * gauge_mult * advance_mult
+					rear_gauge += CsvTable.to_float(String(line_effect["rear_gauge"])) * gauge_mult * advance_mult
 				var chance_count := _count_symbol(RaceTypes.SYMBOL_CHANCE)
 				if chance_count >= 3:
 					chance_three_matches += 1
@@ -548,7 +899,7 @@ func _settle_sector(momentum: bool) -> Array:
 						chance_full = true
 						events.append(_ev("T5", "raceLog.chanceDuel01", {}))
 					else:
-						front_gauge += CsvTable.to_float(String(chance_effect["front_gauge"])) * gauge_mult
+						front_gauge += CsvTable.to_float(String(chance_effect["front_gauge"])) * gauge_mult * advance_mult
 						events.append(_ev("T5", "raceLog.chanceProc01", {}))
 				if momentum:
 					var bonus := data.param("param_gauge_momentum_bonus")
@@ -680,6 +1031,14 @@ func _resolve_duel() -> Array:
 				_entrant_params(opponent_id, {"rank": player_position()})))
 		else:
 			events.append(_ev("T5", "raceLog.defendSuccess01", _entrant_params(opponent_id)))
+	elif bool(skill_mods.get(MOD_DUEL_PENALTY_WAIVED, false)):
+		# SI1 임팩트 가드 — 패배 페널티 면제 (별첨A §4.2 "섀시 −5 / 피추월 무효").
+		# 기존 패배 문면 3종은 **전부 못 쓴다**: `duelLoseDefense01`("피추월")·
+		# `defendFail01`("자리를 내줬다")·`duelLoseOvertake01`(감소량 인자)은 셋 다
+		# 일어나지 않은 일을 말한다. 이번 회차 strings.csv 는 배타 창구라 문면을
+		# 신설하지 않고 **무발화 + 필요 키 보고**로 둔다 (회신 §5). 없는 키를 참조하는
+		# 것보다 침묵이 낫다 — V6 는 참조를 검사하고, 잘못된 문면은 검사에 걸리지 않는다.
+		pass
 	else:
 		if duel_type == RaceTypes.DuelType.OVERTAKE:
 			# P3 경감 대상 [가안]: 문면 "잔여 구간 섀시 소모"가 소모원을 한정하지 않아
@@ -711,7 +1070,13 @@ func _duel_judgment(duel_type: int) -> float:
 	judgment += CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_CHANCE]["per_symbol"])) * _count_symbol(RaceTypes.SYMBOL_CHANCE)
 	var trouble_count := _count_symbol(RaceTypes.SYMBOL_TROUBLE) - negated_troubles
 	judgment += CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_TROUBLE]["per_symbol"])) * maxi(trouble_count, 0)
-	judgment += float(duel_boost) * data.param("param_charge_boost_per_judgment")
+	# SA4 오버토크 — 차지당 보정 10 → 16 (별첨A §4.2). 가산이 아니라 **대체**다:
+	# 문면이 "10 → 16"이라 가산으로 읽으면 26이 된다.
+	judgment += float(duel_boost) * float(skill_mods.get(MOD_BOOST_PER,
+		data.param("param_charge_boost_per_judgment")))
+	if duel_type == RaceTypes.DuelType.DEFENSE:
+		# SA3 하드 브레이킹의 듀얼 절반 — **방어 듀얼 전속** 가산 (별첨A §4.2 문면)
+		judgment += float(skill_mods.get(MOD_DEFENSE_DUEL_ADD, 0.0))
 	judgment += resonance_duel_bonus
 	return judgment
 
@@ -1031,6 +1396,9 @@ func serialize() -> Dictionary:
 		"provisional": provisional.duplicate(),
 		"hold_used": hold_used, "negated_troubles": negated_troubles,
 		"duel_boost": duel_boost,
+		"deck": deck.duplicate(), "skill_uses": skill_uses.duplicate(),
+		"respin_count": respin_count, "skill_mods": skill_mods.duplicate(),
+		"snapshot_previous": snapshot_previous.duplicate(),
 		"pending_duel": pending_duel, "duel_opponent": duel_opponent,
 		"current_turn_is_duel": current_turn_is_duel,
 		"resonance_circuit_id": resonance_circuit_id,
@@ -1078,6 +1446,14 @@ func restore(payload: Dictionary) -> bool:
 	hold_used = bool(payload["hold_used"])
 	negated_troubles = int(payload["negated_troubles"])
 	duel_boost = int(payload["duel_boost"])
+	# 스킬 도입 전 스냅샷 = 빈 덱·무사용·무변조가 충실값 (구세이브 관용 — IMPL-090 전례).
+	# 변조는 턴 스코프라 재개 지점의 값을 그대로 실어야 한다: 재로드로 보험이 풀리면
+	# 이미 지불한 차지가 사라지고, 반대로 남으면 재로드 리롤이 이득이 된다(D12 §6.3).
+	deck = payload.get("deck", [])
+	skill_uses = payload.get("skill_uses", {})
+	respin_count = int(payload.get("respin_count", 0))
+	skill_mods = payload.get("skill_mods", {})
+	snapshot_previous = payload.get("snapshot_previous", [])
 	pending_duel = int(payload["pending_duel"])
 	duel_opponent = String(payload["duel_opponent"])
 	current_turn_is_duel = bool(payload["current_turn_is_duel"])

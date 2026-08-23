@@ -28,6 +28,10 @@ var overhaul_candidates: Array = []
 var overhaul_installs_this_season: int = 0
 var unlocked_skills: Dictionary = {}     # skill id -> true
 var deck: Array = []                     # 편성된 skill id
+# 투어 스코프 스킬 사용 횟수 (skill id -> 횟수) — `uses_per_tour` 의 대장.
+# 레이스 엔진이 아니라 여기 두는 이유: 상한의 주기가 **투어**라 GP 단위로 생성·폐기되는
+# 엔진 인스턴스에 두면 GP 를 새로 시작하는 것만으로 리셋된다 (D07 §4.2 SH4·SI4 회차 제한).
+var skill_uses_this_tour: Dictionary = {}
 var deck_slots: int = 0
 var crew: Dictionary = {}                # crew id -> true
 var sponsor_contracts: Array = []        # sponsor id
@@ -172,6 +176,7 @@ func _field_repair_recoverable(requested_ch: int) -> float:
 
 func begin_tour() -> void:
 	field_repair_count = 0    # 체증 카운터 리셋 = 투어 개시 (D13 별첨A §3.4 R2)
+	skill_uses_this_tour.clear()   # 투어당 횟수 리셋 (D07 §4.2 — SH4 2회 · SI4 1회)
 	# 무상 복원선 — 투어 개시 시 복원선까지 무상 복원, 이미 그 위면 그대로 (D06 §3.3 결정 #12)
 	chassis = maxf(chassis, float(free_restore_line()))
 
@@ -819,6 +824,7 @@ func serialize() -> Dictionary:
 		"relation_pending": _relation_pending.duplicate(),
 		"consumables": consumables.duplicate(),
 		"field_repair_count": field_repair_count,
+		"skill_uses_this_tour": skill_uses_this_tour.duplicate(),
 		"milestones": milestones.duplicate(),
 		"narrative_act": narrative_act,
 		"act_vn_fired": act_vn_fired.duplicate(),
@@ -858,6 +864,8 @@ func restore(payload: Dictionary) -> bool:
 	_relation_pending = payload.get("relation_pending", {})
 	consumables = payload.get("consumables", {})
 	field_repair_count = int(payload.get("field_repair_count", 0))
+	# 스킬 소비부 도입 전 세이브 = 무사용이 충실값 (구세이브 관용)
+	skill_uses_this_tour = payload.get("skill_uses_this_tour", {})
 	milestones = payload.get("milestones", {})
 	narrative_act = int(payload.get("narrative_act", 1))
 	act_vn_fired = payload.get("act_vn_fired", {})

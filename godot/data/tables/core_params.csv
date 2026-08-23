@@ -125,3 +125,9 @@ param_haptic_strong_amp,0.80
 param_cheer_retrigger_sec,4
 param_audio_virtual_channels,12
 param_audio_retrigger_gate_sec,0.05
+param_skill_advance_mult,1.5
+param_skill_pulse_mult,2
+param_skill_defense_mult,1.5
+param_skill_defense_duel_add,12
+param_skill_boost_per_judgment,16
+param_skill_chassis_floor,1

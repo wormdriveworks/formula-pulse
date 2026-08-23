@@ -35,14 +35,15 @@ func _init() -> void:
 	_consumable_paths()
 	_gp_summary_counters()
 	_presentation_grade_caps()
+	_skill_instances()
 	_momentum_interrupt_matrix()
 	_tutorial_step_contract()
 	_check_global_postconditions()
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 1990:
-		print("TC_C_TEST_FAIL checks=%d < 하한 1990 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 2220:
+		print("TC_C_TEST_FAIL checks=%d < 하한 2220 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -64,6 +65,25 @@ func _ok(label: String, condition: bool, detail: String = "") -> void:
 func _eq_float(label: String, actual: float, expected: float, tolerance: float = 0.001) -> void:
 	_ok(label, absf(actual - expected) <= tolerance, "actual=%f expected=%f" % [actual, expected])
 
+
+# 게이지 프로브 기저값 — 상·하한(0·만충)에서 떨어진 자리. 절단이 차분을 먹지 않게 한다.
+const GAUGE_PROBE_BASE := 50.0
+
+
+# 게이지 측정면의 인접 상대를 **없앤다** (선두 = 앞차 없음 / 최하위 = 뒤차 없음).
+#
+# 상대를 남겨 두면 두 가지가 측정을 먹는다: ⓐ앞차 저항·뒤차 압박이 심볼 기여에 섞이고
+# ⓑ정산 ⑧ 백그라운드 AI 가 **플레이어의 이웃을 바꾸면** `_retarget_if_changed` 가
+# 해당 게이지를 0 으로 되돌린다(초판이 그랬다 — 값이 아니라 측정 자체가 사라졌고,
+# 그 스왑은 시드마다 갈려서 "어떤 시드에서는 통과하는 검사"가 됐다).
+# 상대가 없으면 `new_front`/`new_rear` 가 항상 ""이므로 되돌림이 성립하지 않는다.
+func _isolate_gauge_side(engine: RaceEngine, side: String) -> void:
+	engine.positions.erase(RaceEngine.PLAYER_ID)
+	if side == "front":
+		engine.positions.insert(0, RaceEngine.PLAYER_ID)
+	else:
+		engine.positions.append(RaceEngine.PLAYER_ID)
+	engine._retarget(true, true)
 
 var _engines: Array = []
 
@@ -1271,11 +1291,19 @@ func _momentum_interrupt_matrix() -> void:
 		# 비듀얼 턴에서는 증폭 개입 자체가 거부된다 — 배타의 반대 방향
 		_ok("비듀얼 턴에서 증폭 개입 거부",
 			not bool(sector_probe.add_duel_boost().get("ok", false)))
-	# ⑦ 변환 (Convert — 심볼 교체·승급): **인게임 소비부가 없다.**
-	# D05 §6.1은 변환을 스킬 데이터 인스턴스로 규정하는데 RACE-01 스킬 슬롯이 전 슬롯 잠금이라
-	# (IMPL-071) 주입할 개입이 존재하지 않는다 — 매트릭스 4행 중 1행은 **미측정**이며 보고 대상이다.
-	_ok("변환 개입 = 엔진 API 부재 (매트릭스 미측정 행)",
-		not probe.has_method("convert_symbol"))
+	# ⑦ 변환 (Convert — 심볼 교체·승급): **측정됐다.** 스킬 소비부(use_skill)가 서면서
+	# 주입할 개입이 생겼다 — TL-5 §8.3 ③ 매트릭스 4행 중 마지막 미측정 행을 여기서 닫는다.
+	#
+	# 이전 판(IMPL-133)은 `has_method("convert_symbol")` 부재로 미측정을 표기했는데,
+	# 그 이름은 **당시의 추측**이었고 실제 진입로는 `use_skill`이라 소비부가 서도 그대로
+	# 통과했을 검사다. 이름 대조를 실측으로 갈아치운다 — 이름의 부재는 기능의 부재가 아니다.
+	_ok("변환 개입 = 엔진 API 실재", probe.has_method("use_skill"))
+	_eq_float("변환 개입 후에도 모멘텀 델타 불변", _momentum_delta("convert"), bonus)
+	# ⑧ 증폭의 비듀얼 절반 (SA1 풀 스로틀) — 부스트와 달리 섹터 턴에서 성립하므로
+	# 모멘텀과 **같은 턴에 공존한다**. 여기가 [가안]의 판정 지점이다:
+	# 모멘텀 보너스까지 곱하면 델타가 1.5배가 되고, 심볼 유래분 전속이면 델타는 불변이다.
+	_eq_float("SA1 증폭 후에도 모멘텀 델타 불변 (심볼 유래분 전속 [가안])",
+		_momentum_delta("amplify"), bonus)
 
 
 # 지정 개입을 넣고 여유 확정 / 즉시 확정의 전방 게이지 차를 낸다.
@@ -1325,6 +1353,14 @@ func _momentum_engine(interrupt: String) -> RaceEngine:
 		"hold_negate":
 			engine.hold_respin([0, 1, 2])   # 전 릴 고정 = 재회전 0 (조합 보존)
 			engine.negate_trouble()
+		"convert":
+			# SC1 노이즈 필터 — 릴 2의 트러블을 라인으로. 난수 소비 0(결정적 치환)이라
+			# 두 주행의 스트림 위치가 어긋나지 않는다.
+			engine.deck = ["skill_sc1"]
+			engine.use_skill("skill_sc1", {"target": 2})
+		"amplify":
+			engine.deck = ["skill_sa1"]
+			engine.use_skill("skill_sa1")
 	return engine
 
 
@@ -2235,3 +2271,759 @@ func _slot_progression_wired() -> void:
 	strict.start_gp()
 	_ok("미등재 GP 슬롯 조회가 is_ok를 내린다", not strict.data.is_ok())
 	strict.transition_errors = 0
+
+# ── 스킬 소비부 (D05 §5.4·§6.1 · D07 §4.2 · D13 별첨A §4.2) ──
+#
+# 원칙 = **표에 적힌 것이 실제로 일어나는가.** 16종을 이름으로 나열하는 대신
+# ⓐ표↔엔진 양방향 대장 ⓑ관문(창·장착·차지·횟수) ⓒ타입별 효과의 실측 결과를 본다.
+# 효과 수치는 기대값도 GameData 경유로 읽어 이중 기입을 만들지 않되,
+# **치환의 귀결**(SC1 +11G 등)은 별첨A 문면과 대조해야 하므로 산식을 재구성한다.
+func _skill_instances() -> void:
+	_skill_effect_ledger()
+	_skill_gates()
+	_skill_hold_family()
+	_skill_convert_family()
+	_skill_amplify_family()
+	_skill_insure_family()
+	_skill_rng_streams()
+	_skill_persistence()
+
+
+# ⓐ 양방향 대장 — 표에 있고 엔진에 없으면 죽은 스킬(눌러도 아무 일이 없다),
+# 엔진에 있고 표에 없으면 죽은 코드다. 한 방향만 보면 둘 중 하나가 남는다.
+func _skill_effect_ledger() -> void:
+	var engine := _new_engine(700)
+	if engine == null:
+		return
+	var table_effects: Array = []
+	for skill_id in engine.data.skills:
+		var effect := String(engine.data.skills[skill_id]["effect"]).strip_edges()
+		_ok("스킬 %s effect 가 엔진 소비 목록에 있다" % skill_id,
+			RaceEngine.SKILL_EFFECT_IDS.has(effect), effect)
+		if not table_effects.has(effect):
+			table_effects.append(effect)
+	for effect in RaceEngine.SKILL_EFFECT_IDS:
+		_ok("엔진 effect '%s' 가 표에 실재한다 (죽은 코드 0)" % effect,
+			table_effects.has(effect))
+	_ok("스킬 16종 (D07 §4.2)", engine.data.skills.size() == 16,
+		"size=%d" % engine.data.skills.size())
+	# 계열 4타입 × 4종 (D05 §6.1 확정) — 한 계열이 통째로 비면 개입 타입 하나가 사문화된다
+	var families := {"hold": 0, "convert": 0, "amplify": 0, "insure": 0}
+	for skill_id in engine.data.skills:
+		var family := String(engine.data.skills[skill_id]["family"])
+		families[family] = int(families.get(family, 0)) + 1
+	for family in families:
+		_ok("계열 %s = 4종" % family, int(families[family]) == 4, str(families[family]))
+
+
+# ⓑ 관문 — 거부는 **상태를 바꾸지 않고** 거부해야 한다. 부분 소비가 남으면 재시도가 손해가 된다.
+func _skill_gates() -> void:
+	var engine := _new_engine(701)
+	if engine == null:
+		return
+	engine.deck_carry_in = ["skill_sa1", "skill_sh4"]
+	engine.start_gp()
+	_ok("덱 반입 = 세션 창구", engine.deck == ["skill_sa1", "skill_sh4"], str(engine.deck))
+	engine.begin_turn()
+	engine.charge = engine.data.param_int("param_charge_cap")
+	# 창 외(T1) 투입 거부 — 릴이 아직 돌지도 않았다
+	var out_of_phase: Dictionary = engine.use_skill("skill_sa1")
+	_ok("창 외 스킬 거부", not bool(out_of_phase.get("ok", false)))
+	_ok("창 외 거부 사유 = phase", String(out_of_phase.get("error", "")) == "phase")
+	engine.spin()
+	# 미장착 거부 — 해금만으로는 못 쓴다 (D07 §4.1 덱 편성이 조건)
+	var not_in_deck: Dictionary = engine.use_skill("skill_si1")
+	_ok("미장착 스킬 거부", String(not_in_deck.get("error", "")) == "deck")
+	# 차지 부족 거부 + 무변경
+	engine.charge = 0
+	var broke: Dictionary = engine.use_skill("skill_sa1")
+	_ok("차지 부족 거부", String(broke.get("error", "")) == "charge")
+	_ok("차지 부족 거부 후 변조 0", engine.skill_mods.is_empty(), str(engine.skill_mods))
+	# 성립 — 비용은 표 값 그대로
+	engine.charge = engine.data.param_int("param_charge_cap")
+	var before := engine.charge
+	var used: Dictionary = engine.use_skill("skill_sa1")
+	_ok("스킬 투입 성립", bool(used.get("ok", false)), str(used))
+	_ok("스킬 비용 = skills.csv charge_cost",
+		before - engine.charge == CsvTable.to_int(String(engine.data.skills["skill_sa1"]["charge_cost"])),
+		"delta=%d" % (before - engine.charge))
+	_ok("사용 계수 +1", int(engine.skill_uses.get("skill_sa1", 0)) == 1)
+	# 중복 투입 거부 — 배수는 누적이 아니라 설정이므로 두 번째는 차지만 태운다
+	var twice := engine.charge
+	var duplicate: Dictionary = engine.use_skill("skill_sa1")
+	_ok("동일 변조 중복 투입 거부", String(duplicate.get("error", "")) == "already")
+	_ok("중복 거부 시 차지 무변경", engine.charge == twice)
+	_ok("중복 거부 시 사용 계수 무변경", int(engine.skill_uses.get("skill_sa1", 0)) == 1)
+	# 투어 상한 — uses_per_tour > 0 인 2종(SH4 2회 · SI4 1회)이 실제로 소진된다
+	var limited := _new_engine(702)
+	limited.deck_carry_in = ["skill_sh4"]
+	limited.start_gp()
+	var limit := CsvTable.to_int(String(limited.data.skills["skill_sh4"]["uses_per_tour"]))
+	_ok("SH4 투어 상한이 표에 실재", limit > 0, "limit=%d" % limit)
+	var granted := 0
+	for attempt in range(limit + 3):
+		limited.begin_turn()
+		limited.spin()
+		limited.charge = limited.data.param_int("param_charge_cap")
+		if bool(limited.use_skill("skill_sh4").get("ok", false)):
+			granted += 1
+		limited.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
+		limited.confirm(0.0)
+	_ok("SH4 투어 상한 = 표 값", granted == limit, "granted=%d limit=%d" % [granted, limit])
+	# 관문 사유를 보려면 창이 열려 있어야 한다 — 직전 confirm 으로 T6 에 있으면
+	# `phase` 가 먼저 답해서 `uses` 가 가려진다(그것도 정상 거동이지만 여기 대상이 아니다).
+	limited.begin_turn()
+	limited.spin()
+	limited.charge = limited.data.param_int("param_charge_cap")
+	_ok("상한 조회 시 창 개방 확인",
+		limited.turn_phase == RaceTypes.TurnPhase.T4_INTERVENTION, str(limited.turn_phase))
+	_ok("상한 소진 후 사유 = uses",
+		String(limited.use_skill_check("skill_sh4").get("error", "")) == "uses")
+	# 조회 창구 — 버튼 활성 판정이 투입 판정과 같은 답을 내는가 (갈라지면 눌리지 않는 버튼이 생긴다)
+	var slots: Array = limited.skill_slots()
+	_ok("skill_slots = 덱 크기", slots.size() == 1, str(slots.size()))
+	var slot: Dictionary = slots[0]
+	_ok("슬롯 잔여 횟수 0 (소진)", int(slot["uses_left"]) == 0, str(slot["uses_left"]))
+	_ok("슬롯 비가용 표기", not bool(slot["usable"]))
+	_ok("슬롯 사유 = 투입 사유와 동일", String(slot["reason"]) == "uses")
+	_ok("슬롯 이름 키 = 표 값", String(slot["name_key"]) == String(limited.data.skills["skill_sh4"]["name_key"]))
+	# 무제한 스킬은 -1 로 구분한다 (0 = 소진과 같은 값을 쓸 수 없다)
+	var free_slot := _new_engine(703)
+	free_slot.deck_carry_in = ["skill_sa1"]
+	free_slot.start_gp()
+	free_slot.begin_turn()
+	free_slot.spin()
+	var open_slots: Array = free_slot.skill_slots()
+	_ok("투어 무제한 스킬 = uses_left -1", int(Dictionary(open_slots[0])["uses_left"]) == -1)
+
+
+# ⓒ-1 홀드 계열 — 재회전 총량 가드가 이 계열의 핵심 구속이다 (D07 §4.2).
+func _skill_hold_family() -> void:
+	# SH1 프리시전 홀드 — 재회전에서 트러블이 나오지 않는다 (별첨A §4.2 "0.18 → 0")
+	var trouble_seen := 0
+	var rerolled := 0
+	for seed_value in range(60):
+		var engine := _new_engine(800 + seed_value, "", false)
+		if engine == null:
+			return
+		engine.deck_carry_in = ["skill_sh1"]
+		engine.start_gp()
+		engine.begin_turn()
+		engine.spin()
+		engine.charge = engine.data.param_int("param_charge_cap")
+		engine.provisional = [RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_LINE]
+		if not bool(engine.use_skill("skill_sh1", {"keep": [0, 1]}).get("ok", false)):
+			continue
+		rerolled += 1
+		if String(engine.get_provisional()[2]) == RaceTypes.SYMBOL_TROUBLE:
+			trouble_seen += 1
+	_ok("SH1 재회전 표본 확보", rerolled == 60, "rerolled=%d" % rerolled)
+	_ok("SH1 재회전 트러블 0 (60회)", trouble_seen == 0, "trouble=%d" % trouble_seen)
+	# 대조군 — 같은 시드로 기본 홀드를 돌리면 트러블이 나온다. 나오지 않으면 위 검사는
+	# "제외가 작동함"이 아니라 "원래 안 나옴"을 본 것이 되어 아무것도 증명하지 못한다.
+	var control := 0
+	for seed_value in range(60):
+		var engine := _new_engine(800 + seed_value, "", false)
+		engine.start_gp()
+		engine.begin_turn()
+		engine.spin()
+		engine.charge = engine.data.param_int("param_charge_cap")
+		engine.provisional = [RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_LINE]
+		engine.hold_respin([0, 1])
+		if String(engine.get_provisional()[2]) == RaceTypes.SYMBOL_TROUBLE:
+			control += 1
+	_ok("대조군 기본 홀드는 트러블이 나온다", control > 0, "control=%d" % control)
+	# SH1 은 고정 2릴 강제 — 1릴만 고정하면 거부 (별첨A "릴 2 고정 + 1릴 재회전")
+	var strict := _new_engine(860)
+	strict.deck_carry_in = ["skill_sh1"]
+	strict.start_gp()
+	strict.begin_turn()
+	strict.spin()
+	strict.charge = strict.data.param_int("param_charge_cap")
+	_ok("SH1 고정 1릴 거부", String(strict.use_skill("skill_sh1", {"keep": [0]}).get("error", "")) == "keep")
+	_ok("SH1 고정 3릴 거부", String(strict.use_skill("skill_sh1", {"keep": [0, 1, 2]}).get("error", "")) == "keep")
+	_ok("SH1 릴 인덱스 범위 밖 거부",
+		String(strict.use_skill("skill_sh1", {"keep": [0, 5]}).get("error", "")) == "keep")
+	_ok("SH1 거부 후 차지 무변경", strict.charge == strict.data.param_int("param_charge_cap"))
+	# SH2 풀 스윕 — 3릴 전체 재회전 (고정 0)
+	var sweep := _new_engine(861)
+	sweep.deck_carry_in = ["skill_sh2"]
+	sweep.start_gp()
+	sweep.begin_turn()
+	sweep.spin()
+	sweep.charge = sweep.data.param_int("param_charge_cap")
+	sweep.provisional = ["", "", ""]
+	_ok("SH2 성립", bool(sweep.use_skill("skill_sh2").get("ok", false)))
+	var swept := 0
+	for symbol in sweep.get_provisional():
+		if String(symbol) != "":
+			swept += 1
+	_ok("SH2 3릴 전량 재회전", swept == 3, "swept=%d" % swept)
+	# 홀드 계열 총량 가드 — 기본 홀드 + 스킬 홀드 합산 상한 (D13 창구 값)
+	var cap := _new_engine(862)
+	cap.deck_carry_in = ["skill_sh2", "skill_sh1"]
+	cap.start_gp()
+	cap.begin_turn()
+	cap.spin()
+	cap.charge = 99
+	var respin_cap := cap.data.param_int("param_hold_total_cap_per_turn")
+	# 값의 창구 = `param_hold_total_cap_per_turn` (D07 §4.2 · 별첨A §4.2 "합산 턴당 2회 상한").
+	# 이 키는 오래 전에 전사돼 있었고 **소비부가 0이었다** — 새 키를 만들면 값이 두 곳에 산다.
+	_ok("총량 상한 = D13 창구 (기전사 키)", respin_cap == 2, "cap=%d" % respin_cap)
+	_ok("재회전 1회차 성립", bool(cap.use_skill("skill_sh2").get("ok", false)))
+	_ok("재회전 2회차 성립", bool(cap.use_skill("skill_sh1", {"keep": [0, 1]}).get("ok", false)))
+	_ok("재회전 3회차 거부 (총량 상한)",
+		String(cap.use_skill("skill_sh2").get("error", "")) == "respin_cap")
+	_ok("상한 소진 후 **기본 홀드도** 거부",
+		String(cap.hold_respin([0]).get("error", "")) == "respin_cap")
+	# SH4 웜업 스핀 — 기본 홀드 비용 0 (별첨A "1 → 0")
+	var warm := _new_engine(863)
+	warm.deck_carry_in = ["skill_sh4"]
+	warm.start_gp()
+	warm.begin_turn()
+	warm.spin()
+	warm.charge = 5
+	_ok("SH4 성립", bool(warm.use_skill("skill_sh4").get("ok", false)))
+	_ok("SH4 자체 비용 0",
+		warm.charge == 5 - CsvTable.to_int(String(warm.data.skills["skill_sh4"]["charge_cost"])))
+	var warm_before := warm.charge
+	_ok("SH4 후 기본 홀드 성립", bool(warm.hold_respin([0, 1]).get("ok", false)))
+	_ok("SH4 후 기본 홀드 비용 0", warm.charge == warm_before, "charge=%d" % warm.charge)
+	_ok("SH4 는 홀드를 이미 쓴 뒤에는 거부",
+		String(warm.use_skill_check("skill_sh4").get("error", "")) == "already")
+	# 대조군 — SH4 없이는 기본 홀드가 유상이다
+	var paid := _new_engine(864)
+	paid.start_gp()
+	paid.begin_turn()
+	paid.spin()
+	paid.charge = 5
+	paid.hold_respin([0, 1])
+	_ok("대조군 기본 홀드는 유상",
+		paid.charge == 5 - paid.data.param_int("param_charge_hold_cost"), "charge=%d" % paid.charge)
+	# SH3 스냅샷 — 신·구 택1
+	var snap := _new_engine(865)
+	snap.deck_carry_in = ["skill_sh3"]
+	snap.start_gp()
+	snap.begin_turn()
+	snap.spin()
+	snap.charge = snap.data.param_int("param_charge_cap")
+	snap.provisional = [RaceTypes.SYMBOL_CHANCE, RaceTypes.SYMBOL_CHANCE, RaceTypes.SYMBOL_CHANCE]
+	var original: Array = snap.get_provisional()
+	_ok("SH3 택1 전 스냅샷 없음", snap.snapshot_previous.is_empty())
+	_ok("SH3 성립", bool(snap.use_skill("skill_sh3", {"keep": [0]}).get("ok", false)))
+	_ok("SH3 구 후보 보존", snap.snapshot_previous == original, str(snap.snapshot_previous))
+	_ok("SH3 구 후보 복귀 성립", bool(snap.choose_snapshot(false).get("ok", false)))
+	_ok("SH3 복귀 후 잠정 = 구 후보", snap.get_provisional() == original, str(snap.get_provisional()))
+	_ok("SH3 택1 소진 후 재선택 거부",
+		String(snap.choose_snapshot(false).get("error", "")) == "no_snapshot")
+	# 신 후보 유지 경로
+	var snap2 := _new_engine(866)
+	snap2.deck_carry_in = ["skill_sh3"]
+	snap2.start_gp()
+	snap2.begin_turn()
+	snap2.spin()
+	snap2.charge = snap2.data.param_int("param_charge_cap")
+	snap2.provisional = [RaceTypes.SYMBOL_CHANCE, RaceTypes.SYMBOL_CHANCE, RaceTypes.SYMBOL_CHANCE]
+	snap2.use_skill("skill_sh3", {"keep": [0]})
+	var fresh: Array = snap2.get_provisional()
+	snap2.choose_snapshot(true)
+	_ok("SH3 신 후보 유지", snap2.get_provisional() == fresh)
+	_ok("SH3 유지 후 스냅샷 비움", snap2.snapshot_previous.is_empty())
+
+
+# ⓒ-2 변환 계열 — 치환의 **귀결**이 별첨A 표기와 맞는가까지 본다.
+func _skill_convert_family() -> void:
+	var engine := _new_engine(900)
+	if engine == null:
+		return
+	engine.deck_carry_in = ["skill_sc1", "skill_sc2", "skill_sc3", "skill_sc4"]
+	engine.start_gp()
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = 99
+	engine.provisional = [RaceTypes.SYMBOL_TROUBLE, RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_BRAKING]
+	# 대상 심볼이 아니면 거부 (무효과 투입 방지)
+	_ok("SC1 대상 심볼 아님 거부",
+		String(engine.use_skill("skill_sc1", {"target": 1}).get("error", "")) == "symbol")
+	_ok("SC1 릴 지정 없음 거부",
+		String(engine.use_skill("skill_sc1").get("error", "")) == "target")
+	_ok("SC1 성립", bool(engine.use_skill("skill_sc1", {"target": 0}).get("ok", false)))
+	_ok("SC1 트러블 → 라인", String(engine.get_provisional()[0]) == RaceTypes.SYMBOL_LINE)
+	# SC4 라인 → 슬립스트림
+	_ok("SC4 성립", bool(engine.use_skill("skill_sc4", {"target": 1}).get("ok", false)))
+	_ok("SC4 라인 → 슬립스트림",
+		String(engine.get_provisional()[1]) == RaceTypes.SYMBOL_SLIPSTREAM)
+	# SC3 복제 — 인접 강제
+	_ok("SC3 비인접 거부",
+		String(engine.use_skill("skill_sc3", {"target": 2, "donor": 0}).get("error", "")) == "adjacent")
+	_ok("SC3 성립", bool(engine.use_skill("skill_sc3", {"target": 2, "donor": 1}).get("ok", false)))
+	_ok("SC3 인접 심볼 복제",
+		String(engine.get_provisional()[2]) == String(engine.get_provisional()[1]))
+	_ok("SC3 이미 동일하면 거부",
+		String(engine.use_skill("skill_sc3", {"target": 2, "donor": 1}).get("error", "")) == "same")
+	# 귀결 실측 ①: SC1 = 트러블 1 → 라인 1 이 전방 게이지에 별첨A "+11 G"를 남긴다.
+	# 기대값은 표에서 읽되 **차분**을 본다 — 치환 전후를 같은 시드로 돌려 비교한다.
+	var with_convert := _convert_outcome(910, true)
+	var without := _convert_outcome(910, false)
+	var line_front := CsvTable.to_float(String(_match_row(engine, RaceTypes.SYMBOL_LINE, 1)["front_gauge"]))
+	# 별첨A 의 "+11 G" 는 계수 1 기준 표기다 — 실제 가산은 섹터 속성·최종 랩 계수를 탄다.
+	# 계수를 기대값에 곱하지 않으면 이 검사는 계수가 1인 섹터에서만 우연히 맞는다.
+	_eq_float("SC1 귀결 = 라인 1매치 전방 게이지 (별첨A +11 G)",
+		float(with_convert["front"]) - float(without["front"]),
+		line_front * float(with_convert["gauge_mult"]))
+	_ok("SC1 후 섀시 소모가 줄어든다 (트러블이 사라졌으므로)",
+		float(with_convert["chassis"]) > float(without["chassis"]),
+		"with=%f without=%f" % [with_convert["chassis"], without["chassis"]])
+	# 귀결 실측 ②: SC2 = 트러블 1 → 펄스 1 이 차지 +1 을 남긴다 (별첨A "차지 +1")
+	var pulse_charge := CsvTable.to_int(String(_match_row(engine, RaceTypes.SYMBOL_PULSE, 1)["charge"]))
+	var stable_gain := engine.data.param_int("param_charge_stable_sector")
+	var sc2 := _convert_outcome(911, true, "skill_sc2")
+	var sc2_off := _convert_outcome(911, false, "skill_sc2")
+	# 별첨A 는 "차지 +1"만 적지만 실제 귀결은 **둘**이다: 유일한 트러블이 사라지므로
+	# 그 섹터가 안정 완주가 되어 +1 이 더 붙는다(정산 ②). 표기가 절반만 말한 것이 아니라
+	# 표기는 스킬 효과를, 나머지 절반은 정산 규칙을 말한다 — 둘 다 못박아야 한쪽이 죽어도 잡힌다.
+	_ok("SC2 귀결 = 펄스 1매치 차지 + 안정 완주 (별첨A +1 · 정산 ② +1)",
+		int(sc2["charge"]) - int(sc2_off["charge"]) == pulse_charge + stable_gain,
+		"delta=%d expected=%d" % [int(sc2["charge"]) - int(sc2_off["charge"]),
+			pulse_charge + stable_gain])
+	# 차지 개입과의 대장 정합 — 무효화 적립분이 잔존 트러블보다 많아지지 않는다
+	var ledger := _new_engine(912)
+	ledger.deck_carry_in = ["skill_sc1"]
+	ledger.start_gp()
+	ledger.begin_turn()
+	ledger.spin()
+	ledger.charge = 99
+	ledger.provisional = [RaceTypes.SYMBOL_TROUBLE, RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_LINE]
+	ledger.negate_trouble()
+	_ok("차지 개입 적립 1", ledger.negated_troubles == 1)
+	ledger.use_skill("skill_sc1", {"target": 0})
+	_ok("변환으로 트러블 소멸 시 적립분 절단", ledger.negated_troubles == 0,
+		"negated=%d" % ledger.negated_troubles)
+
+
+# 같은 시드에서 SC 스킬 투입 유무만 갈라 정산 결과를 낸다.
+#
+# **차지를 상한 근처에 두지 않는다.** `_gain_charge` 는 보유 상한(10)으로 절단하므로
+# 넉넉히 채워 두면 생산분이 전부 절단에 먹혀 차분이 −잔액이 된다(초판이 그랬다).
+# 비용만큼만 주어 지불 후 0에서 출발시킨다 — 생산 차분이 그대로 보인다.
+# 인접 상대도 지운다: 앞차 저항이 게이지를 음수로 밀면 하한 절단이 차분을 왜곡한다.
+func _convert_outcome(seed_value: int, apply: bool, skill_id := "skill_sc1") -> Dictionary:
+	var engine := _new_engine(seed_value, "", false)
+	if engine == null:
+		return {}
+	engine.deck_carry_in = [skill_id]
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	_isolate_gauge_side(engine, "front")
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = CsvTable.to_int(String(engine.data.skills[skill_id]["charge_cost"]))
+	# 게이지 기저값 — 0 에서 출발하면 앞차 저항이 음수로 밀어 하한 절단(0)에 먹히고,
+	# 절단된 두 값의 차분은 효과가 아니라 절단폭이 된다.
+	# **상대는 지우지 않는다**: 지우면 정산 끝 `_retarget_if_changed` 가 "상대가 바뀌었다"로
+	# 판정해 게이지를 0 으로 되돌린다(초판이 그랬다 — 측정을 지운 셈이다).
+	# 두 주행의 시드·심볼이 같으므로 패시브 기여는 동일하고 차분에서 상쇄된다.
+	engine.front_gauge = GAUGE_PROBE_BASE
+	engine.rear_gauge = GAUGE_PROBE_BASE
+	engine.provisional = [RaceTypes.SYMBOL_TROUBLE, RaceTypes.SYMBOL_BRAKING, RaceTypes.SYMBOL_BRAKING]
+	if apply:
+		engine.use_skill(skill_id, {"target": 0})
+	var charge_before := engine.charge
+	var gauge_mult := engine._gauge_mult()
+	engine.confirm(0.0)
+	return {"front": engine.front_gauge, "chassis": engine.chassis,
+		"charge": engine.charge - charge_before, "rear": engine.rear_gauge,
+		"gauge_mult": gauge_mult}
+
+
+# `match_effects` 는 `symbol_id -> {match_count -> 행}` 2단 딕셔너리다.
+# 초판은 이것을 행 배열로 다뤄 `row["symbol_id"]` 에서 죽었고, GDScript 는 그 자리에서
+# **호출 프레임을 통째로 중단**한다 — 뒤따르는 검사들이 실행되지 않은 채 스위트가 통과했다.
+# (검사 수 하한은 이것을 못 잡는다: 하한을 이미 쪼그라든 값으로 세웠기 때문이다.)
+func _match_row(engine: RaceEngine, symbol_id: String, count: int) -> Dictionary:
+	var by_count: Dictionary = engine.data.match_effects.get(symbol_id, {})
+	if not by_count.has(count):
+		_ok("매치 효과 행 실재 %s×%d" % [symbol_id, count], false)
+		return {}
+	return by_count[count]
+
+
+# ⓒ-3 증폭 계열 — 배수·대체가 정확히 그 항에만 걸리는가.
+func _skill_amplify_family() -> void:
+	var engine := _new_engine(920)
+	if engine == null:
+		return
+	# SA1 전진 효과 배수 — 슬립스트림 3매치를 고정해 차분을 본다
+	var mult := engine.data.param("param_skill_advance_mult")
+	_eq_float("SA1 배수 = D13 별첨A §4.2 (×1.5)", mult, 1.5)
+	# 1매치를 쓴다 — 3매치(95)에 배수를 곱하면 게이지 상한 100 에 절단돼
+	# "×1.5 가 걸렸는지"가 아니라 "절단됐는지"를 보게 된다.
+	var on := _amplify_outcome(921, "skill_sa1", _combo(RaceTypes.SYMBOL_SLIPSTREAM, 1, ""))
+	var off := _amplify_outcome(921, "", _combo(RaceTypes.SYMBOL_SLIPSTREAM, 1, ""))
+	var slip_front := CsvTable.to_float(String(_match_row(engine, RaceTypes.SYMBOL_SLIPSTREAM, 1)["front_gauge"]))
+	# 배수의 순증분만 본다 — 패시브·기저값은 두 주행이 같으므로 차분에서 사라진다.
+	_eq_float("SA1 전진 효과 ×배수 (증분 = 심볼값 × 계수 × (배수−1))",
+		float(on["front"]) - float(off["front"]),
+		slip_front * float(on["gauge_mult"]) * (mult - 1.0))
+	_ok("SA1 대조군 전진 실재", float(off["front"]) > GAUGE_PROBE_BASE, str(off["front"]))
+	# SA2 펄스 생산 배수 — 안정 완주 +1 은 곱하지 않는다 (별첨A 문면 "펄스 심볼의 생산")
+	var pulse_mult := engine.data.param("param_skill_pulse_mult")
+	_eq_float("SA2 배수 = D13 별첨A §4.2 (×2)", pulse_mult, 2.0)
+	var pulse_on := _amplify_outcome(922, "skill_sa2", _combo(RaceTypes.SYMBOL_PULSE, 3, ""))
+	var pulse_off := _amplify_outcome(922, "", _combo(RaceTypes.SYMBOL_PULSE, 3, ""))
+	var stable := engine.data.param_int("param_charge_stable_sector")
+	var symbol_charge := CsvTable.to_int(String(_match_row(engine, RaceTypes.SYMBOL_PULSE, 3)["charge"]))
+	_ok("SA2 미투입 차지 = 심볼 + 안정 완주",
+		int(pulse_off["charge"]) == symbol_charge + stable,
+		"charge=%d" % int(pulse_off["charge"]))
+	_ok("SA2 투입 차지 = 심볼×배수 + 안정 완주 (안정분 무배수)",
+		int(pulse_on["charge"]) == int(round(symbol_charge * pulse_mult)) + stable,
+		"charge=%d expected=%d" % [int(pulse_on["charge"]),
+			int(round(symbol_charge * pulse_mult)) + stable])
+	# SA3 방어 효과 배수 (섹터 턴 절반)
+	var defense_mult := engine.data.param("param_skill_defense_mult")
+	_eq_float("SA3 방어 배수 = D13 별첨A §4.2 (×1.5)", defense_mult, 1.5)
+	var def_on := _amplify_outcome(923, "skill_sa3", _combo(RaceTypes.SYMBOL_BRAKING, 1, ""), "rear")
+	var def_off := _amplify_outcome(923, "", _combo(RaceTypes.SYMBOL_BRAKING, 1, ""), "rear")
+	var braking_rear := CsvTable.to_float(String(_match_row(engine, RaceTypes.SYMBOL_BRAKING, 1)["rear_gauge"]))
+	_ok("SA3 대조군 방어 감소 실재", float(def_off["rear_drop"]) > 0.0, str(def_off["rear_drop"]))
+	_ok("SA3 방어 효과가 후방 게이지를 더 깎는다",
+		float(def_on["rear_drop"]) > float(def_off["rear_drop"]),
+		"on=%f off=%f" % [def_on["rear_drop"], def_off["rear_drop"]])
+	_eq_float("SA3 방어 효과 ×배수 (증분 = |심볼값| × 계수 × (배수−1))",
+		float(def_on["rear_drop"]) - float(def_off["rear_drop"]),
+		absf(braking_rear) * float(def_on["gauge_mult"]) * (defense_mult - 1.0))
+	# SA3 은 섹터 턴에서 듀얼 가산을 세우지 않는다 — 두 절반이 섞이면 배수가 두 번 붙는다
+	_ok("SA3 섹터 턴 = 방어 배수만", not def_on["mods"].has(RaceEngine.MOD_DEFENSE_DUEL_ADD))
+	# SA3·SA4 듀얼 절반 — 판정치 차분
+	var duel_add := engine.data.param("param_skill_defense_duel_add")
+	_eq_float("SA3 듀얼 가산 = D13 별첨A §4.2 (+12)", duel_add, 12.0)
+	var base_defense := _duel_judgment_probe(930, RaceTypes.DuelType.DEFENSE, "")
+	var with_sa3 := _duel_judgment_probe(930, RaceTypes.DuelType.DEFENSE, "skill_sa3")
+	_eq_float("SA3 방어 듀얼 판정 +가산", with_sa3 - base_defense, duel_add)
+	# 추월 듀얼에는 붙지 않는다 (별첨A "방어 듀얼 판정")
+	var base_overtake := _duel_judgment_probe(931, RaceTypes.DuelType.OVERTAKE, "")
+	var overtake_sa3 := _duel_judgment_probe(931, RaceTypes.DuelType.OVERTAKE, "skill_sa3")
+	_eq_float("SA3 가산은 추월 듀얼에 붙지 않는다", overtake_sa3, base_overtake)
+	# SA4 오버토크 — 차지당 보정 **대체** (가산이면 10+16=26 이 된다)
+	var boost_base := engine.data.param("param_charge_boost_per_judgment")
+	var boost_over := engine.data.param("param_skill_boost_per_judgment")
+	_eq_float("SA4 보정 = D13 별첨A §4.2 (16)", boost_over, 16.0)
+	var no_boost := _duel_judgment_probe(932, RaceTypes.DuelType.OVERTAKE, "", 0)
+	var boosted := _duel_judgment_probe(932, RaceTypes.DuelType.OVERTAKE, "", 2)
+	_eq_float("부스트 2차지 = 기본 보정 ×2", boosted - no_boost, boost_base * 2.0)
+	var overtorque := _duel_judgment_probe(932, RaceTypes.DuelType.OVERTAKE, "skill_sa4", 2)
+	_eq_float("SA4 부스트 2차지 = 대체 보정 ×2 (가산 아님)",
+		overtorque - no_boost, boost_over * 2.0)
+	# 턴 종류 관문 — 도달 불가한 투입은 차지를 태우지 않는다
+	var sector := _new_engine(933)
+	sector.deck_carry_in = ["skill_sa4", "skill_si1", "skill_sa1"]
+	sector.start_gp()
+	sector.begin_turn()
+	sector.spin()
+	sector.charge = 99
+	_ok("SA4 섹터 턴 거부", String(sector.use_skill("skill_sa4").get("error", "")) == "sector_turn")
+	_ok("SI1 섹터 턴 거부", String(sector.use_skill("skill_si1").get("error", "")) == "sector_turn")
+	var duel_turn := _new_engine(934)
+	duel_turn.deck_carry_in = ["skill_sa1", "skill_si2", "skill_si3", "skill_sa2"]
+	duel_turn.start_gp()
+	_flatten_neighbors(duel_turn)
+	_force_duel(duel_turn, RaceTypes.DuelType.OVERTAKE)
+	duel_turn.begin_turn()
+	duel_turn.spin()
+	duel_turn.charge = 99
+	for blocked in ["skill_sa1", "skill_sa2", "skill_si2", "skill_si3"]:
+		_ok("%s 듀얼 턴 거부 (정산 ①~⑤ 미적용)" % blocked,
+			String(duel_turn.use_skill(blocked).get("error", "")) == "duel_turn")
+	_ok("듀얼 턴 거부 후 차지 무변경", duel_turn.charge == 99)
+
+
+# rear_start — 방어 효과는 후방 게이지 **감산**이라 0 에서 출발하면 하한 절단(0)에 먹혀
+# 배수가 보이지 않는다. 깎을 잔량을 주고 **감소량**을 재는 것이 유일하게 관측 가능한 형태다.
+# 차지도 상한 근처에 두지 않는다 (_convert_outcome 주석 참조).
+func _amplify_outcome(seed_value: int, skill_id: String, symbols: Array,
+		side := "front", rear_start := GAUGE_PROBE_BASE) -> Dictionary:
+	var engine := _new_engine(seed_value, "", false)
+	if engine == null:
+		return {}
+	if not skill_id.is_empty():
+		engine.deck_carry_in = [skill_id]
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	_isolate_gauge_side(engine, side)
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = 0 if skill_id.is_empty() \
+		else CsvTable.to_int(String(engine.data.skills[skill_id]["charge_cost"]))
+	engine.front_gauge = GAUGE_PROBE_BASE
+	engine.rear_gauge = rear_start
+	engine.provisional = symbols.duplicate()
+	if not skill_id.is_empty():
+		engine.use_skill(skill_id)
+	var mods: Dictionary = engine.skill_mods.duplicate()
+	var charge_before := engine.charge
+	var gauge_mult := engine._gauge_mult()
+	engine.confirm(0.0)
+	return {"front": engine.front_gauge, "rear_drop": rear_start - engine.rear_gauge,
+		"charge": engine.charge - charge_before, "mods": mods, "gauge_mult": gauge_mult}
+
+
+# 듀얼 판정치만 뽑는다 — 임계·승패가 아니라 판정치 자체가 대상이다.
+func _duel_judgment_probe(seed_value: int, duel_type: int, skill_id: String, boost := 0) -> float:
+	var engine := _new_engine(seed_value, "", false)
+	if engine == null:
+		return 0.0
+	if not skill_id.is_empty():
+		engine.deck_carry_in = [skill_id]
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	_force_duel(engine, duel_type)
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = 99
+	engine.provisional = [RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_LINE]
+	if not skill_id.is_empty():
+		engine.use_skill(skill_id)
+	for i in range(boost):
+		engine.add_duel_boost()
+	return engine._duel_judgment(duel_type)
+
+
+# ⓒ-4 보험 계열 — 무효화가 **그 항만** 무효화하는가 (상보 설계가 무너지면 둘이 같아진다).
+func _skill_insure_family() -> void:
+	var engine := _new_engine(940)
+	if engine == null:
+		return
+	var plain := _insure_outcome(941, "")
+	var si2 := _insure_outcome(941, "skill_si2")
+	var si3 := _insure_outcome(941, "skill_si3")
+	_ok("대조군 트러블이 섀시를 깎는다", float(plain["chassis_delta"]) < 0.0,
+		str(plain["chassis_delta"]))
+	_ok("대조군 트러블이 후방 게이지를 올린다", float(plain["rear"]) > 0.0, str(plain["rear"]))
+	# SI2 = 섀시 0 · 후방 유지
+	_eq_float("SI2 섀시 소모 0", float(si2["chassis_delta"]), 0.0)
+	_eq_float("SI2 후방 게이지 가산 유지", float(si2["rear"]), float(plain["rear"]))
+	# SI3 = 후방 0 · 섀시 유지 (SI2 와 상보)
+	_eq_float("SI3 후방 게이지 가산 0", float(si3["rear"]), 0.0)
+	_eq_float("SI3 섀시 소모 유지", float(si3["chassis_delta"]), float(plain["chassis_delta"]))
+	# SI2 는 소모품 실드를 소비하지 않는다 — 깎을 것이 없는데 보험을 태우면 다음 트러블이 맨몸이다
+	var shield := _new_engine(942)
+	shield.deck_carry_in = ["skill_si2"]
+	shield.start_gp()
+	_flatten_neighbors(shield)
+	shield.trouble_shield_charges = 1
+	shield.begin_turn()
+	shield.spin()
+	shield.charge = 99
+	shield.provisional = [RaceTypes.SYMBOL_TROUBLE, RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_LINE]
+	shield.use_skill("skill_si2")
+	shield.confirm(0.0)
+	_ok("SI2 는 소모품 실드를 태우지 않는다", shield.trouble_shield_charges == 1,
+		"charges=%d" % shield.trouble_shield_charges)
+	# SI4 서바이벌 셀 — 섀시 최저 잔존 + 리타이어 회피
+	var floor_value := engine.data.param("param_skill_chassis_floor")
+	_eq_float("SI4 최저 = D13 별첨A §4.2 (1)", floor_value, 1.0)
+	var doomed := _survival_outcome(943, "")
+	var saved := _survival_outcome(943, "skill_si4")
+	_ok("대조군은 리타이어한다", bool(doomed["finished"]), str(doomed))
+	_ok("SI4 는 리타이어를 막는다", not bool(saved["finished"]), str(saved))
+	_eq_float("SI4 잔존 섀시 = 최저값", float(saved["chassis"]), floor_value)
+	# **섀시를 깎는 경로는 둘이다** — 단계 ①(트러블)과 단계 ⑥(듀얼 패배).
+	# 트러블 경로만 보면 최저값 적용을 단계 ① 안으로 옮겨도 통과하고,
+	# 그러면 듀얼 패배로는 여전히 바닥을 뚫는다. 두 경로를 각각 본다.
+	var duel_doom := _survival_duel_outcome(946, "")
+	var duel_save := _survival_duel_outcome(946, "skill_si4")
+	_ok("대조군 듀얼 패배로 리타이어", bool(duel_doom["finished"]), str(duel_doom))
+	_ok("SI4 는 듀얼 패배 리타이어도 막는다", not bool(duel_save["finished"]), str(duel_save))
+	_eq_float("SI4 듀얼 경로 잔존 섀시 = 최저값", float(duel_save["chassis"]), floor_value)
+	# SI1 임팩트 가드 — 듀얼 패배 페널티 면제 (추월 = 섀시 / 방어 = 피추월)
+	var lose_plain := _duel_loss_outcome(944, RaceTypes.DuelType.OVERTAKE, "")
+	var lose_guard := _duel_loss_outcome(944, RaceTypes.DuelType.OVERTAKE, "skill_si1")
+	_ok("대조군 추월 패배 = 섀시 감소", float(lose_plain["chassis_delta"]) < 0.0,
+		str(lose_plain["chassis_delta"]))
+	_eq_float("SI1 추월 패배 섀시 페널티 면제", float(lose_guard["chassis_delta"]), 0.0)
+	var def_plain := _duel_loss_outcome(945, RaceTypes.DuelType.DEFENSE, "")
+	var def_guard := _duel_loss_outcome(945, RaceTypes.DuelType.DEFENSE, "skill_si1")
+	_ok("대조군 방어 패배 = 순위 하락", int(def_plain["rank_delta"]) > 0,
+		str(def_plain["rank_delta"]))
+	_ok("SI1 방어 패배 피추월 무효", int(def_guard["rank_delta"]) == 0,
+		str(def_guard["rank_delta"]))
+	# 면제 시 잘못된 문면을 발행하지 않는다 — 기존 패배 3키는 일어나지 않은 일을 말한다.
+	# 대조군이 그 키를 실제로 발행함을 먼저 확인한다(발행 자체가 없으면 미발행은 무의미하다).
+	_ok("대조군 추월 패배가 감소 문면을 발행",
+		Array(lose_plain["keys"]).has("raceLog.duelLoseOvertake01"), str(lose_plain["keys"]))
+	_ok("대조군 방어 패배가 피추월 문면을 발행",
+		Array(def_plain["keys"]).has("raceLog.defendFail01"), str(def_plain["keys"]))
+	_ok("SI1 추월 면제 시 감소 문면 미발행",
+		not Array(lose_guard["keys"]).has("raceLog.duelLoseOvertake01"))
+	_ok("SI1 방어 면제 시 피추월 문면 미발행",
+		not Array(def_guard["keys"]).has("raceLog.defendFail01"))
+
+
+func _insure_outcome(seed_value: int, skill_id: String) -> Dictionary:
+	var engine := _new_engine(seed_value, "", false)
+	if engine == null:
+		return {}
+	if not skill_id.is_empty():
+		engine.deck_carry_in = [skill_id]
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	_isolate_gauge_side(engine, "rear")   # 뒤차 압박·이웃 교체가 후방 게이지 측정을 먹지 않게
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = 0 if skill_id.is_empty() \
+		else CsvTable.to_int(String(engine.data.skills[skill_id]["charge_cost"]))
+	engine.rear_gauge = GAUGE_PROBE_BASE
+	engine.provisional = [RaceTypes.SYMBOL_TROUBLE, RaceTypes.SYMBOL_CHANCE, RaceTypes.SYMBOL_PULSE]
+	if not skill_id.is_empty():
+		engine.use_skill(skill_id)
+	var chassis_before := engine.chassis
+	engine.confirm(0.0)
+	return {"chassis_delta": engine.chassis - chassis_before,
+		"rear": engine.rear_gauge - GAUGE_PROBE_BASE}
+
+
+func _survival_outcome(seed_value: int, skill_id: String) -> Dictionary:
+	var engine := _new_engine(seed_value, "", false)
+	if engine == null:
+		return {}
+	if not skill_id.is_empty():
+		engine.deck_carry_in = [skill_id]
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = 99
+	engine.chassis = 3.0   # 트러블 3매치(−24)로 확실히 바닥을 뚫는 자리
+	engine.provisional = _combo(RaceTypes.SYMBOL_TROUBLE, 3, RaceTypes.SYMBOL_TROUBLE)
+	if not skill_id.is_empty():
+		engine.use_skill(skill_id)
+	engine.confirm(0.0)
+	return {"chassis": engine.chassis, "finished": engine.finished}
+
+
+# SI4 의 두 번째 경로 — 듀얼 패배 섀시 페널티로 바닥을 뚫는다 (단계 ⑥).
+func _survival_duel_outcome(seed_value: int, skill_id: String) -> Dictionary:
+	var engine := _new_engine(seed_value, "", false)
+	if engine == null:
+		return {}
+	if not skill_id.is_empty():
+		engine.deck_carry_in = [skill_id]
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	_force_duel(engine, RaceTypes.DuelType.OVERTAKE)
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = 99
+	engine.chassis = 1.0   # 패널티 −5 로 확실히 바닥을 뚫는 자리
+	engine.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
+	if not skill_id.is_empty():
+		engine.use_skill(skill_id)
+	engine.confirm(0.0)
+	return {"chassis": engine.chassis, "finished": engine.finished}
+
+
+func _duel_loss_outcome(seed_value: int, duel_type: int, skill_id: String) -> Dictionary:
+	var engine := _new_engine(seed_value, "", false)
+	if engine == null:
+		return {}
+	if not skill_id.is_empty():
+		engine.deck_carry_in = [skill_id]
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	_force_duel(engine, duel_type)
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = 99
+	# 판정치 0 = 확정 패배 (임계는 어떤 상대든 양수다)
+	engine.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
+	if not skill_id.is_empty():
+		engine.use_skill(skill_id)
+	var chassis_before := engine.chassis
+	var rank_before := engine.player_position()
+	var keys: Array = []
+	for event in engine.confirm(0.0):
+		keys.append(String(event.get("key", "")))
+	return {"chassis_delta": engine.chassis - chassis_before,
+		"rank_delta": engine.player_position() - rank_before, "keys": keys}
+
+
+# ⓒ-5 RNG 스트림 소속 (D12 §6) — 스킬 재회전은 기존 관례를 승계하며 신설 스트림이 없다.
+# 홀드 계열만 난수를 쓰고, 변환·증폭·보험은 결정적이다. 스트림을 잘못 쓰면 세이브·재현이
+# 어긋나는데 그 어긋남은 결과가 달라진 뒤에야 보이므로 소비 자체를 상태로 본다.
+func _skill_rng_streams() -> void:
+	for skill_id in ["skill_sh2", "skill_sc1", "skill_sa1", "skill_si2"]:
+		var engine := _new_engine(960, "", false)
+		engine.deck_carry_in = [skill_id]
+		engine.start_gp()
+		engine.begin_turn()
+		engine.spin()
+		engine.charge = 99
+		engine.provisional = [RaceTypes.SYMBOL_TROUBLE, RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_LINE]
+		var before: Dictionary = engine.rng.serialize()["streams"]
+		var outcome: Dictionary = engine.use_skill(skill_id, {"target": 0})
+		_ok("RNG 축: %s 투입 성립" % skill_id, bool(outcome.get("ok", false)), str(outcome))
+		var after: Dictionary = engine.rng.serialize()["streams"]
+		var moved: Array = []
+		for stream_name in after:
+			if String(Dictionary(after[stream_name])["state"]) != String(Dictionary(before[stream_name])["state"]):
+				moved.append(stream_name)
+		var family := String(engine.data.skills[skill_id]["family"])
+		if family == "hold":
+			_ok("%s(홀드) = reel 스트림만 소비" % skill_id, moved == ["reel"], str(moved))
+		else:
+			_ok("%s(%s) = 난수 무소비 (결정적)" % [skill_id, family], moved.is_empty(), str(moved))
+	# 스커밍 무효 — 재회전 직전 스냅샷에서 되돌려도 같은 결과가 나온다 (D12 §6.3)
+	var scum := _new_engine(961)
+	scum.deck_carry_in = ["skill_sh2"]
+	scum.start_gp()
+	for warmup in range(3):
+		scum.begin_turn()
+		scum.spin()
+		scum.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
+		scum.confirm(0.0)
+	scum.begin_turn()
+	scum.spin()
+	scum.charge = 99
+	var snapshot := scum.serialize()
+	scum.use_skill("skill_sh2")
+	var first: Array = scum.get_provisional()
+	for attempt in range(3):
+		var reload := _new_engine(999, "", false)
+		_ok("스킬 재회전 스커밍 복원 성립", reload.restore(snapshot))
+		reload.use_skill("skill_sh2")
+		_ok("스킬 재회전은 재로드 리롤이 무효", reload.get_provisional() == first,
+			"%s vs %s" % [str(reload.get_provisional()), str(first)])
+
+
+# ⓓ 지속 — 재로드가 스킬 상태를 되돌리면 스커밍 경로가 열린다 (D12 §6.3).
+func _skill_persistence() -> void:
+	var engine := _new_engine(950)
+	if engine == null:
+		return
+	engine.deck_carry_in = ["skill_sa1", "skill_sh3"]
+	engine.skill_uses_carry_in = {"skill_sh4": 1}
+	engine.start_gp()
+	_ok("투어 사용 횟수 반입", int(engine.skill_uses.get("skill_sh4", 0)) == 1)
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = 99
+	engine.use_skill("skill_sa1")
+	engine.use_skill("skill_sh3", {"keep": [0]})
+	var payload := engine.serialize()
+	var restored := _new_engine(1)
+	_ok("스킬 상태 복원 성립", restored.restore(payload))
+	_ok("복원 후 덱 보존", restored.deck == engine.deck, str(restored.deck))
+	_ok("복원 후 사용 횟수 보존", restored.skill_uses == engine.skill_uses, str(restored.skill_uses))
+	_ok("복원 후 변조 보존", restored.skill_mods == engine.skill_mods, str(restored.skill_mods))
+	_ok("복원 후 재회전 계수 보존", restored.respin_count == engine.respin_count)
+	_ok("복원 후 스냅샷 후보 보존", restored.snapshot_previous == engine.snapshot_previous)
+	# 구세이브 관용 — 스킬 도입 전 스냅샷은 빈 덱·무사용이 충실값
+	var legacy := payload.duplicate(true)
+	for key in ["deck", "skill_uses", "respin_count", "skill_mods", "snapshot_previous"]:
+		legacy.erase(key)
+	var old_save := _new_engine(2)
+	_ok("구세이브 복원 성립", old_save.restore(legacy))
+	_ok("구세이브 = 빈 덱", old_save.deck.is_empty())
+	_ok("구세이브 = 무사용", old_save.skill_uses.is_empty())
+	_ok("구세이브 = 무변조", old_save.skill_mods.is_empty())

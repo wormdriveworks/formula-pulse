@@ -830,6 +830,26 @@ func _tc_o7_skill_tiers_and_crew() -> void:
 	for skill_id in deck_state.data.skills:
 		overflow.append(skill_id)
 	_ok("슬롯 초과 편성 거부", not deck_state.set_deck(overflow))
+	# 투어당 사용 횟수 대장 — 상한의 주기가 **투어**이므로 정본이 아웃게임에 있다.
+	# 엔진에 두면 GP 를 새로 시작하는 것만으로 SH4·SI4 의 상한이 되살아난다 (D07 §4.2).
+	var uses_state := _new_state()
+	_ok("투어 사용 대장 초기 공란", uses_state.skill_uses_this_tour.is_empty())
+	uses_state.skill_uses_this_tour = {"skill_sh4": 2, "skill_si4": 1}
+	var uses_payload := uses_state.serialize()
+	var uses_restored := _new_state()
+	_ok("투어 사용 대장 복원 성립", uses_restored.restore(uses_payload))
+	_ok("투어 사용 대장 왕복 보존",
+		uses_restored.skill_uses_this_tour == uses_state.skill_uses_this_tour,
+		str(uses_restored.skill_uses_this_tour))
+	uses_restored.begin_tour()
+	_ok("투어 경계에서 사용 대장 리셋", uses_restored.skill_uses_this_tour.is_empty(),
+		str(uses_restored.skill_uses_this_tour))
+	# 구세이브 관용 — 스킬 소비부 도입 전 스냅샷은 무사용이 충실값
+	var legacy_payload := uses_payload.duplicate(true)
+	legacy_payload.erase("skill_uses_this_tour")
+	var legacy_state := _new_state()
+	_ok("구세이브 복원 성립", legacy_state.restore(legacy_payload))
+	_ok("구세이브 = 무사용", legacy_state.skill_uses_this_tour.is_empty())
 
 
 # ── TC-O8 관계 카운터 (D07 §5.5 · D12 §5.2 형식 B · D13 별첨A §5.2) ──

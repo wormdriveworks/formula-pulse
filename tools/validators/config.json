@@ -236,7 +236,7 @@
     "uses_per_tour": "int:0,9",
     "unlock_dp": "int",
     "family": "enum:hold,convert,amplify,insure",
-    "effect": "string"
+    "effect": "enum:precision_hold,full_sweep,snapshot,warmup_spin,trouble_to_line,trouble_to_pulse,symbol_clone,line_to_slipstream,advance_x15,pulse_yield_x2,defense_x15_duel12,overtorque_boost16,duel_penalty_waive,trouble_chassis_zero,trouble_rear_zero,survival_cell"
    }
   },
   "crew.csv": {

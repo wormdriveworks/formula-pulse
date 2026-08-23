@@ -295,6 +295,10 @@ func begin_gp() -> bool:
 	season.apply_to_engine(engine)
 	engine.chassis_carry_in = outgame.chassis  # GP 간 이월 (D05 §8 — 자동 완전 회복 없음)
 	engine.consumables_carry_in = outgame.consumables.duplicate()  # R5 반입 (D06 §3.5)
+	# 덱·투어 사용 횟수 반입 — 스킬 소비부 창구 (D05 §5.4 · D07 §4.2).
+	# 엔진은 아웃게임을 모른다(혼입 0·계층 방향 유지): 세션이 스냅숏을 넣고 되받는다.
+	engine.deck_carry_in = outgame.deck.duplicate()
+	engine.skill_uses_carry_in = outgame.skill_uses_this_tour.duplicate()
 	presentation.reset_gp()  # L2/L3 상한 카운터 = GP 단위 (D08 §8.5)
 	return true
 
@@ -322,6 +326,9 @@ func close_gp() -> void:
 	# R5 이월 회수 — 미사용분은 소멸하지 않는다 (D06 §3.5). 상한 가드는 구매 지점(K4) 전속:
 	# 사용은 수량을 늘리지 못하므로 회수분이 상한을 넘을 경로가 없다.
 	outgame.consumables = engine.consumables_held.duplicate()
+	# 투어 스코프 사용 횟수 회수 — GP 하나만 돌고 끝나는 값이 아니다.
+	# 회수가 빠지면 SH4·SI4 의 투어 상한이 GP 마다 되살아난다.
+	outgame.skill_uses_this_tour = engine.skill_uses.duplicate()
 	_advance_succession_maro(engine)
 	# 카이 벽 조우 = 재회 체인 비트 (D08 §8.7-3 "브리핑·이벤트·벽 조우"의 세 번째 축).
 	if engine.duel_opponents.has(KAI_ID):

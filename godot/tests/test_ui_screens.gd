@@ -111,11 +111,12 @@ func _process(_delta: float) -> bool:
 	_input_handled_ordering()
 	_mouse_click_paths(data)
 	_act_vn_consumption(data)
+	_skill_session_channel(data)
 	_tutorial_callout_placement()
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 308:
-		print("UI_SCREENS_FAIL checks=%d < 하한 308 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 317:
+		print("UI_SCREENS_FAIL checks=%d < 하한 317 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -2084,3 +2085,47 @@ func _collect_buttons(node: Node, out: Array[BaseButton]) -> void:
 		if child is BaseButton:
 			out.append(child)
 		_collect_buttons(child, out)
+
+
+# ── ⑲ 스킬 소비부 세션 창구 (20차 — D05 §5.4 · D07 §4.2) ──
+#
+# 엔진 검사(TC-C)는 `deck_carry_in` 을 **직접** 세우고 돈다. 그러면 아웃게임 덱이 실제로
+# 그 자리에 도달하는지도, 소비한 투어 횟수가 회수되는지도 보지 못한다 —
+# 회수가 빠지면 SH4·SI4 의 투어 상한이 GP 마다 되살아나고, 그 결함은
+# 엔진 안에서는 완전히 정상으로 보인다(17차 A15·19차 C7 와 같은 형태의 사각).
+func _skill_session_channel(data: GameData) -> void:
+	var session := _fresh_session(data)
+	session.outgame.gain_drive_data(500)
+	_ok("⑲ 스킬 해금", session.outgame.unlock_skill("skill_sh4"))
+	_ok("⑲ 덱 편성", session.outgame.set_deck(["skill_sh4"]))
+	_ok("⑲ GP 개시", session.begin_gp())
+	# 덱은 `start_gp()` 에서 스냅숏된다(반입 필드 → 실사용 필드). 화면이 하는 순서 그대로다:
+	# `session.begin_gp()` → `engine.start_gp()` (race_screen `_start_gp`).
+	_ok("⑲ 아웃게임 덱이 반입 필드에 도달", session.engine.deck_carry_in == ["skill_sh4"],
+		str(session.engine.deck_carry_in))
+	session.engine.start_gp()
+	_ok("⑲ 반입 필드가 GP 덱으로 승계", session.engine.deck == ["skill_sh4"],
+		str(session.engine.deck))
+	session.engine.begin_turn()
+	session.engine.spin()
+	session.engine.charge = session.data.param_int("param_charge_cap")
+	_ok("⑲ 세션 경유 스킬 투입 성립",
+		bool(session.engine.use_skill("skill_sh4").get("ok", false)))
+	# GP 를 끝까지 돌려 close_gp 회수 경로를 탄다
+	var guard := 0
+	while not session.engine.finished and guard < 200:
+		guard += 1
+		if session.engine.turn_phase != RaceTypes.TurnPhase.T4_INTERVENTION:
+			if String(session.engine.begin_turn().get("type", "")) == "finished":
+				break
+			session.engine.spin()
+		session.engine.confirm(0.0)
+	session.close_gp()
+	_ok("⑲ 투어 사용 횟수가 아웃게임으로 회수된다",
+		int(session.outgame.skill_uses_this_tour.get("skill_sh4", 0)) == 1,
+		str(session.outgame.skill_uses_this_tour))
+	# 다음 GP 는 소진분을 이어받는다 — 이월이 끊기면 상한이 GP 마다 되살아난다
+	_ok("⑲ 차기 GP 개시", session.begin_gp())
+	_ok("⑲ 소진분이 차기 GP 로 이월",
+		int(session.engine.skill_uses_carry_in.get("skill_sh4", 0)) == 1,
+		str(session.engine.skill_uses_carry_in))
