@@ -233,6 +233,12 @@ for (const name of names) {
   });
   const failsBefore = fails;
   const { w, h } = bases[0];
+  // ── 명도 기준 베이스 (`luma`) — 2026-08-23 신설.
+  //    보레아스 리버리는 3단계 전체에 얹히고(단계 무관) 세 단계는 **기하는 같고 명도는 다르다.**
+  //    `paint_floor` 는 명도로 도장면을 가르므로 **어느 단계를 기준으로 재는지가 결과를 바꾼다.**
+  //    보이지 않는 순서 의존(배열 첫 항)에 맡기지 않고 원장이 명시하게 한다.
+  const lumaIdx = o.luma === undefined ? 0 : baseList.indexOf(o.luma);
+  if (lumaIdx < 0) die(`${name}: luma "${o.luma}" 가 base 목록에 없다`);
   for (const b of bases) if (b.w !== w || b.h !== h) die(`${name}: 베이스 치수 불일치 — 오버레이는 동일 셀 계약이다`);
 
   // 마스크 = 전 베이스 불투명의 **교집합**. 어느 베이스에 얹어도 밖으로 나가지 않는다.
@@ -240,7 +246,8 @@ for (const name of names) {
   for (let i = 0; i < w * h; i++) mask[i] = bases.every((b) => b.rgba[i * 4 + 3] > 0) ? 1 : 0;
 
   const out = Buffer.alloc(w * h * 4);
-  const enc = (i) => (0.2126 * bases[0].rgba[i * 4] + 0.7152 * bases[0].rgba[i * 4 + 1] + 0.0722 * bases[0].rgba[i * 4 + 2]) / 255;
+  const LB = bases[lumaIdx].rgba;
+  const enc = (i) => (0.2126 * LB[i * 4] + 0.7152 * LB[i * 4 + 1] + 0.0722 * LB[i * 4 + 2]) / 255;
 
   // 도장면 = 실루엣 ∩ 명도 문턱. **실루엣만으로는 타이어·하부 그림자가 함께 들어온다** —
   // 첫 회차의 스트라이프가 그렇게 점선으로 부서졌다(밴드의 74~78%가 타이어였다).
@@ -274,16 +281,26 @@ for (const name of names) {
     if (op.recolor) {
       const ramp = rampOf(op.recolor.ramp);
       if (floor === undefined) die(`${name}: recolor 는 paint_floor 선언을 요구한다`);
-      // 문턱 위 명도를 [floor,1] 에서 램프로 펴 준다 — 문턱을 그냥 자르면 전 픽셀이 최암단에 몰린다.
-      let n = 0;
+      // ── 램프를 **관측 범위**로 정규화한다 (2026-08-23 교정).
+      //
+      //    첫 안은 `[floor, 1.0]` 으로 폈고, 그러면 도장면의 실제 최명부가 램프 상단에 닿지
+      //    않는다 — 보레아스 섀시의 도장면은 L 0.388~0.810 인데 [0.36,1.0] 로 재면 최명부의
+      //    t 가 0.70 이라 4단 램프의 3단까지만 쓰이고, 최다 계층(L=0.509 · 174px)은
+      //    t=0.23 으로 **최암단에 몰린다.** 실물이 통째로 어두워졌다(합성 육안 확인).
+      //
+      //    구간이 아니라 **분포**에 맞춰야 한다 — 관측 min·max 로 정규화하면 램프 전 단이
+      //    실제로 쓰인다. 부호화 명도를 쓴 것(선형 휘도가 아니라)과 같은 종류의 교정이다.
+      let lo = 1, hi = 0, n = 0;
+      for (let i = 0; i < w * h; i++) if (paint[i]) { const L = enc(i); if (L < lo) lo = L; if (L > hi) hi = L; n++; }
+      const span = hi - lo;
+      if (span <= 0) die(`${name}: 도장면 명도가 단일값이다 — 램프를 펼 수 없다`);
       for (let i = 0; i < w * h; i++) {
         if (!paint[i]) continue;
-        const t = (enc(i) - floor) / (1 - floor);
+        const t = (enc(i) - lo) / span;
         const idx = Math.min(ramp.length - 1, Math.floor(t * ramp.length));
         if (put(i, ramp[idx])) ink++;
-        n++;
       }
-      console.log(`      · 색 치환 ${n}px (문턱 ${floor})`);
+      console.log(`      · 색 치환 ${n}px (문턱 ${floor} · 관측 명도 ${lo.toFixed(3)}~${hi.toFixed(3)})`);
       continue;
     }
 
@@ -341,9 +358,61 @@ for (const name of names) {
       continue;
     }
 
+    // ── 스프라이트 (`sprite`) — 파츠 오버레이 전속. 2026-08-23 신설 · IMPL-351.
+    //
+    // **윙은 실루엣 밖으로 나가야 하므로 기존 불변식(형태 ∩ 실루엣)이 맞지 않는다.** 그 불변식은
+    // 도색을 위한 것이었다 — 도색은 차 안에만 있고, 파츠는 차에 **붙어서 밖으로 뻗는다.**
+    // 그래서 마스크를 풀고 대신 세 가지를 기계가 본다:
+    //   ⓐ **부착** — 스프라이트 픽셀 중 하나라도 베이스 실루엣과 8-이웃이어야 한다. 안 붙은
+    //      윙은 공중에 뜬 조각이고, 이것이 좌표 작화에서 가장 흔한 실패다.
+    //   ⓑ **한 덩이** — 파츠는 하나여야 한다(4-연결). 두 조각으로 갈리면 부러진 윙이다.
+    //   ⓒ **셀 안** — 셀을 넘으면 런타임에서 잘린다.
+    //
+    // 도상을 ASCII 로 두는 것은 `icon_art.json` 과 같은 규율이다 — PNG 바이트만 남기면
+    // 다음 편집자가 읽을 수 없고 재현도 못 한다. 윙은 형태가 내용이므로 특히 그렇다.
+    if (op.sprite) {
+      const { at, rows, map } = op.sprite;
+      if (!Array.isArray(at) || at.length !== 2) die(`${name}: sprite.at 은 [x,y] 다`);
+      if (!Array.isArray(rows) || !rows.length) die(`${name}: sprite.rows 가 없다`);
+      if (!map) die(`${name}: sprite.map 이 없다`);
+      const px = [];
+      rows.forEach((row, dy) => {
+        [...row].forEach((ch, dx) => {
+          if (ch === ' ' || ch === '.') return;    // 공백·마침표 = 비어 있음
+          if (!map[ch]) die(`${name}: sprite.map 에 없는 문자 '${ch}' (행 ${dy})`);
+          const x = at[0] + dx, y = at[1] + dy;
+          if (x < 0 || y < 0 || x >= w || y >= h) die(`${name}: sprite 가 셀 밖으로 나간다 (${x},${y}) — 런타임에서 잘린다`);
+          px.push([x, y, map[ch]]);
+        });
+      });
+      if (!px.length) die(`${name}: sprite 에 픽셀이 없다`);
+      // ⓐ 부착 — **겹침으로 잰다 (2026-08-23 교정).**
+      //    초판은 8-이웃 1픽셀을 요구했고 12장 전건이 통과했는데 **눈으로는 떠 있었다.**
+      //    위상적 접촉과 시각적 부착은 다르다 — 한 코너만 스치면 사람은 붙었다고 보지 않는다.
+      //    그래서 **루트가 실루엣 안으로 물려 있을 것**을 요구한다(기본 3px). 실차의 윙도
+      //    보디에 물려 있고, 도트에서 그 물림이 곧 부착의 시각적 근거다.
+      const need = op.min_overlap === undefined ? 3 : op.min_overlap;
+      let overlap = 0;
+      for (const [x, y] of px) if (mask[y * w + x]) overlap++;
+      if (overlap < need) { fail(`${name}: sprite 가 차체에 물려 있지 않다 — 겹침 ${overlap}px < ${need} (at ${at}) · 위상적 접촉만으로는 붙어 보이지 않는다`); continue; }
+      // ⓑ 한 덩이
+      const own = new Uint8Array(w * h);
+      for (const [x, y] of px) own[y * w + x] = 1;
+      let n = 0; for (let i = 0; i < w * h; i++) if (own[i]) n++;
+      const big = largestComponent(own, w, h);
+      if (big !== n) { fail(`${name}: sprite 가 ${n}px 중 최대 성분 ${big}px — 파츠가 갈렸다`); continue; }
+      const palCache = new Map();
+      for (const [x, y, key] of px) {
+        if (!palCache.has(key)) palCache.set(key, rampOf([key])[0]);
+        if (put(y * w + x, palCache.get(key))) ink++;
+      }
+      console.log(`      · 파츠 ${n}px @(${at[0]},${at[1]}) ${rows[0].length}×${rows.length} · 차체 물림 ${overlap}px`);
+      continue;
+    }
+
     // ── 형태 (띠·대각·링·사각) — 음영은 베이스가 준다.
     const sh = op.shape;
-    if (!sh) die(`${name}: op 에 recolor·digits·shape 중 하나가 없다`);
+    if (!sh) die(`${name}: op 에 recolor·digits·sprite·shape 중 하나가 없다`);
     const scope = region(op.on);
     const ramp = rampOf(op.ramp || sh.ramp);
     const hit = new Uint8Array(w * h);
