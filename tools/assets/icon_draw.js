@@ -22,8 +22,17 @@
  *    이 검사가 지키지 못하며, 그쪽은 `icon_check.js` 의 기하·팔레트 축과 눈 판독이 소관이다.
  *    본 도구는 색이 팔레트 안인지도 보지 않는다 — 그 축은 `icon_check.js` PAL 이 이미 가진다.
  *
- * 사용:  node tools/assets/icon_draw.js           (렌더 — PNG 를 쓴다)
- *        node tools/assets/icon_draw.js --check   (대조만 — 쓰지 않는다. 불일치 시 exit 1)
+ * ── `--proposal` (IMPL-305 신설).
+ *    **판정 대기 도상을 유입시키지 않고 눈에 보이게 하는 경로다.** 원격은 화면을 못 보므로
+ *    도상 판정에는 PNG 실물이 필요한데, 유입 원장(`icon_art.json`)에 적으면 그 순간
+ *    `godot/assets/ui/icons/` 에 실물이 들어가고 매니페스트 계상이 따라온다.
+ *    그래서 원장(`icon_art_proposal.json`)과 산출 경로(`docs/assets/시안/`)를 **둘 다** 갈랐다.
+ *    `--proposal` 은 `ICON_DIR` 를 열지도 않는다 — 플래그 오타가 유입으로 번지는 길을 끊는다.
+ *
+ * 사용:  node tools/assets/icon_draw.js              (렌더 — PNG 를 쓴다)
+ *        node tools/assets/icon_draw.js --check      (대조만 — 쓰지 않는다. 불일치 시 exit 1)
+ *        node tools/assets/icon_draw.js --proposal   (시안 렌더 → docs/assets/시안/)
+ *        node tools/assets/icon_draw.js --proposal --check
  */
 'use strict';
 const zlib = require('zlib');
@@ -31,9 +40,24 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const ICON_DIR = path.join(ROOT, 'godot', 'assets', 'ui', 'icons');
-const ART = path.join(__dirname, 'icon_art.json');
 const CHECK_ONLY = process.argv.includes('--check');
+const PROPOSAL = process.argv.includes('--proposal');
+
+// **모르는 플래그는 거부한다.** 이 도구는 파일을 쓴다 — `bgm_gen.js --only` 사고(IMPL-280)가
+// 실물 18개를 덮은 기제가 그대로 여기에도 있다: 오타 플래그가 조용히 무시되면 사용자가
+// 의도한 것과 다른 대상이 재생성된다. 특히 `--proposal` 오타는 시안이 유입으로 번진다.
+const KNOWN = new Set(['--check', '--proposal']);
+const badFlags = process.argv.slice(2).filter((a) => a.startsWith('-') && !KNOWN.has(a));
+if (badFlags.length) {
+  console.error(`FATAL: 미지의 플래그 ${badFlags.join(' ')} — 알려진 것은 ${[...KNOWN].join(' ')}`);
+  process.exit(2);
+}
+
+// 시안 모드는 유입 경로를 아예 잡지 않는다 (`ICON_DIR` 미참조).
+const OUT_DIR = PROPOSAL
+  ? path.join(ROOT, 'docs', 'assets', '시안')
+  : path.join(ROOT, 'godot', 'assets', 'ui', 'icons');
+const ART = path.join(__dirname, PROPOSAL ? 'icon_art_proposal.json' : 'icon_art.json');
 
 let fails = 0;
 function fail(msg) { console.error('  ✗ ' + msg); fails++; }
@@ -156,14 +180,15 @@ function decodeRGBA(file, n) {
 // ─────────────────────────────────────────────────────────── 주행
 const art = JSON.parse(fs.readFileSync(ART, 'utf8'));
 const names = Object.keys(art).filter((k) => !k.startsWith('_'));
-if (names.length === 0) die('icon_art.json 에 도상이 없다');
+if (names.length === 0) die(`${path.basename(ART)} 에 도상이 없다`);
+if (!CHECK_ONLY) fs.mkdirSync(OUT_DIR, { recursive: true });
 
-console.log(`손 작화 아이콘 ${CHECK_ONLY ? '대조' : '렌더'} — ${names.length}종\n`);
+console.log(`${PROPOSAL ? '시안' : '손 작화 아이콘'} ${CHECK_ONLY ? '대조' : '렌더'} — ${names.length}종  → ${path.relative(ROOT, OUT_DIR)}\n`);
 
 for (const name of names) {
   const spec = art[name];
   const { n, rgba } = render(spec, name);
-  const file = path.join(ICON_DIR, name + '.png');
+  const file = path.join(OUT_DIR, name + '.png');
   let ink = 0;
   for (let i = 0; i < n * n; i++) if (rgba[i * 4 + 3]) ink++;
 
@@ -189,5 +214,5 @@ for (const name of names) {
   }
 }
 
-if (fails) { console.error(`\nICON_DRAW FAIL fails=${fails}`); process.exit(1); }
-console.log(`\nICON_DRAW ${CHECK_ONLY ? 'PASS' : 'OK'} icons=${names.length}`);
+if (fails) { console.error(`\nICON_DRAW${PROPOSAL ? '_PROPOSAL' : ''} FAIL fails=${fails}`); process.exit(1); }
+console.log(`\nICON_DRAW${PROPOSAL ? '_PROPOSAL' : ''} ${CHECK_ONLY ? 'PASS' : 'OK'} icons=${names.length}`);
