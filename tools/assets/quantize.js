@@ -238,13 +238,19 @@ function applyDigits(name, w, h, put, d) {
   if (uncovered) die(`patch ${name}: 옛 번호 자리 ${uncovered}/${cw * chh}px 가 덮이지 않았다 — 번호가 두 개 남는다`);
 }
 
-function applyPatch(name, w, h, buf) {
-  const spec = (PATCH.patches || {})[`${DST_TAG}/${name}`];
+function applyPatch(name, w, h, buf, spec, geomLocked) {
   if (!spec) return 0;
   let touched = 0;
   const put = (x, y, key) => {
     if (x < 0 || y < 0 || x >= w || y >= h) die(`patch ${name}: 캔버스 밖 (${x},${y})`);
     const i = (y * w + x) * 4;
+    // ── 파생은 기하를 건드릴 수 없다 (사양서 v1.8 §4.1 *"기하는 불변"*).
+    //    표면 변조만 허용하므로 알파를 바꾸는 조작을 구조적으로 막는다 — 검사가 아니라 금지다.
+    //    그러면 3단계의 알파 채널이 원판과 동일해 **실루엣 IoU 100% 가 자료 구조의 성질**이 된다.
+    if (geomLocked) {
+      if (key === '.') die(`derive ${name}: 투명화는 표면 변조가 아니다 — 파생은 기하를 바꿀 수 없다 (${x},${y})`);
+      if (buf[i + 3] === 0) die(`derive ${name}: 실루엣 밖 기입 (${x},${y}) — 파생은 기하를 바꿀 수 없다`);
+    }
     if (key === '.') { buf[i] = buf[i + 1] = buf[i + 2] = buf[i + 3] = 0; touched++; return; }
     const c = PPAL[key];
     if (!c) die(`patch ${name}: palette 에 없는 색 키 '${key}'`);
@@ -254,22 +260,79 @@ function applyPatch(name, w, h, buf) {
     if (op.rect) { const [x, y, rw, rh] = op.rect; for (let dy = 0; dy < rh; dy++) for (let dx = 0; dx < rw; dx++) put(x + dx, y + dy, op.color); }
     else if (op.set) { for (const [x, y] of op.set) put(x, y, op.color); }
     else if (op.digits) applyDigits(name, w, h, put, op.digits);
-    else die(`patch ${name}: op 에 rect·set·digits 가 없다`);
+    else if (op.remap) {
+      // ── 색 계층 치환 (`remap`) — 표면 변조의 주력 도구 (사양서 v1.8 §4.2 파생).
+      //
+      // **좌표로 적는 것보다 이쪽이 옳다.** 원판은 이미 패널 구조를 명암 계층으로 갖고 있다.
+      // 그 계층을 갈면 **패널 경계를 손으로 베끼지 않고** 표면이 바뀐다 — 어느 픽셀이 어느
+      // 패널인지 눈으로 판정할 필요가 없고, 원판이 바뀌면 변조가 따라 움직인다.
+      // 알파를 건드리지 않으므로 기하 불변이 유지된다.
+      //
+      // `in` 을 주면 그 구획 안에서만 치환한다 — *"색 안 맞는 패널"* 처럼 한 면만 다른 경우.
+      const box = op.in;
+      if (box !== undefined && (!Array.isArray(box) || box.length !== 4)) die(`patch ${name}: remap.in 은 [x,y,w,h] 다`);
+      const map = new Map();
+      for (const [from, to] of Object.entries(op.remap)) {
+        if (!/^#[0-9A-Fa-f]{6}$/.test(from)) die(`patch ${name}: remap 원색 형식 아님 (${from})`);
+        if (!PPAL[to]) die(`patch ${name}: palette 에 없는 색 키 '${to}'`);
+        map.set([1, 3, 5].map((k) => parseInt(from.substr(k, 2), 16)).join(','), to);
+      }
+      let hit = 0;
+      const [bx, by, bw, bh] = box || [0, 0, w, h];
+      for (let y = by; y < by + bh; y++) for (let x = bx; x < bx + bw; x++) {
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        const i = (y * w + x) * 4;
+        if (buf[i + 3] === 0) continue;
+        const k = map.get(`${buf[i]},${buf[i + 1]},${buf[i + 2]}`);
+        if (k) { put(x, y, k); hit++; }
+      }
+      // 맞는 픽셀이 하나도 없는 치환은 **낡은 원장 행**이다 — 원판이 바뀌어 색이 사라졌거나
+      // 좌표가 틀렸다. 조용히 지나가면 변조가 없는데 있다고 믿게 된다.
+      if (hit === 0) die(`patch ${name}: remap 이 한 픽셀도 맞추지 못했다 — 원판의 색이 바뀌었거나 in 구획이 틀렸다`);
+    }
+    else die(`patch ${name}: op 에 rect·set·digits·remap 이 없다`);
   }
   return touched;
 }
 // 원장에만 있고 대상이 없는 패치 = 유령 패치. 조용히 늙지 않게 한다.
 const patchKeys = Object.keys(PATCH.patches || {}).filter((k) => k.startsWith(DST_TAG + '/'));
 
+// ── 단일 원판 파생 (`derive`) — 사양서 v1.8 §4.1 *"베이스 산출 = 단일 섀시 파생"*.
+//
+// **왜 1:1 매핑을 깨는가.** 성장 3단계는 서로 다른 생성물이면 안 된다 — 독립 생성은 좌표 정합을
+// 원리적으로 만들지 못한다(실측 IoU 39~78%). 그래서 **한 원판에서 세 산출물이 나온다.**
+//
+// **기하 불변을 검사로 확인하지 않고 구성으로 보장한다.** 파생 op 은 **이미 불투명한 픽셀의 색만**
+// 바꿀 수 있다 — 투명화(`.`)도, 실루엣 밖 기입도 거부된다. 그러면 세 산출물의 알파 채널이 원판과
+// 같으므로 **실루엣 IoU 100% 가 계산 결과가 아니라 자료 구조의 성질**이 된다. 검사는 그것을
+// 재확인하는 이중 안전장치로 남긴다(총괄 승인 게이트).
+const DERIVE = Object.entries(PATCH.derive || {})
+  .filter(([k]) => k.startsWith(DST_TAG + '/'))
+  .map(([k, v]) => ({ out: k.slice(DST_TAG.length + 1), src: v.from, spec: v }));
+const DERIVE_SRC = new Set(DERIVE.map((d) => d.src));
+for (const d of DERIVE) if (!d.src) die(`derive ${d.out}: from 선언이 없다`);
+
 // ─────────────────────────────────────────────── 주행
 const files = fs.readdirSync(SRC).filter((f) => f.endsWith('.png')).sort();
 if (files.length === 0) die(`${SRC} 에 PNG 가 없다`);
+// 파생 원본은 그 자체로 산출물이 아니다 — 원판을 내보내면 대장 밖 유령 파일이 된다.
+for (const src of DERIVE_SRC) if (!files.includes(src)) die(`derive 원본 부재: ${src}`);
+const direct = files.filter((f) => !DERIVE_SRC.has(f));
 if (!CHECK_ONLY) fs.mkdirSync(DST, { recursive: true });
-console.log(`팔레트 양자화 ${CHECK_ONLY ? '대조' : '집행'} — ${files.length}파일 · 순색 ${PAL.length}\n`);
+console.log(`팔레트 양자화 ${CHECK_ONLY ? '대조' : '집행'} — 직접 ${direct.length} + 파생 ${DERIVE.length} · 순색 ${PAL.length}\n`);
 
 const cache = new Map();
-for (const f of files) {
-  const img = decode(path.join(SRC, f));
+
+// 작업 목록 — 직접 산출(1:1) + 파생 산출(1 원판 → N).
+const jobs = [
+  ...direct.map((f) => ({ out: f, src: f, spec: (PATCH.patches || {})[`${DST_TAG}/${f}`], derived: false })),
+  ...DERIVE.map((d) => ({ out: d.out, src: d.src, spec: d.spec, derived: true })),
+];
+const alphaOf = new Map();                       // 파생 출력의 알파 지문 — IoU 재확인용
+
+for (const job of jobs) {
+  const f = job.out;
+  const img = decode(path.join(SRC, job.src));
   const out = Buffer.alloc(img.w * img.h * 4);
   const before = new Set(), after = new Set();
   for (let i = 0; i < img.w * img.h; i++) {
@@ -283,10 +346,18 @@ for (const f of files) {
     out[i * 4] = p[0]; out[i * 4 + 1] = p[1]; out[i * 4 + 2] = p[2]; out[i * 4 + 3] = 255;
     after.add((p[0] << 16) | (p[1] << 8) | p[2]);
   }
-  const patched = applyPatch(f, img.w, img.h, out);
+  const patched = applyPatch(f, img.w, img.h, out, job.spec, job.derived);
   if (patched) { after.clear(); for (let i = 0; i < img.w * img.h; i++) if (out[i * 4 + 3]) after.add((out[i * 4] << 16) | (out[i * 4 + 1] << 8) | out[i * 4 + 2]); }
+  if (job.derived) {
+    let sig = '';
+    for (let i = 0; i < img.w * img.h; i++) sig += out[i * 4 + 3] ? '1' : '0';
+    if (!alphaOf.has(job.src)) alphaOf.set(job.src, new Map());
+    alphaOf.get(job.src).set(f, sig);
+  }
   const dstFile = path.join(DST, f);
-  const tag = `${img.w}×${img.h} · 고유색 ${before.size} → ${after.size}` + (patched ? ` · 패치 ${patched}px` : '');
+  const tag = `${img.w}×${img.h} · 고유색 ${before.size} → ${after.size}`
+    + (patched ? ` · ${job.derived ? '변조' : '패치'} ${patched}px` : '')
+    + (job.derived ? ` · 파생 ← ${job.src}` : '');
   if (CHECK_ONLY) {
     if (!fs.existsSync(dstFile)) { fail(`${f} 산출물 부재 — 원본만 있고 결과가 없다`); continue; }
     const got = decode(dstFile);
@@ -301,8 +372,21 @@ for (const f of files) {
   }
 }
 
-for (const k of patchKeys) { const base = k.slice(DST_TAG.length + 1); if (!files.includes(base)) fail(`유령 패치: ${k} — 대상 파일이 없다`); }
+// ── 실루엣 IoU 100% 게이트 (총괄 승인 · 트랙 내부). 위 `geomLocked` 가 이미 구조로 막지만,
+//    막는 것과 확인하는 것은 다르다 — 원판을 바꿔치기하거나 op 형식을 늘렸을 때 여기서 걸린다.
+for (const [src, outs] of alphaOf) {
+  const list = [...outs.entries()];
+  for (let i = 1; i < list.length; i++) {
+    if (list[i][1] !== list[0][1]) fail(`파생 기하 불일치: ${list[0][0]} 와 ${list[i][0]} 의 실루엣이 다르다 (원판 ${src})`);
+  }
+  if (list.length > 1) console.log(`  ✓ 파생 기하 — ${src} → ${list.length}장 실루엣 IoU 100%`);
+}
+
+// 유령 검사 — 낡은 원장 행이 조용히 늙는 것을 막는다. 검사 대상은 **산출 이름**이다
+// (직접 산출은 원본 파일명과 같고, 파생 산출은 원장이 정한 이름이다).
+const outNames = new Set(jobs.map((j) => j.out));
+for (const k of patchKeys) { const base = k.slice(DST_TAG.length + 1); if (!outNames.has(base)) fail(`유령 패치: ${k} — 대상 산출물이 없다`); }
 
 console.log('');
 if (fails) { console.log(`QUANTIZE FAIL fails=${fails}`); process.exit(1); }
-console.log(`QUANTIZE ${CHECK_ONLY ? 'PASS' : 'OK'} files=${files.length} palette=${PAL.length} patches=${patchKeys.length}`);
+console.log(`QUANTIZE ${CHECK_ONLY ? 'PASS' : 'OK'} files=${jobs.length} palette=${PAL.length} patches=${patchKeys.length} derived=${DERIVE.length}`);
