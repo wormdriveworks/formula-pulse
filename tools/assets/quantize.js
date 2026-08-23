@@ -355,14 +355,29 @@ for (const d of DERIVE) {
   if (!Array.isArray(d.crop) || d.crop.length !== 4) die(`derive ${d.out}: crop 은 [x,y,w,h] 다`);
   if (d.crop.some((n) => !Number.isInteger(n) || n < 0)) die(`derive ${d.out}: crop 값은 음이 아닌 정수다`);
 }
-const DERIVE_SRC = new Set(DERIVE.map((d) => d.src));
+// ── 파생 원본이 산출물인지 아닌지는 **선언한다** (2026-08-23 교정 · IMPL-363).
+//
+//    초판은 *파생 원본은 산출물이 아니다* 로 일괄 처리했다. 보레아스 섀시에는 맞았지만
+//    (대장 37 밖의 파생 원본) **캐릭터 기본 시트는 원본이면서 동시에 산출물**이다 —
+//    스탠딩 13 의 일부이고 동시에 표정 4장의 원판이다. 일괄 제외하니 기본 시트가
+//    생성되지 않아 유령 패치로 잡혔다.
+//
+//    그래서 기본값을 **"원본도 산출물이다"** 로 두고, 산출물이 아닌 원판만 `derive_only`
+//    에 적는다. 안전한 쪽이 기본값이다 — 빠뜨리면 유령 파일이 생기는 것이 아니라
+//    선언 누락이 유령 패치로 드러난다.
+const DERIVE_ONLY = new Set(PATCH.derive_only || []);
+const DERIVE_SRC = new Set([...DERIVE.map((d) => d.src)].filter((f) => DERIVE_ONLY.has(f)));
+// 낡은 선언 검사는 **전역 파생 집합**에 걸어야 한다 — `DERIVE` 는 이번 목적지로 걸러져
+// 있으므로 그것과 대조하면 다른 목적지의 원판을 낡은 선언으로 오판한다(실측 교정).
+const ALL_SRC = new Set(Object.values(PATCH.derive || {}).map((v) => v.from));
+for (const f of DERIVE_ONLY) if (!ALL_SRC.has(f)) die(`derive_only ${f}: 어느 파생의 원본도 아니다 — 낡은 선언이다`);
 for (const d of DERIVE) if (!d.src) die(`derive ${d.out}: from 선언이 없다`);
 
 // ─────────────────────────────────────────────── 주행
 const files = fs.readdirSync(SRC).filter((f) => f.endsWith('.png')).sort();
 if (files.length === 0) die(`${SRC} 에 PNG 가 없다`);
-// 파생 원본은 그 자체로 산출물이 아니다 — 원판을 내보내면 대장 밖 유령 파일이 된다.
-for (const src of DERIVE_SRC) if (!files.includes(src)) die(`derive 원본 부재: ${src}`);
+// `derive_only` 원판은 산출물이 아니다 — 대장 밖 유령 파일이 되기 때문이다.
+for (const d of DERIVE) if (!files.includes(d.src)) die(`derive 원본 부재: ${d.src}`);
 const direct = files.filter((f) => !DERIVE_SRC.has(f));
 if (!CHECK_ONLY) fs.mkdirSync(DST, { recursive: true });
 console.log(`팔레트 양자화 ${CHECK_ONLY ? '대조' : '집행'} — 직접 ${direct.length} + 파생 ${DERIVE.length} · 순색 ${PAL.length}\n`);
