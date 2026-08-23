@@ -42,8 +42,8 @@ func _init() -> void:
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 2220:
-		print("TC_C_TEST_FAIL checks=%d < 하한 2220 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 2230:
+		print("TC_C_TEST_FAIL checks=%d < 하한 2230 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -2344,6 +2344,12 @@ func _skill_gates() -> void:
 	var before := engine.charge
 	var used: Dictionary = engine.use_skill("skill_sa1")
 	_ok("스킬 투입 성립", bool(used.get("ok", false)), str(used))
+	# 발화 문면 (22차 결선) — 20차는 전용 키가 없어 빈 배열이었다. 기본 개입 2종과 같은 자리다.
+	var used_events: Array = used.get("events", [])
+	_ok("스킬 발화 1건", used_events.size() == 1, str(used_events))
+	_ok("스킬 발화 키 = vane.brief.skillUse01", used_events.size() == 1
+		and String(Dictionary(used_events[0]).get("key", "")) == "vane.brief.skillUse01",
+		str(used_events))
 	_ok("스킬 비용 = skills.csv charge_cost",
 		before - engine.charge == CsvTable.to_int(String(engine.data.skills["skill_sa1"]["charge_cost"])),
 		"delta=%d" % (before - engine.charge))
@@ -2854,6 +2860,15 @@ func _skill_insure_family() -> void:
 		Array(lose_plain["keys"]).has("raceLog.duelLoseOvertake01"), str(lose_plain["keys"]))
 	_ok("대조군 방어 패배가 피추월 문면을 발행",
 		Array(def_plain["keys"]).has("raceLog.defendFail01"), str(def_plain["keys"]))
+	# 면제 전용 문면 (22차 결선) — **패배는 말하고 페널티는 말하지 않는다.**
+	# 20차는 전용 키가 없어 무발화였고 그 침묵은 "듀얼이 없었다"와 구분되지 않았다.
+	for guarded in [lose_guard, def_guard]:
+		_ok("SI1 면제 시 전용 문면 발행",
+			Array(Dictionary(guarded)["keys"]).has("raceLog.duelLoseWaived01"),
+			str(Dictionary(guarded)["keys"]))
+	_ok("대조군은 전용 문면 미발행",
+		not Array(lose_plain["keys"]).has("raceLog.duelLoseWaived01")
+		and not Array(def_plain["keys"]).has("raceLog.duelLoseWaived01"))
 	_ok("SI1 추월 면제 시 감소 문면 미발행",
 		not Array(lose_guard["keys"]).has("raceLog.duelLoseOvertake01"))
 	_ok("SI1 방어 면제 시 피추월 문면 미발행",

@@ -350,9 +350,9 @@
    "root": true,
    "columns": {
     "id": "id",
-    "axis_id": "fk:relation_axes.csv",
+    "axis_id": "fk_optional:relation_axes.csv",
     "slot_id": "fk:vn_slots.csv",
-    "stage_id": "structure_ref",
+    "stage_id": "structure_ref_optional",
     "min_stage": "int:0,9",
     "max_stage": "int:0,9",
     "line_count": "int:1,9",

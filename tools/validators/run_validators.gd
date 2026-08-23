@@ -404,7 +404,8 @@ func _check_value(file_name: String, type_spec: String, value: String, row_id: S
 		"enum_optional":
 			if trimmed != "" and not Array(parts[1].split(",")).has(trimmed):
 				_fail("V1", "%s[%s].%s: '%s' not in enum {%s}" % [file_name, row_id, column_name, trimmed, parts[1]])
-		"string_key", "fk", "fk_optional", "fk_array", "string", "structure_ref", "structure_ref_array":
+		"string_key", "fk", "fk_optional", "fk_array", "string", \
+		"structure_ref", "structure_ref_optional", "structure_ref_array":
 			pass  # V2 소관
 		_:
 			_warn("V1", "unknown type spec '%s'" % type_spec)
@@ -415,7 +416,16 @@ func _run_v2_references() -> void:
 	var before_fail := _fail_count
 	var before_warn := _warn_count
 	var checked := 0
-	# 테이블 FK·name_key
+	var structure_ids := _structure_ids()
+	# 테이블 참조 — **구조 JSON 과 같은 판정기를 쓴다** (`_check_reference`).
+	#
+	# 22차 실측: 이 자리는 `string_key` 와 `fk:` **두 종만** 보고 있었고,
+	# `fk_optional:`·`structure_ref`·`structure_ref_optional` 열은 **아무도 보지 않았다**
+	# (표 열 5개 = `garage_facilities.requires_crew` · `milestone_vn.relation_transition` ·
+	# `milestones.source_id` · `vn_beats.axis_id` · `vn_beats.stage_id`).
+	# 검사기가 둘로 갈려 있었고 한쪽만 자란 결과다 — 판정기를 하나로 모아 닫는다.
+	# **통과는 검사의 증거가 아니다**: 19차 회신이 `stage_id` 를 "V2 가 실제로 걸었다"로
+	# 적었으나 그때 걸린 것은 아무것도 없었다(볼 분기가 없었다).
 	for file_name in _config["tables"]:
 		var spec: Dictionary = _config["tables"][file_name]
 		var columns: Dictionary = spec["columns"]
@@ -423,16 +433,10 @@ func _run_v2_references() -> void:
 			for column_name in columns:
 				var type_spec := String(columns[column_name])
 				var value := String(row.get(column_name, "")).strip_edges()
-				if type_spec == "string_key":
-					checked += 1
-					if not _strings.has(value):
-						_fail("V2", "%s[%s].%s: string key '%s' not found" % [file_name, row.get("id", "?"), column_name, value])
-				elif type_spec.begins_with("fk:"):
-					checked += 1
-					if not _table_ids(type_spec.substr(3)).has(value):
-						_fail("V2", "%s[%s].%s: FK '%s' not found in %s" % [file_name, row.get("id", "?"), column_name, value, type_spec.substr(3)])
+				checked += _check_reference(
+					"%s[%s].%s" % [file_name, row.get("id", "?"), column_name],
+					type_spec, value, structure_ids)
 	# 구조 JSON (중첩 배열 포함 — 배열 안의 참조도 동일 규격으로 검사)
-	var structure_ids := _structure_ids()
 	for file_name in _config["structures"]:
 		var spec := _structure_spec(String(file_name))
 		var structure: Dictionary = _structures[file_name]
@@ -507,6 +511,15 @@ func _check_reference(location: String, type_spec: String, value: String, struct
 			_fail("V2", "%s: string key '%s' not found" % [location, value])
 		return 1
 	if type_spec == "structure_ref":
+		if not structure_ids.has(value):
+			_fail("V2", "%s: structure ref '%s' not found" % [location, value])
+		return 1
+	# 공란 = "참조 없음"으로 통과. `fk_optional:` 과 동형이며 근거도 같다 —
+	# **필수 참조는 `structure_ref` 를 쓴다.** 선택형을 기본으로 두면 오타가 공란과
+	# 구분되지 않으므로, 선택화는 열 단위로 명시 선언하는 것만 허용한다.
+	if type_spec == "structure_ref_optional":
+		if value == "":
+			return 0
 		if not structure_ids.has(value):
 			_fail("V2", "%s: structure ref '%s' not found" % [location, value])
 		return 1

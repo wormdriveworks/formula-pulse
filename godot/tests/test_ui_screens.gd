@@ -112,13 +112,14 @@ func _process(_delta: float) -> bool:
 	_mouse_click_paths(data)
 	_act_vn_consumption(data)
 	_skill_session_channel(data)
+	_season_open_wiring(data)
 	_tutorial_callout_placement()
 	_skill_slots(data)
 	_skill_snapshot_pairing(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 360:
-		print("UI_SCREENS_FAIL checks=%d < 하한 360 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 388:
+		print("UI_SCREENS_FAIL checks=%d < 하한 388 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1373,6 +1374,33 @@ func _anch_check_present() -> void:
 	_ok("V7S 자기 검사 정의 실재", source.contains("func _run_v7_self_test("))
 	_ok("V7S 자기 검사 등록(호출) 실재", source.contains("\t_run_v7_self_test()"))
 	_ok("V7S = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("V7S"'))
+	# ── `structure_ref_optional` 신설 (총괄 승인 · 22차 ⓔ) ──
+	#
+	# **선택화는 검사를 끄는 일과 한 걸음 차이다.** 공란을 통과시키는 분기를 넣었으므로
+	# ⓐ필수형(`structure_ref`)이 여전히 살아 있고 ⓑ선택형도 **오타는 잡는지**를 함께 건다.
+	# 둘 중 하나만 보면 "공란도 통과, 오타도 통과"가 조용히 성립한다.
+	_ok("structure_ref 필수형 판정 잔존", source.contains('if type_spec == "structure_ref":'))
+	_ok("structure_ref_optional 판정 실재",
+		source.contains('if type_spec == "structure_ref_optional":'))
+	_ok("structure_ref_optional 도 미등재 참조는 차단",
+		source.contains('if type_spec == "structure_ref_optional":')
+		and source.split('if type_spec == "structure_ref_optional":')[1] \
+			.split("return 1")[0].contains('_fail("V2"'),
+		"공란만 통과해야 하고 오타는 걸려야 한다")
+	_ok("V1 타입 열거에 선택형 등재", source.contains('"structure_ref_optional"'))
+	# 선택화한 두 열이 실제로 선택형인가 (설정 쪽) — 한 열만 풀려도 개막 비트가 서지 않는다
+	var beat_columns: Dictionary = Dictionary(Dictionary(config).get("tables", {})) \
+		.get("vn_beats.csv", {}).get("columns", {})
+	_ok("vn_beats.axis_id = 선택형 FK",
+		String(beat_columns.get("axis_id", "")) == "fk_optional:relation_axes.csv",
+		str(beat_columns.get("axis_id", "")))
+	_ok("vn_beats.stage_id = 선택형 구조 참조",
+		String(beat_columns.get("stage_id", "")) == "structure_ref_optional",
+		str(beat_columns.get("stage_id", "")))
+	# 슬롯은 **필수로 남는다** — 슬롯 없는 비트는 어디에도 서지 않으므로 공란이 정당할 수 없다.
+	_ok("vn_beats.slot_id = 필수 FK 유지",
+		String(beat_columns.get("slot_id", "")) == "fk:vn_slots.csv",
+		str(beat_columns.get("slot_id", "")))
 
 
 # `ANCH_PAIR_PROPERTIES` 목록 본문만 떼어 공백을 지운 형태. 항목이 하나라도 늘거나
@@ -1394,6 +1422,7 @@ func _anch_pair_list(source: String) -> String:
 # D11 §2.10 이 규정한 것은 **음색이 화자를 따라간다**는 쪽이고, 실제 결함(마르타 대사에 베인
 # 3단계 큐음)이 거기서 났다. 그래서 실화면을 세워 라인을 넘기며 무엇이 울렸는지 센다.
 const VN_SCENE := "res://ui/nar/vn_screen.tscn"
+const RECORDS_SCENE := "res://ui/hub/records_screen.tscn"
 
 
 func _vn_line_speakers(data: GameData) -> void:
@@ -2366,3 +2395,85 @@ func _skill_session_channel(data: GameData) -> void:
 	_ok("⑲ 소진분이 차기 GP 로 이월",
 		int(session.engine.skill_uses_carry_in.get("skill_sh4", 0)) == 1,
 		str(session.engine.skill_uses_carry_in))
+
+
+# ── ⑳ 시즌 개막 VN 결선 (22차 — 발주 ⓖⓗⓘ) ──
+#
+# **결선 전에는 세 곳이 각각 끊겨 있었다**: 개시 경로가 `line_keys` 를 넘기지 않아
+# 폴백 1줄이 떴고(주력 12차 관측 3), 시즌 2+ 진입점이 없어 개막이 시즌 1 한 번만 섰고,
+# 아카이브는 비트를 원문 id 로 그렸다. 세 축을 각각 본다 — 하나만 봐도 나머지는 조용하다.
+func _season_open_wiring(data: GameData) -> void:
+	var session := RunSession.new()
+	session.setup(data)
+	session.begin_career(2)
+	# ⓐ 세션 창구 — 라인이 비트 표에서 온다
+	var opening := session.season_open_payload("HUB-01")
+	_ok("⑳ 개막 페이로드 발행", not opening.is_empty())
+	_ok("⑳ 슬롯 = 시즌 개막", String(opening.get("slot_id", "")) == "vnslot_season_open",
+		str(opening.get("slot_id", "")))
+	_ok("⑳ 캘린더 공개 동반", bool(opening.get("calendar", false)))
+	var lines: Array = opening.get("line_keys", [])
+	_ok("⑳ 3라인 동반 (폴백 1줄이 아니다)", lines.size() == 3, str(lines.size()))
+	var dict_lines := 0
+	for line in lines:
+		if typeof(line) == TYPE_DICTIONARY and Dictionary(line).has("speaker_key"):
+			dict_lines += 1
+	_ok("⑳ 전 라인 = 화자 사전", dict_lines == lines.size(), "%d/%d" % [dict_lines, lines.size()])
+	_ok("⑳ 정조 동반", String(opening.get("tone", "")) == "calm", str(opening.get("tone", "")))
+	# `vn_id` 는 시즌 단위 인스턴스여야 한다 — 비트 id 로 두면 아카이브가 전 시즌을 한 줄로 접는다
+	_ok("⑳ vn_id = 시즌 인스턴스",
+		String(opening.get("vn_id", "")) == "vn_season_open_s%d" % session.season.season,
+		String(opening.get("vn_id", "")))
+	# ⓑ 실화면 도달 — 폴백 문면이 아니라 데이터 문면이 그려지는가
+	var screen := _mount_payload(data, session, opening)
+	_ok("⑳ 실화면 1라인 = 데이터 문면",
+		(screen.get_node("%BodyLabel") as Label).text == data.strings.text("vn.seasonOpen.beat01"),
+		(screen.get_node("%BodyLabel") as Label).text)
+	_ok("⑳ 폴백 문면 미노출",
+		(screen.get_node("%BodyLabel") as Label).text != data.strings.text("ui.vn.placeholderLine01"))
+	_unmount(screen)
+	# ⓒ 시즌 2+ — 시즌이 넘어가면 개막 페이로드의 인스턴스 id 도 따라간다.
+	# 진입점 자체(overhaul_screen)는 원본 텍스트로 확인한다: 씬을 세워 오버홀을
+	# 실제로 설치하는 경로는 후보 추첨·랭크 의존이라 이 스위트의 결이 아니다.
+	var season_before := session.season.season
+	session.begin_next_season()
+	var next_opening := session.season_open_payload("HUB-01")
+	_ok("⑳ 시즌 전환 후 인스턴스 id 갱신",
+		String(next_opening.get("vn_id", "")) != "vn_season_open_s%d" % season_before,
+		String(next_opening.get("vn_id", "")))
+	_ok("⑳ 시즌 2+ 도 3라인 (문면이 시즌 무관)",
+		Array(next_opening.get("line_keys", [])).size() == 3)
+	var overhaul_source := FileAccess.get_file_as_string("res://ui/hub/overhaul_screen.gd")
+	_ok("⑳ 시즌 전환 진입점 원본 적재", not overhaul_source.is_empty())
+	_ok("⑳ 시즌 전환이 개막 창구를 부른다",
+		overhaul_source.contains("session.season_open_payload("))
+	_ok("⑳ 시즌 전환이 NAR-01 로 간다", overhaul_source.contains('go("NAR-01", opening)'))
+	# 개시 경로도 같은 창구를 쓴다 — 두 경로가 각자 조립하면 한쪽만 라인을 넘긴다
+	var slot_source := FileAccess.get_file_as_string("res://ui/sys/save_slot_screen.gd")
+	_ok("⑳ 개시 경로도 같은 창구", slot_source.contains("session.season_open_payload("))
+	_ok("⑳ 개시 경로 인라인 조립 잔존 0", not slot_source.contains('"slot_id": "vnslot_season_open"'))
+	# ⓓ 아카이브 표제 — 비트가 원문 id 로 뜨지 않는가
+	var records := _mount(RECORDS_SCENE, session)
+	if records == null:
+		return
+	var titled := 0
+	var raw := 0
+	for beat_id in data.vn_beats:
+		var title := String(records._vn_title(String(beat_id)))
+		if title == String(beat_id):
+			raw += 1
+		elif title != "":
+			titled += 1
+	_ok("⑳ 비트 표제 = 슬롯 표제 (원문 id 노출 0)", raw == 0, "raw=%d titled=%d" % [raw, titled])
+	_ok("⑳ 전 비트가 표제를 갖는다", titled == data.vn_beats.size(),
+		"%d/%d" % [titled, data.vn_beats.size()])
+	_ok("⑳ 개막 비트 표제 = 시즌 개막",
+		String(records._vn_title("vnbeat_season_open")) == data.strings.text("ui.vnSlot.seasonOpen"),
+		String(records._vn_title("vnbeat_season_open")))
+	_ok("⑳ 재회 비트 표제 = 투어 브리핑",
+		String(records._vn_title("vnbeat_reunion_alta")) == data.strings.text("ui.vnSlot.tourBrief"),
+		String(records._vn_title("vnbeat_reunion_alta")))
+	# 표제 도출이 적재 상태를 떨어뜨리지 않는가 — 표시 함수가 `_load_ok` 를 내리면
+	# 그 다음 `param()` 부터 조용한 0 이 나온다.
+	_ok("⑳ 표제 도출 후 데이터 건전", data.is_ok())
+	_unmount(records)

@@ -536,9 +536,11 @@ func use_skill(skill_id: String, args: Dictionary = {}) -> Dictionary:
 		return applied
 	charge -= CsvTable.to_int(String(row["charge_cost"]))
 	skill_uses[skill_id] = int(skill_uses.get(skill_id, 0)) + 1
-	# 발화 문면은 이번 회차 미유입(strings.csv 배타 창구) — 회신 §5 키 목록으로 보고한다.
-	# 빈 배열을 돌려주는 것이 없는 키를 참조하는 것보다 낫다(V6 는 참조를 검사한다).
-	return {"ok": true, "events": [], "family": String(row["family"]), "effect": effect}
+	# 발화 문면 = 20차에 요청하고 내러티브 5차가 유입한 키. 기본 개입 2종
+	# (`holdRespin01`·`negate01`)과 같은 자리이며, 스킬 이름을 인자로 넘기지 않는다 —
+	# 베인은 UI 용어를 발화하지 않는다(D05 §5.4 용어 이층: '등록 루틴 적용').
+	return {"ok": true, "events": [_ev("T4", "vane.brief.skillUse01", {})],
+		"family": String(row["family"]), "effect": effect}
 
 
 # 인자와 무관한 성립 조건 조회 — 투입 없이 판정한다(버튼 활성 판정용).
@@ -1035,10 +1037,10 @@ func _resolve_duel() -> Array:
 		# SI1 임팩트 가드 — 패배 페널티 면제 (별첨A §4.2 "섀시 −5 / 피추월 무효").
 		# 기존 패배 문면 3종은 **전부 못 쓴다**: `duelLoseDefense01`("피추월")·
 		# `defendFail01`("자리를 내줬다")·`duelLoseOvertake01`(감소량 인자)은 셋 다
-		# 일어나지 않은 일을 말한다. 이번 회차 strings.csv 는 배타 창구라 문면을
-		# 신설하지 않고 **무발화 + 필요 키 보고**로 둔다 (회신 §5). 없는 키를 참조하는
-		# 것보다 침묵이 낫다 — V6 는 참조를 검사하고, 잘못된 문면은 검사에 걸리지 않는다.
-		pass
+		# 일어나지 않은 일을 말한다. 20차는 전용 키가 없어 무발화로 두고 보고했고,
+		# 내러티브 5차가 `duelLoseWaived01` 을 유입해 여기서 결선한다 —
+		# **패배는 말하고 페널티는 말하지 않는다**("충격을 받아냈다").
+		events.append(_ev("T5", "raceLog.duelLoseWaived01", {}))
 	else:
 		if duel_type == RaceTypes.DuelType.OVERTAKE:
 			# P3 경감 대상 [가안]: 문면 "잔여 구간 섀시 소모"가 소모원을 한정하지 않아

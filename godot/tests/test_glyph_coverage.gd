@@ -52,21 +52,21 @@ const COVERAGE_EXEMPT := [
 	},
 ]
 
-# 상용한자 대조 입력 — 표가 유입되면 **자동으로 실대조로 승격**한다.
-# 오프라인에 D15 §4.3 상용한자 2,136자 표가 없어 이 회차는 대조하지 못했다.
-# 추정으로 통과 선언하지 않는다 — 대신 계수를 못박아 두어 일문 열의 한자 집합이
-# 바뀌면 검사가 실패하고, 표가 들어오면 그때부터 진짜 판정이 돈다.
+# 상용한자 대조 — **21차의 '표를 기다리는 검사'가 승격했다.** 총괄이 표를 조달했고
+# (KANJIDIC2 grade 1~8 도출 · `𠮟`→`叱` 치환) 22차에 `res://` 로 이동해 실대조가 돈다.
+# 계수 대장은 그대로 둔다: 일문 열의 한자 집합이 바뀌면 검사가 실패해 재대조를 강제한다.
 const JOUYOU_PATH := "res://data/reference/jouyou_kanji.txt"
-const JA_KANJI_EXPECTED := 500          # 내러티브 4차 부록 B 계수
-const JOUYOU_EXPECTED_COUNT := 2136     # D15 §4.3 확정
+const JA_KANJI_EXPECTED := 501          # 내러티브 5차 편입 후 실측 (4차 500 + 五枚虚衝 − 墟蜃楼)
+const JOUYOU_EXPECTED_COUNT := 2136     # D15 §4.3 확정 (표 파일은 `叱` 중복 1건 — 유일 계수로 센다)
 
 # 헤더 순서 = 계약이다. O11 선택 인덱스가 이 순서를 탄다 (options_store.language_code()).
 const HEADER_CONTRACT := ["key", "ko", "en", "ja"]
 
-# O11 언어 단계 라벨 — 계약으로 고정된 이름 (조립형이라 V2 가 보지 못한다).
-# 미유입 2키는 **부재를 단언**한다: 유입되면 이 축이 실패하고, 그때가 조립 분기를
-# 지우고 `OPTIONS["o11"]["steps"]` 에 리터럴로 붙일 시점이다 (자기 만료 강제).
-const LANGUAGE_STEP_PENDING := {"English": "en", "Japanese": "ja"}
+const OPTIONS_STORE_SOURCE := "res://ui/flow/options_store.gd"
+
+# O11 언어 단계 라벨 — 21차는 미유입 2키를 조립했고 22차에 리터럴로 전환했다.
+# 이제 볼 것은 **목록과 헤더의 크기가 같은가**다: 열이 늘고 문면이 안 오면 그 단계의
+# 라벨이 비는데, 빈 라벨은 화면에서 "선택지가 없는 것"과 구분되지 않는다.
 
 var _failures := 0
 var _checked := 0
@@ -97,8 +97,8 @@ func _ok(label: String, condition: bool, detail: String = "") -> void:
 
 func _report() -> void:
 	print("")
-	if _checked < 2500:
-		print("GLYPH_FAIL checks=%d < 하한 2500 (스위트 축소·폰트 적재 실패 의심)" % _checked)
+	if _checked < 3080:
+		print("GLYPH_FAIL checks=%d < 하한 3080 (스위트 축소·폰트 적재 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -332,9 +332,11 @@ func _jouyou_ledger() -> void:
 	_ok("⑤ 일문 한자 계수 = 부록 B 대장", kanji.size() == JA_KANJI_EXPECTED,
 		"actual=%d ledger=%d — 집합이 바뀌었으면 상용한자 재대조가 필요하다"
 			% [kanji.size(), JA_KANJI_EXPECTED])
+	# **'표를 기다리는' 분기는 만료했다.** 21차에는 표가 없어 부재를 정당한 상태로 두었지만
+	# 이제 표가 커밋돼 있으므로 부재는 회귀다 — 경로 오타·파일 이동이 검사를 조용히
+	# '대조 보류'로 내려앉히는 것을 막는다(그 상태에서도 스위트는 녹색이었다).
+	_ok("⑤ 상용한자 표 실재", FileAccess.file_exists(JOUYOU_PATH), JOUYOU_PATH)
 	if not FileAccess.file_exists(JOUYOU_PATH):
-		# 표 부재 = 미대조. **추정으로 통과 선언하지 않는다.** 표가 유입되면 아래로 승격한다.
-		_ok("⑤ 상용한자 표 미유입 — 대조 보류 (추정 통과 금지)", true)
 		return
 	var table := FileAccess.open(JOUYOU_PATH, FileAccess.READ)
 	var text := table.get_as_text()
@@ -346,12 +348,33 @@ func _jouyou_ledger() -> void:
 			allowed[code] = true
 	_ok("⑤ 상용한자 표 계수 = D15 §4.3", allowed.size() == JOUYOU_EXPECTED_COUNT,
 		"actual=%d" % allowed.size())
-	var outside: Array = []
-	for code in kanji:
-		_checked += 1
-		if not allowed.has(code):
-			outside.append(code)
+	# **판별 대조군** — 표가 실제로 가른다는 증거. 이것이 없으면 '상용 밖 0' 은
+	# "표가 전부를 허용한다"로도 성립한다(빈 판정의 전형).
+	_ok("⑤ 표가 상용 안을 통과시킨다: 一", allowed.has("一".unicode_at(0)))
+	_ok("⑤ 표가 상용 밖을 거른다: 墟", not allowed.has("墟".unicode_at(0)))
+	_ok("⑤ 표가 상용 밖을 거른다: 蜃", not allowed.has("蜃".unicode_at(0)))
+	# `𠮟`→`叱` 치환분 — 총괄 조달 문면의 근거가 표에 실제로 반영됐는지
+	_ok("⑤ 치환분 실재: 叱", allowed.has("叱".unicode_at(0)))
+	# 판정을 함수로 떼어 **알려진 입력으로 자기 검사**한다. 단일 분기 검사는 그 분기를
+	# 지우면 조용히 통과하고(돌연변이 G2 미검출로 실측), 표가 가른다는 사실을 확인하는 것과
+	# 비교가 실제로 돈다는 사실을 확인하는 것은 다른 축이다 — V7S 와 같은 형태다.
+	var self_test := _outside_of(
+		{"墟".unicode_at(0): true, "一".unicode_at(0): true}, allowed)
+	_ok("⑤ 판정 자기 검사 — 상용 밖 1자 적출", self_test.size() == 1, str(self_test.size()))
+	_ok("⑤ 판정 자기 검사 — 적출 대상 = 墟",
+		self_test.size() == 1 and int(self_test[0]) == "墟".unicode_at(0))
+	var outside := _outside_of(kanji, allowed)
+	_checked += kanji.size()
 	_ok("⑤ 상용한자 밖 0", outside.is_empty(), _describe_missing(outside))
+
+
+# 집합 차 — 상용 밖 코드포인트 목록. 실사용과 자기 검사가 **같은 함수**를 탄다.
+func _outside_of(chars: Dictionary, allowed: Dictionary) -> Array:
+	var outside: Array = []
+	for code in chars:
+		if not allowed.has(code):
+			outside.append(int(code))
+	return outside
 
 
 # ── ⑥ O11 언어 단계 라벨 계약 ──
@@ -359,26 +382,24 @@ func _language_step_contract() -> void:
 	var keys: Dictionary = {}
 	for row in _strings:
 		keys[String(Dictionary(row).get(KEY_COLUMN, ""))] = true
-	var korean := OptionsStore.LANGUAGE_STEP_DOMAIN + OptionsStore.LANGUAGE_STEP_STEM + "Korean"
-	_ok("⑥ 유입된 단계 키 실재: %s" % korean, keys.has(korean))
-	# **양쪽 상태를 각각 요구한다.** 부재를 그냥 단언하면 문면이 유입되는 정당한 회차가
-	# 이유 없이 붉어진다 — 검사가 남의 정당한 작업을 막는 것은 검사의 일이 아니다.
-	# 대신 "유입되면 리터럴 목록에 있어야 한다"를 건다: 조립 분기는 미유입 임시 경로이므로
-	# 문면이 들어온 뒤에도 조립에 남아 있으면 그것이 결함이다(V2 가 다시 보게 되는 자리다).
-	var literal_steps: Array = Array(Dictionary(OptionsStore.OPTIONS["o11"]).get("steps", []))
-	for stem in LANGUAGE_STEP_PENDING:
-		var key := OptionsStore.LANGUAGE_STEP_DOMAIN + OptionsStore.LANGUAGE_STEP_STEM + String(stem)
-		if keys.has(key):
-			_ok("⑥ 유입된 단계 키는 리터럴 목록에 있다: %s" % key, literal_steps.has(key),
-				"문면이 들어왔으면 조립 분기를 지우고 OPTIONS[\"o11\"][\"steps\"] 에 붙일 시점이다")
-		else:
-			_ok("⑥ 미유입 단계 키는 조립으로 대체: %s" % key, not literal_steps.has(key),
-				"표에 없는 키를 리터럴로 적으면 V2 가 차단한다")
-	# 조립 대장은 어느 상태에서도 헤더 전량을 덮어야 한다 — 한 언어가 빠지면 그 단계가 빈다
-	for code in _languages():
-		var stem := String(OptionsStore.LANGUAGE_STEP_NAMES.get(code, ""))
-		_ok("⑥ 단계 이름 대장 등재: %s" % code, stem != "")
-	_ok("⑥ 언어 코드 표기 대장 = 헤더", OptionsStore.LANGUAGE_STEP_NAMES.size() == _languages().size(),
-		"%d vs %d" % [OptionsStore.LANGUAGE_STEP_NAMES.size(), _languages().size()])
-	for code in _languages():
-		_ok("⑥ 언어 코드 대장 등재: %s" % code, OptionsStore.LANGUAGE_STEP_NAMES.has(code))
+	var steps: Array = Array(Dictionary(OptionsStore.OPTIONS["o11"]).get("steps", []))
+	var languages := _languages()
+	# **크기 대조가 이 축의 본체다.** 목록이 짧으면 뒤 단계의 라벨이 빈 문자열이 되고,
+	# 길면 고를 수 없는 라벨이 목록에 남는다 — 둘 다 화면에서는 조용하다.
+	_ok("⑥ 단계 목록 크기 = 언어 열 수", steps.size() == languages.size(),
+		"steps=%d languages=%d" % [steps.size(), languages.size()])
+	# 조립 분기가 죽었는지 — 리터럴 전환의 실질은 "조립하지 않는다"다.
+	# 원본 텍스트를 본다: 클래스 객체에 상수 유무를 묻는 것보다 확실하고,
+	# 검증기 원본을 읽어 검사 실재를 확인하는 UISCR ⑬ 과 같은 형태다.
+	var store_source := FileAccess.get_file_as_string(OPTIONS_STORE_SOURCE)
+	_ok("⑥ 저장소 원본 적재", not store_source.is_empty(), OPTIONS_STORE_SOURCE)
+	for leftover in ["LANGUAGE_STEP_DOMAIN", "LANGUAGE_STEP_STEM", "LANGUAGE_STEP_NAMES"]:
+		_ok("⑥ 조립 상수 잔존 0: %s" % leftover, not store_source.contains(leftover),
+			"조립 상수가 남아 있으면 리터럴 전환이 절반이다")
+	for step_key in steps:
+		# 리터럴이므로 V2 가 이미 존재를 차단 검사한다. 여기서 겹쳐 보는 이유는
+		# **V2 는 코드 리터럴을 보고 이 축은 목록의 의미를 본다**는 것 — 목록에서 빠진
+		# 키는 V2 의 시야에서도 함께 사라지므로 V2 만으로는 누락을 못 잡는다.
+		_ok("⑥ 단계 문면 실재: %s" % step_key, keys.has(String(step_key)))
+	_ok("⑥ 원문 단계가 첫 자리", steps.size() > 0
+		and String(steps[0]).ends_with("Korean"), str(steps))

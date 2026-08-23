@@ -111,11 +111,20 @@ func _on_confirm() -> void:
 				(%ConfirmButton as Button).disabled = true
 				_rebuild_candidates()
 				return
-			# 시즌 체인 경유(SET-02 → HUB-08)면 다음 시즌을 개막하고 개러지로.
-			# (시즌 엔딩 VN은 NAR-01 결선 시 이 사이에 삽입된다 — D09 §2.3)
+			# 시즌 체인 경유(SET-02 → HUB-08)면 다음 시즌을 개막하고 개막 VN 을 거쳐 개러지로.
+			# (시즌 엔딩 VN 은 이 사이에 삽입된다 — D09 §2.3 · 미결선)
+			#
+			# **개막 VN 의 유일 진입점이 커리어 개시 경로뿐이었다** — `vnslot_season_open` 의
+			# 데이터는 `trigger season_start`(매 시즌)인데 결선은 시즌 1 한 번뿐이라
+			# 데이터와 결선이 어긋난 상태였다(내러티브 5차 §4.4-2 실독). 문안을 시즌 무관
+			# 정경으로 쓴 근거가 여기서 결선 요구가 된다.
 			if _season_chain:
 				session.begin_next_season()
 				session.save_progress()  # 시즌 경계 저장 지점 (D09 §2.4)
+				var opening := session.season_open_payload("HUB-01")
+				if not opening.is_empty():
+					go("NAR-01", opening)
+					return
 			go("HUB-01", {}))
 
 

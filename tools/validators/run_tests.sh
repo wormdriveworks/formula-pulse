@@ -28,12 +28,12 @@ fi
 TESTS=(
 	"tests/test_core_loop.gd:0"
 	"tests/test_save_reload.gd:0"
-	"tests/test_tc_c.gd:2229"
+	"tests/test_tc_c.gd:2234"
 	"tests/test_tc_p.gd:153"
 	"tests/test_events.gd:7039"
 	"tests/test_season.gd:497"
 	"tests/test_tc_o.gd:395"
-	"tests/test_narrative.gd:156"
+	"tests/test_narrative.gd:163"
 	# AUDIO — 오디오 디스패처 정책 4종(봉인·게이트·채널 상한·P1 보호) + 표 전수 대조.
 	"tests/test_audio.gd:384"
 	# AUDIO-A — 오디오 **실물** 68식. 표·디스패처 검사(AUDIO)와 파일 검사(검증기 AUD)가 못 보는
@@ -53,10 +53,10 @@ TESTS=(
 	# GLYPH — 원도 커버리지. 판정 대상이 "원도가 이 문자를 실제로 그릴 수 있는가"이고 그 답의
 	# 정본은 엔진이 적재한 폰트다 — 검증기는 프로젝트리스라 `FontFile` 을 적재할 수 없고,
 	# cmap 자작 파서가 엔진과 한 칸 갈리면 그 차이가 곧 오검출이거나 누락이다(AUD/AUDIO-A 전례).
-	"tests/test_glyph_coverage.gd:2560"
+	"tests/test_glyph_coverage.gd:3081"
 	# UISCR — 화면을 실제로 세워 본다. 문맥 결손(무커리어 진입)·포커스 부재는 데이터·코어
 	# 검사가 원리적으로 닿지 못하고, 커리어를 연 경로에서는 멀쩡해 보인다.
-	"tests/test_ui_screens.gd:360"
+	"tests/test_ui_screens.gd:388"
 	# SEAL-E — 실화면을 인스턴스화해 릴 정지 연출 전 UI 노출을 잡는다.
 	# 라운드 수가 GP 길이(12~15턴 + 듀얼 삽입)에 따라 달라지므로 하한은 최소 GP 기준이다.
 	"tests/test_seal_ui.gd:84"

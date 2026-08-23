@@ -85,12 +85,9 @@ func _on_slot_pressed(profile: int, has_save: bool) -> void:
 		# 연속 슬롯으로 두고(D09 §2.3), D08 §8.1 의 공표 위치가 브리핑 슬롯이다.
 		# 대기분이 없으면 사슬이 그대로 `RACE-01` 로 접힌다 — 분기를 두지 않는다.
 		var after_open := session.take_brief_payload("RACE-01")
-		go("NAR-01", {
-			"vn_id": "vn_season_open_s%d" % session.season.season,
-			"slot_id": "vnslot_season_open",
-			"calendar": true,
-			"next": "NAR-01" if not after_open.is_empty() else "RACE-01",
-			"next_payload": after_open,
-		})
+		# 페이로드는 세션 창구가 조립한다 — 라인·톤이 비트 표에서 오므로 화면이 표를 읽지 않는다.
+		# 화면이 직접 조립하던 시절에는 `line_keys` 가 빠져 폴백 1줄이 떴다(주력 12차 관측 3).
+		go("NAR-01", session.season_open_payload(
+			"NAR-01" if not after_open.is_empty() else "RACE-01", after_open))
 		return
 	go("RACE-01", {})

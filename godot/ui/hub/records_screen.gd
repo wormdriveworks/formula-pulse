@@ -185,6 +185,19 @@ func _vn_title(vn_id: String) -> String:
 	if not session.data.act_vn_entry(vn_id).is_empty():
 		# 표에 없는 막 — 원문 id 를 그리지는 않는다(표제 부재보다 표제 오류가 나쁘다).
 		return s.text("ui.vnSlot.tourBrief")
+	# 비트 id 는 **슬롯 표에서 표제를 얻는다** — 리터럴 매핑을 두지 않는다.
+	# 비트 행이 이미 `slot_id` 를 선언하고 `vn_slots.name_key` 가 그 슬롯의 표제이므로
+	# 매핑을 손으로 적으면 같은 사실이 두 곳에 살고, 비트가 늘 때마다 한쪽이 밀린다
+	# (막 VN 은 표에 슬롯이 없어 리터럴 표가 남아 있는 것이다 — 성격이 다르다).
+	# `name_key` 는 `string_key` 열이라 V2·V6 이 참조를 이미 본다.
+	var beat := session.data.vn_beat(vn_id)
+	var beat_slot := String(beat.get("slot_id", ""))
+	# 공란 검사가 요건이다 — `vn_slot()` 은 미등재 슬롯에 `_load_ok = false` 를 세운다.
+	# 표시 함수가 적재 상태를 떨어뜨리면 그 다음 `param()` 부터 조용한 0 이 나온다.
+	if not beat_slot.is_empty():
+		var slot := session.data.vn_slot(beat_slot)
+		if not slot.is_empty():
+			return s.text(String(slot["name_key"]))
 	if vn_id.begins_with("vn_season_open"):
 		return s.text("ui.vnSlot.seasonOpen")
 	if vn_id.begins_with("vn_season_close"):

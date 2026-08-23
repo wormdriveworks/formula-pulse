@@ -3,7 +3,7 @@
 # 실행: godot --headless --path godot --script tests/test_narrative.gd
 extends SceneTree
 
-const MIN_CHECKS := 156
+const MIN_CHECKS := 163
 
 var _failures := 0
 var _checked := 0
@@ -597,6 +597,32 @@ func _beat_data() -> void:
 		data.vn_beats_for("vnslot_tour_brief", "stage_alta_ridge", stage_one).is_empty())
 	_ok("슬롯 불일치 = 미조회",
 		data.vn_beats_for("vnslot_season_open", "stage_alta_ridge", stage_zero).is_empty())
+	# ── 개막 비트 (22차 — 축도 무대도 갖지 않는 첫 비트) ──
+	#
+	# **무대 질의가 빈 문자열이어야 잡힌다.** 현재 무대를 넘기면 영구 미조회가 되고,
+	# 그 미조회는 화면에서 폴백 1줄로 나타나 "문안이 없다"와 구분되지 않는다.
+	var opening := data.vn_beats_for("vnslot_season_open", "", stage_zero)
+	_ok("개막 비트 = 빈 무대 질의로 조회", opening.size() == 1, str(opening.size()))
+	_ok("개막 비트 = 현재 무대 질의로는 미조회 (호출부 인자 계약)",
+		data.vn_beats_for("vnslot_season_open", "stage_metro_night", stage_zero).is_empty())
+	# 축이 없어도 단계 구간 0~0 이 성립한다 — `relation_stage("")` 가 0 을 돌려주기 때문이다.
+	# 그 사실이 깨지면 개막 비트가 조용히 사라지므로 여기서 값으로 확인한다.
+	_ok("축 공란 비트의 단계 구간 성립", opening.size() == 1
+		and String(Dictionary(opening[0]).get("axis_id", "x")) == "")
+	# **슬롯 격리** — 브리핑 질의에 개막 비트가 섞이면 투어마다 개막 정경이 뜬다.
+	_ok("브리핑 질의에 개막 비트 미포함",
+		data.vn_beats_for("vnslot_tour_brief", "", stage_zero).is_empty())
+	if opening.size() == 1:
+		var opening_id := String(Dictionary(opening[0])["id"])
+		var opening_lines := data.vn_beat_lines_for(opening_id)
+		_ok("개막 비트 3라인", opening_lines.size() == 3, str(opening_lines.size()))
+		_ok("개막 비트 톤 = 슬롯 톤(calm)",
+			String(Dictionary(opening[0]).get("tone", "")) == "calm")
+		# 표제는 **슬롯 표에서** 온다 — 아카이브가 원문 id 를 그리지 않는 근거다(22차 ⓘ).
+		var slot := data.vn_slot(String(Dictionary(opening[0])["slot_id"]))
+		_ok("개막 비트 슬롯 표제 실재",
+			not slot.is_empty() and data.strings.has_key(String(slot["name_key"])),
+			str(slot.get("name_key", "")))
 	# **반복 노출 상한이 데이터로 정해진다** — 단계 0 구간이므로 카운터가 2에 닿으면(threshold1)
 	# 더 이상 서지 않는다. 내러티브 3차 §5.2 가 이월한 "반복 피로"의 현행 상한이 그것이다.
 	var beat: Dictionary = data.vn_beats["vnbeat_reunion_alta"]

@@ -151,6 +151,7 @@ func begin_career(profile: int) -> void:
 # 막 VN 발행 슬롯 — 공표 위치는 **투어 브리핑 슬롯**이다
 # (D08 §8.1 "투어 종료 결산~차기 투어 브리핑 슬롯에서 공표").
 const ACT_VN_SLOT := "vnslot_tour_brief"
+const SEASON_OPEN_SLOT := "vnslot_season_open"
 
 
 # 브리핑 슬롯에서 세울 VN 사슬을 NAR-01 페이로드로 꺼낸다 — 없으면 **빈 사전**(화면은 그대로
@@ -198,7 +199,24 @@ func _pending_brief_beats() -> Array:
 		func(axis_id: String): return outgame.relation_stage(axis_id))
 
 
-func _beat_payload(beat_id: String, next_route: String, next_payload: Dictionary) -> Dictionary:
+# vn_id_override — 아카이브가 시즌마다 한 줄을 남겨야 하는 개막 비트용.
+# 비어 있으면 비트 id 를 그대로 쓴다(브리핑 비트의 기존 거동).
+func _beat_payload(beat_id: String, next_route: String, next_payload: Dictionary,
+		vn_id_override := "") -> Dictionary:
+	var beat := data.vn_beat(beat_id)
+	return {
+		"vn_id": beat_id if vn_id_override.is_empty() else vn_id_override,
+		# 슬롯은 **비트 행이 이미 선언한다** — 호출부가 상수로 못 박으면 비트가 다른 슬롯에
+		# 붙는 날(개막 비트가 그랬다) 라인은 맞고 슬롯만 틀린 페이로드가 나간다.
+		"slot_id": String(beat.get("slot_id", ACT_VN_SLOT)),
+		"line_keys": _beat_lines(beat_id),
+		"tone": String(beat.get("tone", "")),
+		"next": next_route,
+		"next_payload": next_payload,
+	}
+
+
+func _beat_lines(beat_id: String) -> Array:
 	var lines: Array = []
 	for line in data.vn_beat_lines_for(beat_id):
 		var row: Dictionary = line
@@ -206,14 +224,38 @@ func _beat_payload(beat_id: String, next_route: String, next_payload: Dictionary
 			"speaker_key": String(row["speaker_key"]),
 			"text_key": String(row["text_key"]),
 		})
-	return {
-		"vn_id": beat_id,
-		"slot_id": ACT_VN_SLOT,
-		"line_keys": lines,
-		"tone": String(data.vn_beat(beat_id).get("tone", "")),
-		"next": next_route,
-		"next_payload": next_payload,
-	}
+	return lines
+
+
+# 시즌 개막 VN 페이로드 — **유일 창구.** 개시 경로(SYS-02)와 시즌 전환 경로(HUB-08)가
+# 각자 조립하면 한쪽만 라인을 넘기는 상태가 생긴다 (22차 전에 정확히 그랬다:
+# 개시 경로만 있었고 그 경로가 `line_keys` 를 넘기지 않아 폴백 1줄이 떴다).
+#
+# **무대 조회에 빈 문자열을 넘긴다.** 개막 비트는 무대도 축도 갖지 않으므로
+# 현재 무대를 넘기면 영구 미조회가 된다 (내러티브 5차 §4.3 실독).
+# `vn_id` 는 시즌 단위 인스턴스로 유지한다 — 아카이브가 시즌마다 한 줄을 남겨야 하고,
+# 비트 id 로 바꾸면 전 시즌이 한 줄로 접힌다.
+func season_open_payload(next_route: String, next_payload: Dictionary = {}) -> Dictionary:
+	if season == null:
+		return {}
+	var vn_id := "vn_season_open_s%d" % season.season
+	var beats := _season_open_beats()
+	if beats.is_empty():
+		# 표 행 부재 — 캘린더만. 라인 폴백은 화면 소관이다.
+		return {"vn_id": vn_id, "slot_id": SEASON_OPEN_SLOT, "calendar": true,
+			"next": next_route, "next_payload": next_payload}
+	# **페이로드 조립기는 하나다** — 슬롯·톤·라인이 비트 행에서 오는 규칙을 두 곳에 두면
+	# 한쪽만 낡는다(개막 경로가 슬롯을 상수로 적던 것이 그 형태였다).
+	var payload := _beat_payload(String(beats[0]["id"]), next_route, next_payload, vn_id)
+	payload["calendar"] = true   # 캘린더 공개 (D09 §2.3)
+	return payload
+
+
+func _season_open_beats() -> Array:
+	if outgame == null or data == null:
+		return []
+	return data.vn_beats_for(SEASON_OPEN_SLOT, "",
+		func(axis_id: String): return outgame.relation_stage(axis_id))
 
 
 func _act_vn_payload(vn_id: String, next_route: String, next_payload: Dictionary) -> Dictionary:
