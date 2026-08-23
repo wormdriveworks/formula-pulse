@@ -719,6 +719,9 @@ vn.reunion.beat05,그 이름은 여기서 꺼내지 마라.,Do not bring up that
 vn.seasonOpen.beat01,리그 캘린더가 붙는다. 무대 다섯.,The league calendar goes up. Five stages.,リーグカレンダーが出た。舞台は五つ。
 vn.seasonOpen.beat02,한 해가 종이 한 장이에요.,A whole year on one sheet of paper.,一年が紙一枚に収まってます。
 vn.seasonOpen.beat03,한 장이면 됐다. 순서대로 간다.,One sheet is enough. We go in order.,一枚で足りる。順に行く。
+vn.seasonClose.beat01,정비대에 낡은 부품이 쌓여 있다.,Worn parts pile up on the bench.,整備台に古い部品が積まれている。
+vn.seasonClose.beat02,하나는 남겨두죠.,Let's keep one.,一つは残しましょう。
+vn.seasonClose.beat03,한 시즌이 저만큼이다.,One season comes to that much.,一シーズンがあれだけです。
 vnChoice.act1.opt1,[스티어링을 고쳐 쥔다],[Regrip the wheel],[ステアリングを握り直す]
 vnChoice.act1.opt2,[13번을 손으로 덮는다],[Cover the 13 by hand],[13番を手で覆う]
 vnChoice.act1.opt3,[마르타를 본다],[Look at Marta],[マルタを見る]
