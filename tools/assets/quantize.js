@@ -21,10 +21,19 @@
  *    이고 이 파일은 색값을 하나도 갖지 않는다. 디더는 끈다(운용지침 §4.3 — 자동 디더는
  *    도트 그리드를 깨서 수작업량을 늘린다).
  *
+ * ── 패치 단계 (IMPL-337 신설) — 사양서 §2.3 ④ 수작업이 사는 자리.
+ *    양자화 뒤에 `pixel_patch.json` 의 편집을 적용한다. **왜 파일이 아니라 데이터로 두는가:**
+ *    산출물을 손으로 고치면 `--check`(원본+팔레트 → 산출물 재산출 대조)가 즉시 깨진다.
+ *    그러면 선택지가 둘인데 둘 다 나쁘다 — 검사를 끄거나, 원본을 고쳐 "원본"을 거짓으로 만드는 것.
+ *    편집을 **좌표·색으로 적어 두면** 세 번째 길이 열린다: `--check` 가 *원본 + 팔레트 + 패치*
+ *    → 산출물을 재산출해 대조하므로 **수작업이 재현 계약 안에 들어온다.**
+ *    부수 이득이 더 크다 — 손으로 무엇을 고쳤는지가 **읽을 수 있는 기록**으로 남는다
+ *    (`icon_art.json` 이 도상을 ASCII 로 둔 것과 같은 규율: *"PNG 바이트만 남기면 다음
+ *    편집자가 읽을 수 없고 재현도 못 한다"*).
+ *
  * ── 무엇을 하지 않는가 (검증한 척하지 않는다)
- *    **믹셀 제거·윤곽 정리(사양서 §2.3 ④)를 하지 않는다.** 그 단계는 명시적으로 수작업이며,
- *    본 도구는 색만 옮긴다. 양자화가 형태를 뭉갰는지도 판정하지 않는다 — 그것은 눈 소관이고,
- *    그래서 원본을 지우지 않고 남긴다(되돌릴 수 있어야 원인을 분리할 수 있다).
+ *    **무엇을 고쳐야 하는지 판정하지 않는다.** 패치 내용은 눈이 정하고 본 도구는 적용·대조만 한다.
+ *    양자화가 형태를 뭉갰는지도 판정하지 않는다 — 그래서 원본을 지우지 않고 남긴다.
  *
  * 사용:  node tools/assets/quantize.js <원본디렉토리> <출력디렉토리>
  *        node tools/assets/quantize.js <원본디렉토리> <출력디렉토리> --check
@@ -38,6 +47,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const STRIP = path.join(ROOT, 'tools', 'palette', 'master_60_strip.png');
 
 const KNOWN = new Set(['--check']);
+const PATCH_FILE = path.join(__dirname, 'pixel_patch.json');
 const args = process.argv.slice(2);
 const bad = args.filter((a) => a.startsWith('-') && !KNOWN.has(a));
 if (bad.length) { console.error(`FATAL: 미지의 플래그 ${bad.join(' ')} — 알려진 것은 ${[...KNOWN].join(' ')}`); process.exit(2); }
@@ -156,6 +166,41 @@ function nearest(r, g, b) {
   return PAL[best];
 }
 
+// ─────────────────────────────────────────────── 패치 (사양서 §2.3 ④)
+// 키 = "<산출 디렉토리명>/<파일명>" — 캐릭터·머신이 같은 원장을 쓰되 섞이지 않게 한다.
+let PATCH = { palette: {}, patches: {} };
+if (fs.existsSync(PATCH_FILE)) PATCH = JSON.parse(fs.readFileSync(PATCH_FILE, 'utf8'));
+const PPAL = {};
+for (const [k, v] of Object.entries(PATCH.palette || {})) {
+  if (!/^#[0-9A-F]{6}$/.test(v)) die(`pixel_patch palette ${k}: 색 형식 아님 (${v})`);
+  // 패치 색도 순색 60 안이어야 한다 — 손으로 고친 픽셀이 대장을 빠져나가면 양자화가 무의미해진다.
+  if (!PAL.some((p) => p[0] === parseInt(v.substr(1, 2), 16) && p[1] === parseInt(v.substr(3, 2), 16) && p[2] === parseInt(v.substr(5, 2), 16)))
+    die(`pixel_patch palette ${k} ${v}: 순색 60 밖 — 패치도 조달 대장 안에서만 고른다`);
+  PPAL[k] = [1, 3, 5].map((i) => parseInt(v.substr(i, 2), 16));
+}
+const DST_TAG = path.basename(path.resolve(DST));
+function applyPatch(name, w, h, buf) {
+  const spec = (PATCH.patches || {})[`${DST_TAG}/${name}`];
+  if (!spec) return 0;
+  let touched = 0;
+  const put = (x, y, key) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) die(`patch ${name}: 캔버스 밖 (${x},${y})`);
+    const i = (y * w + x) * 4;
+    if (key === '.') { buf[i] = buf[i + 1] = buf[i + 2] = buf[i + 3] = 0; touched++; return; }
+    const c = PPAL[key];
+    if (!c) die(`patch ${name}: palette 에 없는 색 키 '${key}'`);
+    buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255; touched++;
+  };
+  for (const op of spec.ops || []) {
+    if (op.rect) { const [x, y, rw, rh] = op.rect; for (let dy = 0; dy < rh; dy++) for (let dx = 0; dx < rw; dx++) put(x + dx, y + dy, op.color); }
+    else if (op.set) { for (const [x, y] of op.set) put(x, y, op.color); }
+    else die(`patch ${name}: op 에 rect·set 이 없다`);
+  }
+  return touched;
+}
+// 원장에만 있고 대상이 없는 패치 = 유령 패치. 조용히 늙지 않게 한다.
+const patchKeys = Object.keys(PATCH.patches || {}).filter((k) => k.startsWith(DST_TAG + '/'));
+
 // ─────────────────────────────────────────────── 주행
 const files = fs.readdirSync(SRC).filter((f) => f.endsWith('.png')).sort();
 if (files.length === 0) die(`${SRC} 에 PNG 가 없다`);
@@ -178,8 +223,10 @@ for (const f of files) {
     out[i * 4] = p[0]; out[i * 4 + 1] = p[1]; out[i * 4 + 2] = p[2]; out[i * 4 + 3] = 255;
     after.add((p[0] << 16) | (p[1] << 8) | p[2]);
   }
+  const patched = applyPatch(f, img.w, img.h, out);
+  if (patched) { after.clear(); for (let i = 0; i < img.w * img.h; i++) if (out[i * 4 + 3]) after.add((out[i * 4] << 16) | (out[i * 4 + 1] << 8) | out[i * 4 + 2]); }
   const dstFile = path.join(DST, f);
-  const tag = `${img.w}×${img.h} · 고유색 ${before.size} → ${after.size}`;
+  const tag = `${img.w}×${img.h} · 고유색 ${before.size} → ${after.size}` + (patched ? ` · 패치 ${patched}px` : '');
   if (CHECK_ONLY) {
     if (!fs.existsSync(dstFile)) { fail(`${f} 산출물 부재 — 원본만 있고 결과가 없다`); continue; }
     const got = decode(dstFile);
@@ -194,6 +241,8 @@ for (const f of files) {
   }
 }
 
+for (const k of patchKeys) { const base = k.slice(DST_TAG.length + 1); if (!files.includes(base)) fail(`유령 패치: ${k} — 대상 파일이 없다`); }
+
 console.log('');
 if (fails) { console.log(`QUANTIZE FAIL fails=${fails}`); process.exit(1); }
-console.log(`QUANTIZE ${CHECK_ONLY ? 'PASS' : 'OK'} files=${files.length} palette=${PAL.length}`);
+console.log(`QUANTIZE ${CHECK_ONLY ? 'PASS' : 'OK'} files=${files.length} palette=${PAL.length} patches=${patchKeys.length}`);
