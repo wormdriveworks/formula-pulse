@@ -164,14 +164,78 @@ function nearest(r, g, b) {
   }
   return PAL[best];
 }
+// ─────────────────────────────────────────────── 작도 (`draw`)
+//
+//    **기하 요소는 RD 로 만들지 않는다.** 지침 §5.1 이 실측한 일반화 —
+//    *"RD 의 하한은 절대 픽셀 수가 아니라 대상 복잡도 대비 픽셀 수다"* — 의 반대편이다.
+//    스피드 라인·잔상·경고광·섬광은 이 프로젝트에서 **가장 단순한 형상**이면서
+//    **축·간격·색이 정확해야** 한다. 글리프 20종이 *"정확히 같아야 한다"* 는 요구 때문에
+//    RD 기각 후 선언형 작도로 채택된 것과 같은 자리다(IMPL-314 · `frame_gen.js` glyph).
+//
+//    좌표와 색은 **전부 원장에 있다** — 코드는 규칙만 갖는다(불변규칙 #2).
+//    프레임을 굽지 않는다: 움직임은 합성 선언(§5.2.2)의 스크롤·명멸·확대가 만든다.
+function drawElement(name, e) {
+  if (!Array.isArray(e.size) || e.size.length !== 2) die(`${name}: draw 요소는 size [w,h] 가 필요하다`);
+  const [W, H] = e.size;
+  const buf = Buffer.alloc(W * H * 4);
+  const put = (x, y, c) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return false;
+    const i = (y * W + x) * 4;
+    buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2]; buf[i + 3] = 255;
+    return true;
+  };
+  let drawn = 0, outside = 0;
+  const mark = (x, y, c) => { if (put(x, y, c)) drawn++; else outside++; };
+  for (const op of (e.draw || [])) {
+    const c = op.color === undefined ? null : hex(op.color);
+    if (c && !PAL.some((q) => q[0] === c[0] && q[1] === c[1] && q[2] === c[2])) {
+      die(`${name}: 작도색 ${op.color} 이 순색 60 밖이다 — 작도도 조달 대장 안에서만 고른다`);
+    }
+    if (op.t === 'run') {                      // 가로 획 — 스피드 라인·잔상의 기본 단위
+      for (let x = op.x; x < op.x + op.len; x++) mark(x, op.y, c);
+    } else if (op.t === 'disc') {              // 채운 원 — 광원 코어
+      for (let y = -op.r; y <= op.r; y++) for (let x = -op.r; x <= op.r; x++) {
+        if (x * x + y * y <= op.r * op.r) mark(op.cx + x, op.cy + y, c);
+      }
+    } else if (op.t === 'ring') {               // 고리 — 광원 헤일로
+      const r2i = op.r0 * op.r0, r2o = op.r1 * op.r1;
+      for (let y = -op.r1; y <= op.r1; y++) for (let x = -op.r1; x <= op.r1; x++) {
+        const d = x * x + y * y;
+        if (d >= r2i && d <= r2o) mark(op.cx + x, op.cy + y, c);
+      }
+    } else if (op.t === 'rays') {               // 방사선 — 섬광
+      if (!Number.isInteger(op.n) || op.n < 2) die(`${name}: rays.n 은 2 이상의 정수다`);
+      for (let k = 0; k < op.n; k++) {
+        const a = (2 * Math.PI * k) / op.n + (op.rot || 0);
+        const dx = Math.cos(a), dy = Math.sin(a) * (op.squash === undefined ? 1 : op.squash);
+        for (let r = op.r0; r <= op.r1; r++) {
+          mark(op.cx + Math.round(dx * r), op.cy + Math.round(dy * r), c);
+        }
+      }
+    } else {
+      die(`${name}: 미지의 작도 연산 '${op.t}'`);
+    }
+  }
+  if (!drawn) die(`${name}: 작도가 한 픽셀도 그리지 않았다`);
+  if (outside) die(`${name}: 작도가 캔버스 밖으로 ${outside}회 나갔다 — 좌표가 틀렸다`);
+  console.log(`      · 작도 ${e.draw.length}연산 · ${drawn}px`);
+  return { w: W, h: H, rgba: buf };
+}
+
 // ─────────────────────────────────────────────── 본체
 const spec = JSON.parse(fs.readFileSync(SPEC, 'utf8'));
 console.log(`연출 요소 렌더 — ${Object.keys(spec.elements).length}종 · 순색 60\n`);
 
 for (const [name, e] of Object.entries(spec.elements)) {
-  const srcPath = path.join(SRC, e.src);
-  if (!fs.existsSync(srcPath)) die(`${name}: 원본 없음 — ${e.src}`);
-  const img = decode(srcPath);
+  let img;
+  if (e.draw) {
+    if (e.src) die(`${name}: draw 와 src 를 함께 선언할 수 없다`);
+    img = drawElement(name, e);
+  } else {
+    const srcPath = path.join(SRC, e.src);
+    if (!fs.existsSync(srcPath)) die(`${name}: 원본 없음 — ${e.src}`);
+    img = decode(srcPath);
+  }
   const { w: W, h: H } = img;
   const CW = e.cell[0], CH = e.cell[1];
   if (W % CW || H % CH) die(`${name}: 시트 ${W}×${H} 가 셀 ${CW}×${CH} 로 나뉘지 않는다`);
