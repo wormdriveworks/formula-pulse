@@ -212,6 +212,25 @@ function drawElement(name, e) {
           mark(op.cx + Math.round(dx * r), op.cy + Math.round(dy * r), c);
         }
       }
+    } else if (op.t === 'halo') {
+      // 밴드 디더 — **장(場)을 그리는 연산**. 실선 고리를 겹치면 표적이 되고, 성기게 흩으면
+      // 감쇠가 된다(경고광 1차·오라 1차가 같은 이유로 실패했다: 규칙적 경계는 기계로 읽힌다).
+      // 표본 솎기는 **결정적**이다 — 난수를 쓰면 `--check` 재현이 깨진다.
+      if (!Array.isArray(op.keep) || op.keep.length !== 2) die(`${name}: halo.keep 은 [남길 수, 주기] 다`);
+      const [kk, nn] = op.keep;
+      if (!Number.isInteger(kk) || !Number.isInteger(nn) || kk < 1 || kk > nn) die(`${name}: halo.keep 값이 범위 밖이다`);
+      const sq = op.squash === undefined ? 1 : op.squash;
+      const r2i = op.r0 * op.r0, r2o = op.r1 * op.r1;
+      let idx = 0;
+      for (let y = -Math.ceil(op.r1 * sq); y <= Math.ceil(op.r1 * sq); y++) {
+        for (let x = -op.r1; x <= op.r1; x++) {
+          const yy = y / sq;
+          const d = x * x + yy * yy;
+          if (d < r2i || d > r2o) continue;
+          if ((idx++ * 7) % nn >= kk) continue;   // 결정적 솎기
+          mark(op.cx + x, op.cy + y, c);
+        }
+      }
     } else {
       die(`${name}: 미지의 작도 연산 '${op.t}'`);
     }
