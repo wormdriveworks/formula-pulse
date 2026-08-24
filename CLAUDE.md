@@ -124,7 +124,7 @@ C:\SDKs\godot\Godot_v4.7.1-stable_win64_console.exe  ← CLI 전용 (실측 검�
 내러티브 턴제 레이싱 로그라이트. 슬롯 릴로 섹터를 주파하고, 자원으로 무작위성을 통제한다.
 설계 문서 **D01~D16 전량 확정** 상태이며, 본 리포지토리는 **구현 단계** 전용이다.
 
-- **단일 진실 원천:** `docs/master_plan_v3_08.md`
+- **단일 진실 원천:** `docs/master_plan_v3_09.md`
 - **설계 정본:** `docs/design/` (21개 파일 — **읽기 전용. 수정 금지**)
 - **구현 결정 로그:** `docs/decisions/impl_log.md`
 - **현재 마일스톤:** MS-3 Steam EA (D15 §1.1) — 착수 프롬프트 = `prompts/MS3_kickoff.md` (양 레인 공용)
@@ -144,8 +144,10 @@ godot/ui/        화면 층 (D09/D09-2)
 godot/data/      콘텐츠 데이터 (tables=CSV·structures=JSON·strings=CSV)
 godot/assets/    아트·사운드 실물 — D10 §8.2 카테고리별 하위 (characters/vane/machines/
                  scenecuts/ui/{icons,frames}/glyphs/fonts/palettes/backgrounds/illustrations)
-                 + audio/ (D11 소관 — SFX·BGM·징글) · platform/ (앱 아이콘·스플래시) ·
-                   store/ (D15 스토어 소재 — 리프레임 산출물). ← 이 3계는 D10 카테고리 밖이며
+                 + audio/ (D11 소관 — SFX·BGM·징글) · platform/ (앱 아이콘·스플래시).
+                   스토어 제출 소재는 리포지토리 루트 store/ (godot/ 밖 — 빌드 제외가 목적,
+                   res:// 밖이라 export 제외 규칙·.import 불요 — 배치 대장 v1.2 §1.1 논거,
+                   총괄 정정 IMPL-414). ← audio/·platform/·store/ 3계는 D10 카테고리 밖이며
                    구현 재량 배치다 (총괄 판정 2026-08-16). D10 §8.2는 아트 수량 집계표이지
                    디렉토리 규격이 아니다 — 디렉토리 정본 = D12 §2.1 + 본 파일
                  에셋 ID = `A-<분류>-##` (D10 §8.1) · `.import` 커밋 필수 (IMPL-003·IMPL-021)
