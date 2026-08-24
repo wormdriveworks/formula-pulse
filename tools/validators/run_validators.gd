@@ -1005,7 +1005,10 @@ func _run_v6_id_hygiene() -> void:
 		var columns: Dictionary = _config["tables"][file_name]["columns"]
 		for row in _tables[file_name]:
 			for column_name in columns:
-				if String(columns[column_name]) == "string_key":
+				# **선택형도 참조다** — `string_key_optional` 을 빼면 그 열이 가리키는 키가
+				# 전부 고아로 잡힌다(27차 실측: `title_key` 8건). 새 타입을 한 검사에만
+				# 넣고 다른 검사에 넣지 않는 것이 22차 V2 구멍과 같은 형태다.
+				if String(columns[column_name]) in ["string_key", "string_key_optional"]:
 					all_referenced[String(row.get(column_name, "")).strip_edges()] = true
 	for file_name in _structures:
 		_collect_strings_deep(_structures[file_name], all_referenced)

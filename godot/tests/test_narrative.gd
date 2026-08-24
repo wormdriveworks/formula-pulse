@@ -3,15 +3,21 @@
 # 실행: godot --headless --path godot --script tests/test_narrative.gd
 extends SceneTree
 
-const MIN_CHECKS := 213
+const MIN_CHECKS := 235
 
 # 화자 키 도메인 — 조각으로 나누지 않아도 되는 형태(끝이 `.` 라 키 문법에 걸리지 않는다).
 # 조각으로 나눈다 — 이어 붙인 전체가 리터럴로 있으면 V2 가 '코드가 발행하는 키'로 보고
 # 미등재를 차단한다(접두는 키가 아니다 · 21차·25차 전례).
 const SPEAKER_DOMAIN := "ui.vn." + "speaker"
 
-# 표제 미유입 계수 — 내러티브 9차가 8문안을 대면 0이 되고 이 대장은 만료한다.
-const TITLE_PENDING := 8
+# 표제 미기입 계수 — **0 = 전건 기입**. 26차에 8로 세웠고 내러티브 9차 유입과 함께 만료했다.
+#
+# **트립와이어가 어디 걸려 있는지 26차 회신이 틀리게 적었다** (총괄 정정 접수): 이 축은
+# `title_key` **열의 공란 수**를 세지 `strings.csv` 를 보지 않는다 — 문면이 도착해도 축은
+# 조용하고, **열을 채우는 순간** 8→0 으로 붉어진다. 즉 이 상수는 *문면 대기*가 아니라
+# **열 기입과 같은 커밋에서 함께 움직여야 하는 값**이다. 0 이 된 지금은 회귀 가드다:
+# 누군가 표제를 지우면 여기서 걸린다.
+const TITLE_PENDING := 0
 
 var _failures := 0
 var _checked := 0
@@ -34,6 +40,7 @@ func _init() -> void:
 	_beat_data()
 	_season_boundary_vn()
 	_milestone_vn_wiring()
+	_milestone_firing()
 	print("")
 	if _checked < MIN_CHECKS:
 		print("NARRATIVE_TEST_FAIL checks=%d < 하한 %d (스위트 축소·로드 실패 의심)" % [_checked, MIN_CHECKS])
@@ -796,7 +803,121 @@ func _milestone_vn_wiring() -> void:
 	for beat in milestone:
 		if data.vn_beat_title_key(String(Dictionary(beat)["id"])).is_empty():
 			untitled.append(String(Dictionary(beat)["id"]))
-	_ok("표제 미유입 대장 = 8건 (내러티브 9차 대기)", untitled.size() == TITLE_PENDING,
-		"%d — 문면이 유입되면 title_key 를 채울 시점이다" % untitled.size())
+	_ok("표제 미기입 0 (전건 기입)", untitled.size() == TITLE_PENDING,
+		"%d — 미기입 비트: %s" % [untitled.size(), str(untitled)])
 	_ok("표제 기제 실재 (비트 행이 표제를 인다)",
 		data.vn_beats.values().any(func(row): return Dictionary(row).has("title_key")))
+
+
+# ── 마일스톤 VN 발화 경로 (27차) — 자격·우선순위·이월·형식 B ──
+#
+# **이월에 대기열이 없다.** 자격을 상태에서 도출하므로 밀린 비트는 다음 경계에도
+# 여전히 자격을 갖고 같은 정렬이 다시 고른다 — 그 성질을 축으로 못박는다
+# (대기열이 없다는 것은 *잃어버릴 대기열도 없다*는 뜻이다).
+func _milestone_firing() -> void:
+	var data := _t7_data()
+	if data == null:
+		return
+	var session := RunSession.new()
+	session.setup(data)
+	session.begin_career(2)
+	# ⓐ 트리거 미성립 = 미발화. 조용한 상시 발화가 이 축의 반대편이다.
+	_ok("트리거 전 미발화", session.pending_milestone_beat().is_empty(),
+		str(session.pending_milestone_beat().get("id", "")))
+	# **트리거 미선언 행도 자격이 없다.** 현행 데이터에 그런 행이 없으므로 메모리에서
+	# 만들어 본다 — 없는 상태를 만들지 않으면 그 분기는 영원히 관측되지 않는다.
+	# **다른 자격자가 하나도 없을 때 재는 것이 요건**이다: 우선순위가 높은 비트가 있으면
+	# 미선언 행이 자격을 얻어도 뽑히지 않아 통과한다(돌연변이 K3 초판 미검출).
+	var probe_row: Dictionary = data.vn_beats["vnbeat_feat_finish"].duplicate()
+	probe_row["trigger_milestone"] = ""
+	probe_row["id"] = "vnbeat_probe_notrigger"
+	data.vn_beats["vnbeat_probe_notrigger"] = probe_row
+	_ok("트리거 미선언 비트는 자격 없음", session.pending_milestone_beat().is_empty(),
+		String(session.pending_milestone_beat().get("id", "")))
+	data.vn_beats.erase("vnbeat_probe_notrigger")
+	# ⓑ 성취 트리거 — 마일스톤 플래그가 서면 자격이 생긴다
+	session.outgame.milestones["milestone_first_finish"] = true
+	var first := session.pending_milestone_beat()
+	_ok("성취 마일스톤 → 자격", String(first.get("id", "")) == "vnbeat_feat_finish",
+		String(first.get("id", "")))
+	# ⓒ **우선순위 4단.** 짝을 **id 순과 어긋나게** 고른다 — 크루(2) vs 단서(3) 는
+	# id 로는 `clue` 가 앞이고 우선순위로는 `crew` 가 앞이다. 같은 순서를 내는 짝으로 재면
+	# 정렬을 통째로 지워도 통과한다(돌연변이 K1 초판 미검출이 정확히 그 형태였다).
+	session.outgame.crew["crew_nadia"] = true
+	session.outgame.narrative_act = 2   # 단서 1 자격 동시 성립
+	var picked := session.pending_milestone_beat()
+	_ok("우선순위: 크루 합류(2) > 기원 단서(3) — id 순과 반대",
+		String(picked.get("id", "")) == "vnbeat_crew_nadia", String(picked.get("id", "")))
+	_ok("전제: id 순이면 단서가 먼저", "vnbeat_clue_locked" < "vnbeat_crew_nadia")
+	# ⓓ **이월 — 대기열 없이 성립한다.** 크루가 발생하면 밀렸던 성취가 다음 차례가 된다.
+	# 세 건이 동시에 자격을 갖고 있으므로 **우선순위 순으로 세 경계에 걸쳐 선다** —
+	# 대기열 없이 이월이 성립하는 것을 사슬로 확인한다(밀린 것이 사라지지 않는다).
+	session.narrative.trigger_vn("vnbeat_crew_nadia", "vnslot_tour_milestone", false)
+	var carried := session.pending_milestone_beat()
+	_ok("이월 1: 크루 다음은 단서(3)", String(carried.get("id", "")) == "vnbeat_clue_locked",
+		String(carried.get("id", "")))
+	session.narrative.trigger_vn("vnbeat_clue_locked", "vnslot_tour_milestone", false)
+	var carried2 := session.pending_milestone_beat()
+	_ok("이월 2: 단서 다음은 성취(4)", String(carried2.get("id", "")) == "vnbeat_feat_finish",
+		String(carried2.get("id", "")))
+	# ⓔ 단서 = 막 진행 트리거
+	# ⓕ 발생분은 다시 서지 않는다 — 스킵도 발생이다
+	for beat_id in ["vnbeat_clue_locked", "vnbeat_feat_finish"]:
+		session.narrative.trigger_vn(beat_id, "vnslot_tour_milestone", true)
+	_ok("발생분 재자격 0",
+		String(session.pending_milestone_beat().get("id", "")) != "vnbeat_clue_locked")
+	# ⓖ 페이로드 — 경계 VN 과 같은 조립기(슬롯·톤·라인이 비트 행에서 온다)
+	session.outgame.crew["crew_oscar"] = true
+	var payload := session.milestone_payload("HUB-01")
+	_ok("마일스톤 페이로드 발행", not payload.is_empty())
+	_ok("슬롯 = 투어 종료", String(payload.get("slot_id", "")) == "vnslot_tour_milestone",
+		String(payload.get("slot_id", "")))
+	_ok("라인 동반", Array(payload.get("line_keys", [])).size() == 9,
+		str(Array(payload.get("line_keys", [])).size()))
+	# ⓗ 발화 지점이 실재하는가 — 투어 결산 화면이 이 창구를 부른다
+	var report := FileAccess.get_file_as_string("res://ui/settle/tour_report_screen.gd")
+	_ok("투어 종료가 마일스톤 창구를 부른다", report.contains("session.milestone_payload("))
+	_ok("투어 종료가 NAR-01 로 간다", report.contains('go("NAR-01", milestone)'))
+	# ⓘ **형식 B 카운터 — 5축 중 셋이 0이었다.** 산식을 표의 `counter_source` 가 말한다.
+	var counted: Array = []
+	for axis_id in data.relation_axes:
+		var source := String(Dictionary(data.relation_axes[axis_id]).get("counter_source", ""))
+		if ["beat_and_duel", "duel_with_lorentz", "adjacent_finish_and_duel"].has(source):
+			counted.append(String(axis_id))
+	_ok("레이스 계수 대상 축 = 4", counted.size() == 4, str(counted))
+	var session_source := FileAccess.get_file_as_string("res://ui/flow/run_session.gd")
+	for source_kind in ["beat_and_duel", "duel_with_lorentz", "adjacent_finish_and_duel"]:
+		_ok("산식 소비부 실재: %s" % source_kind, session_source.contains('"%s":' % source_kind))
+	# **레이스 계수 함수는 축 이름을 알지 않는다** — 표가 선언한 산식 종류를 읽으므로
+	# 축이 늘어도 코드가 그대로다. (형식 A 의 지정 이벤트 경로는 별개다 — D08 §8.8 이
+	# 특정 이벤트를 명문하므로 그쪽 이름은 정당하다. 축을 좁혀 그것을 잡지 않는다.)
+	# **거동으로 본다.** 원본에 산식 이름이 있다는 것과 그 산식이 세는 것은 다른 사실이다
+	# (돌연변이 K6 초판 미검출 — 분기는 남기고 본문만 비워도 문자열 검사는 통과한다).
+	var probe := RunSession.new()
+	probe.setup(data)
+	probe.begin_career(2)
+	probe.begin_gp()
+	probe.engine.start_gp()
+	probe.engine.duel_opponents = ["ai_lorentz", "ai_bianca"]
+	probe.last_gp_result = {"beaten_rivals": ["ai_bianca"],
+		"standings": ["ai_jude", RaceEngine.PLAYER_ID, "ai_diaz"]}
+	var before_throne: int = probe.outgame.relation_counters.get("relation_throne", 0)
+	var before_succ: int = probe.outgame.relation_counters.get("relation_succession", 0)
+	var before_kin: int = probe.outgame.relation_counters.get("relation_kinship", 0)
+	probe._advance_succession_maro(probe.engine)
+	_ok("왕좌(로렌츠) = 듀얼 1회 계수",
+		int(probe.outgame.relation_counters.get("relation_throne", 0)) - int(before_throne) == 1,
+		str(probe.outgame.relation_counters.get("relation_throne", 0)))
+	_ok("계승(비앙카) = 선착 + 듀얼 = 2",
+		int(probe.outgame.relation_counters.get("relation_succession", 0)) - int(before_succ) == 2,
+		str(probe.outgame.relation_counters.get("relation_succession", 0)))
+	_ok("동기(주드) = 인접 완주 1 (듀얼 0)",
+		int(probe.outgame.relation_counters.get("relation_kinship", 0)) - int(before_kin) == 1,
+		str(probe.outgame.relation_counters.get("relation_kinship", 0)))
+	var counter_start := session_source.find("func _advance_relation_counters(")
+	var counter_stop := session_source.find("\nfunc ", counter_start + 1)
+	var counter_body := session_source.substr(counter_start, counter_stop - counter_start)
+	_ok("레이스 계수 함수 추출", counter_start > 0 and counter_body.length() > 100)
+	# **따옴표가 붙은** 축 id 만 본다 — `data.relation_axes`(표 이름)는 하드코딩이 아니다.
+	_ok("계수 함수에 축 id 리터럴 0", not counter_body.contains('"relation_'),
+		"축 이름이 들어오면 축이 늘 때마다 이 함수가 자란다")

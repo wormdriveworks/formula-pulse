@@ -37,14 +37,15 @@ func _init() -> void:
 	_gp_summary_counters()
 	_presentation_grade_caps()
 	_skill_instances()
+	_reject_code_ledger()
 	_momentum_interrupt_matrix()
 	_tutorial_step_contract()
 	_check_global_postconditions()
 	print("")
 	# 검사 수 하한 — 클래스 로드 실패 등으로 스위트가 쪼그라들면 "통과"가 아니다.
 	# 실행되지 않은 검사와 통과한 검사를 구분하는 유일한 수단이다.
-	if _checked < 2235:
-		print("TC_C_TEST_FAIL checks=%d < 하한 2235 (스위트 축소·로드 실패 의심)" % _checked)
+	if _checked < 2250:
+		print("TC_C_TEST_FAIL checks=%d < 하한 2250 (스위트 축소·로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -2274,6 +2275,8 @@ func _slot_progression_wired() -> void:
 	strict.transition_errors = 0
 
 const REJECT_KEY_DOMAIN := "ui.race."
+const ENGINE_SOURCE := "res://core/state/race_engine.gd"
+const RACE_SCREEN_SOURCE := "res://ui/race/race_screen.gd"
 
 
 # ── 스킬 소비부 (D05 §5.4·§6.1 · D07 §4.2 · D13 별첨A §4.2) ──
@@ -3060,3 +3063,76 @@ func _skill_persistence() -> void:
 	_ok("구세이브 = 빈 덱", old_save.deck.is_empty())
 	_ok("구세이브 = 무사용", old_save.skill_uses.is_empty())
 	_ok("구세이브 = 무변조", old_save.skill_mods.is_empty())
+
+
+# ── 거부 사유 대장 완전성 (26차 재검 — "대장이 정확해야 침묵이 판정이 된다") ──
+#
+# 26차 산문 대장이 2종(`limit`·`no_snapshot`)을 빠뜨렸고, 그 순간 **침묵은 판정이 아니라
+# 누락**이 됐다. 산문은 또 틀린다 — 대장을 코드에 두고 **원본과 기계로 대조**한다.
+#
+# 원본에서 두 갈래를 훑는다: `"error": "…"` 리터럴과 `_skill_precondition` 의 `return "…"`.
+# 어느 한쪽이 늘어도 대장이 함께 자라지 않으면 여기서 걸린다.
+func _reject_code_ledger() -> void:
+	var source := FileAccess.get_file_as_string(ENGINE_SOURCE)
+	_ok("엔진 원본 적재", not source.is_empty(), ENGINE_SOURCE)
+	if source.is_empty():
+		return
+	var found: Dictionary = {}
+	for line in source.split("\n"):
+		var text := String(line)
+		if text.strip_edges().begins_with("#"):
+			continue   # 주석은 데이터가 아니다 (23차 전례)
+		var at := text.find('"error": "')
+		if at >= 0:
+			var rest := text.substr(at + 10)
+			found[rest.substr(0, rest.find('"'))] = true
+	# `_skill_precondition` 구간의 반환값
+	var start := source.find("func _skill_precondition(")
+	var stop := source.find("\nfunc ", start + 1)
+	for line in source.substr(start, stop - start).split("\n"):
+		var text := String(line)
+		if text.strip_edges().begins_with("#"):
+			continue
+		var at := text.find('return "')
+		if at >= 0:
+			var rest := text.substr(at + 8)
+			var code := rest.substr(0, rest.find('"'))
+			if code != "":
+				found[code] = true
+	_ok("원본 사유 수집 성립", found.size() >= 15, str(found.size()))
+	var ledger: Dictionary = {}
+	for code in RaceEngine.SKILL_ERROR_CODES:
+		ledger[String(code)] = true
+	var missing: Array = []
+	for code in found:
+		if not ledger.has(String(code)):
+			missing.append(String(code))
+	var stale: Array = []
+	for code in ledger:
+		if not found.has(String(code)):
+			stale.append(String(code))
+	_ok("대장에 없는 사유 0 (원본 → 대장)", missing.is_empty(), str(missing))
+	_ok("원본에 없는 대장 항목 0 (대장 → 원본)", stale.is_empty(), str(stale))
+	# 계수 핀 — 양방향 대조가 *어긋남*을 잡고, 이 핀이 **양쪽에서 함께 사라지는 것**을 잡는다
+	# (사유 하나가 조용히 없어지는 것은 실제 규칙 변경이므로 소리가 나야 한다).
+	# 21 = 총괄 재계수 20 + 이번 회차 `limit` 2분할(`limit_hold`·`limit_boost`)로 +1.
+	_ok("대장 계수 = 21", RaceEngine.SKILL_ERROR_CODES.size() == 21,
+		str(RaceEngine.SKILL_ERROR_CODES.size()))
+	# 침묵 3종은 대장의 부분집합이어야 한다 — 밖에 있으면 그 침묵은 어디에도 근거가 없다
+	for code in RaceEngine.SEAL_SILENT_ERRORS:
+		_ok("침묵 사유가 대장 안: %s" % code, ledger.has(String(code)))
+	# 화면 층 분류가 대장을 **정확히 분할**하는가 — 고지 ∪ 침묵 ∪ 미고지 = 대장, 교집합 0
+	var screen := FileAccess.get_file_as_string(RACE_SCREEN_SOURCE)
+	var announced: Array = []
+	for code in ledger:
+		if screen.contains('"%s": "ui.race.skillRejected' % String(code)):
+			announced.append(String(code))
+	_ok("고지 사유 수집 성립", announced.size() >= 7, str(announced.size()))
+	for code in announced:
+		_ok("고지 사유는 침묵이 아니다: %s" % code,
+			not RaceEngine.SEAL_SILENT_ERRORS.has(String(code)))
+	_ok("고지 + 침묵 ≤ 대장",
+		announced.size() + RaceEngine.SEAL_SILENT_ERRORS.size() <= ledger.size())
+	print("  [측정] 거부 사유 %d종 = 고지 %d · 침묵 %d · 미고지 %d"
+		% [ledger.size(), announced.size(), RaceEngine.SEAL_SILENT_ERRORS.size(),
+			ledger.size() - announced.size() - RaceEngine.SEAL_SILENT_ERRORS.size()])

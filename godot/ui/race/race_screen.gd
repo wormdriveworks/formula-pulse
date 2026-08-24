@@ -587,7 +587,11 @@ func _refresh_boost() -> void:
 func _on_boost() -> void:
 	if not _timer_active or _revealing or not engine.current_turn_is_duel:
 		return
-	engine.add_duel_boost()
+	# **거부에 확인음을 내지 않는다 (26차 재검 부수).** 상한에 걸린 투입에도
+	# `boost_spend` 가 울려 "썼다"는 거짓 확인을 주고 있었다 — 소리는 결과를 말해야 한다.
+	if not bool(engine.add_duel_boost().get("ok", false)):
+		sfx("input_rejected")
+		return
 	sfx("boost_spend")
 	_refresh_boost()
 	_refresh_resources()
@@ -646,8 +650,13 @@ func _on_confirm() -> void:
 	# 비활성 시 모멘텀 = 조건 불성립 (여유 구간 자체가 없다 — D09 §6.2 채택 구조)
 	var ratio := 0.0 if _timer_disabled else _timer_remaining / _timer_effective_base
 	sfx("confirm")
+	# 결판 상대를 정산 **전에** 떠 둔다 — `_resolve_duel` 이 `duel_opponent` 를 비운다.
+	_last_duel_opponent = engine.duel_opponent if engine.current_turn_is_duel else ""
 	var events := engine.confirm(ratio)
 	_tutorial.notify_action("confirm")
+	# 기원 단서 3 — 결판이 실제로 났을 때만(무산된 듀얼은 결판이 아니다)
+	if not _last_duel_opponent.is_empty() and not _duel_result_event(events).is_empty():
+		_emit_clue_axion(_last_duel_opponent)
 	_push_events(events)
 	_run_presentation(events)  # 확정 후 이벤트에서만 — 봉인 (불변규칙 5)
 	# 듀얼 결과는 프레임 내 표기 후 해제한다 (D09 §3.5). 표기 유지 0.6초 = D13 별첨A
@@ -843,6 +852,9 @@ const SKILL_REJECT_KEYS := {
 	"charge": "ui.race.skillRejectedCharge",
 	"uses": "ui.race.skillRejectedUses",
 	"respin_cap": "ui.race.skillRejectedHoldCap",
+	# `limit_hold` 는 **문면 대기**다 (26차 재검 — 도달 가능 실측: `_on_respin` 이
+	# `hold_used` 를 보지 않고 키·패드 액션 경로가 버튼 `disabled` 를 우회한다).
+	# 키가 유입되면 여기 한 행이다 — 그때까지는 미고지 대장에 남는다.
 	"already_hold": "ui.race.skillRejectedAlreadyHold",
 	"already_mod": "ui.race.skillRejectedAlreadyMod",
 	"duel_turn": "ui.race.skillRejectedDuelTurn",
@@ -1275,6 +1287,10 @@ var _shake_strength := 0.0
 var _tutorial_pending := ""
 
 
+# 결판 직후의 상대 — `_resolve_duel` 이 `duel_opponent` 를 비우므로 정산 **전에** 떠 둔다.
+var _last_duel_opponent := ""
+
+
 func _collect_triggers(events: Array) -> Array:
 	var triggers: Array = []
 	for event in events:
@@ -1290,6 +1306,33 @@ func _collect_triggers(events: Array) -> Array:
 				if not wall.is_empty() and engine.duel_opponent == wall:
 					triggers.append("trigger_wall_rival_beat")
 	return triggers
+
+
+# ── 기원 단서 3 — 결판 직후 라이벌 발화 1줄 (사용자 판정 2026-08-24) ──
+#
+# **VN 이 아니다.** 운반체가 로그 존 한 줄이고 신설 UI 가 없다(D08 §8.6 — 마일스톤 슬롯 밖).
+# 그래서 아카이브에도 넣지 않는다: `vn_seen` 을 쓰면 VN 이 아닌 것이 VN 목록에 선다.
+# 1회성 보장은 **발견 대장**(`discoveries`)이 진다 — 세이브에 직렬화되고 되돌아가지 않는
+# 플래그라 재개·재대결 어느 경로에서도 두 번 흘리지 않는다.
+#
+# 변형 택1 = **결판 상대**가 고른다(로렌츠 / 마로). 상대가 곧 화자이므로 문면과 화자가
+# 한 데이터에서 나오고, 조립할 것이 없다.
+const CLUE_AXION_BY_RIVAL := {
+	"ai_lorentz": {"text": "vn.clueAxion.lorentz01", "speaker": "ui.vn.speakerLorentz"},
+	"ai_maro": {"text": "vn.clueAxion.maro01", "speaker": "ui.vn.speakerMaro"},
+}
+const CLUE_AXION_DISCOVERY := "clue_axion_hint"
+
+
+func _emit_clue_axion(opponent_id: String) -> void:
+	if not CLUE_AXION_BY_RIVAL.has(opponent_id):
+		return
+	if session.outgame.discoveries.has(CLUE_AXION_DISCOVERY):
+		return   # 1회성 — 단서는 두 번 흘리지 않는다
+	session.outgame.record_discovery(CLUE_AXION_DISCOVERY)
+	var line: Dictionary = CLUE_AXION_BY_RIVAL[opponent_id]
+	var s := data.strings
+	_e10_log.push_line(s.text(String(line["speaker"])), s.text(String(line["text"])))
 
 
 # L3 조우 판정 (D10 §7 결정 #6 — CG-01~03은 D08 §8.11 발견형 히든 업적과 1:1).

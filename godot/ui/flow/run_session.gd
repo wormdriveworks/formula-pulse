@@ -153,6 +153,7 @@ func begin_career(profile: int) -> void:
 const ACT_VN_SLOT := "vnslot_tour_brief"
 const SEASON_OPEN_SLOT := "vnslot_season_open"
 const SEASON_CLOSE_SLOT := "vnslot_season_close"
+const MILESTONE_SLOT := "vnslot_tour_milestone"
 
 
 # 브리핑 슬롯에서 세울 VN 사슬을 NAR-01 페이로드로 꺼낸다 — 없으면 **빈 사전**(화면은 그대로
@@ -257,6 +258,69 @@ func season_open_payload(next_route: String, next_payload: Dictionary = {}) -> D
 	var payload := _beat_payload(String(beats[0]["id"]), next_route, next_payload, vn_id)
 	payload["calendar"] = true   # 캘린더 공개 (D09 §2.3)
 	return payload
+
+
+# ── 마일스톤 VN 발화 (D08 §8.4 · 27차) ──
+#
+# **이월에 대기열을 두지 않았다.** 정본의 이월은 *"동일 투어 경계에 2건 이상 몰릴 경우
+# 우선순위 … 잔여분은 차기 경계로 이월"* 인데, **자격을 상태에서 도출**하면 이월이
+# 저절로 성립한다: 이번 경계에 밀린 비트는 다음 경계에도 여전히 자격을 갖고, 같은
+# 우선순위 정렬이 다시 고른다. 대기열은 직렬화해야 하고 실제 상태와 어긋날 수 있는데
+# **도출은 어긋날 수가 없다** — 상태가 곳 대기열이다.
+#
+# 자격 = 트리거 성립 ∧ 미발생(`vn_seen`). 트리거는 열이 셋이고 **각기 다른 표를 참조**한다
+# (하나의 문자열 열로 두면 어느 표를 가리키는지 검사가 못 보고, 오타가 조용히 통과한다).
+func pending_milestone_beat() -> Dictionary:
+	if data == null or outgame == null or narrative == null:
+		return {}
+	var eligible: Array = []
+	for beat_id in data.vn_beats:
+		var row: Dictionary = data.vn_beats[beat_id]
+		if String(row.get("slot_id", "")) != MILESTONE_SLOT:
+			continue
+		if narrative.vn_seen.has(String(beat_id)):
+			continue   # 발생 = 도달. 스킵도 발생이다
+		if not _milestone_trigger_met(row):
+			continue
+		eligible.append(row)
+	if eligible.is_empty():
+		return {}
+	# 우선순위 4단 (D08 §8.4). 동순위 타이브레이크 = id 순 — 같은 상태면 같은 결과.
+	eligible.sort_custom(func(a: Dictionary, b: Dictionary):
+		var pa := _milestone_priority(a)
+		var pb := _milestone_priority(b)
+		if pa != pb:
+			return pa < pb
+		return String(a["id"]) < String(b["id"]))
+	return eligible[0]
+
+
+func _milestone_priority(row: Dictionary) -> int:
+	var class_row := data.milestone_vn_row(String(row.get("milestone_class", "")))
+	if class_row.is_empty():
+		return 9
+	return CsvTable.to_int(String(class_row.get("priority", "9")))
+
+
+func _milestone_trigger_met(row: Dictionary) -> bool:
+	var milestone := String(row.get("trigger_milestone", "")).strip_edges()
+	if not milestone.is_empty():
+		return outgame.milestones.has(milestone)
+	var crew := String(row.get("trigger_crew", "")).strip_edges()
+	if not crew.is_empty():
+		return outgame.crew.has(crew)
+	var act := CsvTable.to_int(String(row.get("trigger_act", "0")))
+	if act > 0:
+		return outgame.narrative_act >= act
+	return false   # 트리거 미선언 = 미발화 (조용한 상시 발화를 막는다)
+
+
+# 투어 종료 마일스톤 VN 페이로드 — 경계 VN 과 같은 조립기를 탄다.
+func milestone_payload(next_route: String, next_payload: Dictionary = {}) -> Dictionary:
+	var beat := pending_milestone_beat()
+	if beat.is_empty():
+		return {}
+	return _beat_payload(String(beat["id"]), next_route, next_payload)
 
 
 func _season_open_beats() -> Array:
@@ -430,14 +494,59 @@ func close_gp() -> void:
 # 계승 2축(마로) 주축 B — **선착 1회 또는 마로와의 듀얼 수행 1회마다 +1**
 # (D13 별첨A §5.2 계승 행 카운터 = "선착 + 듀얼 수행" · `counter_source=beat_and_duel`).
 func _advance_succession_maro(source: RaceEngine) -> void:
-	var gained := 0
-	if Array(last_gp_result.get("beaten_rivals", [])).has(MARO_ID):
-		gained += 1
-	for opponent in source.duel_opponents:
-		if String(opponent) == MARO_ID:
-			gained += 1
-	if gained > 0:
-		outgame.add_relation("relation_succession_maro", gained)
+	_advance_relation_counters(source)
+
+
+# ── 형식 B 카운터 (D07 §5.5 · relation_axes.counter_source) ──
+#
+# **5축 중 2축만 세고 있었다** (마로·재회 — 실독보고 §3.3). 나머지 셋은 `counter_source` 가
+# 레이스 중 조건을 기술하는데 아무도 세지 않아 **주드·비앙카·로렌츠 축이 영구히 0** 이었다.
+#
+# 산식은 표의 `counter_source` 가 말하는 그대로다 — 코드가 축 이름을 알지 않고
+# **표가 선언한 산식 종류를 읽는다**(축이 늘어도 코드가 그대로다):
+#   `beat_and_duel`            = 그 라이벌 선착 + 그 라이벌과의 듀얼
+#   `duel_with_lorentz`        = 로렌츠와의 듀얼 (선착은 세지 않는다 — 왕좌는 대결의 축이다)
+#   `adjacent_finish_and_duel` = 인접 완주 + 듀얼
+# `alta_ridge_vn_chain`(재회)는 VN 사슬 축이라 여기서 세지 않는다 — `record_reunion_beat` 소관.
+func _advance_relation_counters(source: RaceEngine) -> void:
+	var beaten: Array = last_gp_result.get("beaten_rivals", [])
+	for axis_id in data.relation_axes:
+		var axis: Dictionary = data.relation_axes[axis_id]
+		var rival := String(axis.get("rival_id", ""))
+		if rival.is_empty():
+			continue
+		var duels := 0
+		for opponent in source.duel_opponents:
+			if String(opponent) == rival:
+				duels += 1
+		var gained := 0
+		match String(axis.get("counter_source", "")):
+			"beat_and_duel":
+				gained = duels + (1 if beaten.has(rival) else 0)
+			"duel_with_lorentz":
+				gained = duels
+			"adjacent_finish_and_duel":
+				# 인접 완주 = 결승선에서 바로 앞뒤였는가. 듀얼과 **별개 사건**이므로 더한다.
+				gained = duels + (1 if _finished_adjacent(rival) else 0)
+			_:
+				continue   # VN 사슬 축 등 — 레이스 계수 대상이 아니다
+		if gained > 0:
+			outgame.add_relation(String(axis_id), gained)
+
+
+# 결승선 인접 — 최종 순위표에서 플레이어 바로 앞뒤인가.
+func _finished_adjacent(rival_id: String) -> bool:
+	var standings: Array = last_gp_result.get("standings", [])
+	var at := -1
+	var rival_at := -1
+	for index in range(standings.size()):
+		# `standings` 는 **id 문자열 배열**이다 (`_finish_gp` 실독) — 사전으로 다루면 죽는다.
+		var id := String(standings[index])
+		if id == RaceEngine.PLAYER_ID:
+			at = index
+		elif id == rival_id:
+			rival_at = index
+	return at >= 0 and rival_at >= 0 and absi(at - rival_at) == 1
 
 
 # 재회 축(카이) 형식 A — **알타 리지 투어 안에서 체인 비트가 발생할 때마다 +1.**

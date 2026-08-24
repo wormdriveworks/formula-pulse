@@ -358,7 +358,10 @@
     "line_count": "int:1,18",
     "tone": "enum_optional:calm,tense",
     "title_key": "string_key_optional",
-    "milestone_class": "fk_optional:milestone_vn.csv"
+    "milestone_class": "fk_optional:milestone_vn.csv",
+    "trigger_milestone": "fk_optional:milestones.csv",
+    "trigger_crew": "fk_optional:crew.csv",
+    "trigger_act": "int:0,4"
    }
   },
   "vn_beat_lines.csv": {
@@ -686,6 +689,14 @@
   },
   {
    "domain_prefixes": [
+    "ui.vnTitle."
+   ],
+   "max_lines": 1,
+   "max_chars_full": 13,
+   "source": "아카이브 표제 라벨 폭 140px (records_screen.gd — Galmuri9 @ 9px · G4W 실측 슬롯). `ui.vnSlot.` 규칙 승계 — 같은 라벨에 서는 두 도메인이 다른 규칙을 가질 이유가 없다. **문면 유입 전에 선등재한다**(총괄 판정 ② — 규칙이 먼저 서 있는 것이 유입 시 규율 밖으로 새지 않게 하는 정당한 상태다)."
+  },
+  {
+   "domain_prefixes": [
     "vnChoice."
    ],
    "max_lines": 1,
@@ -705,6 +716,7 @@
   "relay.",
   "vane.",
   "vnChoice.",
+  "ui.vnTitle.",
   "vn."
  ],
  "v7_terms": {

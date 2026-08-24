@@ -69,8 +69,16 @@ func _on_bound(_payload: Dictionary) -> void:
 
 func _on_next() -> void:
 	# D09 §2.3: [시즌 내 잔여 투어 有] → HUB-01 / [시즌 최종 투어] → SET-02 체인
+	var destination := "HUB-01"
 	if session.season.season_finished():
 		session.close_season()
-		go("SET-02", {})
+		destination = "SET-02"
+	# 투어 종료 마일스톤 VN — **여기가 그 슬롯이다** (D08 §8.4 `slot_kind = tour_close`).
+	# 자격이 있으면 한 건이 서고, 같은 경계에 몰린 나머지는 다음 경계로 **저절로 이월된다**
+	# (자격을 상태에서 도출하므로 대기열이 없다 — `run_session.pending_milestone_beat`).
+	# 시즌 최종 투어에서도 같은 자리다: 결산 앞에 서는 것이 '투어 종료'의 문면 그대로다.
+	var milestone := session.milestone_payload(destination)
+	if not milestone.is_empty():
+		go("NAR-01", milestone)
 		return
-	go("HUB-01", {})
+	go(destination, {})

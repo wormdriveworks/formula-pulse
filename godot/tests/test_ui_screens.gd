@@ -119,8 +119,8 @@ func _process(_delta: float) -> bool:
 	_skill_snapshot_pairing(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 441:
-		print("UI_SCREENS_FAIL checks=%d < 하한 441 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 459:
+		print("UI_SCREENS_FAIL checks=%d < 하한 459 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -2648,6 +2648,22 @@ func _season_open_wiring(data: GameData) -> void:
 	_ok("⑳ 개막 비트 표제 = 시즌 개막",
 		String(records._vn_title("vnbeat_season_open")) == data.strings.text("ui.vnSlot.seasonOpen"),
 		String(records._vn_title("vnbeat_season_open")))
+	# **비트가 선언한 표제가 슬롯 표제를 이긴다** (26차 세 번째 형태 · 27차 거동 축).
+	# 마일스톤 8건이 한 슬롯을 공유하므로 이 우선이 없으면 전부 같은 표제로 선다.
+	# 문면은 아직 미유입이므로 **기존 키로 대입해** 순서만 잰다 — 순서는 문면과 무관하다.
+	var slot_title := data.strings.text("ui.vnSlot.tourMilestone")
+	var distinct: Dictionary = {}
+	for beat_id in data.vn_beats:
+		var row: Dictionary = data.vn_beats[beat_id]
+		if String(row.get("slot_id", "")) != "vnslot_tour_milestone":
+			continue
+		var title := String(records._vn_title(String(beat_id)))
+		_ok("⑳ 마일스톤 비트 표제 = 선언 키: %s" % beat_id,
+			title == data.strings.text(String(row["title_key"])), title)
+		_ok("⑳ 슬롯 표제로 접히지 않는다: %s" % beat_id, title != slot_title, title)
+		distinct[title] = true
+	# **8건이 서로 다른 표제를 갖는다** — 한 슬롯을 공유해도 갈린다는 것이 기제의 목적이다.
+	_ok("⑳ 마일스톤 표제 8종이 전부 상이", distinct.size() == 8, str(distinct.size()))
 	_ok("⑳ 엔딩 비트 표제 = 시즌 결산",
 		String(records._vn_title("vnbeat_season_close")) == data.strings.text("ui.vnSlot.seasonClose"),
 		String(records._vn_title("vnbeat_season_close")))

@@ -29,6 +29,23 @@ const MOD_FREE_HOLD := "free_hold"                      # SH4 기본 홀드 비�
 # 아니다"·"두 릴이 이미 같다". 문면으로 말하는 순간 릴 정지 연출 전에 결과가 새므로
 # (불변규칙 5) **소리 거부만 남기고 문면은 두지 않는 것이 최종형**이다.
 # 20차가 `use_skill_check` 에서 인자 의존 조건을 일부러 보지 않은 것과 같은 근거다.
+# 개입 거부 사유 **전량 대장**. 문면을 둘지 말지는 화면 층이 정하지만, **무엇이 있는지는
+# 엔진이 안다** — 26차에 산문 대장이 2종(`limit`·`no_snapshot`)을 빠뜨렸고 그 순간
+# 침묵은 판정이 아니라 누락이 됐다. 목록을 코드에 두고 **원본과 기계로 대조**한다
+# (검사가 `"error": "…"` 리터럴과 `_skill_precondition` 반환을 훑어 이 집합과 맞춘다).
+const SKILL_ERROR_CODES := [
+	# 창·자격·자원
+	"phase", "deck", "unknown", "charge", "uses",
+	# 상한 — 셋이 각기 다른 사실이다 (턴당 홀드 1회 / 합산 재회전 / 부스트 상한)
+	"limit_hold", "respin_cap", "limit_boost",
+	# 턴 종류·중복 (효과가 이번 턴에 도달할 수 없다)
+	"duel_turn", "sector_turn", "already_hold", "already_mod",
+	# 인자·상태
+	"no_provisional", "keep", "target", "adjacent", "no_snapshot", "effect",
+	# 봉인 침묵 3종 (아래)
+	"no_trouble", "symbol", "same",
+]
+
 const SEAL_SILENT_ERRORS := ["no_trouble", "symbol", "same"]
 
 const SKILL_EFFECT_IDS := [
@@ -472,7 +489,10 @@ func hold_respin(keep_indices: Array) -> Dictionary:
 	if turn_phase != RaceTypes.TurnPhase.T4_INTERVENTION:
 		return {"ok": false, "error": "phase"}
 	if hold_used:
-		return {"ok": false, "error": "limit"}
+		# **`limit_boost` 와 갈라 둔다 (26차 재검).** 이쪽은 "홀드는 턴당 1회"(D05 §5.4)이고
+		# 저쪽은 "부스트 상한"이다 — `already` 2분할과 같은 근거: 한 문면으로 둘을 말하면
+		# 한쪽이 거짓이 된다. 같은 함수의 `respin_cap`(합산 상한)과도 다른 사실이다.
+		return {"ok": false, "error": "limit_hold"}
 	# 홀드 계열 총량 가드 (D07 §4.2 · 별첨A §4.2) — 기본 홀드 + 스킬 홀드 **합산** 상한.
 	# D05 §5.4 의 "턴당 1회"(기본 액션 자체의 한도)는 무개정이고, 그 취지(무한 리롤 방지)를
 	# 스킬 층까지 넓힌 것이 이 상한이다. 두 카운터를 겹쳐 두는 이유: 스킬이 상한을 먼저
@@ -513,7 +533,7 @@ func add_duel_boost() -> Dictionary:
 	if turn_phase != RaceTypes.TurnPhase.T4_INTERVENTION or not current_turn_is_duel:
 		return {"ok": false, "error": "phase"}
 	if duel_boost >= data.param_int("param_charge_boost_max"):
-		return {"ok": false, "error": "limit"}
+		return {"ok": false, "error": "limit_boost"}
 	if charge < 1:
 		return {"ok": false, "error": "charge"}
 	charge -= 1
