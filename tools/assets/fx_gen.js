@@ -382,6 +382,20 @@ for (const [name, e] of Object.entries(spec.elements)) {
     fail(`${name}: 중심 산포 x ${spanX.toFixed(1)} · y ${spanY.toFixed(1)} > 허용 ${tol} — 앵커를 한 값으로 선언할 수 없다`);
   }
 
+  // ⓘ 정지 폴백 대표 프레임 (`still_frame`) — 2026-08-24 · IMPL-390 · 사용자 판정.
+  //
+  //    **현 단계는 애니메이션 없이 간다** — 애니메이션은 전체 아트 품질 관리 뒤 **확정된
+  //    에셋을 기준으로** 별도 회차에 만든다. `E-04` 만 이미 5프레임 루프로 들어와 있으므로
+  //    파일은 그대로 두고 **소비를 정지로 맞춘다**: 사양서 §5.1 의 *"정지 폴백 = 각 컷 대표
+  //    1프레임 지정(O12 — 신규 에셋 0)"* 이 이 상황을 위해 이미 있는 기제다.
+  //    **지불된 산출물을 버리지 않고, 그렇다고 지금 쓰지도 않는다.**
+  if (e.still_frame !== undefined) {
+    if (!Number.isInteger(e.still_frame) || e.still_frame < 0 || e.still_frame >= sc * sr) {
+      die(`${name}: still_frame ${e.still_frame} 이 산출 격자 ${sc}×${sr} 밖이다 — 낡은 선언이다`);
+    }
+    console.log(`      · 정지 폴백 대표 프레임 ${e.still_frame} (현 단계 소비 · 나머지는 후속 애니메이션 회차 재료)`);
+  }
+
   const dstPath = path.join(DST, name + '.png');
   const png = encode(SW, SH, out);
   if (CHECK_ONLY) {
