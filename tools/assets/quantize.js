@@ -166,6 +166,30 @@ function nearest(r, g, b) {
   return PAL[best];
 }
 
+// 온색만 후보로 두는 양자화 — `warm_lock` 전용. 팔레트에서 **파랑이 우세한 항목을 뺀다.**
+// 대장 밖으로 나가지 않으므로 조달 계약은 그대로다 — **후보를 좁힐 뿐 새 색을 만들지 않는다.**
+const WARM_MARGIN = 6;
+const PAL_WARM = [];
+const PAL_WARM_L = [];
+// **후보에서 네온 자홍·자색을 뺀다.** 이것들은 산술적으로는 '온색'(r>b)이지만 **피부가 아니다** —
+// 넣어 두면 얼굴 그늘이 분홍으로 간다(실측 1회차: 로렌츠·사샤·셔우드 뺨이 자홍으로 물들었다).
+// **원판 판정 문턱과 후보 팔레트 필터는 다른 것이고, 한 값으로 묶은 것이 그 실패의 원인이었다.**
+const NEON_OUT = new Set(['#C41E7E', '#FF4FB0', '#FFB0DC', '#6B0F4A', '#8B31ED', '#490C8A', '#D08DFF', '#EAC7FF']);
+const hx6 = (c) => '#' + c.map((v) => v.toString(16).padStart(2, '0').toUpperCase()).join('');
+PAL.forEach((c, i) => { if (c[2] <= c[0] + WARM_MARGIN && !NEON_OUT.has(hx6(c))) { PAL_WARM.push(c); PAL_WARM_L.push(PAL_L[i]); } });
+if (PAL_WARM.length < 10) die(`온색 후보 ${PAL_WARM.length} — 팔레트가 바뀌었다`);
+function nearestWarm(r, g, b) {
+  const L = lum(r, g, b);
+  let best = 0, bd = Infinity;
+  for (let i = 0; i < PAL_WARM.length; i++) {
+    const p = PAL_WARM[i];
+    const dr = r - p[0], dg = g - p[1], db = b - p[2];
+    const d = (dr * dr + dg * dg + db * db) + 24000 * (L - PAL_WARM_L[i]) * (L - PAL_WARM_L[i]);
+    if (d < bd) { bd = d; best = i; }
+  }
+  return PAL_WARM[best];
+}
+
 // ─────────────────────────────────────────────── 패치 (사양서 §2.3 ④)
 // 키 = "<산출 디렉토리명>/<파일명>" — 캐릭터·머신이 같은 원장을 쓰되 섞이지 않게 한다.
 let PATCH = { palette: {}, patches: {} };
@@ -398,14 +422,47 @@ for (const job of jobs) {
   //    적용해야** 하기 때문이다 — 아래 참조).
   let out = Buffer.alloc(img.w * img.h * 4);
   const before = new Set();
+  // **파생도 원판의 온색 잠금을 물려받는다** (2026-08-24 · IMPL-401).
+  //    물려받지 않으면 **베이스는 따뜻하고 표정 34 는 회색**으로 남는다 — 같은 인물이 표정에
+  //    따라 다른 색이 되는 조용한 사고이며, 이 파일의 파생 패치 상속(IMPL-372)이 막으려던 것과
+  //    **같은 사고다.** 좌표는 원판 좌표계이고 양자화는 크롭 전에 하므로 그대로 쓴다.
+  const srcPatchWL = job.derived ? (PATCH.patches || {})[`${DST_TAG}/${job.src}`] : null;
+  const warmLockRaw = (job.spec && job.spec.warm_lock) || (srcPatchWL && srcPatchWL.warm_lock);
+  const warmLock = Array.isArray(warmLockRaw) ? warmLockRaw : (warmLockRaw && warmLockRaw.box);
+  // **문턱은 '따뜻한가'가 아니라 '파랗지 않은가'다.** 원판이 냉색인 화소를 그대로 두면
+  //    따뜻한 살 옆에 붙어 **얼룩**이 되고, 얼룩은 균일한 회색보다 나쁘다(실측 — 사샤·셔우드).
+  //    음수 여유를 허용해 **명백한 파랑(눈·림라이트)만 남기고** 나머지를 온색으로 끌어온다.
+  const warmMargin = (warmLockRaw && warmLockRaw.margin !== undefined) ? warmLockRaw.margin : WARM_MARGIN;
+  const cacheWarm = new Map();
+  if (warmLock && (!Array.isArray(warmLock) || warmLock.length !== 4)) die(`${job.out}: warm_lock 은 [x,y,w,h] 다`);
+  const inWarmBox = (x, y) => warmLock && x >= warmLock[0] && y >= warmLock[1] && x < warmLock[0] + warmLock[2] && y < warmLock[1] + warmLock[3];
   for (let i = 0; i < img.w * img.h; i++) {
     const a = img.rgba[i * 4 + 3];
     if (a === 0) continue;                       // 투명은 건드리지 않는다 (컷아웃 보존)
     const r = img.rgba[i * 4], g = img.rgba[i * 4 + 1], b = img.rgba[i * 4 + 2];
     const key = (r << 16) | (g << 8) | b;
     before.add(key);
-    let p = cache.get(key);
-    if (!p) { p = nearest(r, g, b); cache.set(key, p); }
+    let p;
+    if (warmLock && inWarmBox(i % img.w, Math.floor(i / img.w)) && r > b + warmMargin) {
+      // ── 온색 잠금 (`warm_lock`) — 2026-08-24 신설 · IMPL-401 · 눈 검수 4회차.
+      //
+      //    **60색 대장에는 주황과 갈색 사이의 붉은/장미 대역이 없다**(팔레트 정본 §5 가
+      //    이미 명문화한 사실 — 기능 부속 13 을 56 밖에 두는 근거가 그것이다).
+      //    그래서 **따뜻한 조명 아래의 정상 피부**(원판 `#A16B7E`·`#8E546A` 류 자주빛)가
+      //    갈 곳을 잃고 **감청 `#0B2A5E`·청회색으로 밀린다.** 실측: 13인 중 4인의 얼굴이
+      //    냉색 우세 41~83%(원판 9~23%)로 굳었고 **로렌츠는 얼굴 전체가 회색 돌**이 됐다.
+      //
+      //    **이 잠금이 눈을 건드리지 않는 이유가 설계의 요점이다.** 조건이 *산출색*이
+      //    아니라 **원판색**이다 — 눈은 원판부터 파랗고(b>r) 피부는 원판이 따뜻하다(r>b).
+      //    **틀린 것만 정확히 고른다.** 앞서 눈 구획을 자동 검출로 잡으려다 4인 중 0인을
+      //    맞힌 전례가 있고(IMPL-372), 이번 회차에도 다시 실패했다 —
+      //    **검출이 필요 없는 규칙을 찾는 편이 검출을 고치는 것보다 낫다.**
+      p = cacheWarm.get(key);
+      if (!p) { p = nearestWarm(r, g, b); cacheWarm.set(key, p); }
+    } else {
+      p = cache.get(key);
+      if (!p) { p = nearest(r, g, b); cache.set(key, p); }
+    }
     out[i * 4] = p[0]; out[i * 4 + 1] = p[1]; out[i * 4 + 2] = p[2]; out[i * 4 + 3] = 255;
   }
   let W = img.w, H = img.h;
