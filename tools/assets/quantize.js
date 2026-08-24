@@ -393,16 +393,11 @@ const alphaOf = new Map();                       // 파생 출력의 알파 지�
 
 for (const job of jobs) {
   const f = job.out;
-  let img = decode(path.join(SRC, job.src));
-  if (job.crop) {
-    const [cx, cy, cw, chh] = job.crop;
-    if (cx + cw > img.w || cy + chh > img.h) die(`derive ${f}: crop [${job.crop}] 이 원판 ${img.w}×${img.h} 밖으로 나간다`);
-    const sub = Buffer.alloc(cw * chh * 4);
-    for (let y = 0; y < chh; y++) img.rgba.copy(sub, y * cw * 4, ((cy + y) * img.w + cx) * 4, ((cy + y) * img.w + cx + cw) * 4);
-    img = { w: cw, h: chh, rgba: sub };
-  }
-  const out = Buffer.alloc(img.w * img.h * 4);
-  const before = new Set(), after = new Set();
+  const img = decode(path.join(SRC, job.src));
+  // ── 양자화는 크롭 앞에 둔다 (픽셀 단위 연산이라 결과가 같고, **원판 패치를 크롭 전에
+  //    적용해야** 하기 때문이다 — 아래 참조).
+  let out = Buffer.alloc(img.w * img.h * 4);
+  const before = new Set();
   for (let i = 0; i < img.w * img.h; i++) {
     const a = img.rgba[i * 4 + 3];
     if (a === 0) continue;                       // 투명은 건드리지 않는다 (컷아웃 보존)
@@ -412,13 +407,34 @@ for (const job of jobs) {
     let p = cache.get(key);
     if (!p) { p = nearest(r, g, b); cache.set(key, p); }
     out[i * 4] = p[0]; out[i * 4 + 1] = p[1]; out[i * 4 + 2] = p[2]; out[i * 4 + 3] = 255;
-    after.add((p[0] << 16) | (p[1] << 8) | p[2]);
   }
-  const patched = applyPatch(f, img.w, img.h, out, job.spec, job.derived);
-  if (patched) { after.clear(); for (let i = 0; i < img.w * img.h; i++) if (out[i * 4 + 3]) after.add((out[i * 4] << 16) | (out[i * 4 + 1] << 8) | out[i * 4 + 2]); }
+  let W = img.w, H = img.h;
+  // ── 파생은 **원판의 패치를 물려받는다** (2026-08-24 신설 · IMPL-372).
+  //
+  //    파생은 원판(raw)에서 출발하므로, 원판이 산출물로서 받는 패치를 그냥 두면
+  //    **베이스와 파생이 갈린다.** `ai_maro_base` 의 마젠타 셰이딩 교정이 그 사례다 —
+  //    교정 구획이 얼굴 레이어 크롭 안에 있으므로, 물려받지 않으면 베이스는 청색이고
+  //    표정 34 는 마젠타로 남는다. 같은 인물이 표정에 따라 다른 색이 되는 조용한 사고다.
+  //
+  //    순서: 양자화 → **원판 패치** → 크롭 → 파생 op.
+  if (job.derived) {
+    const srcSpec = (PATCH.patches || {})[`${DST_TAG}/${job.src}`];
+    if (srcSpec) applyPatch(job.src, W, H, out, srcSpec, false);
+  }
+  if (job.crop) {
+    const [cx, cy, cw, chh] = job.crop;
+    if (cx + cw > W || cy + chh > H) die(`derive ${f}: crop [${job.crop}] 이 원판 ${W}×${H} 밖으로 나간다`);
+    const sub = Buffer.alloc(cw * chh * 4);
+    for (let y = 0; y < chh; y++) out.copy(sub, y * cw * 4, ((cy + y) * W + cx) * 4, ((cy + y) * W + cx + cw) * 4);
+    out = sub; W = cw; H = chh;
+  }
+  const after = new Set();
+  for (let i = 0; i < W * H; i++) if (out[i * 4 + 3]) after.add((out[i * 4] << 16) | (out[i * 4 + 1] << 8) | out[i * 4 + 2]);
+  const patched = applyPatch(f, W, H, out, job.spec, job.derived);
+  if (patched) { after.clear(); for (let i = 0; i < W * H; i++) if (out[i * 4 + 3]) after.add((out[i * 4] << 16) | (out[i * 4 + 1] << 8) | out[i * 4 + 2]); }
   if (job.derived) {
     let sig = '';
-    for (let i = 0; i < img.w * img.h; i++) sig += out[i * 4 + 3] ? '1' : '0';
+    for (let i = 0; i < W * H; i++) sig += out[i * 4 + 3] ? '1' : '0';
     // 묶음 키 = **원판 + 크롭**. 크롭이 다르면 알파 지문이 달라도 정상이므로
     // 원판만으로 묶으면 정상 상태를 불일치로 오판한다.
     const gkey = job.src + (job.crop ? `#${job.crop.join(',')}` : '');
@@ -426,19 +442,19 @@ for (const job of jobs) {
     alphaOf.get(gkey).set(f, sig);
   }
   const dstFile = path.join(DST, f);
-  const tag = `${img.w}×${img.h} · 고유색 ${before.size} → ${after.size}`
+  const tag = `${W}×${H} · 고유색 ${before.size} → ${after.size}`
     + (patched ? ` · ${job.derived ? '변조' : '패치'} ${patched}px` : '')
     + (job.derived ? ` · 파생 ← ${job.src}` : '');
   if (CHECK_ONLY) {
     if (!fs.existsSync(dstFile)) { fail(`${f} 산출물 부재 — 원본만 있고 결과가 없다`); continue; }
     const got = decode(dstFile);
-    if (got.w !== img.w || got.h !== img.h) { fail(`${f} 치수 ${got.w}×${got.h} != ${img.w}×${img.h}`); continue; }
+    if (got.w !== W || got.h !== H) { fail(`${f} 치수 ${got.w}×${got.h} != ${W}×${H}`); continue; }
     let diff = 0;
-    for (let i = 0; i < img.w * img.h * 4; i++) if (got.rgba[i] !== out[i]) diff++;
+    for (let i = 0; i < W * H * 4; i++) if (got.rgba[i] !== out[i]) diff++;
     if (diff) fail(`${f} 가 원본+팔레트 재산출과 다르다 — 바이트 ${diff}개 (한쪽만 고쳐졌다)`);
     else console.log(`  ✓ ${f}  ${tag}`);
   } else {
-    fs.writeFileSync(dstFile, encode(img.w, img.h, out));
+    fs.writeFileSync(dstFile, encode(W, H, out));
     console.log(`  → ${f}  ${tag}`);
   }
 }
