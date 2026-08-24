@@ -283,6 +283,46 @@ for (const stage of names) {
 
   // ⑤ 밴드 분할 — 원경/근경. **수평 절단은 열 관계인 x-랩을 건드릴 수 없다**(v1.10 §5.1).
   const cut = s.split_y;
+
+  // ③-3 머신 가림 게이트 (`machine_box`) — 2026-08-24 신설 · IMPL-399 · 눈 검수 3회차.
+  //
+  //    **분할 기준이 틀린 명제를 재고 있었다.** `split_y` 는 *"행 변화량 최대점"* 으로 골랐는데
+  //    2레이어의 목적은 §5.1 이 적은 대로 **"컷 합성용"** — 즉 **머신이 원경과 근경 사이에
+  //    들어가는 것**이다. 물어야 할 것은 *"그림이 가장 크게 바뀌는 곳"* 이 아니라
+  //    **"머신 앞에 무엇이 오는가"** 였다.
+  //    실측: 메트로 나이트가 `split_y=53` 에서 **머신을 97% 가렸다** — 근경에 **차가 달리는
+  //    노면**이 들어갔기 때문이고, 노면은 차 뒤에 있어야 한다. (88 로 옮기니 0%.)
+  //
+  //    **그래서 기준을 고치는 데서 그치지 않고 게이트로 받는다.** 고친 값은 다음 회차에
+  //    누군가 다시 옮길 수 있고, 그때 이 실패는 조용히 돌아온다.
+  //    이 세션에서 같은 종류의 오독이 일곱 번째다(형태 연속성 · 8-이웃 접촉 · 양자화 전 이음 ·
+  //    비네트 대역 평균 · 팔레트 사용량 · 휘도 평균 · 분할 기준).
+  if (spec.machine_box) {
+    const mb = spec.machine_box;
+    if (!Array.isArray(mb) || mb.length !== 4) die('machine_box 는 [x,y,w,h] 다');
+    const [bx, by, bw, bh] = mb;
+    const lim = s.max_machine_occlusion === undefined ? 0.4 : s.max_machine_occlusion;
+    let tot = 0, hid = 0;
+    for (let y = by; y < by + bh; y++) {
+      for (let x = bx; x < bx + bw; x++) {
+        if (y < 0 || y >= H || x < 0 || x >= W0) continue;
+        tot++;
+        if (y >= cut) hid++;
+      }
+    }
+    // **이 값은 대리 지표다 — 그것도 적어 둔다.** 머신 실루엣이 아니라 **구획 안에서 분할선
+    //    아래에 있는 행의 비율**을 센다. 실루엣으로 재면 메트로(고장) 97% · 미라지 18% 인데
+    //    대리 지표로는 64% · 36% 로 나온다 — **크기는 다르고 순위는 같다.** 머신 실물을
+    //    읽어 오면 정확해지지만 `bg_gen` 이 `machines/` 에 묶이고, 그 결합은 배경 생성이
+    //    머신 회차에 깨지게 만든다. **정확도보다 결합을 피하는 쪽을 골랐고, 대신 값이
+    //    무엇인지 숨기지 않는다.** 문턱 0.4 는 고장(64%)을 잡고 정상 최댓값(36%)을 통과시킨다.
+    const frac = tot ? hid / tot : 0;
+    if (frac > lim) {
+      fail(`${stage}: 근경이 머신 자리를 ${(frac * 100).toFixed(0)}% 가린다 (허용 ${(lim * 100).toFixed(0)}%) — 분할 y=${cut} 가 머신 앞에 노면을 놓는다`);
+    }
+    console.log(`      · 머신 가림 ${(frac * 100).toFixed(0)}%(대리) 허용 ${(lim * 100).toFixed(0)}%`);
+  }
+
   if (!Number.isInteger(cut) || cut <= 0 || cut >= H) die(`${stage}: split_y 는 1~${H - 1} 의 정수다`);
   const layers = { far: [0, cut], near: [cut, H] };
   const sig = {};
