@@ -17,6 +17,9 @@
  *    ⓑ**무손실 분할** — 원경 불투명 + 근경 불투명 = 전체. 겹치거나 빠지면 실패.
  *    ⓒ**조달 대장** — 순색 60 밖 색 0(양자화가 보장하고 스크럽 색도 대장 안에서 고른다).
  *    ⓓ**재현** — `--check` 가 원본+팔레트+원장 → 산출물을 재산출 대조.
+ *    ⓔ**비네트**(보고 전용) — 좌우 끝 대역과 중앙 대역의 평균색 차. 25 초과면 ⚠ 를 붙인다.
+ *      차단하지 않는 이유는 본문 주석에 있다 — 문면으로 낮출 수는 있고 없앨 수는 없다.
+ *      경고 문턱 30 은 5표본 + 육안 경험값이며 유도값이 아니다.
  *
  * ── 무엇을 하지 않는가.
  *    **베이크된 글자를 기계가 찾지 않는다.** 도트 글립은 간판 무늬와 통계적으로 구분되지
@@ -213,6 +216,30 @@ for (const stage of names) {
   const need = s.max_seam_ratio === undefined ? 1.0 : s.max_seam_ratio;
   if (ratio >= need) fail(`${stage}: 이음비 ${ratio.toFixed(2)}배 (내부 ${inner.toFixed(2)} · 이음 ${seam.toFixed(2)}) — 요구 ${need} 미만`);
 
+  // ③-2 비네트 계측 — **보고만 하고 차단하지 않는다** (2026-08-24 · IMPL-379).
+  //
+  //    `tile_x` 는 좌우 끝을 이어야 하므로 **대칭 구도를 만들고**, 2:1 화면비에서 그 대칭이
+  //    **아치형 프레이밍**으로 굳는다. 좌우 끝 대역의 평균색이 중앙 대역과 크게 달라지는 것이
+  //    그 신호다.
+  //
+  //    **차단형으로 두지 않는 이유:** 문면으로 심도를 낮출 수는 있으나(미라지 97 → 49 실측)
+  //    **없애지는 못한다.** 반비네트·수평 층화 두 문면을 시험해 각각 부분 개선만 얻었고,
+  //    아주르는 50 으로 **이미 도달 가능한 하한**이었다. 하한이 허용 대역(≤약 20 — 육안
+  //    허용인 알타 16.7·메트로 12.6·돔 19.4 에서 경험적으로 잡았다) 위에 있으므로
+  //    차단형으로 두면 납품이 막힌다. **지표를 남기고 판정을 사람에게 넘긴다.**
+  const vband = (x0, x1) => { const t = [0, 0, 0]; let n = 0;
+    for (let y = 0; y < H; y++) for (let x = x0; x < x1; x++) { const i = (y * W0 + x) * 4; if (!q[i + 3]) continue;
+      t[0] += q[i]; t[1] += q[i + 1]; t[2] += q[i + 2]; n++; }
+    return n ? t.map((v) => v / n) : [0, 0, 0]; };
+  const VB = 24;
+  const vl = vband(0, VB), vr = vband(W0 - VB, W0), vc = vband(Math.floor(W0 / 2) - VB / 2, Math.floor(W0 / 2) + VB / 2);
+  const cdist = (a, b) => (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2])) / 3;
+  const vig = Math.max(cdist(vl, vc), cdist(vr, vc));
+  // 경고 문턱 30 — **5표본 + 육안으로 잡은 경험값이고 유도값이 아니다.** 양자화 후 실측에서
+  // 알타 27.1 은 허용으로 읽혔고 아주르 40.0 은 아니었다(메트로 7.6·돔 22.8 도 허용).
+  // 그 사이에 선을 그었다. 표본이 늘면 다시 잡는다.
+  const VIG_WARN = 30;
+
   // ④ 타일 반복 → 408
   const full = Buffer.alloc(W * H * 4);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -254,7 +281,7 @@ for (const stage of names) {
   let total = 0; for (let i = 0; i < W * H; i++) if (full[i * 4 + 3]) total++;
   if (sig.far + sig.near !== total)
     fail(`${stage}: 분할이 무손실이 아니다 — 원경 ${sig.far} + 근경 ${sig.near} = ${sig.far + sig.near} != 전체 ${total}`);
-  console.log(`      · 이음비 ${ratio.toFixed(2)}배 · 분할 y=${cut} · 무손실 ${sig.far}+${sig.near}=${total}` + (scrubbed ? ` · 스크럽 ${scrubbed}px` : ''));
+  console.log(`      · 이음비 ${ratio.toFixed(2)}배 · 비네트 ${vig.toFixed(1)}${vig > VIG_WARN ? ' ⚠' : ''} · 분할 y=${cut} · 무손실 ${sig.far}+${sig.near}=${total}` + (scrubbed ? ` · 스크럽 ${scrubbed}px` : ''));
 }
 
 console.log('');
