@@ -231,15 +231,31 @@ const FONT35 = {
 
 function applyDigits(name, w, h, put, d) {
   const { text, at, color, outline, covers } = d;
+  const scale = d.scale === undefined ? 1 : d.scale;
   if (!/^[0-9]{1,3}$/.test(String(text))) die(`patch ${name}: digits.text 는 1~3자리 숫자다 (${text})`);
   if (!Array.isArray(at) || at.length !== 2) die(`patch ${name}: digits.at 은 [x,y] 다`);
   if (!outline) die(`patch ${name}: digits 는 outline 선언을 요구한다 — 배경 명도를 모르는 자리다`);
-  if (!Array.isArray(covers) || covers.length !== 4) die(`patch ${name}: digits 는 covers [x,y,w,h] 선언을 요구한다 — 옛 번호를 덮는 것이 본체다`);
+  // `scale` — 2026-08-24 신설 · IMPL-409. 자형은 3×5 이고 머신 셀(128×64)에서는 1× 가 맞지만
+  //    **앱 아이콘 마스터(128×128)에서는 같은 3×5 가 높이의 4% 라 번호가 사라진다.**
+  //    자형을 새로 만들지 않고 **정수배로만** 키운다 — 도트 격자가 깨지지 않고,
+  //    머신과 아이콘이 **같은 자형**을 쓰는 계약(IMPL-347)도 유지된다.
+  if (!Number.isInteger(scale) || scale < 1 || scale > 16) die(`patch ${name}: digits.scale 은 1~16 의 정수다`);
+  // `covers` — **교체용 계약**이다(옛 번호를 덮는 것이 본체 — IMPL-347).
+  //    덮을 옛 번호가 없는 자리(빈 면에 찍는 경우)에는 **빠뜨리지 않고 `false` 로 명시**하게 한다.
+  //    누락과 부재를 같은 모양으로 두면 **깜빡한 것과 없는 것이 구분되지 않는다.**
+  if (covers !== false && (!Array.isArray(covers) || covers.length !== 4)) {
+    die(`patch ${name}: digits 는 covers [x,y,w,h] 또는 covers:false(덮을 옛 번호 없음) 를 선언해야 한다`);
+  }
   const glyph = new Set();
   let gx = at[0];
   for (const ch of String(text)) {
-    FONT35[ch].forEach((row, dy) => { [...row].forEach((c, dx) => { if (c === '#') glyph.add(`${gx + dx},${at[1] + dy}`); }); });
-    gx += 4;                                          // 3 + 1 공백
+    FONT35[ch].forEach((row, dy) => { [...row].forEach((c, dx) => {
+      if (c !== '#') return;
+      for (let sy = 0; sy < scale; sy++) for (let sx = 0; sx < scale; sx++) {
+        glyph.add(`${gx + dx * scale + sx},${at[1] + dy * scale + sy}`);
+      }
+    }); });
+    gx += 4 * scale;                                  // (3 + 1 공백) × 배율
   }
   // 외곽선 먼저(8-이웃 한 겹), 그 위에 심색. 글리프 3×5 상자가 전부 불투명해진다.
   const ring = new Set();
@@ -254,6 +270,7 @@ function applyDigits(name, w, h, put, d) {
   for (const k of glyph) { const [x, y] = k.split(',').map(Number); put(x, y, color); }
   // **덮기 검증** — 우연히 덮는 것과 계약으로 덮는 것은 다르다. 자형·자리·자릿수가 바뀌면
   // 우연은 조용히 깨지고 차에 번호가 두 개 남는다.
+  if (covers === false) return;                       // 덮을 것이 없다고 선언된 자리
   const [cx, cy, cw, chh] = covers;
   let uncovered = 0;
   for (let y = cy; y < cy + chh; y++) for (let x = cx; x < cx + cw; x++) {
