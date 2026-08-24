@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 /*
- * 키 비주얼 생성기 — `kv_spec.json` → `godot/assets/illustrations/` · `store/` · `platform/`
+ * 대형 원도 생성기 — `kv_spec.json` → `illustrations/` · `backgrounds/` · `store/` · `platform/`
+ *
+ * ── 이름은 키 비주얼에서 시작했으나 **다루는 것은 대형 원도 계열 전부**다(키 비주얼 2 · 배경 4 ·
+ *    스토어 리프레임 7 · 부트 스플래시 · 후속 전용 CG 6). 셋이 같은 문제를 갖기 때문이다 —
+ *    **RD 상한 384 보다 큰 원도를 정수배로만 얻어야 한다.** 파일을 나누면 코덱이 다섯 벌째가 된다.
  *
  * 소유: 에셋 트랙 (`tools/assets/`) · 신설 IMPL-412 · D15 §2.2 · D10 §6.4
  *
@@ -268,7 +272,20 @@ for (const o of spec.outputs) {
   let src = out, sw = W, sh = H;
   if (o.source) {
     const si = decode(abs(o.source));
-    src = si.rgba; sw = si.w; sh = si.h;
+    src = Buffer.from(si.rgba); sw = si.w; sh = si.h;
+    // `quantize` — **명시 선언이다.** 원본이 이미 순색 60 인 산출물(아이콘·머신)이면 다시
+    //    양자화하는 것이 무의미하고, RD 원판이면 반드시 거쳐야 한다. **조용히 알아서 하지 않는다** —
+    //    자동으로 두면 '대장 밖 색이 있었는데 도구가 지웠다'와 '애초에 없었다'가 구분되지 않는다.
+    if (o.quantize) {
+      const seen = new Set();
+      for (let i = 0; i < sw * sh; i++) {
+        if (!src[i * 4 + 3]) continue;
+        const p = nearest(src[i * 4], src[i * 4 + 1], src[i * 4 + 2]);
+        src[i * 4] = p[0]; src[i * 4 + 1] = p[1]; src[i * 4 + 2] = p[2];
+        seen.add(p.join(','));
+      }
+      console.log(`      · ${path.basename(o.source)} 양자화 · 고유색 ${seen.size}`);
+    }
   }
   const k = o.scale === undefined ? 1 : o.scale;
   if (!Number.isInteger(k) || k < 1 || k > 12) die(`${o.file}: scale 은 1~12 의 정수다 — 비정수 배율은 도트 격자를 깬다`);
