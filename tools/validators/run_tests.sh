@@ -33,7 +33,7 @@ TESTS=(
 	"tests/test_events.gd:7039"
 	"tests/test_season.gd:497"
 	"tests/test_tc_o.gd:395"
-	"tests/test_narrative.gd:184"
+	"tests/test_narrative.gd:213"
 	# AUDIO — 오디오 디스패처 정책 4종(봉인·게이트·채널 상한·P1 보호) + 표 전수 대조.
 	"tests/test_audio.gd:384"
 	# AUDIO-A — 오디오 **실물** 68식. 표·디스패처 검사(AUDIO)와 파일 검사(검증기 AUD)가 못 보는
@@ -53,11 +53,11 @@ TESTS=(
 	# GLYPH — 원도 커버리지. 판정 대상이 "원도가 이 문자를 실제로 그릴 수 있는가"이고 그 답의
 	# 정본은 엔진이 적재한 폰트다 — 검증기는 프로젝트리스라 `FontFile` 을 적재할 수 없고,
 	# cmap 자작 파서가 엔진과 한 칸 갈리면 그 차이가 곧 오검출이거나 누락이다(AUD/AUDIO-A 전례).
-	"tests/test_glyph_coverage.gd:3095"
+	"tests/test_glyph_coverage.gd:3240"
 	# G4W — 게이트 G-4(최장 키 언어 라벨 · D12 §8.5 · D14 §5.4). V3 는 **자수**를 규칙과
 	# 대조하고 이 스위트는 **실 원도 픽셀 폭**을 **실 슬롯 폭**과 대조한다 — 같은 자수라도
 	# 원도별 글자 폭이 다르고 en 은 반각이라 자수는 작고 픽셀은 크다.
-	"tests/test_label_width.gd:2305"
+	"tests/test_label_width.gd:2520"
 	# UISCR — 화면을 실제로 세워 본다. 문맥 결손(무커리어 진입)·포커스 부재는 데이터·코어
 	# 검사가 원리적으로 닿지 못하고, 커리어를 연 경로에서는 멀쩡해 보인다.
 	"tests/test_ui_screens.gd:441"
@@ -71,7 +71,17 @@ TESTS=(
 # `SaveManager` 격리 훅과 UISCR ㉑(전 하네스 훅 경유)이 안쪽 방어이고, 이것이 밖의 방어다 —
 # **훅을 우회하는 경로가 새로 생기면 스위트 검사로는 보이지 않고 실 파일만 바뀐다.**
 # 그래서 게이트 전후로 실 저장 파일 바이트를 대조한다. 훅이 아니라 **피해 자체**를 본다.
-USER_DIR="${GODOT_USER_DIR:-$HOME/.local/share/godot/app_userdata/Formula Pulse- Spin the Grid}"
+# **경로를 엔진에게 묻는다.** 손으로 적거나 환경 변수로 받으면 대조 대상과 기록 대상이
+# 갈린다 — `GODOT_USER_DIR` 는 Godot 이 모르는 이름이라(실측: 값을 바꿔도
+# `OS.get_user_data_dir()` 불변) 그 변수를 신뢰하면 **스냅숏 경로만 옮겨지고 실 파일은
+# 그대로 변조되면서 대조는 녹색**이 된다. 26차 벽두 교정 — 내러티브 8차 실측 채택.
+USER_DIR=$("$GODOT" --headless --path godot --script tests/print_user_dir.gd 2>/dev/null \
+	| sed -n 's/^USER_DATA_DIR=//p' | tail -1)
+if [ -z "$USER_DIR" ]; then
+	printf '\nTESTS_FAIL 실 저장 경로를 엔진에서 얻지 못했다 — 무접촉 대조가 성립하지 않는다\n'
+	exit 1
+fi
+printf '실 저장 경로(엔진 보고): %s\n' "$USER_DIR"
 snapshot_real_saves() {
 	if [ ! -d "$USER_DIR" ]; then
 		return

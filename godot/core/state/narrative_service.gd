@@ -66,7 +66,10 @@ func trigger_vn(vn_id: String, slot_id: String, skipped: bool) -> Dictionary:
 func _consume_transition(vn_id: String) -> String:
 	if _transitions_fired.has(vn_id):
 		return ""
-	var row := data.milestone_vn_row(vn_id)
+	# **분류 한 겹을 거친다** (총괄 판정 ① B안). 재발화 가드는 `vn_id` 단위로 유지하고
+	# 조회만 분류로 돌린다 — 그래야 같은 분류의 N 건이 각자 1회씩 전이를 소비한다
+	# (공유 id 로 두면 가드가 걸려 1회만 나고, 고유 id 로 직접 조회하면 아예 안 난다).
+	var row := data.milestone_vn_row(data.milestone_class_of(vn_id))
 	if row.is_empty():
 		return ""
 	var relation := String(row["relation_transition"]).strip_edges()

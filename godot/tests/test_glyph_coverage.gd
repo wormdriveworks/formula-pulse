@@ -104,8 +104,8 @@ func _ok(label: String, condition: bool, detail: String = "") -> void:
 
 func _report() -> void:
 	print("")
-	if _checked < 3090:
-		print("GLYPH_FAIL checks=%d < 하한 3090 (스위트 축소·폰트 적재 실패 의심)" % _checked)
+	if _checked < 3240:
+		print("GLYPH_FAIL checks=%d < 하한 3240 (스위트 축소·폰트 적재 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:

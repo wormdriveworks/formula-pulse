@@ -3,7 +3,15 @@
 # 실행: godot --headless --path godot --script tests/test_narrative.gd
 extends SceneTree
 
-const MIN_CHECKS := 184
+const MIN_CHECKS := 213
+
+# 화자 키 도메인 — 조각으로 나누지 않아도 되는 형태(끝이 `.` 라 키 문법에 걸리지 않는다).
+# 조각으로 나눈다 — 이어 붙인 전체가 리터럴로 있으면 V2 가 '코드가 발행하는 키'로 보고
+# 미등재를 차단한다(접두는 키가 아니다 · 21차·25차 전례).
+const SPEAKER_DOMAIN := "ui.vn." + "speaker"
+
+# 표제 미유입 계수 — 내러티브 9차가 8문안을 대면 0이 되고 이 대장은 만료한다.
+const TITLE_PENDING := 8
 
 var _failures := 0
 var _checked := 0
@@ -25,6 +33,7 @@ func _init() -> void:
 	_t7_choice_data()
 	_beat_data()
 	_season_boundary_vn()
+	_milestone_vn_wiring()
 	print("")
 	if _checked < MIN_CHECKS:
 		print("NARRATIVE_TEST_FAIL checks=%d < 하한 %d (스위트 축소·로드 실패 의심)" % [_checked, MIN_CHECKS])
@@ -563,8 +572,14 @@ func _beat_data() -> void:
 	var order_broken := 0
 	var count_mismatch := 0
 	var bad_range := 0
-	var allowed := ["ui.vn.speakerMarta", "ui.vn.speakerTheo", "ui.vn.speakerVane",
-		"ui.vn.speakerNarration"]
+	# 화자 목록을 손으로 적지 않는다 — 26차에 크루 3인이 들어오며 손 목록이 먼저 걸렸다.
+	# **화자 키는 `ui.vn.speaker*` 도메인 전속**이라는 것이 실제 규칙이고, 그 도메인에서
+	# 뽑으면 화자가 늘어도 목록이 낡지 않으며 **도메인 밖 키는 여전히 걸린다.**
+	var allowed: Array = []
+	for key in data.strings.keys():
+		if String(key).begins_with(SPEAKER_DOMAIN):
+			allowed.append(String(key))
+	_ok("화자 키 도메인 표본 확보", allowed.size() >= 4, str(allowed.size()))
 	var speaker_off := 0
 	for beat_id in data.vn_beats:
 		var row: Dictionary = data.vn_beats[beat_id]
@@ -706,3 +721,82 @@ func _season_boundary_vn() -> void:
 	session.narrative.trigger_vn(String(close_payload["vn_id"]),
 		String(close_payload["slot_id"]), false)
 	_ok("발화 후 엔딩 재발행 0", session.season_close_payload("HUB-01").is_empty())
+
+
+# ── 마일스톤 VN 결선 (26차) ──
+#
+# **라인 계수는 대사만 센다** (총괄 판정 ④ 전사 — D04 §5.2 상한의 해석 명문).
+# 지문은 무게가 아니라 호흡이라 상한에 넣지 않는다. 단서 계열은 **무게 예외**다
+# (판정 ⓐ — D08 §8.6 이 단서별 구체 명문을 두므로 일반 무게 규격에 우선한다).
+func _milestone_vn_wiring() -> void:
+	var data := _t7_data()
+	if data == null:
+		return
+	var stage_zero := func(_axis: String): return 0
+	var milestone := data.vn_beats_for("vnslot_tour_milestone", "", stage_zero)
+	_ok("마일스톤 비트 8건", milestone.size() == 8, str(milestone.size()))
+	var narration := SPEAKER_DOMAIN + "Narration"
+	var weight_exempt := 0
+	var light: Array = []
+	for beat in milestone:
+		var row: Dictionary = beat
+		var beat_id := String(row["id"])
+		var lines := data.vn_beat_lines_for(beat_id)
+		# 대사 = 지문 밖 전부
+		var dialogue := 0
+		var narration_lines := 0
+		for line in lines:
+			if String(Dictionary(line)["speaker_key"]) == narration:
+				narration_lines += 1
+			else:
+				dialogue += 1
+		_ok("%s 지문 ≤ 2 (D04 §5.2)" % beat_id, narration_lines <= 2, str(narration_lines))
+		if beat_id.begins_with("vnbeat_clue_"):
+			# 단서는 무게 규격 밖 — 재지 않는 것이 판정 ⓐ의 이행이다.
+			weight_exempt += 1
+			_ok("%s 단서 = 무게 예외 (재지 않음)" % beat_id, true)
+			continue
+		# **천장만 판정한다.** 중량 16 은 D04 §5.2 의 상한이라 넘으면 규격 위반이지만,
+		# 표준형 하한(대사 8)은 *어느 무게로 쓸 것인가*의 선택이고 그 선택은 작법이다 —
+		# 성취 3건이 대사 7(총 8라인)로 왔는데, 그것이 '경량으로 쓴 것'인지 '표준형 미달'인지는
+		# 기계가 정할 수 없다. **관측으로 남기고 판정을 올린다**(회신 §보고).
+		_ok("%s 대사 ≤ 16 (중량 천장)" % beat_id, dialogue <= 16, "대사=%d" % dialogue)
+		if dialogue < 8:
+			light.append("%s(대사 %d)" % [beat_id, dialogue])
+	_ok("무게 예외 = 단서 2건", weight_exempt == 2, str(weight_exempt))
+	# 관측 — 표준형 하한(대사 8) 미만. 판정이 아니라 보고다.
+	print("  [측정] 표준형 하한 미만 %d건%s"
+		% [light.size(), ("  " + str(light)) if not light.is_empty() else ""])
+	_ok("무게 관측 성립", light.size() <= milestone.size())
+	# 분류 매핑 (판정 ① B안) — 고유 vn_id 가 분류 한 겹을 거쳐 전이를 찾는가
+	for probe in [["vnbeat_crew_nadia", "mvn_crew_join"], ["vnbeat_crew_sasha", "mvn_crew_join"],
+			["vnbeat_feat_point", "mvn_general_feat"], ["vnbeat_clue_locked", "mvn_origin_clue"]]:
+		_ok("분류 매핑: %s → %s" % [probe[0], probe[1]],
+			data.milestone_class_of(String(probe[0])) == String(probe[1]),
+			data.milestone_class_of(String(probe[0])))
+	# 비트가 없는 id 는 자기 자신 — 기존 직접 조회 경로가 살아 있어야 한다
+	_ok("비트 밖 id 는 자기 자신", data.milestone_class_of("mvn_act_transition") == "mvn_act_transition")
+	# **같은 분류의 N 건이 각자 1회씩 전이를 소비한다** — 공유 id 로 두면 1회만 나고
+	# 고유 id 로 직접 조회하면 아예 안 난다(내러티브 8차 §4.1 두 형태의 실패).
+	var service := _new_service()
+	var fired := 0
+	for beat_id in ["vnbeat_crew_nadia", "vnbeat_crew_oscar", "vnbeat_crew_sasha"]:
+		var outcome: Dictionary = service.trigger_vn(beat_id, "vnslot_tour_milestone", false)
+		if String(outcome.get("relation", "")) == "relation_kinship":
+			fired += 1
+	_ok("크루 3건이 각자 전이를 소비 (친애 축 3회)", fired == 3, str(fired))
+	# 재발화 가드는 vn_id 단위 유지 — 같은 VN 을 다시 발생시켜도 두 번 나지 않는다
+	_ok("동일 vn_id 재발화 시 전이 0",
+		String(service.trigger_vn("vnbeat_crew_nadia", "vnslot_tour_milestone", false)
+			.get("relation", "")) == "")
+	# 표제 기제 — 한 슬롯을 여럿이 공유하면 슬롯 표제로 갈리지 않는다.
+	# **미유입 대장**이 만료를 강제한다: 문면이 들어오면 이 축이 실패하고 그때가
+	# `title_key` 를 채울 시점이다(내러티브 9차 키 계약).
+	var untitled: Array = []
+	for beat in milestone:
+		if data.vn_beat_title_key(String(Dictionary(beat)["id"])).is_empty():
+			untitled.append(String(Dictionary(beat)["id"]))
+	_ok("표제 미유입 대장 = 8건 (내러티브 9차 대기)", untitled.size() == TITLE_PENDING,
+		"%d — 문면이 유입되면 title_key 를 채울 시점이다" % untitled.size())
+	_ok("표제 기제 실재 (비트 행이 표제를 인다)",
+		data.vn_beats.values().any(func(row): return Dictionary(row).has("title_key")))

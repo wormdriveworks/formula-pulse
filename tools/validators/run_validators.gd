@@ -405,7 +405,7 @@ func _check_value(file_name: String, type_spec: String, value: String, row_id: S
 			if trimmed != "" and not Array(parts[1].split(",")).has(trimmed):
 				_fail("V1", "%s[%s].%s: '%s' not in enum {%s}" % [file_name, row_id, column_name, trimmed, parts[1]])
 		"string_key", "fk", "fk_optional", "fk_array", "string", \
-		"structure_ref", "structure_ref_optional", "structure_ref_array":
+		"structure_ref", "structure_ref_optional", "structure_ref_array", "string_key_optional":
 			pass  # V2 소관
 		_:
 			_warn("V1", "unknown type spec '%s'" % type_spec)
@@ -507,6 +507,14 @@ func _collect_strings_deep(value: Variant, sink: Dictionary) -> void:
 # fk_optional의 공란은 "참조 없음"으로 통과 — 필수 참조는 fk를 쓴다.
 func _check_reference(location: String, type_spec: String, value: String, structure_ids: Array) -> int:
 	if type_spec == "string_key":
+		if not _strings.has(value):
+			_fail("V2", "%s: string key '%s' not found" % [location, value])
+		return 1
+	# 공란 = "문면 없음"으로 통과. `structure_ref_optional` 과 동형이며 근거도 같다 —
+	# **필수 참조는 `string_key` 를 쓴다.** 선택형을 기본으로 두면 오타가 공란과 구분되지 않는다.
+	if type_spec == "string_key_optional":
+		if value == "":
+			return 0
 		if not _strings.has(value):
 			_fail("V2", "%s: string key '%s' not found" % [location, value])
 		return 1

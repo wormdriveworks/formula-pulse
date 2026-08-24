@@ -618,6 +618,25 @@ func vn_beat(beat_id: String) -> Dictionary:
 	return vn_beats.get(beat_id, {})
 
 
+# 아카이브 표제 키 — 비트 행이 선언한다. 공란이면 화면 층이 슬롯 표제로 폴백한다.
+# **세 번째 형태다** (내러티브 8차 §4.2): 막 VN 은 슬롯 행이 없어 리터럴 표를 쓰고,
+# 경계 VN 은 슬롯이 1:1 이라 슬롯 표제로 갈리는데, 마일스톤 VN 은 **한 슬롯을 8건이 공유**해
+# 슬롯 해소만으로는 갈릴 수 없다. 표제를 **비트 행 자신이** 이고 있는 것이 그 답이다 —
+# `string_key` 계열 열이라 V2·V6 이 참조를 이미 보고, 리터럴 표처럼 코드로 새지 않는다.
+func vn_beat_title_key(beat_id: String) -> String:
+	return String(vn_beats.get(beat_id, {}).get("title_key", "")).strip_edges()
+
+
+# 형식 A 전이의 **분류 한 겹** (총괄 판정 ① B안 — 내러티브 8차 §4.1).
+# 고유 `vn_id` 는 아카이브가 요구하고(나디아 합류와 사샤 복귀는 별 기억이다),
+# 전이는 분류 단위다. 그 사이를 비트 행의 `milestone_class` 가 잇는다 —
+# 분류 표가 분류 표로 남고, 같은 분류의 N 건이 **각자 1회씩** 전이를 소비한다.
+# 비트가 없는 vn_id(막 VN 등)는 자기 id 를 그대로 돌려준다 — 기존 직접 조회 경로 보존.
+func milestone_class_of(vn_id: String) -> String:
+	var declared := String(vn_beats.get(vn_id, {}).get("milestone_class", "")).strip_edges()
+	return declared if not declared.is_empty() else vn_id
+
+
 func vn_beat_lines_for(beat_id: String) -> Array:
 	return vn_beat_lines.get(beat_id, [])
 

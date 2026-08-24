@@ -755,6 +755,11 @@ func _refresh_skill_slots() -> void:
 			"label": s.text(String(slot["name_key"])),
 			"cost": s.text("ui.race.costFormat", {"cost": int(slot["charge_cost"])}),
 		})
+		# **잔여 횟수 배지는 붙이지 못했다 (26차 보고).** 문면(`ui.race.skillUsesFormat`)은
+		# 유입됐으나 버튼 문면이 이미 `actionWithCost` 로 조립돼 있어 배지를 이어 붙이려면
+		# 코드에서 문자열을 합성해야 하고, 그것은 V4(표시 문자열 = 키 참조 전속)가 막는다 —
+		# **막는 것이 옳다.** 필요한 것은 조립 키 1건(`{label}`·`{cost}`·`{left}`)이거나
+		# 배지 전용 노드(씬 층)다. 회신 §키 계약으로 올린다.
 		button.disabled = not open or not bool(slot["usable"])
 
 
@@ -798,6 +803,7 @@ func _on_skill_slot(index: int) -> void:
 	var outcome := engine.use_skill(String(slot["id"]), _skill_args(family))
 	if not bool(outcome.get("ok", false)):
 		sfx("input_rejected")   # 거부 = 비용·횟수 무변경 (계약 §1.1)
+		_notify_skill_rejected(String(outcome.get("error", "")))
 		_refresh_action_enabled()
 		return
 	# 계열음 4종 = SE-I05~I08. `family` 를 그대로 쓴다 — 표에 이미 서 있다(계약 §1.5).
@@ -818,6 +824,40 @@ func _on_skill_slot(index: int) -> void:
 	_refresh_snapshot_row()
 	_refresh_resources()
 	_refresh_action_enabled()
+
+
+# ── 스킬 거부 고지 (26차) ──
+#
+# **19분기가 5키로 접힌다.** `use_skill` 의 `error` 는 리터럴 15종 + `_skill_precondition`
+# 경유 4종인데, 문면은 그보다 적다 — 같은 말을 할 사유끼리 묶이기 때문이다.
+#
+# **셋은 문면을 두지 않는다** (`RaceEngine.SEAL_SILENT_ERRORS` — 총괄 판정):
+# `no_trouble`·`symbol`·`same` 은 사유가 **잠정 결과의 내용에 의존**하므로 문면이 곧
+# 결과 누출이다(불변규칙 5). 소리 거부만 남긴다 — 침묵이 이 셋의 최종형이다.
+#
+# 나머지 — `phase`·`deck`·`unknown`·`effect`·`no_provisional`·`keep`·`target`·`adjacent` 는
+# **조작 오류이지 규칙 거부가 아니다**(창이 닫혔거나 인자가 안 모였다). 화면이 애초에
+# 그 상태의 버튼을 비활성으로 두므로(`_refresh_action_enabled`) 사용자에게 도달하지 않는다 —
+# 도달한다면 그것은 문면 사안이 아니라 화면 결함이다. 그래서 고지하지 않는다.
+const SKILL_REJECT_KEYS := {
+	"charge": "ui.race.skillRejectedCharge",
+	"uses": "ui.race.skillRejectedUses",
+	"respin_cap": "ui.race.skillRejectedHoldCap",
+	"already_hold": "ui.race.skillRejectedAlreadyHold",
+	"already_mod": "ui.race.skillRejectedAlreadyMod",
+	"duel_turn": "ui.race.skillRejectedDuelTurn",
+	"sector_turn": "ui.race.skillRejectedSectorTurn",
+}
+
+
+# 고지 자리 — **잠정 조치다.** 전용 고지 슬롯은 주력 14차 몫이며(총괄 분리 · 최소 100px),
+# 그때 이 호출부 하나만 옮기면 된다. 지금 로그 존에 얹는 이유: 문면이 유입됐는데 소비부가
+# 없으면 **또 한 번 '표는 있고 소리는 없는' 상태**가 되고, 그 상태는 화면에서 정상과
+# 구분되지 않는다(AUDIO-W 대장이 반복해서 잡아 온 형태다).
+func _notify_skill_rejected(error: String) -> void:
+	if not SKILL_REJECT_KEYS.has(error):
+		return   # 침묵 3종 + 조작 오류 계열 — 소리 거부만
+	_e10_log.push_line("", session.data.strings.text(String(SKILL_REJECT_KEYS[error])))
 
 
 # 변환 계열이 바꾼 잠정 결과를 릴에 다시 그린다. **정지 연출이 아니다** — 심볼이 제자리에서
@@ -849,7 +889,13 @@ func _refresh_snapshot_row() -> void:
 	var previous: Array = engine.snapshot_previous
 	for i in range(mini(_snapshot_icons.size(), previous.size())):
 		_snapshot_icons[i].texture = _icon_texture(String(previous[i]))
-	# 이전 후보가 무엇이었는지는 도상이 말하고, 이 줄의 정체는 툴팁이 말한다.
+	# **신·구 어느 쪽인지 말이 붙는다 (26차).** 도상만으로는 "이 줄이 구 후보"라는 것이
+	# 드러나지 않는다 — SH3 의 효과는 *택1* 이고 무엇과 무엇 중 고르는지가 보여야 성립한다.
+	# **이 줄이 '구 후보'임을 말이 밝힌다 (26차).** 도상만으로는 신·구가 갈리지 않고,
+	# SH3 의 효과는 *택1* 이라 무엇과 무엇 중 고르는지가 보여야 성립한다.
+	# `snapshotKeepNew` 는 붙이지 못했다 — 신 후보 유지는 **버튼이 아니라 '그냥 확정'** 이라
+	# 라벨을 걸 노드가 없다(전용 버튼 = 씬 층 · 주력 몫). 회신 §키 계약으로 올린다.
+	_e05_snapshot.text = data.strings.text("ui.race.snapshotKeepOld")
 	_e05_snapshot.tooltip_text = data.strings.text("ui.skill.sh3")
 
 

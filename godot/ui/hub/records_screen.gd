@@ -191,6 +191,11 @@ func _vn_title(vn_id: String) -> String:
 	# (막 VN 은 표에 슬롯이 없어 리터럴 표가 남아 있는 것이다 — 성격이 다르다).
 	# `name_key` 는 `string_key` 열이라 V2·V6 이 참조를 이미 본다.
 	var beat := session.data.vn_beat(vn_id)
+	# **비트가 선언한 표제가 먼저다** (26차 · 세 번째 형태). 한 슬롯을 여러 비트가 공유하면
+	# 슬롯 표제로는 갈리지 않는다 — 마일스톤 슬롯 하나에 8건이 선다.
+	var declared_title := session.data.vn_beat_title_key(vn_id)
+	if not declared_title.is_empty():
+		return s.text(declared_title)
 	var beat_slot := String(beat.get("slot_id", ""))
 	# 공란 검사가 요건이다 — `vn_slot()` 은 미등재 슬롯에 `_load_ok = false` 를 세운다.
 	# 표시 함수가 적재 상태를 떨어뜨리면 그 다음 `param()` 부터 조용한 0 이 나온다.

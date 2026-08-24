@@ -138,8 +138,8 @@ func _report() -> void:
 	for line in _report_lines:
 		print(line)
 	print("")
-	if _checked < 2305:
-		print("G4W_FAIL checks=%d < 하한 2305 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 2520:
+		print("G4W_FAIL checks=%d < 하한 2520 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:

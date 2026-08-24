@@ -355,8 +355,10 @@
     "stage_id": "structure_ref_optional",
     "min_stage": "int:0,9",
     "max_stage": "int:0,9",
-    "line_count": "int:1,9",
-    "tone": "enum_optional:calm,tense"
+    "line_count": "int:1,18",
+    "tone": "enum_optional:calm,tense",
+    "title_key": "string_key_optional",
+    "milestone_class": "fk_optional:milestone_vn.csv"
    }
   },
   "vn_beat_lines.csv": {
@@ -365,7 +367,7 @@
    "columns": {
     "id": "id",
     "beat_id": "fk:vn_beats.csv",
-    "line_order": "int:1,9",
+    "line_order": "int:1,18",
     "speaker_key": "string_key",
     "text_key": "string_key"
    }
