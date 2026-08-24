@@ -197,6 +197,14 @@ ui.vnSlot.act3,3막 브레이킹 포인트,Act 3: Breaking Point,第3幕ブレ�
 ui.vnSlot.act4,4막 휠투휠,Act 4: Wheel to Wheel,第4幕ホイールトゥホイール
 ui.vnSlot.origin,기원 공개,Origin Revealed,起源の開示
 ui.vnSlot.epilogue,에필로그,Epilogue,エピローグ
+ui.vnTitle.crewNadia,나디아 합류,Nadia Joins,ナディア加入
+ui.vnTitle.crewOscar,오스카 합류,Oskar Joins,オスカル加入
+ui.vnTitle.crewSasha,사샤 복귀,Sasha Returns,サーシャ復帰
+ui.vnTitle.clueLocked,잠긴 영역,The Locked Area,施錠領域
+ui.vnTitle.clueSilence,사샤의 침묵,Sasha's Silence,サーシャの沈黙
+ui.vnTitle.featFinish,첫 완주,First Finish,初完走
+ui.vnTitle.featPoint,첫 포인트,First Point,初ポイント
+ui.vnTitle.featTourWin,첫 투어 우승,First Tour Win,初ツアー優勝
 ui.milestoneVn.actTransition,막 전이,Act Transition,幕の転換
 ui.milestoneVn.crewJoin,크루 합류,Crew Joins,クルー加入
 ui.milestoneVn.originClue,기원 단서,Origin Clue,起源の手がかり
@@ -779,6 +787,7 @@ vn.featFinish.beat05,순위는 다음이다.,Position comes next.,順位は次�
 vn.featFinish.beat06,완주 기록 1건. 참조 데이터 갱신.,"Finish logged, one. Reference data updated.",完走記録1件。参照データを更新。
 vn.featFinish.beat07,이 팀의 첫 줄이다.,This is this team's first line.,このチームの最初の行だ。
 vn.featFinish.beat08,기록실에 남겠네요.,It will be in the Records Room.,記録室に残りますね。
+vn.featFinish.beat09,그 줄은 우리가 썼다.,We wrote that line.,その行はこちらが書いた。
 vn.featPoint.beat01,결과판. 노스윈드 옆에 숫자가 붙었다.,The result board. A number beside Northwind.,結果板。ノースウィンドの横に数字がついた。
 vn.featPoint.beat02,포인트예요. 0이 아니에요.,Points. Not zero anymore.,ポイントです。0じゃありません。
 vn.featPoint.beat03,표에 우리 줄이 생겼다.,We have a row on the table now.,表にこちらの行ができた。
@@ -787,6 +796,7 @@ vn.featPoint.beat05,이거 계속 쌓이는 거죠?,"These keep stacking, right?
 vn.featPoint.beat06,쌓인다. 빠지지도 않는다.,They stack. They do not come off.,積まれる。抜かれもしない。
 vn.featPoint.beat07,그래서 처음이 제일 무겁다.,That is why the first one is heaviest.,だから最初が一番重い。
 vn.featPoint.beat08,가볍게 들었는데요.,I lifted it lightly though.,軽く持ちましたけど。
+vn.featPoint.beat09,들 수 있으면 됐다.,Being able to lift it is enough.,持てるならそれでいい。
 vn.featTourWin.beat01,투어 결산판 앞. 종합 1위에 노스윈드.,Before the tour board. Northwind first overall.,ツアー決算板の前。総合1位にノースウィンド。
 vn.featTourWin.beat02,투어를 가져왔어요. 하나 통째로요.,We took a tour. A whole one.,ツアーを取りました。丸ごと一つ。
 vn.featTourWin.beat03,대회 넷을 합쳐 이겼다.,Four races added up to a win.,大会四つを合わせて勝った。
@@ -795,6 +805,7 @@ vn.featTourWin.beat05,팩토리 셋을 앞에 두고요.,With three factory team
 vn.featTourWin.beat06,투어 종합 1위. 참조 사례 없음.,Tour standing first. No reference case.,ツアー総合1位。参照事例なし。
 vn.featTourWin.beat07,기록에는 없던 결과다.,A result the records did not have.,記録になかった結果だ。
 vn.featTourWin.beat08,다음 투어도 있어요.,There is another tour next.,次のツアーもありますよ。
+vn.featTourWin.beat09,있다. 오늘은 이걸 본다.,There is. Today we look at this.,ある。今日はこれを見る。
 vn.seasonOpen.beat01,리그 캘린더가 붙는다. 무대 다섯.,The league calendar goes up. Five stages.,リーグカレンダーが出た。舞台は五つ。
 vn.seasonOpen.beat02,한 해가 종이 한 장이에요.,A whole year on one sheet of paper.,一年が紙一枚に収まってます。
 vn.seasonOpen.beat03,한 장이면 됐다. 순서대로 간다.,One sheet is enough. We go in order.,一枚で足りる。順に行く。
