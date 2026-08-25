@@ -230,7 +230,7 @@ ui.race.consumableFilled,▣,▣,▣
 ui.race.menu,≡,≡,≡
 ui.race.timerFormat,{value},{value},{value}
 ui.race.resonanceBanner,레조넌스,Resonance,レゾナンス
-ui.race.locked,잠금,Locked,ロック
+ui.race.locked,잠금,―,ロック
 ui.race.snapshotKeepNew,새 후보,New candidate,新しい候補
 ui.race.snapshotKeepOld,이전 후보,Previous candidate,前の候補
 ui.race.skillRejectedCharge,차지 부족,Not enough charge,チャージ不足
