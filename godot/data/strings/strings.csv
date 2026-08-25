@@ -215,7 +215,7 @@ ui.race.gaugeFront,전방,Front,前方
 ui.race.gaugeRear,후방,Rear,後方
 ui.race.hold,홀드,Hold,ホールド
 ui.race.respin,리스핀,Re-spin,リスピン
-ui.race.chargeIntervene,차지 개입,Charge Intervene,チャージ介入
+ui.race.chargeIntervene,차지 개입,Step In,介入
 ui.race.confirm,확정,Confirm,確定
 ui.race.spin,스핀,Spin,スピン
 ui.race.skillSlotFormat,S{index},S{index},S{index}
