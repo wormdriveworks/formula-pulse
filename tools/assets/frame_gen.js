@@ -90,6 +90,17 @@ const ledger = new Set([
 ]);
 if (ledger.size === 0) die('조달 대장이 비었다 — 팔레트 실물·정본 확인 필요');
 
+// 정본 §6(색각 대체 교체 4색)은 **대장에 넣되 격리한다.** 넣는 이유: `*_alt` 원도가
+// 쓸 색이 여기밖에 없다 — 색상 회전은 틴트로 표현되지 않으므로(IMPL-436) 색각 대체는
+// 별도 원도이고, 그 원도의 색은 §6 이 정본이다. 격리하는 이유: 열어 두면 §6 색이
+// 일반 프레임에 새어 들어가 **색각용 색이 기본 의장에 박힌다.** 그래서 두 방향으로 묶는다.
+//   ⓐ §6 전용 색은 이름이 `_alt` 로 끝나는 원도에서만 쓸 수 있다.
+//   ⓑ `_alt` 로 끝나는 원도는 §6 색을 **반드시 하나는** 써야 한다 — 안 쓰면 대체가 아니고,
+//      빈 유예가 남는다(9패치 symmetry 면제 검사와 같은 규약).
+const cbOnly = new Set(canonHexes(6).filter((h) => !ledger.has(h)));
+if (cbOnly.size === 0) die('정본 §6 에서 §5·대장 밖 색을 못 읽었다 — 표 구조가 바뀌었는가');
+for (const h of cbOnly) ledger.add(h);
+
 // ─────────────────────────────────────────────────── PNG 입출력
 function crc32(buf) {
   let c, t = crc32.t;
@@ -167,8 +178,27 @@ const spec = JSON.parse(fs.readFileSync(SPEC, 'utf8'));
 const PAL = spec.palette;
 for (const [k, v] of Object.entries(PAL)) {
   if (!/^#[0-9A-F]{6}$/.test(v)) die(`palette ${k}: 색 형식 아님 (${v})`);
-  if (!ledger.has(v)) die(`palette ${k} ${v}: 조달 대장 밖 — 대장(master_60 + 정본 §5) 안에서만 고른다`);
+  if (!ledger.has(v)) die(`palette ${k} ${v}: 조달 대장 밖 — 대장(master_60 + 정본 §5·§6) 안에서만 고른다`);
 }
+// 원도별 §6 사용 집계 — 위 ⓐⓑ 두 방향을 프레임 이름과 대조한다.
+const CB_KEYS = new Set(Object.entries(PAL).filter(([, v]) => cbOnly.has(v)).map(([k]) => k));
+function auditColorblindScope(name, s) {
+  const used = new Set();
+  const walk = (v) => {
+    if (typeof v === 'string') { if (CB_KEYS.has(v)) used.add(v); return; }
+    if (Array.isArray(v)) { v.forEach(walk); return; }
+    if (v && typeof v === 'object') { Object.values(v).forEach(walk); }
+  };
+  walk(s);
+  const isAlt = /_alt(_9p)?$/.test(name) || /_alt_/.test(name);
+  if (used.size && !isAlt) {
+    fail('CB-SCOPE', `${name}: 정본 §6 색각 대체색 [${[...used].join(',')}] 을 썼는데 이름이 _alt 가 아니다 — 색각용 색이 기본 의장에 박힌다`);
+  }
+  if (!used.size && isAltName(name)) {
+    fail('CB-SCOPE', `${name}: 이름이 _alt 인데 §6 색을 쓰지 않는다 — 대체가 아니고 빈 유예다`);
+  }
+}
+function isAltName(name) { return /_alt(_9p)?$/.test(name) || /_alt_/.test(name); }
 // `bases._palette` 도 `palette` 키만 가리킬 수 있다 — 색값을 두 곳에 두지 않는다.
 function rgbOf(key, where) {
   if (key === '.') return null;
@@ -331,6 +361,7 @@ console.log(`UI 프레임 ${CHECK_ONLY ? '대조' : '렌더'} — ${names.length
 let audited = 0;
 for (const name of names) {
   const s = spec.frames[name];
+  auditColorblindScope(name, s);
   const img = s.type === 'ninepatch' ? renderNinePatch(name, s)
     : s.type === 'glyph' ? renderGlyph(name, s, spec.bases || {})
     : renderSprite(name, s);

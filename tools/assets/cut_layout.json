@@ -1,0 +1,175 @@
+{
+  "_원장": [
+    "E15 컷 머신 배치 선언 — 총괄 발주 IMPL-440 ④ (원격 29차 §4.2 미결). 렌더러 = `cut_layout.js`.",
+    "**앵커는 중심 좌표다.** `scene_cut_layers.csv` 의 fx 앵커가 중심이라는 것을 실측으로 확인했다 — `fxe_slipstream`(64×32 @108,62)과 `fxe_accel_afterimage`(96×32 @92,62)가 중심 해석에서 **둘 다 정확히 x=140 에서 끝난다**. 140 = 머신 표준 자리 `[140,30,128,64]` 의 좌단. 두 원소가 독립적으로 같은 선에 맞는 것은 우연이 아니다. 그러므로 머신 좌표도 중심으로 적는다 — 한 표에서 앵커 규약이 갈리면 안 된다.",
+    "**원근 축소는 없다.** 비정수 배율은 도트 격자를 깬다(전 프로젝트 규칙). 그러므로 깊이의 단서는 **세로 offset + 그리는 순서** 둘뿐이고, 세로 offset 이 쓸 수 있는 폭은 노면 대역만큼이다 — 그 밖으로 나가면 차가 하늘에 뜬다.",
+    "머신은 오른쪽을 본다(측면 셀 실측 · 불투명 bbox x13~113 · y16~51 = 중심 기준 위 −16 / 아래 +19). 그러므로 **앞 = 오른쪽 · 뒤 = 왼쪽**이고, 슬립스트림이 머신 좌단에 붙는 것이 그 증거다.",
+    "**차폭 병주(나란히)와 전후(도열)를 가르는 것은 세로 offset 이 아니라 겹침이다.** 측면 시점에서 같은 y 로 나란히 두면 그냥 줄이 되고, 겹치면서 y 가 갈리면 다른 레인이 된다. 그래서 접전 SC-05 = **겹침**(접촉 불꽃이 겹친 자리에 온다) · 대치 SC-07 = **간격**(듀얼 오라가 빈 자리에 온다)로 갈랐다 — 같은 2대인데 뜻이 다른 이유가 좌표에 있어야 한다.",
+    "**슬롯 순서 = 그리는 순서다. 먼저가 뒤다.** 아래(큰 cy)가 카메라에 가까우므로 나중에 그린다."
+  ],
+  "canvas": [
+    408,
+    100
+  ],
+  "standard_slot": [
+    204,
+    62
+  ],
+  "road_band": [
+    75,
+    82
+  ],
+  "_road_band": "**노면선 기준이고 눈으로 정했다 — 유도된 값이 아니다.** 실기 합성 3점(cy 52·62·72 · metro_night)을 보고 골랐다: 위쪽 52 는 차가 방벽선에 올라타 **떠 보였고**, 아래쪽 72 는 metro 에서는 멀쩡한데 mirage_flat(근경 29행)에서 화소 76% 가 모래에 묻혔다. 상단은 원경/방벽이 막고 하단은 근경이 막으며 **두 무대가 서로 다른 쪽을 막는다.** 폭이 12px 뿐인 것은 좁아서가 아니라 차의 불투명 높이가 36px 이라 그렇다. 표준 자리(제원표 §4 `[140,30,128,64]`)의 노면선 = 81 이 기준점이다(중심 62 + nw01 바닥오프셋 19).",
+  "probe_sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+  "sheet_stage": "stage_metro_night",
+  "sheet_stage_worst": "stage_mirage_flat",
+  "sheet_scale": 2,
+  "limits": {
+    "max_upper_occlusion": 0.0,
+    "min_visible": 0.35,
+    "max_fx_over_cockpit": 0.6
+  },
+  "_limits": "`max_upper_occlusion` = **0 이고 이것은 유도된 값이다** — 근경은 언제나 아래에서 먹어 들어오므로 상반이 한 화소라도 먹히면 그 자리는 노면 대역 밖이다(근거 = `cut_layout.js` 게이트 ⓒ). 총량은 차단하지 않고 정보로만 찍는다. `min_visible`·`max_fx_over_cockpit` 은 **경험 문턱이며 유도되지 않았다**: 전자는 '실루엣이 1/3 남으면 차로 읽힌다', 후자는 '조종석이 반 넘게 덮이면 어느 z 순서든 위험' — 둘 다 눈 판단이다. 실패를 맞추려고 내리지 않는다.",
+  "cuts": {
+    "cut_basic_solo": {
+      "pattern": "단독",
+      "_": "SC-01. 표준 자리 그 자체 — 이 컷은 미결이 아니었고 기준선으로 함께 싣는다.",
+      "slots": [
+        {
+          "name": "self",
+          "cx": 204,
+          "sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+          "road_y": 81
+        }
+      ]
+    },
+    "cut_basic_group": {
+      "pattern": "집단 — 우상향 사행(1열 후퇴)",
+      "_": "SC-02 3대. **후미차 좌단을 140 에 맞췄다** — 슬립스트림(76~140)이 그 뒤에 붙는 자리다. 선두가 위·오른쪽으로 물러나며 셋이 사행을 이룬다: 앞으로 갈수록 멀어진다(오른쪽=앞 · 위=멀다)는 두 단서가 같은 방향을 가리키므로 서로 싸우지 않는다. **세로 3단은 75/78/82 로 균등하게 나눴다** — 초판은 78 자리에 81 을 써서 중간차와 후미차가 1px 차이로 붙었고, 3단 사행이 사실상 2단으로 접혔다(대역 폭이 7px 뿐이라 균등 배분이 아니면 한 단이 사라진다).",
+      "slots": [
+        {
+          "name": "lead",
+          "cx": 344,
+          "sprite": "godot/assets/machines/vh8_behemoth_base_side.png",
+          "road_y": 75
+        },
+        {
+          "name": "mid",
+          "cx": 274,
+          "sprite": "godot/assets/machines/gm12_paladin_base_side.png",
+          "road_y": 78
+        },
+        {
+          "name": "tail",
+          "cx": 204,
+          "sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+          "road_y": 82
+        }
+      ]
+    },
+    "cut_overtake": {
+      "pattern": "교차 — 안쪽 저선에서 올라붙는다 (겹침 48)",
+      "_": "SC-03 2대. 잔상(44~140)과 슬립스트림(76~140)이 **둘 다 140 왼쪽**이므로 그 꼬리를 가진 차가 `passer` 이고 좌단이 140 으로 고정된다 — 즉 passer 의 cx 는 fx 앵커가 이미 정해 놓았다(204). passer 는 아래(가까운 안쪽 레인) · passed 는 위·오른쪽(아직 앞). **겹침은 48px 이다 — 초판 68px 은 판독에서 \"추월\"보다 \"바짝 따라붙음\"으로 읽혔다**: 세로 여유가 7px 뿐이라 깊이 단서가 거의 없고, 그러면 남는 단서는 **두 실루엣이 온전히 둘로 보이는가** 뿐이다. 겹침을 줄여 passer 의 코가 passed 의 뒷날개까지만 물게 했다. **이 컷은 6종 중 판독이 가장 약하다** — 회신에 한계로 적었다.",
+      "slots": [
+        {
+          "name": "passed",
+          "cx": 284,
+          "sprite": "godot/assets/machines/ax9_theorem_base_side.png",
+          "road_y": 75
+        },
+        {
+          "name": "passer",
+          "cx": 204,
+          "sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+          "road_y": 82
+        }
+      ]
+    },
+    "cut_defense": {
+      "pattern": "전후 — 같은 레인 코앞 (겹침 0)",
+      "_": "SC-04 2대. 방어는 **같은 선을 막는 것**이므로 두 차의 cy 가 같아야 한다 — y 가 갈리면 다른 레인이 되고 그건 막는 그림이 아니다. 상자를 268 에서 정확히 맞대 **겹침 0**: 측면 시점에서 같은 깊이의 두 차가 겹치면 어느 쪽이 위인지 물리적으로 답이 없다. `chaser` 좌단 140 = 잔상 자리.",
+      "slots": [
+        {
+          "name": "blocker",
+          "cx": 332,
+          "sprite": "godot/assets/machines/gm12_paladin_base_side.png",
+          "road_y": 81
+        },
+        {
+          "name": "chaser",
+          "cx": 204,
+          "sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+          "road_y": 81
+        }
+      ]
+    },
+    "cut_close_battle": {
+      "pattern": "나란히 — 차폭 병주 (겹침 32)",
+      "_": "SC-05 2대. 접촉 불꽃 앵커(204,62 → 180~228)가 **겹친 구간에 걸쳐야** 무엇이 닿았는지 읽힌다. **겹침은 32px 이다 — 초판 64px 은 실패했다**: 세로 12px 차이로는 같은 형상의 36px 차 둘이 절반씩 겹치면 **한 대로 융합해** 접전이 아니라 추돌로 읽혔다(실기 합성 판독). 화소 잔존율은 87% 였다 — 게이트는 화소를 셌고 눈은 *차가 몇 대로 보이는가* 를 셌다. 겹침을 1/4 로 줄여 두 실루엣을 온전히 남기고, 안쪽 차 코와 바깥 차 꼬리가 만나는 자리에 불꽃을 둔다.",
+      "slots": [
+        {
+          "name": "outside",
+          "cx": 268,
+          "sprite": "godot/assets/machines/ax9_theorem_base_side.png",
+          "road_y": 75
+        },
+        {
+          "name": "inside",
+          "cx": 172,
+          "sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+          "road_y": 82
+        }
+      ]
+    },
+    "cut_duel_standoff": {
+      "pattern": "대치 — 중앙 대칭 (겹침 0 · 오라가 사이에)",
+      "_": "SC-07 2대. 듀얼 오라 앵커(204,62 → 172~236)가 캔버스 정중앙이므로 **두 차를 그 좌우로 갈라 세우고 사이를 비웠다**(맞댄 선 = 204). 오라가 빈 자리에서 타오르는 그림이라 '대치'가 겹침 없이 성립한다 — 접전 SC-05 와 대수가 같은데 뜻이 다른 것이 좌표에서 갈린다.",
+      "slots": [
+        {
+          "name": "rival",
+          "cx": 268,
+          "sprite": "godot/assets/machines/ax9_theorem_base_side.png",
+          "road_y": 81
+        },
+        {
+          "name": "self",
+          "cx": 140,
+          "sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+          "road_y": 81
+        }
+      ]
+    },
+    "cut_start": {
+      "pattern": "도열 — 2×2 지그재그 그리드",
+      "_": "SC-08 4대. **4×128 = 512 > 408 이라 1열 도열은 물리적으로 불가**하다 — 겹치지 않으려면 두 레인으로 갈라야 하고, 그것이 실제 그리드 도열(홀짝 엇갈림)과 같은 모양이라 규격이 정본을 밀어준 자리다. 앞 레인(near, cy 68) 140·268 · 뒤 레인(far, cy 58) 204·332 — 가로 엇갈림 64. **near 를 오른쪽으로 밀어** 잔상(44~140)이 p4 조종석을 덮지 않게 했다(초판 p4 cx 124 는 69% 덮어 게이트 ⓔ 위반).",
+      "slots": [
+        {
+          "name": "p3_far_back",
+          "cx": 204,
+          "sprite": "godot/assets/machines/gm12_paladin_base_side.png",
+          "road_y": 76
+        },
+        {
+          "name": "p1_far_front",
+          "cx": 332,
+          "sprite": "godot/assets/machines/vh8_behemoth_base_side.png",
+          "road_y": 76
+        },
+        {
+          "name": "p4_near_back",
+          "cx": 140,
+          "sprite": "godot/assets/machines/priv_common_base_side.png",
+          "road_y": 82
+        },
+        {
+          "name": "p2_near_front",
+          "cx": 268,
+          "sprite": "godot/assets/machines/ax9_theorem_base_side.png",
+          "road_y": 82
+        }
+      ]
+    }
+  },
+  "standard_road_y": 81,
+  "_anchor": "**anchor_y 는 노면선이고 셀 중심이 아니다.** 섀시 5종의 불투명 바닥이 셀 중심 기준 +11~+19 로 8px 흩어져 있어(priv 11 · ax9/gm12 13 · vh8 18 · nw01 19) 같은 셀 중심을 주면 차들이 서로 다른 높이에 선다 — SC-04(같은 레인 방어)가 그 자리에서 깨진다. 이 형식은 **해소 방향과 무관하게 성립한다**: 셀을 정렬해 오프셋을 통일하든, 오프셋을 데이터로 넘기든 같은 숫자가 쓰인다."
+}
