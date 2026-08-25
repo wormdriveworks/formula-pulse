@@ -38,8 +38,9 @@
         {
           "name": "self",
           "cx": 204,
-          "sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
-          "road_y": 81
+          "road_y": 81,
+          "review_sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+          "occupant": "player"
         }
       ]
     },
@@ -50,20 +51,23 @@
         {
           "name": "lead",
           "cx": 344,
-          "sprite": "godot/assets/machines/vh8_behemoth_base_side.png",
-          "road_y": 75
+          "road_y": 75,
+          "review_sprite": "godot/assets/machines/vh8_behemoth_base_side.png",
+          "occupant": "rival"
         },
         {
           "name": "mid",
           "cx": 274,
-          "sprite": "godot/assets/machines/gm12_paladin_base_side.png",
-          "road_y": 78
+          "road_y": 78,
+          "review_sprite": "godot/assets/machines/gm12_paladin_base_side.png",
+          "occupant": "rival"
         },
         {
           "name": "tail",
           "cx": 204,
-          "sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
-          "road_y": 82
+          "road_y": 82,
+          "review_sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+          "occupant": "player"
         }
       ]
     },
@@ -74,14 +78,16 @@
         {
           "name": "passed",
           "cx": 284,
-          "sprite": "godot/assets/machines/ax9_theorem_base_side.png",
-          "road_y": 75
+          "road_y": 75,
+          "review_sprite": "godot/assets/machines/ax9_theorem_base_side.png",
+          "occupant": "rival"
         },
         {
           "name": "passer",
           "cx": 204,
-          "sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
-          "road_y": 82
+          "road_y": 82,
+          "review_sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+          "occupant": "player"
         }
       ]
     },
@@ -92,14 +98,16 @@
         {
           "name": "blocker",
           "cx": 332,
-          "sprite": "godot/assets/machines/gm12_paladin_base_side.png",
-          "road_y": 81
+          "road_y": 81,
+          "review_sprite": "godot/assets/machines/gm12_paladin_base_side.png",
+          "occupant": "rival"
         },
         {
           "name": "chaser",
           "cx": 204,
-          "sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
-          "road_y": 81
+          "road_y": 81,
+          "review_sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+          "occupant": "player"
         }
       ]
     },
@@ -110,14 +118,16 @@
         {
           "name": "outside",
           "cx": 268,
-          "sprite": "godot/assets/machines/ax9_theorem_base_side.png",
-          "road_y": 75
+          "road_y": 75,
+          "review_sprite": "godot/assets/machines/ax9_theorem_base_side.png",
+          "occupant": "rival"
         },
         {
           "name": "inside",
           "cx": 172,
-          "sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
-          "road_y": 82
+          "road_y": 82,
+          "review_sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+          "occupant": "player"
         }
       ]
     },
@@ -128,14 +138,16 @@
         {
           "name": "rival",
           "cx": 268,
-          "sprite": "godot/assets/machines/ax9_theorem_base_side.png",
-          "road_y": 81
+          "road_y": 81,
+          "review_sprite": "godot/assets/machines/ax9_theorem_base_side.png",
+          "occupant": "rival"
         },
         {
           "name": "self",
           "cx": 140,
-          "sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
-          "road_y": 81
+          "road_y": 81,
+          "review_sprite": "godot/assets/machines/nw01_boreas_base_s1_side.png",
+          "occupant": "player"
         }
       ]
     },
@@ -146,30 +158,36 @@
         {
           "name": "p3_far_back",
           "cx": 204,
-          "sprite": "godot/assets/machines/gm12_paladin_base_side.png",
-          "road_y": 76
+          "road_y": 76,
+          "review_sprite": "godot/assets/machines/gm12_paladin_base_side.png",
+          "occupant": "grid"
         },
         {
           "name": "p1_far_front",
           "cx": 332,
-          "sprite": "godot/assets/machines/vh8_behemoth_base_side.png",
-          "road_y": 76
+          "road_y": 76,
+          "review_sprite": "godot/assets/machines/vh8_behemoth_base_side.png",
+          "occupant": "grid"
         },
         {
           "name": "p4_near_back",
           "cx": 140,
-          "sprite": "godot/assets/machines/priv_common_base_side.png",
-          "road_y": 82
+          "road_y": 82,
+          "review_sprite": "godot/assets/machines/priv_common_base_side.png",
+          "occupant": "grid"
         },
         {
           "name": "p2_near_front",
           "cx": 268,
-          "sprite": "godot/assets/machines/ax9_theorem_base_side.png",
-          "road_y": 82
+          "road_y": 82,
+          "review_sprite": "godot/assets/machines/ax9_theorem_base_side.png",
+          "occupant": "grid"
         }
       ]
     }
   },
   "standard_road_y": 81,
-  "_anchor": "**anchor_y 는 노면선이고 셀 중심이 아니다.** 섀시 5종의 불투명 바닥이 셀 중심 기준 +11~+19 로 8px 흩어져 있어(priv 11 · ax9/gm12 13 · vh8 18 · nw01 19) 같은 셀 중심을 주면 차들이 서로 다른 높이에 선다 — SC-04(같은 레인 방어)가 그 자리에서 깨진다. **해소 = ⓑ 오프셋 데이터, 소비부 계산** (총괄 판정 IMPL-445 — 재정렬의 이득은 열 하나 제거인데 비용이 보레아스 오버레이 6장 + CG 좌표 연쇄다). **섀시 셀은 지금 정렬 상태 그대로 둔다** — 그러므로 `--table` 블록 ②가 영구 소비 데이터이고, 새 섀시를 컷 선언에 넣으면 도구가 그 오프셋을 계측해 표에 더한다(손으로 갱신하지 않는다)."
+  "_anchor": "**anchor_y 는 노면선이고 셀 중심이 아니다.** 섀시 5종의 불투명 바닥이 셀 중심 기준 +11~+19 로 8px 흩어져 있어(priv 11 · ax9/gm12 13 · vh8 18 · nw01 19) 같은 셀 중심을 주면 차들이 서로 다른 높이에 선다 — SC-04(같은 레인 방어)가 그 자리에서 깨진다. **해소 = ⓑ 오프셋 데이터, 소비부 계산** (총괄 판정 IMPL-445 — 재정렬의 이득은 열 하나 제거인데 비용이 보레아스 오버레이 6장 + CG 좌표 연쇄다). **섀시 셀은 지금 정렬 상태 그대로 둔다** — 그러므로 `--table` 블록 ②가 영구 소비 데이터이고, 새 섀시를 컷 선언에 넣으면 도구가 그 오프셋을 계측해 표에 더한다(손으로 갱신하지 않는다).",
+  "_review_sprite": "**`review_sprite` 는 런타임 데이터가 아니다 — 검수 표본이다.** 이 열이 있는 이유는 계측 하나뿐이다: 상호 가림(게이트 ⓓ)을 색 일치 마스크로 재는데 **같은 스프라이트를 두 번 놓으면 가려진 화소도 색이 맞아 가림이 0 으로 나온다.** 그래서 슬롯마다 다른 섀시를 얹어야 측정이 성립한다. **2026-08-25 개명:** 종전 이름은 `sprite` 였고 원격 31차가 그것을 `scene_cut_machines.csv` 의 `sprite` 열로 전사해 **런타임이 이 표본을 그대로 그렸다**(IMPL-450 소건 추적 중 발견). 제원표는 *\"검수용 표본이다\"* 라고 적어 뒀었다 — **기계가 읽는 필드 옆의 산문 경고는 필드에 진다.** 이름을 바꿔 오독을 불가능하게 한다.",
+  "_occupant": "**`occupant` 이 런타임이 실제로 물어야 할 것이다** — `player` · `rival` · `grid`. 자리마다 누가 오는가는 배치가 정하는 것이고(SC-02·03·04 는 잔상·슬립스트림이 붙는 차가 플레이어이므로 좌단 140 이 그 자리다 · SC-05 는 안쪽 저선이 플레이어), 어떤 섀시인가는 대전 상대가 정한다. **`grid` = SC-08 뿐이다** — 출발 도열은 자리가 순위이고 플레이어가 몇 번 그리드인지는 레이스 로직 소관이라 에셋이 정하지 않는다. 다만 **네 자리 전부가 라이벌이 되면 안 된다**(현행 표의 결함)."
 }

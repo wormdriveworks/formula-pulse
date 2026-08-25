@@ -300,7 +300,7 @@ for (const [cutId, decl] of Object.entries(spec.cuts)) {
     // 머신 — 선언 순서대로(먼저 = 뒤). 원경 위·근경 아래 (제원표 §4).
     const placed = [];
     for (const s0 of slots) {
-      const spr = machine(s0.sprite || spec.probe_sprite);
+      const spr = machine(s0.review_sprite || spec.probe_sprite);
       // 노면선 → 셀 중심. 섀시별 바닥 오프셋이 8px 흩어져 있으므로 여기서 푼다.
       const cy = s0.road_y - (opaqueRows(spr).bot - (spr.h >> 1));
       const s = Object.assign({}, s0, { cy });
@@ -424,9 +424,25 @@ if (SHEET) {
 
 if (TABLE) {
   console.log('\n--- 전사용 블록 ① 머신 자리 (anchor_y = **노면선** · slot_order = 그리는 순서) ---');
-  console.log('cut_id,slot_name,slot_order,anchor_x,anchor_road_y');
+  console.log('#  occupant       = 이 자리에 누가 오는가. player · rival · grid.');
+  console.log('#                   **런타임이 물어야 할 것은 이 열이다** — 섀시는 대전 상대가 정한다.');
+  console.log('#                   grid = SC-08 뿐(자리가 순위) · 플레이어의 그리드 번호는 레이스 로직 소관.');
+  console.log('#  review_sprite  = **런타임 데이터 아님. 검수 표본이다.**');
+  console.log('#                   상호 가림을 색 일치로 재려면 슬롯마다 다른 섀시가 필요해서 있는 열이고,');
+  console.log('#                   그게 이 열의 유일한 용도다. 표에 그대로 옮기면 대전 상대와 무관하게');
+  console.log('#                   같은 차가 나온다 — 실제로 그렇게 됐다(IMPL-450 추적분).');
+  console.log('cut_id,slot_name,slot_order,occupant,anchor_x,anchor_road_y,review_sprite');
   for (const [cutId, decl] of Object.entries(spec.cuts)) {
-    decl.slots.forEach((s, i) => console.log(`${cutId},${s.name},${i + 1},${s.cx},${s.road_y}`));
+    decl.slots.forEach((s, i) => console.log(
+      `${cutId},${s.name},${i + 1},${s.occupant},${s.cx},${s.road_y},${path.basename(s.review_sprite || spec.probe_sprite, '.png')}`));
+  }
+  // 전 자리가 rival 인 컷은 플레이어가 화면에서 사라진다 — 1대 폴백이 PLAYER_MACHINE 을
+  // 그리는데 다대 경로가 안 그리면 같은 패널이 자기와 모순된다.
+  for (const [cutId, decl] of Object.entries(spec.cuts)) {
+    const occ = decl.slots.map((s) => s.occupant);
+    if (occ.length > 1 && !occ.includes('player') && !occ.includes('grid')) {
+      fail(`${cutId}: 전 자리가 rival 이다 — 플레이어 차가 화면에서 사라진다`);
+    }
   }
   console.log('\n--- 전사용 블록 ② 섀시 바닥 오프셋 (**베이스 전량** — 선언에 쓴 것만이 아니다) ---');
   console.log('#  셀 중심 y  = anchor_road_y - baseline_offset');
@@ -457,7 +473,7 @@ if (TABLE) {
   }
   // 선언 표본이 베이스 전량을 덮는지 — 덮지 않으면 검수하지 않은 섀시가 있다는 뜻이다.
   const sampled = new Set();
-  for (const decl of Object.values(spec.cuts)) for (const s of decl.slots) sampled.add(path.basename(s.sprite || spec.probe_sprite));
+  for (const decl of Object.values(spec.cuts)) for (const s of decl.slots) sampled.add(path.basename(s.review_sprite || spec.probe_sprite));
   const unsampled = bases.filter((f) => !sampled.has(f));
   if (unsampled.length) console.log(`#\n# 검수 표본에 없는 베이스 ${unsampled.length}종 (오프셋은 위 표가 덮는다): ${unsampled.join(' ')}`);
 }
