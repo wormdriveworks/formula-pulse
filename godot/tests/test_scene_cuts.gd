@@ -18,6 +18,8 @@ const EXPECTED_ELEMENTS := 8   # 사양서 §5.2.1 연출 요소 8종
 const EXPECTED_CUTS := 10      # D10 §6.2 10종 + 예비 2
 const EXPECTED_BACKDROPS := 5  # 무대 5
 const MACHINE_DIR := "res://assets/machines/"
+# 측면 베이스 전량 = 팀 3 + 프라이비티어 공용 1 + 보레아스 3단계 + 필러 변조 4 (에셋 IMPL-461)
+const EXPECTED_BASELINES := 11
 
 # D13 별첨A §8.2 서열의 전사 — **말을 순서 배열로만 옮긴다.** 숫자는 표가 갖고 검사는
 # 서열만 갖는다(양쪽에 숫자를 두면 한쪽이 밀려도 대조가 성립한다).
@@ -48,8 +50,8 @@ func _init() -> void:
 	_mapping_priority(data)
 	_mapping_negatives(data)
 	print("")
-	if _checked < 244:
-		print("SCENE_FAIL checks=%d < 하한 244 (스위트 축소 의심)" % _checked)
+	if _checked < 295:
+		print("SCENE_FAIL checks=%d < 하한 295 (스위트 축소 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -244,6 +246,29 @@ func _machine_layout(data: GameData) -> void:
 		_ok("라이벌 '%s' 섀시 해소" % rival_id,
 			data.machine_baselines.has(data.rival_chassis(rival_id)),
 			data.rival_chassis(rival_id))
+	# ── 필러 결속 (34차 소건 ②) ──
+	# **결정적이어야 한다** — 같은 참가자는 언제나 같은 색이다(재현 계약).
+	var probe_ids: Array = ["filler_01", "filler_02", "filler_03", "filler_04", "filler_05",
+		"unknown_entrant"]
+	var assigned: Dictionary = {}
+	for entrant in probe_ids:
+		var chassis := data.rival_chassis(String(entrant))
+		_ok("필러 '%s' 섀시 해소" % String(entrant),
+			data.machine_baselines.has(chassis), chassis)
+		_ok("필러 '%s' = 변조 계열" % String(entrant), chassis.contains("_filler_"), chassis)
+		_ok("필러 '%s' 재호출 동일 (결정적)" % String(entrant),
+			data.rival_chassis(String(entrant)) == chassis)
+		assigned[String(entrant)] = chassis
+	# **한 색으로 몰리지 않는가** — 몰리면 필드가 같은 차로 가득 찬다.
+	var distinct: Dictionary = {}
+	for entrant in assigned:
+		distinct[String(assigned[entrant])] = true
+	_ok("필러 배정이 한 색으로 몰리지 않는다", distinct.size() >= 3, str(distinct.keys()))
+	# 네임드 상대는 **필러 폴백으로 새지 않는다** — 팀 배정이 우선이다.
+	for row in data.rivals:
+		_ok("네임드 '%s' 는 필러 계열이 아니다" % String(row["id"]),
+			not data.rival_chassis(String(row["id"])).contains("_filler_"),
+			data.rival_chassis(String(row["id"])))
 	_ok("점유자 3종 전건 사용 (player·rival·grid)",
 		occupants.has("player") and occupants.has("rival") and occupants.has("grid"),
 		str(occupants.keys()))
@@ -268,7 +293,9 @@ func _machine_layout(data: GameData) -> void:
 # 표를 표와 맞대면 전사를 확인할 뿐이다. 여기서는 **스프라이트 화소를 직접 세어**
 # `opaque_bottom` 과 `baseline_offset` 을 다시 유도한다 — 원본이 바뀌면 대장이 붉어진다.
 func _baseline_pixels(data: GameData) -> void:
-	_ok("섀시 대장 = 베이스 전량 7행", data.machine_baselines.size() == 7,
+	# 계수 핀 — **양쪽이 함께 줄어드는 것**을 잡는다(디렉토리 대조만으로는 둘 다 사라지면
+	# 성립해 버린다). 7 → **11** 은 필러 변조 4종 유입분이다(에셋 IMPL-461).
+	_ok("섀시 대장 = 측면 베이스 전량 11행", data.machine_baselines.size() == EXPECTED_BASELINES,
 		str(data.machine_baselines.size()))
 	for sprite in data.machine_baselines:
 		var row: Dictionary = data.machine_baselines[sprite]
@@ -310,7 +337,7 @@ func _baseline_pixels(data: GameData) -> void:
 			continue
 		if not found.has(name):
 			found.append(name)
-	_ok("베이스 실물 열거 비공허", found.size() == 7, str(found.size()))
+	_ok("베이스 실물 열거 비공허", found.size() == EXPECTED_BASELINES, str(found.size()))
 	for name in found:
 		_ok("베이스 '%s' 대장 등재" % String(name),
 			data.machine_baselines.has(String(name).trim_suffix(".png")),

@@ -456,7 +456,43 @@ func rival_chassis(rival_id: String) -> String:
 		if String(row.get("id", "")) != rival_id:
 			continue
 		return String(teams.get(String(row.get("team_id", "")), {}).get("chassis", ""))
-	return ""
+	return _filler_chassis(rival_id)
+
+
+# ── 필러 결속 (34차 · 총괄 소건 ② — 형식 재량) ──
+#
+# `ai_rivals` 밖의 참가자(`filler_*`)는 팀이 없다. 에셋 실물은 **공용 섀시의 도색 변조 4종**
+# 이고 오프셋이 전부 같으므로(11) 어느 것을 골라도 자리가 흔들리지 않는다 — 고르는 것은
+# **색**이다.
+#
+# **결정적 배정이 요건이다** (재현 계약 — D12 §6 세이브 재로드가 리롤이 되면 안 되는 것과
+# 같은 축이고, 여기는 난수를 쓰지 않는 것으로 만족한다). id 의 **후행 숫자**를 대장 크기로
+# 나눈 나머지를 쓴다 — 같은 참가자는 언제나 같은 색이고, 필드가 넓어져도 순환한다.
+#
+# **숫자가 없으면 문자 합으로 떨어뜨린다** — 미상 형식의 id 가 들어와도 배정이 결정적이어야
+# 하고, 그때 0번으로 몰면 여러 참가자가 같은 색이 된다.
+func _filler_chassis(entrant_id: String) -> String:
+	var pool: Array = []
+	for sprite in machine_baselines:
+		if String(sprite).contains("_filler_"):
+			pool.append(String(sprite))
+	if pool.is_empty():
+		return ""
+	pool.sort()
+	return String(pool[_stable_index(entrant_id, pool.size())])
+
+
+func _stable_index(source: String, size: int) -> int:
+	var digits := ""
+	for index in range(source.length()):
+		if source[index].is_valid_int():
+			digits += source[index]
+	if digits != "":
+		return digits.to_int() % size
+	var total := 0
+	for index in range(source.length()):
+		total += source.unicode_at(index)
+	return total % size
 
 
 # 스프라이트 바닥 오프셋 — **셀 중심 y = anchor_road_y − baseline_offset** (총괄 판정 ② ⓑ).

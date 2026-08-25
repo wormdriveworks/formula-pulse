@@ -130,8 +130,8 @@ func _process(_delta: float) -> bool:
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 667:
-		print("UI_SCREENS_FAIL checks=%d < 하한 667 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 670:
+		print("UI_SCREENS_FAIL checks=%d < 하한 670 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -3613,18 +3613,28 @@ func _scene_panel_layers(data: GameData) -> void:
 		# 오프셋이 실제로 쓰였는가 — 0 이면 노면선이 곧 중심이 되어 차가 뜬다.
 		_ok("%s 오프셋 비영 (축 비공허)" % String(row["slot_name"]),
 			data.machine_baseline(sprite) != 0, str(data.machine_baseline(sprite)))
-	# **필러는 결속이 없다** — `ai_rivals` 밖이라 팀이 없고, 대장은 공용 섀시를 문서로만
-	# 말한다(팔레트 스왑·파일 없음). 조용히 그리지 않고 관측으로 남는지 본다.
+	# ── 실 필드 경로 (34차 — 필러 결속 유입 후) ──
+	#
+	# **33차의 미결속 축은 내려갔다.** 그 축은 *필러에 섀시가 없다*는 사실을 붙들던 가드이고,
+	# 에셋 실물(변조 4종 · IMPL-461)과 결속이 들어왔으므로 붙들 것이 없다 —
+	# "가드는 자기가 지키던 것이 사라지면 함께 내려간다"의 세 번째 적용이다.
+	#
+	# 대신 **실기 경로 그 자체**를 잰다: 화면이 배정한 실 인접 참가자로 컷이 서는가.
+	# 기본 필드는 필러가 대부분이므로 이 경로가 실물 플레이에서 늘 밟히는 자리다.
 	var live: Dictionary = screen._scene_occupants()
-	var filler := ""
-	for entrant in Array(live.get("rival", [])):
-		if data.rival_chassis(String(entrant)).is_empty():
-			filler = String(entrant)
-	_ok("전제: 실 필드에 미결속 참가자가 있다 (필러)", not filler.is_empty(),
-		str(live.get("rival", [])))
-	panel.show_cut("cut_overtake", screen._active_stage_id(), {"rival": [filler]})
-	_ok("미결속 참가자 = 그리지 않고 관측", not panel.unbound_occupants.is_empty(),
+	var live_rivals: Array = Array(live.get("rival", []))
+	_ok("전제: 실 필드가 인접 참가자를 낸다", not live_rivals.is_empty(), str(live_rivals))
+	panel.show_cut("cut_overtake", screen._active_stage_id(), {"rival": live_rivals})
+	_ok("실 필드 경로 = 미결속 0", panel.unbound_occupants.is_empty(),
 		str(panel.unbound_occupants))
+	_ok("실 필드 경로 = 선언 대수 전량",
+		machines.get_child_count() == data.scene_cut_machines_for("cut_overtake").size(),
+		str(machines.get_child_count()))
+	for node in machines.get_children():
+		_ok("실 필드 섀시가 대장 안",
+			data.machine_baselines.has(
+				String(node.get_meta(ScenePanel.MACHINE_SPRITE_META, ""))),
+			String(node.get_meta(ScenePanel.MACHINE_SPRITE_META, "")))
 	# ── 그리드 자리 = 자리 이름의 `p<n>` 이 순위다 (도구 명문) ──
 	# **짝을 어긋나게 고른다**: 순위 순서와 그리는 순서가 다르므로(도열은 2×2 지그재그)
 	# 파싱을 지우면 자리마다 다른 차가 온다. 배정도 서로 다른 팀으로 세운다.
