@@ -68,7 +68,8 @@
     "aggression_add": "float",
     "stability_add": "float",
     "rush_lap_final_add": "float",
-    "pressure_mult": "float"
+    "pressure_mult": "float",
+    "chassis": "string"
    }
   },
   "ai_rivals.csv": {

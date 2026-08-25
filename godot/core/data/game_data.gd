@@ -448,6 +448,17 @@ func scene_cut_machines_for(cut_id: String) -> Array:
 	return scene_cut_machines.get(cut_id, [])
 
 
+# 라이벌 → 섀시. **팀이 차를 갖는다** (에셋 대장 §4 선언의 데이터화 — 33차 전사).
+# 라이벌 개인이 아니라 팀에 붙는 것은 세컨드 드라이버가 **같은 차에 리버리만 다른** 구조이기
+# 때문이다(대장 `*_livery_ai_*` 3장이 그 실물). 리버리 스왑은 아직 소비부가 없다.
+func rival_chassis(rival_id: String) -> String:
+	for row in rivals:
+		if String(row.get("id", "")) != rival_id:
+			continue
+		return String(teams.get(String(row.get("team_id", "")), {}).get("chassis", ""))
+	return ""
+
+
 # 스프라이트 바닥 오프셋 — **셀 중심 y = anchor_road_y − baseline_offset** (총괄 판정 ② ⓑ).
 # 섀시마다 셀 안에서 바퀴 높이가 다르다(+11~+19 · 산포 8px). 앵커를 셀 중심으로 두면
 # 무대 노면선 위에 서는 차와 뜨는 차가 갈리므로, **앵커는 노면선이고 셀은 계산으로 얹는다.**

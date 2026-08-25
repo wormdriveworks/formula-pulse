@@ -130,8 +130,8 @@ func _process(_delta: float) -> bool:
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 644:
-		print("UI_SCREENS_FAIL checks=%d < 하한 644 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 666:
+		print("UI_SCREENS_FAIL checks=%d < 하한 666 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1376,6 +1376,13 @@ func _anch_check_present() -> void:
 	_ok("CUTM 검사 등록(호출) 실재", source.contains("\t_run_cut_layout_scan()"))
 	_ok("CUTM 전사 소재 = cut_layout", source.contains("tools/assets/cut_layout.json"))
 	_ok("CUTM = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("CUTM"'))
+	# ── FXJ (신설 33차 — **경고형** · 성격은 총괄 판정 대기) ──
+	# 정의·등록·소재만 본다(성격은 못박지 않는다 — 전환 전이므로).
+	# **양 정규화가 이 검사의 본체다** — `pick` 을 빼면 거짓 결함이 상시로 나온다.
+	_ok("FXJ 검사 정의 실재", source.contains("func _run_fx_join_scan("))
+	_ok("FXJ 검사 등록(호출) 실재", source.contains("\t_run_fx_join_scan()"))
+	_ok("FXJ 접합 소재 = fx_spec", source.contains("tools/assets/fx_spec.json"))
+	_ok("FXJ 양 정규화 보유 (pick)", source.contains('entry.has("pick")'))
 	# ── 선택지 자수 규칙 (총괄 판정 IMPL-257 ②) ──
 	# **검사가 아니라 규칙 행이다.** V3·V7 은 그대로 살아 있으므로 행이 지워져도 검사는 죽지
 	# 않고 **그 도메인만 조용히 규율 밖으로 나간다** — 종료코드가 구분하지 못하는 자리가
@@ -3521,6 +3528,8 @@ func _action_row_budget(data: GameData) -> void:
 const SCENE_PANEL_NODE := "ScenePanel"
 # **fx 가 두 대역으로 갈렸다** (31차 · 총괄 판정 ③) — 오라는 차 뒤, 불꽃은 차 앞.
 const SCENE_LAYER_ORDER := ["Far", "FxBehind", "Machines", "Near", "FxFront"]
+# 팀이 서로 다른 네임드 상대 2인 — 섀시가 갈려야 배정이 무동작인지 알 수 있다.
+const NAMED_RIVALS := ["ai_lorentz", "ai_jude"]
 
 
 func _scene_panel_layers(data: GameData) -> void:
@@ -3562,35 +3571,38 @@ func _scene_panel_layers(data: GameData) -> void:
 	# 검수 표본은 런타임 데이터가 아니다), `rival`·`grid` 는 팀↔섀시 결속이 없어 아직
 	# 그리지 못한다. 그래서 **그려지는 것은 `player` 자리뿐**이고 나머지는 관측에 남는다.
 	# 오프셋 축의 "짝 어긋내기"는 결속이 서면 되돌아온다 — 지금은 잴 짝이 없다.
-	panel.show_cut("cut_basic_group", screen._active_stage_id())
+	# **네임드 상대로 세운다** (33차 결선) — 팀↔섀시 결속은 `ai_rivals` 에 등재된 상대에만
+	# 선다. 기본 필드는 필러가 대부분이라 화면 배정을 그대로 쓰면 결속이 아니라 **미결속**을
+	# 재게 된다(실측: 인접이 `filler_07`). 결속 축과 미결속 축을 **따로** 세운다.
+	var assigned := {"rival": [NAMED_RIVALS[0], NAMED_RIVALS[1]]}
+	_ok("전제: 두 상대의 팀 섀시가 서로 다르다 (축 비공허)",
+		data.rival_chassis(NAMED_RIVALS[0]) != data.rival_chassis(NAMED_RIVALS[1]),
+		"%s vs %s" % [data.rival_chassis(NAMED_RIVALS[0]), data.rival_chassis(NAMED_RIVALS[1])])
+	panel.show_cut("cut_basic_group", screen._active_stage_id(), assigned)
 	# **정렬을 검사가 스스로 한다.** 창구가 돌려준 순서를 그대로 쓰면 창구가 순서를 뒤집어도
 	# 노드와 행이 함께 뒤집혀 통과한다(반증 Q10 초판 미검출). `slot_order` 로 여기서 세운다.
 	var rows: Array = data.scene_cut_machines_for("cut_basic_group").duplicate()
 	rows.sort_custom(func(a, b):
 		return CsvTable.to_int(String(a["slot_order"])) < CsvTable.to_int(String(b["slot_order"])))
 	_ok("전제: 집단 컷 선언 3대", rows.size() == 3, str(rows.size()))
-	var bound: Array = []
-	var unbound: Array = []
-	for row in rows:
-		if String(row["occupant"]) == "player":
-			bound.append(row)
-		else:
-			unbound.append(row)
-	_ok("전제: 결속·미결속이 둘 다 있다 (축 비공허)",
-		not bound.is_empty() and not unbound.is_empty(),
-		"결속 %d · 미결속 %d" % [bound.size(), unbound.size()])
-	_ok("머신 노드 = 결속된 자리 수", machines.get_child_count() == bound.size(),
+	# 배정이 서면 **선언 대수 전량**이 그려진다 — 미결속 0 이 결선의 증명이다.
+	_ok("머신 노드 = 선언 대수 (결속 완료)", machines.get_child_count() == rows.size(),
 		str(machines.get_child_count()))
-	# **미결속은 조용히 사라지지 않는다** — 못 그린 자리가 관측에 남아야 한다.
-	_ok("미결속 자리 = 관측 등재",
-		panel.unbound_occupants.size() == unbound.size(), str(panel.unbound_occupants))
-	# **검수 표본을 대신 그리지 않는다** — 그것이 에셋이 되돌린 결함 그 자체다.
+	_ok("미결속 자리 0 (33차 결선)", panel.unbound_occupants.is_empty(),
+		str(panel.unbound_occupants))
+	# **팀이 차를 갖는다** — 인접 상대의 팀 섀시가 그려져야 한다. 짝을 어긋나게 고른다:
+	# 플레이어 자리와 상대 자리의 섀시가 같으면 배정이 무동작이어도 통과한다.
+	var drawn: Array = []
 	for node in machines.get_children():
-		_ok("그려진 섀시는 플레이어 머신", String(node.name) == ScenePanel.PLAYER_MACHINE,
-			String(node.name))
-	for row in bound:
-		var node := machines.get_child(bound.find(row)) as TextureRect
-		var sprite := ScenePanel.PLAYER_MACHINE
+		drawn.append(String(node.get_meta(ScenePanel.MACHINE_SPRITE_META, "")))
+	_ok("플레이어 섀시가 정확히 1대", drawn.count(ScenePanel.PLAYER_MACHINE) == 1, str(drawn))
+	for rival_id in NAMED_RIVALS:
+		_ok("배정 상대 '%s' 의 팀 섀시가 그려졌다" % String(rival_id),
+			drawn.has(data.rival_chassis(String(rival_id))), str(drawn))
+	for index in range(mini(rows.size(), machines.get_child_count())):
+		var row: Dictionary = rows[index]
+		var node := machines.get_child(index) as TextureRect
+		var sprite := String(node.get_meta(ScenePanel.MACHINE_SPRITE_META, ""))
 		var expected_center := Vector2(
 			float(CsvTable.to_int(String(row["anchor_x"]))),
 			float(CsvTable.to_int(String(row["anchor_road_y"]))
@@ -3601,6 +3613,39 @@ func _scene_panel_layers(data: GameData) -> void:
 		# 오프셋이 실제로 쓰였는가 — 0 이면 노면선이 곧 중심이 되어 차가 뜬다.
 		_ok("%s 오프셋 비영 (축 비공허)" % String(row["slot_name"]),
 			data.machine_baseline(sprite) != 0, str(data.machine_baseline(sprite)))
+	# **필러는 결속이 없다** — `ai_rivals` 밖이라 팀이 없고, 대장은 공용 섀시를 문서로만
+	# 말한다(팔레트 스왑·파일 없음). 조용히 그리지 않고 관측으로 남는지 본다.
+	var live: Dictionary = screen._scene_occupants()
+	var filler := ""
+	for entrant in Array(live.get("rival", [])):
+		if data.rival_chassis(String(entrant)).is_empty():
+			filler = String(entrant)
+	_ok("전제: 실 필드에 미결속 참가자가 있다 (필러)", not filler.is_empty(),
+		str(live.get("rival", [])))
+	panel.show_cut("cut_overtake", screen._active_stage_id(), {"rival": [filler]})
+	_ok("미결속 참가자 = 그리지 않고 관측", not panel.unbound_occupants.is_empty(),
+		str(panel.unbound_occupants))
+	# ── 그리드 자리 = 자리 이름의 `p<n>` 이 순위다 (도구 명문) ──
+	# **짝을 어긋나게 고른다**: 순위 순서와 그리는 순서가 다르므로(도열은 2×2 지그재그)
+	# 파싱을 지우면 자리마다 다른 차가 온다. 배정도 서로 다른 팀으로 세운다.
+	var grid_ids: Array = [NAMED_RIVALS[0], NAMED_RIVALS[1], NAMED_RIVALS[0], NAMED_RIVALS[1]]
+	panel.show_cut("cut_start", screen._active_stage_id(), {"grid": grid_ids})
+	var start_rows: Array = data.scene_cut_machines_for("cut_start").duplicate()
+	start_rows.sort_custom(func(a, b):
+		return CsvTable.to_int(String(a["slot_order"])) < CsvTable.to_int(String(b["slot_order"])))
+	_ok("전제: 도열 4대", start_rows.size() == 4, str(start_rows.size()))
+	_ok("도열 노드 = 선언 대수", machines.get_child_count() == start_rows.size(),
+		str(machines.get_child_count()))
+	for index in range(mini(start_rows.size(), machines.get_child_count())):
+		var slot_name := String(start_rows[index]["slot_name"])
+		var rank := panel._grid_rank(slot_name)
+		_ok("자리 '%s' 이름이 순위 부호를 갖는다" % slot_name, rank >= 1 and rank <= 4, str(rank))
+		var node := machines.get_child(index) as TextureRect
+		_ok("자리 '%s' = 그리드 %d번의 섀시" % [slot_name, rank],
+			String(node.get_meta(ScenePanel.MACHINE_SPRITE_META, ""))
+			== data.rival_chassis(String(grid_ids[rank - 1])),
+			String(node.get_meta(ScenePanel.MACHINE_SPRITE_META, "")))
+
 	# **선언이 없는 1대 컷은 표준 자리다** — 폴백이 아니라 제원표 §4 그 자체다.
 	panel.show_cut("cut_finish", screen._active_stage_id())
 	_ok("전제: 피니시는 자리 선언이 없다",

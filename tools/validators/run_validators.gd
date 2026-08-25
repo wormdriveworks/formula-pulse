@@ -50,6 +50,7 @@ func _init() -> void:
 	_run_audio_asset_scan()
 	_run_fx_placement_scan()
 	_run_cut_layout_scan()
+	_run_fx_join_scan()
 	# **완주 관문** — 스캔이 중도 이탈하면 실패 0·보고 0 으로 통과가 찍힌다(2026-08-20 실측:
 	# OGG 헤더의 없는 키를 `header["x"]` 로 읽자 함수가 이탈하고 게이트가 `VALIDATORS_PASS` 를 냈다).
 	# `run_tests.sh` 가 "성공 토큰의 부재 자체를 실패로 본다"고 한 것과 같은 축이다 —
@@ -1164,6 +1165,70 @@ func _run_v8_key_grammar() -> void:
 		if key_regex.search(String(key)) == null:
 			_fail("V8", "invalid key grammar: '%s'" % key)
 	_report("V8", "key grammar", checked, before_fail, before_warn)
+
+
+# ── FXJ 연출 요소 접합 대조 (신설 33차 — **경고형** · 총괄 배정) ──
+#
+# CUTM 과 같은 자리다: SCENE 은 표를 **실물 화소**와 맞대고 에셋 도구는 자기 선언을 갖는데,
+# **표와 도구 선언을 잇는 축**이 없었다(측정 동일성 3형 ③ — 미접합).
+#
+# **⚠ 잇기 전에 같은 양인지부터 묻는다.** 순진하게 이으면 거짓 결함이 나온다 — 실측:
+#   `fx_contact_spark  표 frames 5 ≠ 도구 frames 8`
+# 도구의 `frames` 는 **원본 시트** 프레임 수이고 표의 `frames` 는 **납품 셀** 수이며,
+# 그 사이를 `pick` 이 가른다(8장을 굽고 5장을 납품). **같은 이름의 다른 양**이다.
+# 양을 맞추면(`pick` 이 있으면 그 길이) 갈림 0 이다. 31차 회신 §10.5 실측.
+#
+# **성격 = 경고형(신설).** 차단/경고는 총괄 판정 경유(불변규칙 7) — FONT·PAL·ANCH·FXPL·
+# CUTM 이 밟은 절차 그대로 상신한다. 실재는 UISCR ⑬축이 받친다.
+const FXJ_SPEC := "tools/assets/fx_spec.json"
+const FXJ_TABLE := "fx_elements.csv"
+
+
+func _run_fx_join_scan() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	var parsed: Variant = JSON.parse_string(_read_text(FXJ_SPEC))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		_warn("FXJ", "%s 를 읽지 못했다 — 접합 대조 불가" % FXJ_SPEC)
+		_report("FXJ", "fx element join", checked, before_fail, before_warn)
+		return
+	var elements: Dictionary = Dictionary(parsed).get("elements", {})
+	checked += 1
+	if elements.is_empty():
+		_warn("FXJ", "도구 산출에 요소가 없다 — 대조가 공허해진다")
+	var seen: Dictionary = {}
+	for row in _tables.get(FXJ_TABLE, []):
+		var asset := String(row.get("asset", "")).strip_edges()
+		seen[asset] = true
+		checked += 1
+		if not elements.has(asset):
+			_warn("FXJ", "%s: 도구 산출에 없는 요소다" % asset)
+			continue
+		var entry: Dictionary = elements[asset]
+		# 셀 = `cell` 우선, 없으면 `size` (도구가 두 이름을 쓴다 — 작도형·시트형)
+		var cell: Array = Array(entry.get("cell", entry.get("size", [])))
+		if cell.size() >= 2:
+			_fxj_compare(asset, "cell_w", row, int(cell[0]))
+			_fxj_compare(asset, "cell_h", row, int(cell[1]))
+		# **양 정규화** — 납품 셀 수는 `pick` 이 있으면 그 길이다.
+		var delivered := int(entry.get("frames", 1))
+		if entry.has("pick"):
+			delivered = Array(entry["pick"]).size()
+		_fxj_compare(asset, "frames", row, delivered)
+		_fxj_compare(asset, "still_frame", row, int(entry.get("still_frame", 0)))
+	# 역방향 — 도구가 낸 요소가 표에 전부 있는가
+	for asset in elements:
+		checked += 1
+		if not seen.has(String(asset)):
+			_warn("FXJ", "%s: 도구가 낸 요소가 표에 없다" % String(asset))
+	_report("FXJ", "fx element join", checked, before_fail, before_warn)
+
+
+func _fxj_compare(asset: String, column: String, row: Dictionary, want: int) -> void:
+	var got := String(row.get(column, "")).strip_edges().to_int()
+	if got != want:
+		_warn("FXJ", "%s.%s: 표 %d ≠ 도구 %d" % [asset, column, got, want])
 
 
 # ── CUTM 컷 머신 배치 전사 대조 (신설 31차 — **경고형** · 에셋 IMPL-444·447) ──

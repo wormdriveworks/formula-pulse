@@ -48,8 +48,8 @@ func _init() -> void:
 	_mapping_priority(data)
 	_mapping_negatives(data)
 	print("")
-	if _checked < 220:
-		print("SCENE_FAIL checks=%d < 하한 220 (스위트 축소 의심)" % _checked)
+	if _checked < 244:
+		print("SCENE_FAIL checks=%d < 하한 244 (스위트 축소 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -222,6 +222,28 @@ func _machine_layout(data: GameData) -> void:
 			var anchor_x := CsvTable.to_int(String(row["anchor_x"]))
 			_ok("%s 앵커가 캔버스 안" % String(row["id"]),
 				anchor_x >= 0 and anchor_x <= CANVAS_W, str(anchor_x))
+	# ── 팀↔섀시 결속 (33차 · 에셋 대장 §4 전사) ──
+	# **팀이 차를 갖는다.** 값은 반드시 섀시 대장 안이어야 한다 — 밖이면 오프셋이 0 으로
+	# 떨어져 차가 뜨고, 그 결함은 화면에서만 보인다.
+	var team_count := 0
+	for team_id in data.teams:
+		var chassis := String(data.teams[team_id].get("chassis", "")).strip_edges()
+		team_count += 1
+		_ok("팀 '%s' 섀시 선언" % String(team_id), not chassis.is_empty())
+		_ok("팀 '%s' 섀시가 대장 안" % String(team_id),
+			data.machine_baselines.has(chassis), chassis)
+		# **성장 단계 접미가 붙지 않는다** (에셋 소견 — s1~s3 는 플레이어 머신의 시간 축이고
+		# 라이벌이 성장 단계를 갖게 되면 안 된다).
+		_ok("팀 '%s' 섀시에 단계 접미 없음" % String(team_id),
+			not chassis.contains("_s1_") and not chassis.contains("_s2_")
+			and not chassis.contains("_s3_"), chassis)
+	_ok("팀 전수 (5)", team_count == 5, str(team_count))
+	# 라이벌 → 팀 → 섀시가 전건 이어지는가 (`ai_rivals` 등재분)
+	for row in data.rivals:
+		var rival_id := String(row["id"])
+		_ok("라이벌 '%s' 섀시 해소" % rival_id,
+			data.machine_baselines.has(data.rival_chassis(rival_id)),
+			data.rival_chassis(rival_id))
 	_ok("점유자 3종 전건 사용 (player·rival·grid)",
 		occupants.has("player") and occupants.has("rival") and occupants.has("grid"),
 		str(occupants.keys()))

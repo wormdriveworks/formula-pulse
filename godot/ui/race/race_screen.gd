@@ -1641,7 +1641,8 @@ func _show_reel_phase_cut() -> void:
 	if _scene_panel == null or engine == null:
 		return
 	_scene_panel.set_motion_enabled(false)
-	_scene_panel.show_cut(session.scene_cuts.reel_phase_cut(_field_size()), _active_stage_id())
+	_scene_panel.show_cut(session.scene_cuts.reel_phase_cut(_field_size()),
+		_active_stage_id(), _scene_occupants())
 
 
 # 전개 국면 컷 — **확정 이벤트에서만** 부른다(호출부 = `_on_confirm` 의 정산 뒤).
@@ -1661,8 +1662,33 @@ func _show_result_cut(events: Array, duel_turn: bool, gp_finished: bool) -> void
 	})
 	if cut_id.is_empty():
 		return   # 폴백 행이 사라진 경우 — 검사가 잡는다(코드가 기본값을 들지 않는다)
-	_scene_panel.show_cut(cut_id, _active_stage_id())
+	_scene_panel.show_cut(cut_id, _active_stage_id(), _scene_occupants())
 	_scene_panel.set_motion_enabled(session.options.index_of("o12") == 0)
+
+
+# 씬 패널 점유자 배정 — **화면이 안다, 패널이 아니라.**
+#
+#   · `rival` — **[가안] 플레이어 앞뒤 인접 상대를 앞에서부터.** 패널이 비추는 것은 플레이어
+#     주변이므로 인접이 자연스러운 읽기다(`_field_size()` 의 단독/그룹 판정과 같은 근거).
+#     정본은 *어느 상대가 그 자리인가*를 정하지 않는다.
+#     **폐문 조건:** 실물 플레이 검증 회차 눈 판정 — 화면의 차가 옆에 달리는 차로 읽히는가.
+#   · `grid`  — 순위표 순서 그대로(자리 이름의 `p<n>` 이 순위다 — 도구 명문).
+func _scene_occupants() -> Dictionary:
+	if engine == null:
+		return {}
+	var order: Array = engine.positions
+	var index := order.find(RaceEngine.PLAYER_ID)
+	var neighbours: Array = []
+	if index >= 0:
+		if index > 0:
+			neighbours.append(String(order[index - 1]))
+		if index < order.size() - 1:
+			neighbours.append(String(order[index + 1]))
+	var grid: Array = []
+	for entrant in order:
+		if String(entrant) != RaceEngine.PLAYER_ID:
+			grid.append(String(entrant))
+	return {"rival": neighbours, "grid": grid}
 
 
 func _active_stage_id() -> String:

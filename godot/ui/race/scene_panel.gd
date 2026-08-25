@@ -24,6 +24,8 @@ const PLAYER_MACHINE := "nw01_boreas_base_s1_side"
 # 측면 셀 규격 — 제원표 §4 `[140, 30, 128, 64]` 의 폭·높이. 앵커는 데이터 창구를 거치지만
 # 셀 치수는 스프라이트가 이고 있으므로 표준 자리 환산에만 쓴다.
 const MACHINE_CELL := Vector2(128.0, 64.0)
+# 머신 노드가 이고 있는 섀시 id — 검사·회귀의 관측 지점.
+const MACHINE_SPRITE_META := "scene_machine_sprite"
 
 # 색 치환 역할 → 팔레트 정본 색 (사양서 §5.2.1 "생성은 중립색으로 받고 팔레트는 원장이 정한다").
 # **표가 선언한 역할 전부가 여기 있어야 한다** — 검사가 양방향으로 본다.
@@ -65,6 +67,11 @@ var multi_machine_omissions: Array = []
 # **검수 표본을 대신 그리지 않는다** — 그것이 에셋이 IMPL-452 로 되돌린 결함 그 자체다.
 # 못 그린 자리를 여기 남긴다: 조용한 1대보다 시끄러운 빈자리가 낫다.
 var unbound_occupants: Array = []
+# 이번 컷의 점유자 배정 — 화면 층이 넘긴다. `{"rival": [id...], "grid": [id...]}`.
+# **패널은 레이스 규칙을 갖지 않는다** — 누가 인접한지·누가 그리드 몇 번인지는 화면·엔진이
+# 알고, 패널은 받은 id 를 팀 표로 섀시에 옮길 뿐이다(D09 §3.1.1 "화면은 규칙을 갖지 않는다").
+var _occupants: Dictionary = {}
+var _rival_cursor := 0
 
 
 func setup(game_data: GameData) -> void:
@@ -119,9 +126,10 @@ func _notification(what: int) -> void:
 
 # 컷 전환. **같은 컷이면 되감지 않는다** — 매 턴 같은 기본 주행 컷이 서는데 그때마다
 # 루프가 0 프레임으로 튀면 화면이 딸꾹질한다.
-func show_cut(cut_id: String, stage_id: String) -> void:
-	if cut_id == _cut_id and stage_id == _stage_id:
+func show_cut(cut_id: String, stage_id: String, occupants: Dictionary = {}) -> void:
+	if cut_id == _cut_id and stage_id == _stage_id and occupants == _occupants:
 		return
+	_occupants = occupants.duplicate(true)
 	_cut_id = cut_id
 	_stage_id = stage_id
 	_frames = maxi(1, CsvTable.to_int(String(data.scene_cut(cut_id).get("frames", "1"))))
@@ -151,6 +159,7 @@ func _build_machines(cut_id: String) -> void:
 	for child in _machines.get_children():
 		_machines.remove_child(child)
 		child.queue_free()
+	_rival_cursor = 0
 	var slots := data.scene_cut_machines_for(cut_id)
 	var declared := CsvTable.to_int(String(data.scene_cut(cut_id).get("machines", "1")))
 	if slots.is_empty():
@@ -161,7 +170,7 @@ func _build_machines(cut_id: String) -> void:
 			data.param("param_scene_machine_y") + MACHINE_CELL.y * 0.5)
 		return
 	for row in slots:
-		var sprite := _chassis_for(String(row["occupant"]))
+		var sprite := _chassis_for(String(row["occupant"]), String(row["slot_name"]))
 		if sprite.is_empty():
 			var mark := "%s/%s" % [cut_id, String(row["slot_name"])]
 			if not unbound_occupants.has(mark):
@@ -173,18 +182,58 @@ func _build_machines(cut_id: String) -> void:
 				- data.machine_baseline(sprite)))
 
 
-# 점유자 → 섀시. **오늘 아는 것은 `player` 뿐이다.**
-# `rival`·`grid` 는 대전 상대가 정하는데 팀↔섀시 결속이 데이터에 없다 — 에셋 대장은
-# 그 대응을 문서로 선언하고 있으나(악시온=AX-9 · 불카=VH-8 · 그리폰=GM-12 ·
-# 프라이비티어=공용) `ai_teams.csv` 에 섀시 열이 없어 기계가 잇지 못한다.
-# **이름으로 추측하지 않는다** — 결속이 서면 이 함수 하나가 답한다.
-func _chassis_for(occupant: String) -> String:
-	return PLAYER_MACHINE if occupant == "player" else ""
+# 점유자 → 섀시 (33차 결선 — 팀↔섀시 결속 유입 후).
+#
+#   · `player` — 플레이어 머신. **성장 단계는 아직 상태에 없다**(아웃게임에 머신 단계 축이
+#     부재) → 1단계 고정. 단계가 서면 이 한 줄이 답한다.
+#   · `rival`  — 화면이 넘긴 상대 id 를 **자리 순서대로** 소비한다. 팀이 차를 갖는다.
+#   · `grid`   — 자리 이름이 곧 순위다(`p1`~`p4` — 도구 명문 "grid = 자리가 순위").
+#     이름을 파싱하는 것은 **선언된 부호**를 읽는 것이고, 그 부호의 형태는 검사가 못박는다.
+#
+# **넘겨받은 것이 없으면 빈 문자열이다** — 없는 상대를 그리지 않는다.
+func _chassis_for(occupant: String, slot_name: String) -> String:
+	match occupant:
+		"player":
+			return PLAYER_MACHINE
+		"rival":
+			return _from_ids(Array(_occupants.get("rival", [])), _next_rival_index())
+		"grid":
+			return _from_ids(Array(_occupants.get("grid", [])), _grid_rank(slot_name) - 1)
+	return ""
+
+
+# 자리 이름의 선행 `p<숫자>` = 그리드 순위. 형태가 아니면 −1 (해석 불가 = 미결속).
+func _grid_rank(slot_name: String) -> int:
+	if not slot_name.begins_with("p"):
+		return -1
+	var digits := ""
+	for index in range(1, slot_name.length()):
+		if not slot_name[index].is_valid_int():
+			break
+		digits += slot_name[index]
+	return digits.to_int() if digits != "" else -1
+
+
+func _from_ids(ids: Array, index: int) -> String:
+	if index < 0 or index >= ids.size():
+		return ""
+	return data.rival_chassis(String(ids[index]))
+
+
+# 이 컷에서 몇 번째 rival 자리인가 — 그리는 동안 증가한다.
+func _next_rival_index() -> int:
+	var used := _rival_cursor
+	_rival_cursor += 1
+	return used
 
 
 func _place_machine(sprite: String, center_x: float, center_y: float) -> void:
 	var node := TextureRect.new()
-	node.name = sprite
+	# **이름으로 정체를 싣지 않는다.** 같은 섀시가 두 자리에 서면(프라이비티어 공용 — 실버
+	# 트레일·코멧웍스가 같은 차다) 엔진이 이름을 `@TextureRect@N` 으로 갈아 버려 정체가
+	# 사라진다. 33차 반증에서 실제로 그 모양이 나왔다 — 메타로 싣는다.
+	node.name = "Machine"
+	node.set_meta(MACHINE_SPRITE_META, sprite)
 	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	node.stretch_mode = TextureRect.STRETCH_KEEP
