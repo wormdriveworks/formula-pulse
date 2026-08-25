@@ -48,8 +48,8 @@ func _init() -> void:
 	_mapping_priority(data)
 	_mapping_negatives(data)
 	print("")
-	if _checked < 218:
-		print("SCENE_FAIL checks=%d < 하한 218 (스위트 축소 의심)" % _checked)
+	if _checked < 220:
+		print("SCENE_FAIL checks=%d < 하한 220 (스위트 축소 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -201,13 +201,34 @@ func _machine_layout(data: GameData) -> void:
 			str(slots.size()))
 	# 비공허성 — 다대 컷이 실재해야 위 축이 무언가를 잰다.
 	_ok("다대 컷 전수 (6종)", multi == 6, str(multi))
+	# **검수 표본이 런타임 표에 없는가** (에셋 IMPL-452) — 31차 전사가 정확히 이 형태로 샜다.
+	# 열 이름이 아니라 **값**으로 잡는다: 어느 열에든 섀시 파일명이 들어오면 그것이 유입이다.
+	var leaked: Array = []
+	for cut_id in data.scene_cut_machines:
+		for row in data.scene_cut_machines_for(String(cut_id)):
+			for column_name in row:
+				if data.machine_baselines.has(String(row[column_name]).strip_edges()):
+					leaked.append("%s.%s" % [String(row["id"]), String(column_name)])
+	_ok("검수 표본 유입 0 (자리 표에 섀시 파일명 없음)", leaked.is_empty(),
+		"%s — 표본이 들어오면 대전 상대와 무관하게 같은 차가 나온다" % str(leaked))
+	# 점유자 3종이 다 서는가 — 한 종만 쓰이면 열이 열 노릇을 하지 않는다.
+	var occupants: Dictionary = {}
+	for cut_id in data.scene_cut_machines:
+		for row in data.scene_cut_machines_for(String(cut_id)):
+			occupants[String(row["occupant"])] = true
+	# 자리마다 캔버스 안인가 — 셀 폭 128 의 절반이 넘어가면 차가 화면 밖에서 잘린다.
+	for cut_id in data.scene_cut_machines:
+		for row in data.scene_cut_machines_for(String(cut_id)):
+			var anchor_x := CsvTable.to_int(String(row["anchor_x"]))
+			_ok("%s 앵커가 캔버스 안" % String(row["id"]),
+				anchor_x >= 0 and anchor_x <= CANVAS_W, str(anchor_x))
+	_ok("점유자 3종 전건 사용 (player·rival·grid)",
+		occupants.has("player") and occupants.has("rival") and occupants.has("grid"),
+		str(occupants.keys()))
 	for cut_id in data.scene_cut_machines:
 		var orders: Array = []
 		for row in data.scene_cut_machines_for(String(cut_id)):
 			orders.append(CsvTable.to_int(String(row["slot_order"])))
-			# 섀시가 대장에 있어야 오프셋이 나온다 — 없으면 0 으로 떨어져 차가 뜬다.
-			_ok("%s 섀시 대장 등재" % String(row["id"]),
-				data.machine_baselines.has(String(row["sprite"])), String(row["sprite"]))
 		# 그리는 순서는 데이터가 정한다 — 중복이면 겹침 순서가 표 행 순서에 달린다.
 		var seen: Array = []
 		for order in orders:

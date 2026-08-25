@@ -130,8 +130,8 @@ func _process(_delta: float) -> bool:
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 647:
-		print("UI_SCREENS_FAIL checks=%d < 하한 647 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 644:
+		print("UI_SCREENS_FAIL checks=%d < 하한 644 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -3558,8 +3558,10 @@ func _scene_panel_layers(data: GameData) -> void:
 
 	# ── 머신 자리 = 노면선 앵커 − 섀시 오프셋 (31차 · 총괄 판정 ② ⓑ) ──
 	#
-	# **짝을 어긋나게 고른다**: 같은 컷 안에서 오프셋이 다른 두 섀시를 고르지 않으면
-	# 오프셋을 통째로 지워도 통과한다(19 대 13 — 6px 이 갈리는 짝).
+	# **32차에 축이 좁아졌다.** 자리 표가 `sprite` 대신 `occupant` 를 이고(에셋 IMPL-452 —
+	# 검수 표본은 런타임 데이터가 아니다), `rival`·`grid` 는 팀↔섀시 결속이 없어 아직
+	# 그리지 못한다. 그래서 **그려지는 것은 `player` 자리뿐**이고 나머지는 관측에 남는다.
+	# 오프셋 축의 "짝 어긋내기"는 결속이 서면 되돌아온다 — 지금은 잴 짝이 없다.
 	panel.show_cut("cut_basic_group", screen._active_stage_id())
 	# **정렬을 검사가 스스로 한다.** 창구가 돌려준 순서를 그대로 쓰면 창구가 순서를 뒤집어도
 	# 노드와 행이 함께 뒤집혀 통과한다(반증 Q10 초판 미검출). `slot_order` 로 여기서 세운다.
@@ -3567,27 +3569,38 @@ func _scene_panel_layers(data: GameData) -> void:
 	rows.sort_custom(func(a, b):
 		return CsvTable.to_int(String(a["slot_order"])) < CsvTable.to_int(String(b["slot_order"])))
 	_ok("전제: 집단 컷 선언 3대", rows.size() == 3, str(rows.size()))
-	_ok("전제: 선언 순서가 슬롯마다 다르다 (축 비공허)",
-		String(rows[0]["slot_name"]) != String(rows[rows.size() - 1]["slot_name"]))
-	_ok("머신 노드 = 선언 대수", machines.get_child_count() == rows.size(),
-		str(machines.get_child_count()))
-	var offsets: Array = []
+	var bound: Array = []
+	var unbound: Array = []
 	for row in rows:
-		offsets.append(data.machine_baseline(String(row["sprite"])))
-	_ok("전제: 선언 섀시의 오프셋이 서로 다르다 (축 비공허)",
-		offsets.min() != offsets.max(), str(offsets))
-	for index in range(mini(rows.size(), machines.get_child_count())):
-		var row: Dictionary = rows[index]
-		var node := machines.get_child(index) as TextureRect
+		if String(row["occupant"]) == "player":
+			bound.append(row)
+		else:
+			unbound.append(row)
+	_ok("전제: 결속·미결속이 둘 다 있다 (축 비공허)",
+		not bound.is_empty() and not unbound.is_empty(),
+		"결속 %d · 미결속 %d" % [bound.size(), unbound.size()])
+	_ok("머신 노드 = 결속된 자리 수", machines.get_child_count() == bound.size(),
+		str(machines.get_child_count()))
+	# **미결속은 조용히 사라지지 않는다** — 못 그린 자리가 관측에 남아야 한다.
+	_ok("미결속 자리 = 관측 등재",
+		panel.unbound_occupants.size() == unbound.size(), str(panel.unbound_occupants))
+	# **검수 표본을 대신 그리지 않는다** — 그것이 에셋이 되돌린 결함 그 자체다.
+	for node in machines.get_children():
+		_ok("그려진 섀시는 플레이어 머신", String(node.name) == ScenePanel.PLAYER_MACHINE,
+			String(node.name))
+	for row in bound:
+		var node := machines.get_child(bound.find(row)) as TextureRect
+		var sprite := ScenePanel.PLAYER_MACHINE
 		var expected_center := Vector2(
 			float(CsvTable.to_int(String(row["anchor_x"]))),
 			float(CsvTable.to_int(String(row["anchor_road_y"]))
-				- data.machine_baseline(String(row["sprite"]))))
-		_ok("%s 섀시 = 선언" % String(row["slot_name"]),
-			node.name == String(row["sprite"]), String(node.name))
+				- data.machine_baseline(sprite)))
 		_ok("%s 셀 중심 = 노면선 − 오프셋" % String(row["slot_name"]),
 			node.position + node.size * 0.5 == expected_center,
 			"%s vs %s" % [str(node.position + node.size * 0.5), str(expected_center)])
+		# 오프셋이 실제로 쓰였는가 — 0 이면 노면선이 곧 중심이 되어 차가 뜬다.
+		_ok("%s 오프셋 비영 (축 비공허)" % String(row["slot_name"]),
+			data.machine_baseline(sprite) != 0, str(data.machine_baseline(sprite)))
 	# **선언이 없는 1대 컷은 표준 자리다** — 폴백이 아니라 제원표 §4 그 자체다.
 	panel.show_cut("cut_finish", screen._active_stage_id())
 	_ok("전제: 피니시는 자리 선언이 없다",

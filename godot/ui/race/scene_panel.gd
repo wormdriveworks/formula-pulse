@@ -60,6 +60,11 @@ var _fx_nodes: Array = []
 # **미배치 관측 지점.** 컷이 머신 2대 이상을 선언했는데 배치 선언이 없다 — 조용히 1대만
 # 그리지 않고 기계가 읽을 수 있게 남긴다 (`choice_omissions` 규약).
 var multi_machine_omissions: Array = []
+# **점유자↔섀시 결속이 아직 없다.** 자리 표는 *누가 오는가*(`occupant`)를 말하고 실제 섀시는
+# 대전 상대가 정하는데, 그 결속 데이터가 어디에도 없다(`ai_rivals` 에 섀시 열 없음).
+# **검수 표본을 대신 그리지 않는다** — 그것이 에셋이 IMPL-452 로 되돌린 결함 그 자체다.
+# 못 그린 자리를 여기 남긴다: 조용한 1대보다 시끄러운 빈자리가 낫다.
+var unbound_occupants: Array = []
 
 
 func setup(game_data: GameData) -> void:
@@ -156,11 +161,25 @@ func _build_machines(cut_id: String) -> void:
 			data.param("param_scene_machine_y") + MACHINE_CELL.y * 0.5)
 		return
 	for row in slots:
-		var sprite := String(row["sprite"])
+		var sprite := _chassis_for(String(row["occupant"]))
+		if sprite.is_empty():
+			var mark := "%s/%s" % [cut_id, String(row["slot_name"])]
+			if not unbound_occupants.has(mark):
+				unbound_occupants.append(mark)
+			continue
 		# **셀 중심 = 노면선 − 바닥 오프셋** (총괄 판정 ② ⓑ)
 		_place_machine(sprite, float(CsvTable.to_int(String(row["anchor_x"]))),
 			float(CsvTable.to_int(String(row["anchor_road_y"]))
 				- data.machine_baseline(sprite)))
+
+
+# 점유자 → 섀시. **오늘 아는 것은 `player` 뿐이다.**
+# `rival`·`grid` 는 대전 상대가 정하는데 팀↔섀시 결속이 데이터에 없다 — 에셋 대장은
+# 그 대응을 문서로 선언하고 있으나(악시온=AX-9 · 불카=VH-8 · 그리폰=GM-12 ·
+# 프라이비티어=공용) `ai_teams.csv` 에 섀시 열이 없어 기계가 잇지 못한다.
+# **이름으로 추측하지 않는다** — 결속이 서면 이 함수 하나가 답한다.
+func _chassis_for(occupant: String) -> String:
+	return PLAYER_MACHINE if occupant == "player" else ""
 
 
 func _place_machine(sprite: String, center_x: float, center_y: float) -> void:

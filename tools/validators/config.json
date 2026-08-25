@@ -431,7 +431,7 @@
     "cut_id": "fk:scene_cuts.csv",
     "slot_name": "string",
     "slot_order": "int:1,8",
-    "sprite": "string",
+    "occupant": "enum:player,rival,grid",
     "anchor_x": "int:0,408",
     "anchor_road_y": "int:0,100"
    }

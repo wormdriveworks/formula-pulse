@@ -1188,6 +1188,18 @@ const CUTM_TABLE := "scene_cut_machines.csv"
 const CUTM_BASELINES := "machine_baselines.csv"
 
 
+# 검수 표본 필드 — 개명 내성. 값이 섀시 파일명 꼴이면 그것이 표본이다.
+const CUTM_REVIEW_FIELDS := ["review_sprite", "sprite", "sample_sprite"]
+
+
+func _cutm_review_sample(entry: Dictionary) -> String:
+	for field in CUTM_REVIEW_FIELDS:
+		var value := String(entry.get(field, "")).strip_edges()
+		if value != "":
+			return value.get_file().trim_suffix(".png")
+	return ""
+
+
 func _run_cut_layout_scan() -> void:
 	var before_fail := _fail_count
 	var before_warn := _warn_count
@@ -1207,13 +1219,32 @@ func _run_cut_layout_scan() -> void:
 			var entry: Dictionary = slot
 			spec_slots["%s/%s" % [cut_id, entry.get("name", "")]] = {
 				"order": order,
-				"sprite": String(entry.get("sprite", "")).get_file().trim_suffix(".png"),
+				"occupant": String(entry.get("occupant", "")),
+				# **런타임 데이터가 아니다** — 도구가 명기한 검수 표본이다. 표에 들어오면
+				# 대전 상대와 무관하게 같은 차가 나온다(에셋 IMPL-452 추적분). 대조가
+				# 아니라 **유입 차단**을 위해 읽는다.
+				#
+				# **열 이름을 하나로 고정하지 않는다.** 이 필드는 개명과 원복을 이미 한 번씩
+				# 겪었고(IMPL-452 → 453), 이름을 박아 두면 다음 개명에서 **가드가 조용히
+				# 무동작이 된다** — 값이 빈 문자열이 되어 비교가 늘 참이 되기 때문이다.
+				# 후보를 훑고, **하나도 없으면 실패**로 올린다(판정 불가 = 위반 없음이 아니다).
+				"review": _cutm_review_sample(entry),
 				"cx": int(entry.get("cx", -1)),
 				"road_y": int(entry.get("road_y", -1)),
 			}
 	checked += 1
 	if spec_slots.is_empty():
 		_fail("CUTM", "도구 산출에 슬롯이 없다 — 대조가 공허해진다")
+	# **가드가 무동작이 되지 않았는가** — 표본 필드를 하나도 못 찾으면 유입 차단이
+	# 통째로 잠든다. 그 상태는 "위반 없음"이 아니라 "판정 없음"이다.
+	var sampled := 0
+	for key in spec_slots:
+		if String(Dictionary(spec_slots[key])["review"]) != "":
+			sampled += 1
+	checked += 1
+	if sampled == 0 and not spec_slots.is_empty():
+		_fail("CUTM", "검수 표본 필드를 찾지 못했다 (후보 %s) — 유입 차단이 무동작이다"
+			% str(CUTM_REVIEW_FIELDS))
 	var seen: Dictionary = {}
 	for row in _tables.get(CUTM_TABLE, []):
 		var key := "%s/%s" % [String(row.get("cut_id", "")), String(row.get("slot_name", ""))]
@@ -1228,9 +1259,16 @@ func _run_cut_layout_scan() -> void:
 			if got != int(want[String(column[1])]):
 				_fail("CUTM", "%s.%s: 표 %d ≠ 도구 %d"
 					% [key, String(column[0]), got, int(want[String(column[1])])])
-		if String(row.get("sprite", "")).strip_edges() != String(want["sprite"]):
-			_fail("CUTM", "%s.sprite: 표 '%s' ≠ 도구 '%s'"
-				% [key, row.get("sprite", ""), want["sprite"]])
+		if String(row.get("occupant", "")).strip_edges() != String(want["occupant"]):
+			_fail("CUTM", "%s.occupant: 표 '%s' ≠ 도구 '%s'"
+				% [key, row.get("occupant", ""), want["occupant"]])
+		# **검수 표본이 런타임 표에 들어왔는가** — 열 이름이 무엇이든 값으로 잡는다.
+		# 31차 전사가 정확히 이 형태로 샜다(`sprite` 열에 `review_sprite` 값).
+		for column_name in row:
+			if String(row[column_name]).strip_edges() == String(want["review"]) \
+					and String(want["review"]) != "":
+				_fail("CUTM", "%s.%s: 검수 표본이 런타임 표에 있다 — 대전 상대와 무관하게 같은 차가 나온다"
+					% [key, String(column_name)])
 	# 역방향 — 도구가 낸 자리가 표에 전부 있는가 (빠진 슬롯은 컷이 조용히 좁아진다)
 	for key in spec_slots:
 		checked += 1
