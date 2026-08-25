@@ -444,7 +444,7 @@ if (TABLE) {
       fail(`${cutId}: 전 자리가 rival 이다 — 플레이어 차가 화면에서 사라진다`);
     }
   }
-  console.log('\n--- 전사용 블록 ② 섀시 바닥 오프셋 (**베이스 전량** — 선언에 쓴 것만이 아니다) ---');
+  console.log('\n--- 전사용 블록 ② 섀시 바닥 오프셋 (**측면 베이스 전량** — 선언에 쓴 것만이 아니다) ---');
   console.log('#  셀 중심 y  = anchor_road_y - baseline_offset');
   console.log('#  좌상단 y   = 셀 중심 y - cell_h/2      (좌상단 x = anchor_x - cell_w/2)');
   console.log('#  baseline_offset = 불투명 바닥행 - cell_h/2  (셀 중심에서 바퀴까지)');
@@ -454,7 +454,9 @@ if (TABLE) {
   console.log('#     스프라이트별로 재서 각각 적용하면 리어윙(오프셋 -6)이 차체(19) 대비');
   console.log('#     25px 아래로 밀린다 — 아래 참고 행이 그 실측이다.');
   console.log('#  ⚠ 이 표는 **런타임에 슬롯에 들어올 수 있는 전 베이스**를 싣는다. 컷 선언의');
-  console.log('#     `sprite` 는 검수용 표본이고, 실제 섀시는 대전 상대에 따라 바뀐다.');
+  console.log('#     `review_sprite` 는 검수 표본이고, 실제 섀시는 대전 상대에 따라 바뀐다.');
+  console.log('#  ⚠ **측면 셀 전속이다.** 컷 합성이 측면 시점이라 `*_side.png` 만 싣는다 —');
+  console.log('#     추격 셀(`*_chase`)은 여기 없고, 이 표로 추격 배치를 풀 수 없다.');
   console.log('chassis_sprite,cell_h,opaque_top,opaque_bottom,baseline_offset');
   const dir = path.join(ROOT, 'godot/assets/machines');
   const all = fs.readdirSync(dir).filter((f) => f.endsWith('_side.png')).sort();
