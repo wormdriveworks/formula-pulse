@@ -49,6 +49,7 @@ func _init() -> void:
 	_run_string_field_scan()
 	_run_audio_asset_scan()
 	_run_fx_placement_scan()
+	_run_cut_layout_scan()
 	# **완주 관문** — 스캔이 중도 이탈하면 실패 0·보고 0 으로 통과가 찍힌다(2026-08-20 실측:
 	# OGG 헤더의 없는 키를 `header["x"]` 로 읽자 함수가 이탈하고 게이트가 `VALIDATORS_PASS` 를 냈다).
 	# `run_tests.sh` 가 "성공 토큰의 부재 자체를 실패로 본다"고 한 것과 같은 축이다 —
@@ -1163,6 +1164,82 @@ func _run_v8_key_grammar() -> void:
 		if key_regex.search(String(key)) == null:
 			_fail("V8", "invalid key grammar: '%s'" % key)
 	_report("V8", "key grammar", checked, before_fail, before_warn)
+
+
+# ── CUTM 컷 머신 배치 전사 대조 (신설 31차 — **경고형** · 에셋 IMPL-444·447) ──
+#
+# **왜 필요한가 — 반증이 먼저 말했다.** 자리 좌표를 오기해도(Q11: `anchor_x` 344→300)
+# 게이트가 통과했다. UISCR 은 *패널이 표를 따르는가* 를 보고 SCENE 은 *표가 화소와 맞는가*
+# 를 보는데, **표가 에셋 도구의 출력과 같은가**를 보는 축이 어디에도 없었다. 오프셋은
+# 화소로 되짚을 수 있어 SCENE 이 잡지만(Q1) 좌표는 되짚을 소재가 `res://` 밖에 있다.
+#
+# 소재 = `tools/assets/cut_layout.json`(생성기의 산출). FXPL 이 `bg_spec.json` 을 읽는 것과
+# 같은 자리이며, 같은 이유로 스위트가 아니라 검증기다.
+#
+# **성격 = 경고형(신설).** 차단/경고는 총괄 판정을 경유한다(불변규칙 7) — FONT·PAL·ANCH·
+# FXPL 이 밟은 절차 그대로 상신한다. **경고형은 스스로 죽어도 빌드를 멈추지 못하므로**
+# 실재는 UISCR ⑬축이 받친다.
+const CUTM_SPEC := "tools/assets/cut_layout.json"
+const CUTM_TABLE := "scene_cut_machines.csv"
+const CUTM_BASELINES := "machine_baselines.csv"
+
+
+func _run_cut_layout_scan() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	var parsed: Variant = JSON.parse_string(_read_text(CUTM_SPEC))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		_warn("CUTM", "%s 를 읽지 못했다 — 전사 대조 불가" % CUTM_SPEC)
+		_report("CUTM", "cut machine layout transcription", checked, before_fail, before_warn)
+		return
+	# 도구 산출 → {cut_id: {slot_name: {order, sprite, cx, road_y}}}
+	var spec_slots: Dictionary = {}
+	var cuts: Dictionary = Dictionary(parsed).get("cuts", {})
+	for cut_id in cuts:
+		var order := 0
+		for slot in Array(Dictionary(cuts[cut_id]).get("slots", [])):
+			order += 1
+			var entry: Dictionary = slot
+			spec_slots["%s/%s" % [cut_id, entry.get("name", "")]] = {
+				"order": order,
+				"sprite": String(entry.get("sprite", "")).get_file().trim_suffix(".png"),
+				"cx": int(entry.get("cx", -1)),
+				"road_y": int(entry.get("road_y", -1)),
+			}
+	checked += 1
+	if spec_slots.is_empty():
+		_warn("CUTM", "도구 산출에 슬롯이 없다 — 대조가 공허해진다")
+	var seen: Dictionary = {}
+	for row in _tables.get(CUTM_TABLE, []):
+		var key := "%s/%s" % [String(row.get("cut_id", "")), String(row.get("slot_name", ""))]
+		seen[key] = true
+		checked += 1
+		if not spec_slots.has(key):
+			_warn("CUTM", "%s: 도구 산출에 없는 자리다 — 손 전사 의심" % key)
+			continue
+		var want: Dictionary = spec_slots[key]
+		for column in [["slot_order", "order"], ["anchor_x", "cx"], ["anchor_road_y", "road_y"]]:
+			var got := String(row.get(String(column[0]), "")).strip_edges().to_int()
+			if got != int(want[String(column[1])]):
+				_warn("CUTM", "%s.%s: 표 %d ≠ 도구 %d"
+					% [key, String(column[0]), got, int(want[String(column[1])])])
+		if String(row.get("sprite", "")).strip_edges() != String(want["sprite"]):
+			_warn("CUTM", "%s.sprite: 표 '%s' ≠ 도구 '%s'"
+				% [key, row.get("sprite", ""), want["sprite"]])
+	# 역방향 — 도구가 낸 자리가 표에 전부 있는가 (빠진 슬롯은 컷이 조용히 좁아진다)
+	for key in spec_slots:
+		checked += 1
+		if not seen.has(String(key)):
+			_warn("CUTM", "%s: 도구가 낸 자리가 표에 없다" % String(key))
+	# 섀시 대장 — **오버레이 혼입 0** (총괄 재확인 ① — 오버레이에 오프셋을 적용하면
+	# 리어윙이 25px 밀린다). 도구는 오버레이를 "적용 금지" 참고 행으로만 뱉는다.
+	for row in _tables.get(CUTM_BASELINES, []):
+		checked += 1
+		if String(row.get("sprite", "")).contains("_overlay_"):
+			_warn("CUTM", "%s: 오버레이가 섀시 대장에 있다 — 오프셋 오적용 경로"
+				% String(row.get("id", "")))
+	_report("CUTM", "cut machine layout transcription", checked, before_fail, before_warn)
 
 
 # ── FXPL 연출 요소 배치 제약 (신설 29차 — **경고형** · 제원표 §3.1 · `fx_spec.json` `_합성제약`) ──

@@ -21,6 +21,9 @@ const SCENECUT_DIR := "res://assets/scenecuts/"
 const MACHINE_DIR := "res://assets/machines/"
 # 플레이어 머신 측면 셀 — 제원표 §5 베이스. 시즌 리버리 스왑은 씬 패널의 관심사가 아니다.
 const PLAYER_MACHINE := "nw01_boreas_base_s1_side"
+# 측면 셀 규격 — 제원표 §4 `[140, 30, 128, 64]` 의 폭·높이. 앵커는 데이터 창구를 거치지만
+# 셀 치수는 스프라이트가 이고 있으므로 표준 자리 환산에만 쓴다.
+const MACHINE_CELL := Vector2(128.0, 64.0)
 
 # 색 치환 역할 → 팔레트 정본 색 (사양서 §5.2.1 "생성은 중립색으로 받고 팔레트는 원장이 정한다").
 # **표가 선언한 역할 전부가 여기 있어야 한다** — 검사가 양방향으로 본다.
@@ -42,9 +45,10 @@ var data: GameData
 
 var _canvas: Control
 var _far: TextureRect
-var _machine: TextureRect
 var _near: TextureRect
-var _fx_root: Control
+var _fx_behind: Control
+var _machines: Control
+var _fx_front: Control
 
 var _cut_id := ""
 var _stage_id := ""
@@ -68,16 +72,18 @@ func setup(game_data: GameData) -> void:
 	_canvas.size = Vector2(_canvas_width(), _canvas_height())
 	add_child(_canvas)
 	_far = _new_layer("Far")
-	_machine = _new_layer("Machine")
+	_fx_behind = _new_group("FxBehind")
+	_machines = _new_group("Machines")
 	_near = _new_layer("Near")
-	_fx_root = Control.new()
-	_fx_root.name = "Fx"
-	_fx_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_canvas.add_child(_fx_root)
-	_machine.texture = load(MACHINE_DIR + PLAYER_MACHINE + ".png") as Texture2D
-	_machine.position = Vector2(
-		data.param("param_scene_machine_x"), data.param("param_scene_machine_y"))
-	_machine.size = _machine.texture.get_size() if _machine.texture != null else Vector2.ZERO
+	_fx_front = _new_group("FxFront")
+
+
+func _new_group(group_name: String) -> Control:
+	var group := Control.new()
+	group.name = group_name
+	group.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.add_child(group)
+	return group
 
 
 func _new_layer(layer_name: String) -> TextureRect:
@@ -116,6 +122,7 @@ func show_cut(cut_id: String, stage_id: String) -> void:
 	_frames = maxi(1, CsvTable.to_int(String(data.scene_cut(cut_id).get("frames", "1"))))
 	_elapsed = 0.0
 	_apply_backdrop(stage_id)
+	_build_machines(cut_id)
 	_build_fx(cut_id)
 	_apply_frame(0)
 
@@ -130,17 +137,55 @@ func _apply_backdrop(stage_id: String) -> void:
 	_near.texture = load(SCENECUT_DIR + String(backdrop["near_asset"]) + ".png") as Texture2D
 
 
-func _build_fx(cut_id: String) -> void:
-	for child in _fx_root.get_children():
-		_fx_root.remove_child(child)
+# 머신 층 — 선언된 자리에 선언된 섀시를 얹는다.
+#
+# **선언이 없는 컷은 표준 자리 1대다** (제원표 §4 `[140,30,128,64]`). 1대 컷은 표준 자리가
+# 곧 배치이므로 선언을 요구하지 않는다 — 선언이 필요한 것은 **2대 이상의 겹침·사행**이고
+# 그것은 눈 판단이다. 그래서 `machines > 1` 인데 선언이 없는 경우만 관측에 남는다.
+func _build_machines(cut_id: String) -> void:
+	for child in _machines.get_children():
+		_machines.remove_child(child)
 		child.queue_free()
-	_fx_nodes.clear()
-	# **머신 2대 이상은 배치 선언이 없다** — 제원표 §4 가 준 것은 표준 자리 1개뿐이고
-	# 그 문서 스스로 "합성 선언의 앵커 그 자체는 아니다"라고 적었다. 조용히 1대로 그리면
-	# 표의 `machines` 가 거짓이 되므로 관측 지점에 남긴다(회신 §미결).
+	var slots := data.scene_cut_machines_for(cut_id)
 	var declared := CsvTable.to_int(String(data.scene_cut(cut_id).get("machines", "1")))
-	if declared > 1 and not multi_machine_omissions.has(cut_id):
-		multi_machine_omissions.append(cut_id)
+	if slots.is_empty():
+		if declared > 1 and not multi_machine_omissions.has(cut_id):
+			multi_machine_omissions.append(cut_id)
+		_place_machine(PLAYER_MACHINE,
+			data.param("param_scene_machine_x") + MACHINE_CELL.x * 0.5,
+			data.param("param_scene_machine_y") + MACHINE_CELL.y * 0.5)
+		return
+	for row in slots:
+		var sprite := String(row["sprite"])
+		# **셀 중심 = 노면선 − 바닥 오프셋** (총괄 판정 ② ⓑ)
+		_place_machine(sprite, float(CsvTable.to_int(String(row["anchor_x"]))),
+			float(CsvTable.to_int(String(row["anchor_road_y"]))
+				- data.machine_baseline(sprite)))
+
+
+func _place_machine(sprite: String, center_x: float, center_y: float) -> void:
+	var node := TextureRect.new()
+	node.name = sprite
+	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	node.stretch_mode = TextureRect.STRETCH_KEEP
+	var texture := load(MACHINE_DIR + sprite + ".png") as Texture2D
+	if texture == null:
+		push_error("ScenePanel: machine sprite '%s' not found" % sprite)
+		node.queue_free()
+		return
+	node.texture = texture
+	node.size = texture.get_size()
+	node.position = Vector2(center_x, center_y) - texture.get_size() * 0.5
+	_machines.add_child(node)
+
+
+func _build_fx(cut_id: String) -> void:
+	for group in [_fx_behind, _fx_front]:
+		for child in group.get_children():
+			group.remove_child(child)
+			child.queue_free()
+	_fx_nodes.clear()
 	for row in data.scene_cut_layers_for(cut_id):
 		var element := data.fx_element(String(row["element_id"]))
 		if element.is_empty():
@@ -170,7 +215,10 @@ func _build_fx(cut_id: String) -> void:
 		var tint := String(row.get("tint", "")).strip_edges()
 		if not tint.is_empty() and TINT_ROLES.has(tint):
 			node.modulate = tint_color(tint)
-		_fx_root.add_child(node)
+		# z 대역 = **요소가 선언한다** (총괄 판정 ③). 컷이 정하면 같은 불꽃이 컷마다
+		# 다른 자리에 보인다 — 재사용이 설계라는 §5.2 논거가 곧 이 선언 자리의 근거다.
+		var band := String(element.get("z_band", "front"))
+		(_fx_behind if band == "behind" else _fx_front).add_child(node)
 		_fx_nodes.append({"node": node, "element": element, "base": node.position,
 			"cell": cell, "tint": node.modulate})
 

@@ -36,6 +36,19 @@ var _seal_open := false
 # **봉인 차단 기록은 건수만 남긴다.** 어떤 사운드가 막혔는지를 남기면 그 자체가
 # 결과 상관 신호의 디버그 노출 경로가 된다 (불변규칙 5는 디버그 오버레이를 명시 포함).
 var _seal_refusals := 0
+# ── 봉인 개폐 **이력** (31차 · 총괄 판정 ④ ⓐ) ──
+#
+# 하네스가 프레임을 표집해 *"열려 있는 순간을 봤는가"* 를 재던 것을 걷는다. 표집은 부하가
+# 오르면 창을 통째로 건너뛰고, 그때 **봉인이 안 열린 것과 관측자가 못 본 것이 같은 모양**이
+# 된다(일괄 주행 3회 실패 · 단독 12회 통과 실측). 개폐를 세면 관측이 프레임에 의존하지 않는다.
+#
+# **건수만 남긴다** — `_seal_refusals` 와 같은 규약이다. 무엇이 언제 열렸는지를 남기면
+# 그 자체가 결과 상관 신호의 디버그 노출 경로가 된다(불변규칙 5).
+var _seal_opens := 0
+var _seal_closes := 0
+# 봉인 창 **안에서** 실제로 발화한 건수. 창이 열렸다는 것과 그 창이 정지 연출을 덮었다는
+# 것은 다른 사실이다 — 스핀·정지음이 창 안에서 울렸다면 창이 그 구간을 덮은 것이다.
+var _seal_window_fires := 0
 var _voices: Array = []            # 재생 중 보이스 [{sfx_id, priority}] — 표현 층이 release 로 비운다
 var _last_fire_msec: Dictionary = {}   # sfx_id -> 마지막 발화 시각
 var _bgm_track := ""
@@ -58,10 +71,14 @@ func setup(game_data: GameData, audio_output: AudioOutput = null, haptics_out: I
 # 스핀 커밋(T2)에서 열고 릴 정지 연출 완료 시점에 닫는다. 열려 있는 동안
 # `seal_gated` 행은 어떤 경로로도 발화하지 않는다 — 매치 예고음이 곧 결과 예고다.
 func open_seal() -> void:
+	if not _seal_open:
+		_seal_opens += 1
 	_seal_open = true
 
 
 func close_seal() -> void:
+	if _seal_open:
+		_seal_closes += 1
 	_seal_open = false
 
 
@@ -71,6 +88,19 @@ func seal_open() -> bool:
 
 func seal_refusal_count() -> int:
 	return _seal_refusals
+
+
+# 개폐 이력 — 표집 대신 이것을 본다.
+func seal_open_count() -> int:
+	return _seal_opens
+
+
+func seal_close_count() -> int:
+	return _seal_closes
+
+
+func seal_window_fire_count() -> int:
+	return _seal_window_fires
 
 
 # 이벤트 발화 — 발화된 sound_* 행 id 배열을 돌려준다 (미등재 이벤트 = 빈 배열, 정상).
@@ -111,6 +141,8 @@ func _fire(row: Dictionary) -> bool:
 	_last_fire_msec[sfx_id] = now
 	_voices.append({"sfx_id": sfx_id, "priority": priority})
 	fired.append(sfx_id)
+	if _seal_open:
+		_seal_window_fires += 1
 	if channel == CHANNEL_JINGLE:
 		output.play_jingle(sfx_id)
 	else:

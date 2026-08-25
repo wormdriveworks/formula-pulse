@@ -1,0 +1,8 @@
+id,sprite,cell_h,opaque_bottom,baseline_offset
+mbase_ax9_theorem_base_side,ax9_theorem_base_side,64,45,13
+mbase_gm12_paladin_base_side,gm12_paladin_base_side,64,45,13
+mbase_nw01_boreas_base_s1_side,nw01_boreas_base_s1_side,64,51,19
+mbase_nw01_boreas_base_s2_side,nw01_boreas_base_s2_side,64,51,19
+mbase_nw01_boreas_base_s3_side,nw01_boreas_base_s3_side,64,51,19
+mbase_priv_common_base_side,priv_common_base_side,64,43,11
+mbase_vh8_behemoth_base_side,vh8_behemoth_base_side,64,50,18

@@ -35,6 +35,8 @@ var stage_backdrops: Dictionary = {}   # bdrop_* id -> 행 (무대 배경 2레�
 var scene_cuts: Dictionary = {}        # cut_* id -> 행 (씬 컷 10종 — D10 §6.2)
 var scene_cut_triggers: Array = []     # sct_* 행 (매칭 조건 — 평가는 우선순위 순)
 var scene_cut_layers: Dictionary = {}  # cut_* id -> 합성 선언 행 배열 (layer_order 오름차순)
+var scene_cut_machines: Dictionary = {} # cut_* id -> 머신 자리 행 배열 (slot_order 오름차순)
+var machine_baselines: Dictionary = {}  # 스프라이트 stem -> 바닥 오프셋 행
 var events: Dictionary = {}            # event_* id -> 행 (D08 §7 · D12 §5.4)
 var facilities: Dictionary = {}        # facility_* id -> 행 (D07 §2.2)
 var tuning_lines: Dictionary = {}      # tuning_* id -> 행 (D13 별첨A §3.5)
@@ -413,6 +415,18 @@ func _load_scene_cuts() -> void:
 		scene_cuts[String(row["id"])] = row
 	for row in CsvTable.load_rows(_table_path("scene_cut_triggers.csv")):
 		scene_cut_triggers.append(row)
+	scene_cut_machines.clear()
+	machine_baselines.clear()
+	for row in CsvTable.load_rows(_table_path("machine_baselines.csv")):
+		machine_baselines[String(row["sprite"])] = row
+	for row in CsvTable.load_rows(_table_path("scene_cut_machines.csv")):
+		var machine_cut := String(row["cut_id"])
+		if not scene_cut_machines.has(machine_cut):
+			scene_cut_machines[machine_cut] = []
+		scene_cut_machines[machine_cut].append(row)
+	for machine_cut in scene_cut_machines:
+		scene_cut_machines[machine_cut].sort_custom(func(a, b):
+			return CsvTable.to_int(String(a["slot_order"])) < CsvTable.to_int(String(b["slot_order"])))
 	for row in CsvTable.load_rows(_table_path("scene_cut_layers.csv")):
 		var cut_id := String(row["cut_id"])
 		if not scene_cut_layers.has(cut_id):
@@ -423,8 +437,22 @@ func _load_scene_cuts() -> void:
 		scene_cut_layers[cut_id].sort_custom(func(a, b):
 			return CsvTable.to_int(String(a["layer_order"])) < CsvTable.to_int(String(b["layer_order"])))
 	if fx_elements.is_empty() or stage_backdrops.is_empty() or scene_cuts.is_empty() \
-			or scene_cut_triggers.is_empty():
+			or scene_cut_triggers.is_empty() or scene_cut_machines.is_empty() \
+			or machine_baselines.is_empty():
 		_load_ok = false
+
+
+# 컷의 머신 자리 — **없을 수 있다.** 1대 컷은 제원표 §4 표준 자리로 성립하므로 선언을
+# 요구하지 않는다(선언이 필요한 것은 2대 이상의 배치이고 그것은 눈 판단이다).
+func scene_cut_machines_for(cut_id: String) -> Array:
+	return scene_cut_machines.get(cut_id, [])
+
+
+# 스프라이트 바닥 오프셋 — **셀 중심 y = anchor_road_y − baseline_offset** (총괄 판정 ② ⓑ).
+# 섀시마다 셀 안에서 바퀴 높이가 다르다(+11~+19 · 산포 8px). 앵커를 셀 중심으로 두면
+# 무대 노면선 위에 서는 차와 뜨는 차가 갈리므로, **앵커는 노면선이고 셀은 계산으로 얹는다.**
+func machine_baseline(sprite: String) -> int:
+	return CsvTable.to_int(String(machine_baselines.get(sprite, {}).get("baseline_offset", "0")))
 
 
 func scene_cut(cut_id: String) -> Dictionary:

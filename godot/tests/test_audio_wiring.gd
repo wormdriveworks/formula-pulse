@@ -72,8 +72,16 @@ var _phase := "static"
 var _settle := 0.0
 var _done := false
 var _started_msec := 0
-var _seal_open_seen := false
-var _seal_leaks := 0
+# ── 봉인 관측 = **표집에서 기록으로** (31차 · 총괄 판정 ④ ⓐ) ──
+#
+# 종전은 프레임마다 `_screen._revealing` 과 `audio.seal_open()` 을 함께 보는 **표집**이었다.
+# 부하가 오르면 프레임 간격이 벌어져 창을 통째로 건너뛰고, 그러면 **봉인이 안 열린 것과
+# 관측자가 못 본 것이 같은 모양**이 된다(일괄 주행 3회 실패 · 단독 12회 통과 실측 —
+# 30차 §6). 이제 디스패처가 개폐를 세고 하네스는 **라운드 전후 차이**를 본다 —
+# 관측이 프레임 수에 의존하지 않는다.
+var _seal_opens_before := 0
+var _seal_closes_before := 0
+var _seal_window_before := 0
 
 
 func _initialize() -> void:
@@ -401,21 +409,27 @@ func _process(delta: float) -> bool:
 				_assert_gp_open(audio)
 				_assert_chassis_threshold()
 			audio.fired.clear()
-			_seal_open_seen = false
-			_seal_leaks = 0
+			_seal_opens_before = audio.seal_open_count()
+			_seal_closes_before = audio.seal_close_count()
+			_seal_window_before = audio.seal_window_fire_count()
 			_screen._on_primary_action()   # 스핀 = T2 커밋
 			_phase = "revealing"
 		"revealing":
 			# 봉인은 **정지 연출이 도는 동안** 열려 있어야 한다. 열리지 않았다면
 			# 결과 상관 사운드가 연출 중에 지나갈 수 있다는 뜻이다.
+			# **프레임을 잡지 않는다** — 연출이 끝난 뒤 이력의 차이를 본다.
 			if _screen._revealing:
-				if audio.seal_open():
-					_seal_open_seen = true
-				else:
-					_seal_leaks += 1
 				return false
-			_ok("정지 연출 중 봉인 개방 (라운드 %d)" % _round, _seal_open_seen and _seal_leaks == 0,
-				"열린 프레임 %s · 닫힌 프레임 %d" % [_seal_open_seen, _seal_leaks])
+			_ok("정지 연출에 봉인 개폐 1회 (라운드 %d)" % _round,
+				audio.seal_open_count() == _seal_opens_before + 1
+				and audio.seal_close_count() == _seal_closes_before + 1,
+				"개방 +%d · 폐쇄 +%d" % [audio.seal_open_count() - _seal_opens_before,
+					audio.seal_close_count() - _seal_closes_before])
+			# **열렸다는 것과 그 창이 연출을 덮었다는 것은 다른 사실이다.** 스핀·정지음이
+			# 창 안에서 울렸으면 창이 그 구간을 덮은 것이다 — 표집이 하려던 판정의 실물.
+			_ok("봉인 창이 정지 연출을 덮었다 (라운드 %d)" % _round,
+				audio.seal_window_fire_count() > _seal_window_before,
+				"창 안 발화 +%d" % [audio.seal_window_fire_count() - _seal_window_before])
 			_ok("정지 연출 종료 시 봉인 해제 (라운드 %d)" % _round, not audio.seal_open())
 			_assert_spin_sounds(audio)
 			_phase = "open"

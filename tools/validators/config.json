@@ -376,6 +376,7 @@
     "frames": "int:1,10",
     "still_frame": "int:0,9",
     "motion": "enum:scroll_x,fade,still,rise,blink,pulse,expand",
+    "z_band": "enum:behind,front",
     "tint_required": "int:0,1",
     "band_ground": "int:0,1"
    }
@@ -409,6 +410,30 @@
     "cut_id": "fk:scene_cuts.csv",
     "match_kind": "enum:duel_turn,log_event,close_gauge,gp_finish,group_field,fallback",
     "log_key": "string_key_optional"
+   }
+  },
+  "machine_baselines.csv": {
+   "id_prefix": "mbase_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "sprite": "string",
+    "cell_h": "int:8,128",
+    "opaque_bottom": "int:0,127",
+    "baseline_offset": "int:-64,64"
+   }
+  },
+  "scene_cut_machines.csv": {
+   "id_prefix": "scm_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "cut_id": "fk:scene_cuts.csv",
+    "slot_name": "string",
+    "slot_order": "int:1,8",
+    "sprite": "string",
+    "anchor_x": "int:0,408",
+    "anchor_road_y": "int:0,100"
    }
   },
   "scene_cut_layers.csv": {

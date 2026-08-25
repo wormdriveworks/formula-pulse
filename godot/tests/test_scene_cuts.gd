@@ -17,6 +17,7 @@ const CANVAS_H := 100      # D10 §6.2 패널 원도 높이
 const EXPECTED_ELEMENTS := 8   # 사양서 §5.2.1 연출 요소 8종
 const EXPECTED_CUTS := 10      # D10 §6.2 10종 + 예비 2
 const EXPECTED_BACKDROPS := 5  # 무대 5
+const MACHINE_DIR := "res://assets/machines/"
 
 # D13 별첨A §8.2 서열의 전사 — **말을 순서 배열로만 옮긴다.** 숫자는 표가 갖고 검사는
 # 서열만 갖는다(양쪽에 숫자를 두면 한쪽이 밀려도 대조가 성립한다).
@@ -41,11 +42,14 @@ func _init() -> void:
 	_backdrop_assets(data)
 	_consumption_reverse(data)
 	_placement_constraints(data)
+	_machine_layout(data)
+	_baseline_pixels(data)
+	_z_bands(data)
 	_mapping_priority(data)
 	_mapping_negatives(data)
 	print("")
-	if _checked < 139:
-		print("SCENE_FAIL checks=%d < 하한 139 (스위트 축소 의심)" % _checked)
+	if _checked < 218:
+		print("SCENE_FAIL checks=%d < 하한 218 (스위트 축소 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -181,6 +185,115 @@ func _placement_constraints(data: GameData) -> void:
 			if tint.is_empty():
 				continue
 			_ok("역할 '%s' 를 화면 층이 안다" % tint, panel_source.contains('"%s"' % tint))
+
+
+# ── ⑧ 머신 자리 대장 (31차 · 에셋 IMPL-444·447 전사분) ──
+func _machine_layout(data: GameData) -> void:
+	var multi := 0
+	for cut_id in data.scene_cuts:
+		var declared := CsvTable.to_int(String(data.scene_cuts[cut_id]["machines"]))
+		var slots := data.scene_cut_machines_for(String(cut_id))
+		if declared <= 1:
+			continue
+		multi += 1
+		# 2대 이상은 **선언이 있어야 한다** — 없으면 조용히 1대로 그려지고 표가 거짓이 된다.
+		_ok("%s 머신 자리 선언 = 선언 대수 %d" % [cut_id, declared], slots.size() == declared,
+			str(slots.size()))
+	# 비공허성 — 다대 컷이 실재해야 위 축이 무언가를 잰다.
+	_ok("다대 컷 전수 (6종)", multi == 6, str(multi))
+	for cut_id in data.scene_cut_machines:
+		var orders: Array = []
+		for row in data.scene_cut_machines_for(String(cut_id)):
+			orders.append(CsvTable.to_int(String(row["slot_order"])))
+			# 섀시가 대장에 있어야 오프셋이 나온다 — 없으면 0 으로 떨어져 차가 뜬다.
+			_ok("%s 섀시 대장 등재" % String(row["id"]),
+				data.machine_baselines.has(String(row["sprite"])), String(row["sprite"]))
+		# 그리는 순서는 데이터가 정한다 — 중복이면 겹침 순서가 표 행 순서에 달린다.
+		var seen: Array = []
+		for order in orders:
+			seen.append(order)
+		orders.sort()
+		var unique := true
+		for i in range(1, orders.size()):
+			if orders[i] == orders[i - 1]:
+				unique = false
+		_ok("%s 그리는 순서 중복 0" % String(cut_id), unique, str(seen))
+
+
+# ── ⑨ 바닥 오프셋 = **화소로 재확인** (총괄 판정 ② ⓑ) ──
+#
+# 표를 표와 맞대면 전사를 확인할 뿐이다. 여기서는 **스프라이트 화소를 직접 세어**
+# `opaque_bottom` 과 `baseline_offset` 을 다시 유도한다 — 원본이 바뀌면 대장이 붉어진다.
+func _baseline_pixels(data: GameData) -> void:
+	_ok("섀시 대장 = 베이스 전량 7행", data.machine_baselines.size() == 7,
+		str(data.machine_baselines.size()))
+	for sprite in data.machine_baselines:
+		var row: Dictionary = data.machine_baselines[sprite]
+		# **오버레이는 대장에 들어오지 않는다** (총괄 재확인 ①) — 오버레이는 노면이 아니라
+		# 베이스 셀에 정렬돼 있어 오프셋을 각각 적용하면 리어윙이 25px 밀린다.
+		_ok("대장에 오버레이 없음: %s" % String(sprite), not String(sprite).contains("_overlay_"))
+		var texture := load(MACHINE_DIR + String(sprite) + ".png") as Texture2D
+		_ok("섀시 실물 적재: %s" % String(sprite), texture != null)
+		if texture == null:
+			continue
+		var image := texture.get_image()
+		var bottom := -1
+		for y in range(image.get_height() - 1, -1, -1):
+			var opaque := false
+			for x in range(image.get_width()):
+				if image.get_pixel(x, y).a > 0.0:
+					opaque = true
+					break
+			if opaque:
+				bottom = y
+				break
+		var cell_h := CsvTable.to_int(String(row["cell_h"]))
+		_ok("%s 불투명 바닥행 화소 대조" % String(sprite),
+			bottom == CsvTable.to_int(String(row["opaque_bottom"])),
+			"화소 %d vs 대장 %s" % [bottom, row["opaque_bottom"]])
+		_ok("%s 오프셋 = 바닥행 − 셀높이/2" % String(sprite),
+			CsvTable.to_int(String(row["baseline_offset"])) == bottom - cell_h / 2,
+			"대장 %s vs 유도 %d" % [row["baseline_offset"], bottom - cell_h / 2])
+		_ok("%s 셀 높이 = 실물" % String(sprite), cell_h == image.get_height(),
+			str(image.get_height()))
+	# **표본 밖 베이스도 덮는가** (총괄 재확인 ②) — 실 섀시는 대전 상대에 따라 바뀌므로
+	# 컷 선언의 sprite 는 검수 표본일 뿐이다. 디렉토리의 `*_base_*_side` 전량이 대장에 있어야 한다.
+	# 임포트된 프로젝트는 원본 옆에 `.import` 를 함께 열거한다 — **같은 파일이므로 접는다**
+	# (접지 않으면 계수가 2배로 나오고, 그 2배가 "전량 확인"처럼 보인다).
+	var found: Array = []
+	for file_name in DirAccess.get_files_at(MACHINE_DIR):
+		var name := String(file_name).trim_suffix(".import")
+		if not name.ends_with("_side.png") or not name.contains("_base_"):
+			continue
+		if not found.has(name):
+			found.append(name)
+	_ok("베이스 실물 열거 비공허", found.size() == 7, str(found.size()))
+	for name in found:
+		_ok("베이스 '%s' 대장 등재" % String(name),
+			data.machine_baselines.has(String(name).trim_suffix(".png")),
+			"표본 밖 섀시가 슬롯에 들어오면 오프셋 0 으로 떨어진다")
+
+
+# ── ⑩ fx z 대역 (총괄 판정 ③) ──
+func _z_bands(data: GameData) -> void:
+	var behind := 0
+	var front := 0
+	for element_id in data.fx_elements:
+		match String(data.fx_elements[element_id]["z_band"]):
+			"behind":
+				behind += 1
+			"front":
+				front += 1
+	# **한 값이 아니다** — 양쪽이 다 서야 요소별 선언이 뜻을 갖는다. 한쪽이 0 이면
+	# 그것은 선언이 아니라 전역 상수이고, 오라와 불꽃 중 하나는 반드시 틀린다.
+	_ok("z 대역 양쪽 비공허 (뒤 %d · 앞 %d)" % [behind, front], behind > 0 and front > 0)
+	_ok("z 대역 합 = 요소 전량", behind + front == EXPECTED_ELEMENTS, str(behind + front))
+	# 정본 문면의 두 지점 — 오라는 뒤, 불꽃은 앞.
+	_ok("듀얼 오라 = 뒤", String(data.fx_element("fxe_duel_aura")["z_band"]) == "behind")
+	_ok("접촉 불꽃 = 앞", String(data.fx_element("fxe_contact_spark")["z_band"]) == "front")
+	# 검수 시트가 짚은 관통 — 스피드 라인이 후미차를 뚫었다.
+	_ok("스피드 라인 = 뒤 (후미차 관통 교정)",
+		String(data.fx_element("fxe_speed_lines")["z_band"]) == "behind")
 
 
 # ── ⑥ 매핑 우선순위 — D13 §8.2 서열을 호출로 재현 ──

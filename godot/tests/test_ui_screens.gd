@@ -130,8 +130,8 @@ func _process(_delta: float) -> bool:
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 629:
-		print("UI_SCREENS_FAIL checks=%d < 하한 629 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 646:
+		print("UI_SCREENS_FAIL checks=%d < 하한 646 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1370,6 +1370,12 @@ func _anch_check_present() -> void:
 	# 지형 소재를 잃으면 검사가 조용히 무대상이 된다 — 소재 경로까지 본다.
 	_ok("FXPL 지형 소재 = bg_spec", source.contains("tools/assets/bg_spec.json"))
 	_ok("FXPL = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("FXPL"'))
+	# ── CUTM (신설 31차 — **경고형** · 성격은 총괄 판정 대기) ──
+	# 경고형이라 스스로 죽어도 빌드가 멈추지 않는다 — 실재를 여기가 받친다.
+	# **성격은 못박지 않는다**(차단형 전환 전이므로) — 정의·등록·소재만 본다.
+	_ok("CUTM 검사 정의 실재", source.contains("func _run_cut_layout_scan("))
+	_ok("CUTM 검사 등록(호출) 실재", source.contains("\t_run_cut_layout_scan()"))
+	_ok("CUTM 전사 소재 = cut_layout", source.contains("tools/assets/cut_layout.json"))
 	# ── 선택지 자수 규칙 (총괄 판정 IMPL-257 ②) ──
 	# **검사가 아니라 규칙 행이다.** V3·V7 은 그대로 살아 있으므로 행이 지워져도 검사는 죽지
 	# 않고 **그 도메인만 조용히 규율 밖으로 나간다** — 종료코드가 구분하지 못하는 자리가
@@ -3513,14 +3519,15 @@ func _action_row_budget(data: GameData) -> void:
 # **순서가 곧 계약이다**: 원경 → 머신 → 근경 → 요소. 근경이 머신 위인 것이 배경 2레이어
 # 분리의 목적이며(§5.1 "컷 합성용"), 뒤집으면 분리가 무의미해진다.
 const SCENE_PANEL_NODE := "ScenePanel"
-const SCENE_LAYER_ORDER := ["Far", "Machine", "Near", "Fx"]
+# **fx 가 두 대역으로 갈렸다** (31차 · 총괄 판정 ③) — 오라는 차 뒤, 불꽃은 차 앞.
+const SCENE_LAYER_ORDER := ["Far", "FxBehind", "Machines", "Near", "FxFront"]
 
 
 func _scene_panel_layers(data: GameData) -> void:
 	var screen := _new_race_screen()
 	if screen == null:
 		return
-	var panel := screen._scene_panel as Control
+	var panel: ScenePanel = screen._scene_panel
 	_ok("씬 패널 실물 실재", panel != null)
 	if panel == null:
 		_unmount(screen)
@@ -3542,16 +3549,73 @@ func _scene_panel_layers(data: GameData) -> void:
 	_ok("캔버스 폭 = 제작 원도", is_equal_approx(canvas.size.x,
 		data.param("param_scene_canvas_width_px")), str(canvas.size.x))
 	var far := canvas.get_node("Far") as TextureRect
-	var machine := canvas.get_node("Machine") as TextureRect
 	var near := canvas.get_node("Near") as TextureRect
+	var machines := canvas.get_node("Machines") as Control
 	_ok("원경 텍스처 실재", far.texture != null)
 	_ok("근경 텍스처 실재", near.texture != null)
 	_ok("원경 ≠ 근경 (같은 파일을 두 번 얹지 않는다)", far.texture != near.texture)
-	_ok("머신 텍스처 실재", machine.texture != null)
-	_ok("머신 표준 자리 = 데이터 창구",
-		is_equal_approx(machine.position.x, data.param("param_scene_machine_x"))
-		and is_equal_approx(machine.position.y, data.param("param_scene_machine_y")),
-		str(machine.position))
+	_ok("머신 층 1대 이상", machines.get_child_count() >= 1, str(machines.get_child_count()))
+
+	# ── 머신 자리 = 노면선 앵커 − 섀시 오프셋 (31차 · 총괄 판정 ② ⓑ) ──
+	#
+	# **짝을 어긋나게 고른다**: 같은 컷 안에서 오프셋이 다른 두 섀시를 고르지 않으면
+	# 오프셋을 통째로 지워도 통과한다(19 대 13 — 6px 이 갈리는 짝).
+	panel.show_cut("cut_basic_group", screen._active_stage_id())
+	# **정렬을 검사가 스스로 한다.** 창구가 돌려준 순서를 그대로 쓰면 창구가 순서를 뒤집어도
+	# 노드와 행이 함께 뒤집혀 통과한다(반증 Q10 초판 미검출). `slot_order` 로 여기서 세운다.
+	var rows: Array = data.scene_cut_machines_for("cut_basic_group").duplicate()
+	rows.sort_custom(func(a, b):
+		return CsvTable.to_int(String(a["slot_order"])) < CsvTable.to_int(String(b["slot_order"])))
+	_ok("전제: 집단 컷 선언 3대", rows.size() == 3, str(rows.size()))
+	_ok("전제: 선언 순서가 슬롯마다 다르다 (축 비공허)",
+		String(rows[0]["slot_name"]) != String(rows[rows.size() - 1]["slot_name"]))
+	_ok("머신 노드 = 선언 대수", machines.get_child_count() == rows.size(),
+		str(machines.get_child_count()))
+	var offsets: Array = []
+	for row in rows:
+		offsets.append(data.machine_baseline(String(row["sprite"])))
+	_ok("전제: 선언 섀시의 오프셋이 서로 다르다 (축 비공허)",
+		offsets.min() != offsets.max(), str(offsets))
+	for index in range(mini(rows.size(), machines.get_child_count())):
+		var row: Dictionary = rows[index]
+		var node := machines.get_child(index) as TextureRect
+		var expected_center := Vector2(
+			float(CsvTable.to_int(String(row["anchor_x"]))),
+			float(CsvTable.to_int(String(row["anchor_road_y"]))
+				- data.machine_baseline(String(row["sprite"]))))
+		_ok("%s 섀시 = 선언" % String(row["slot_name"]),
+			node.name == String(row["sprite"]), String(node.name))
+		_ok("%s 셀 중심 = 노면선 − 오프셋" % String(row["slot_name"]),
+			node.position + node.size * 0.5 == expected_center,
+			"%s vs %s" % [str(node.position + node.size * 0.5), str(expected_center)])
+	# **선언이 없는 1대 컷은 표준 자리다** — 폴백이 아니라 제원표 §4 그 자체다.
+	panel.show_cut("cut_finish", screen._active_stage_id())
+	_ok("전제: 피니시는 자리 선언이 없다",
+		data.scene_cut_machines_for("cut_finish").is_empty())
+	_ok("자리 미선언 = 1대", machines.get_child_count() == 1,
+		str(machines.get_child_count()))
+	var standalone := machines.get_child(0) as TextureRect
+	_ok("자리 미선언 = 표준 자리 (제원표 §4)",
+		is_equal_approx(standalone.position.x, data.param("param_scene_machine_x"))
+		and is_equal_approx(standalone.position.y, data.param("param_scene_machine_y")),
+		str(standalone.position))
+	# 선언이 들어왔으므로 다대 미배치 관측은 **비어야** 한다 (30차 미결의 폐문 증명).
+	_ok("다대 미배치 관측 0 (선언 유입 폐문)", panel.multi_machine_omissions.is_empty(),
+		str(panel.multi_machine_omissions))
+
+	# ── fx z 대역 — 오라는 뒤, 불꽃은 앞 (총괄 판정 ③) ──
+	panel.show_cut("cut_duel_standoff", screen._active_stage_id())
+	_ok("오라 = 머신 뒤 대역",
+		(canvas.get_node("FxBehind") as Control).get_child_count() == 1
+		and (canvas.get_node("FxFront") as Control).get_child_count() == 0,
+		"뒤 %d · 앞 %d" % [(canvas.get_node("FxBehind") as Control).get_child_count(),
+			(canvas.get_node("FxFront") as Control).get_child_count()])
+	panel.show_cut("cut_close_battle", screen._active_stage_id())
+	_ok("불꽃 = 머신 앞 대역",
+		(canvas.get_node("FxFront") as Control).get_child_count() == 1
+		and (canvas.get_node("FxBehind") as Control).get_child_count() == 0,
+		"뒤 %d · 앞 %d" % [(canvas.get_node("FxBehind") as Control).get_child_count(),
+			(canvas.get_node("FxFront") as Control).get_child_count()])
 	_unmount(screen)
 
 
@@ -3581,7 +3645,7 @@ func _scene_panel_phase(data: GameData) -> void:
 	_ok("전제: 두 컷이 다르다", trouble_cut != overtake_cut)
 	_ok("전개 국면 = 모션 재개", panel._motion_enabled)
 	# ⓒ 요소 층이 실제로 섰는가 — 합성 선언이 노드로 옮겨졌는지
-	var fx_root := panel.get_node("Canvas/Fx") as Control
+	var fx_root := panel.get_node("Canvas/FxBehind") as Control
 	_ok("추월 컷 요소 층 = 선언 수",
 		fx_root.get_child_count() == data.scene_cut_layers_for("cut_overtake").size(),
 		str(fx_root.get_child_count()))
@@ -3610,7 +3674,7 @@ func _scene_panel_phase(data: GameData) -> void:
 	#    시트를 통째로 얹으면 5칸이 가로로 늘어선 채 뜬다 — 화면에서 "정지"로 보이지 않는다.
 	screen._show_result_cut([], false, false)
 	panel.show_cut("cut_close_battle", screen._active_stage_id())
-	var spark := (panel.get_node("Canvas/Fx") as Control).get_child(0) as TextureRect
+	var spark := (panel.get_node("Canvas/FxFront") as Control).get_child(0) as TextureRect
 	var atlas := spark.texture as AtlasTexture
 	_ok("시트 요소 = AtlasTexture 로 한 칸만", atlas != null)
 	if atlas != null:
@@ -3625,7 +3689,7 @@ func _scene_panel_phase(data: GameData) -> void:
 	# ⓙ **움직임의 진폭이 요소 자신의 치수인가** — 상수를 적으면 여기서 갈린다.
 	#    한 바퀴(마지막 프레임)에서 스크롤 오프셋 = 셀 폭 × (frames-1)/frames.
 	panel.show_cut("cut_basic_solo", screen._active_stage_id())
-	var lines := (panel.get_node("Canvas/Fx") as Control).get_child(0) as TextureRect
+	var lines := (panel.get_node("Canvas/FxBehind") as Control).get_child(0) as TextureRect
 	var base_x := lines.position.x
 	var frames := CsvTable.to_int(String(data.scene_cut("cut_basic_solo")["frames"]))
 	var line_cell := CsvTable.to_int(String(data.fx_element("fxe_speed_lines")["cell_w"]))
@@ -3637,7 +3701,8 @@ func _scene_panel_phase(data: GameData) -> void:
 			float(line_cell) * float(frames - 1) / float(frames)])
 	panel._apply_frame(0)
 	_ok("0 프레임 = 원자리 복귀", is_equal_approx(lines.position.x, base_x))
-	# ⓗ 머신 다수 컷은 배치 선언이 없다 — 조용히 1대로 그리지 않고 관측에 남는다
-	_ok("머신 다수 컷 = 미배치 관측", panel.multi_machine_omissions.has("cut_overtake"),
-		str(panel.multi_machine_omissions))
+	# ⓗ **미배치 관측 축은 내려갔다** (31차). 29차에 세운 것은 *배치 선언이 없다*는
+	#    사실을 붙들던 가드이고, 선언이 들어왔으므로(에셋 IMPL-444) 붙들 것이 없다 —
+	#    남기면 *없어진 것을 지키느라* 붉어진다(30차 상한 철거와 같은 자리).
+	#    폐문 증명은 ㉕ 이 진다: **관측이 비어 있는가**를 그쪽이 단언한다.
 	_unmount(screen)

@@ -42,7 +42,7 @@ TESTS=(
 	"tests/test_audio_assets.gd:340"
 	# AUDIO-W — 표와 화면 사이의 공백. 부를 곳이 없는 행은 실물이 유입돼도 영원히 울리지
 	# 않는데, 무음 폴백 단계에서는 그 침묵이 정상과 구분되지 않는다.
-	"tests/test_audio_wiring.gd:101"
+	"tests/test_audio_wiring.gd:107"
 	"tests/test_data_driven.gd:69"
 	# AUDIO-P — 재생기(표현 층). 헤드리스 더미 드라이버에서도 버스·볼륨·재생 상태·`finished`
 	# 통지가 실재하므로 **소리 없이 상태 검증이 성립**한다. 관측은 전부 `AudioServer` 되읽기다 —
@@ -60,7 +60,7 @@ TESTS=(
 	"tests/test_label_width.gd:2520"
 	# UISCR — 화면을 실제로 세워 본다. 문맥 결손(무커리어 진입)·포커스 부재는 데이터·코어
 	# 검사가 원리적으로 닿지 못하고, 커리어를 연 경로에서는 멀쩡해 보인다.
-	"tests/test_ui_screens.gd:629"
+	"tests/test_ui_screens.gd:646"
 	# CG — 전용 CG 6종의 대장·실물 **양방향** 대조. AUDIO-A 와 같은 사유로 검증기가 아니다
 	# (프로젝트리스 실행은 `res://` 텍스처를 적재하지 못한다). 역방향(파일 → 행)이 이 축의
 	# 요지다 — 그림이 들어왔는데 행이 없으면 **아무도 그 그림을 띄우지 않는다.**
@@ -68,7 +68,7 @@ TESTS=(
 	# SCENE — 씬 컷 합성. 역방향(요소 → 소비 컷)이 요지다: 29차 착수 사유가 "`fx_*` 8 ·
 	# `stage_*` 5 소비부 0건"이었으므로 이 축이 그 0 을 다시 만들지 않는다는 보장이다.
 	# 우선순위는 표의 숫자가 아니라 `resolve()` 호출 결과로 잰다.
-	"tests/test_scene_cuts.gd:139"
+	"tests/test_scene_cuts.gd:218"
 	# SEAL-E — 실화면을 인스턴스화해 릴 정지 연출 전 UI 노출을 잡는다.
 	# 라운드 수가 GP 길이(12~15턴 + 듀얼 삽입)에 따라 달라지므로 하한은 최소 GP 기준이다.
 	"tests/test_seal_ui.gd:84"
