@@ -176,57 +176,51 @@ function inPal(rgba, w, h, label) {
   if (bad.size) fail(`${label}: 순색 60 밖 ${bad.size}색 (${[...bad].slice(0, 3).map(([k, n]) => `${k}×${n}`).join(' ')})`);
 }
 
-// ── 1× 원판 합성
-const base = spec.base;
-const bg = decode(abs(base.background));
-let W = bg.w, H = bg.h;
-const out = Buffer.from(bg.rgba);
-// 배경만 양자화한다 — 머신·헬멧은 **이미 납품된 순색 60 산출물**이라 다시 건드리면 두 벌이 된다.
-{
-  const seen = new Set();
-  let moved = 0;
-  for (let i = 0; i < W * H; i++) {
-    if (!out[i * 4 + 3]) continue;
-    const p = nearest(out[i * 4], out[i * 4 + 1], out[i * 4 + 2]);
-    if (p[0] !== out[i * 4] || p[1] !== out[i * 4 + 1] || p[2] !== out[i * 4 + 2]) moved++;
-    out[i * 4] = p[0]; out[i * 4 + 1] = p[1]; out[i * 4 + 2] = p[2];
-    seen.add(p.join(','));
+// ── 1× 원판 합성 — **출력마다 다른 원판을 가질 수 있다** (2026-08-25 · IMPL-418).
+//    키 비주얼은 원판 하나에서 10건이 나왔지만 **전용 CG 는 장면마다 배경이 다르다.**
+//    그래서 `compose` 를 출력 단위로 선언할 수 있게 열되, **없으면 전역 원판을 쓴다** —
+//    한 장에서 여럿이 나오는 구조(키 비주얼)를 깨지 않는다.
+function buildBase(cfg, label) {
+  const bg = decode(abs(cfg.background));
+  const W = bg.w, H = bg.h;
+  const out = Buffer.from(bg.rgba);
+  {
+    const seen = new Set();
+    let moved = 0;
+    for (let i = 0; i < W * H; i++) {
+      if (!out[i * 4 + 3]) continue;
+      const p = nearest(out[i * 4], out[i * 4 + 1], out[i * 4 + 2]);
+      if (p[0] !== out[i * 4] || p[1] !== out[i * 4 + 1] || p[2] !== out[i * 4 + 2]) moved++;
+      out[i * 4] = p[0]; out[i * 4 + 1] = p[1]; out[i * 4 + 2] = p[2];
+      seen.add(p.join(','));
+    }
+    console.log(`      · ${label} 배경 양자화 ${W}×${H} · 고유색 ${seen.size} · 이동 ${moved}px`);
   }
-  console.log(`      · 배경 양자화 ${W}×${H} · 고유색 ${seen.size} · 이동 ${moved}px`);
-}
-const put = (x, y, c) => {
-  if (x < 0 || y < 0 || x >= W || y >= H) return;
-  const i = (y * W + x) * 4;
-  out[i] = c[0]; out[i + 1] = c[1]; out[i + 2] = c[2]; out[i + 3] = 255;
-};
-
-// 접지 그림자 — **부품보다 먼저 깔린다.** 순서를 선언이 정하지 않고 코드가 정하는 이유는
-//    그림자가 언제나 아래이기 때문이다. 성긴 디더인 것은 1차에서 꽉 채웠더니 **검은 웅덩이**로
-//    읽혔기 때문이고(IMPL-410), 노면보다 한 단만 어두운 색을 4에 1로 솎는다.
-for (const sh of (spec.shadows || [])) {
-  const c = hex(sh.color);
-  if (!PALSET.has(c.join(','))) die(`shadow: ${sh.color} 이 순색 60 밖이다`);
-  const [cx, cy] = sh.at, [rx, ry] = sh.radius;
-  const [keep, period] = sh.dither || [1, 4];
-  let n = 0;
-  for (let y = cy - ry; y <= cy + ry; y++) {
-    for (let x = cx - rx; x <= cx + rx; x++) {
+  const put = (x, y, c) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const i = (y * W + x) * 4;
+    out[i] = c[0]; out[i + 1] = c[1]; out[i + 2] = c[2]; out[i + 3] = 255;
+  };
+  for (const sh of (cfg.shadows || [])) {
+    const c = hex(sh.color);
+    if (!PALSET.has(c.join(','))) die(`${label} shadow: ${sh.color} 이 순색 60 밖이다`);
+    const [cx, cy] = sh.at, [rx, ry] = sh.radius;
+    const [keep, period] = sh.dither || [1, 4];
+    let n = 0;
+    for (let y = cy - ry; y <= cy + ry; y++) for (let x = cx - rx; x <= cx + rx; x++) {
       const dx = (x - cx) / rx, dy = (y - cy) / ry;
       if (dx * dx + dy * dy > 1) continue;
       if ((x * 3 + y * 5) % period >= keep) continue;
       put(x, y, c); n++;
     }
+    if (!n) die(`${label} shadow: 한 픽셀도 그리지 않았다 — 좌표가 틀렸다`);
+    console.log(`      · ${label} 접지 그림자 ${n}px`);
   }
-  if (!n) die('shadow: 한 픽셀도 그리지 않았다 — 좌표가 틀렸다');
-  console.log(`      · 접지 그림자 ${n}px`);
-}
-
-for (const p of (spec.parts || [])) {
-  const img = decode(abs(p.src));
-  const [ox, oy] = p.at;
-  let drawn = 0, outside = 0;
-  for (let y = 0; y < img.h; y++) {
-    for (let x = 0; x < img.w; x++) {
+  for (const pt of (cfg.parts || [])) {
+    const img = decode(abs(pt.src));
+    const [ox, oy] = pt.at;
+    let drawn = 0, outside = 0;
+    for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) {
       const si = (y * img.w + x) * 4;
       if (!img.rgba[si + 3]) continue;
       const X = ox + x, Y = oy + y;
@@ -234,14 +228,16 @@ for (const p of (spec.parts || [])) {
       put(X, Y, [img.rgba[si], img.rgba[si + 1], img.rgba[si + 2]]);
       drawn++;
     }
+    if (!drawn) die(`${label} part ${pt.src}: 한 픽셀도 그려지지 않았다`);
+    if (outside > 0 && !pt.allow_crop) fail(`${label} part ${pt.src}: ${outside}px 가 화면 밖이다 — 잘림을 허용하려면 allow_crop 을 선언해야 한다`);
+    console.log(`      · ${label} ${path.basename(pt.src)} ${drawn}px${outside ? ` (밖 ${outside}px · 선언된 잘림)` : ''}`);
   }
-  if (!drawn) die(`part ${p.src}: 한 픽셀도 그려지지 않았다`);
-  const lim = p.allow_crop === undefined ? 0 : p.allow_crop;
-  if (outside > 0 && !lim) fail(`part ${p.src}: ${outside}px 가 화면 밖이다 — 잘림을 허용하려면 allow_crop 을 선언해야 한다`);
-  console.log(`      · ${path.basename(p.src)} ${drawn}px${outside ? ` (프레임 밖 ${outside}px · 선언된 잘림)` : ''}`);
+  inPal(out, W, H, `${label} 1× 원판`);
+  return { buf: out, w: W, h: H };
 }
-inPal(out, W, H, '1× 원판');
-
+const baseMain = spec.base ? buildBase({ ...spec.base, shadows: spec.shadows, parts: spec.parts }, '주') : null;
+let W = baseMain ? baseMain.w : 0, H = baseMain ? baseMain.h : 0;
+const out = baseMain ? baseMain.buf : Buffer.alloc(0);
 // ── 파생: 정수배 확대 → 크롭 → (선택) 가장자리 행 반복
 function scaleUp(src, w, h, k) {
   const W2 = w * k, H2 = h * k;
@@ -270,6 +266,10 @@ for (const o of spec.outputs) {
   //    크롭이면 48px 에서 무너지므로 §11 이 맞다. **한 문장이 전량을 덮으려다 예외를 삼킨 것**이고
   //    도구가 그 예외를 표현할 수 있어야 대장을 고칠 수 있다.
   let src = out, sw = W, sh = H;
+  if (o.compose) {
+    const b = buildBase(o.compose, path.basename(o.file, '.png'));
+    src = b.buf; sw = b.w; sh = b.h;
+  }
   if (o.source) {
     const si = decode(abs(o.source));
     src = Buffer.from(si.rgba); sw = si.w; sh = si.h;
@@ -320,6 +320,27 @@ for (const o of spec.outputs) {
     for (let y = 0; y < ext.bottom; y++) copyRow(ch - 1, ext.top + ch + y);
   } else {
     for (let y = 0; y < ch; y++) copyRow(y, y);
+  }
+  // `overlays` — **확대 뒤에 얹는 부품.** 스탠딩(180×240)은 1× 캔버스(320×180)에 들어가지
+  //    않으므로 원판 합성에 넣을 수 없다. 확대 뒤 640×360 에 1× 그대로 얹으면
+  //    **배경은 굵고 인물은 선명한 초점 분리**가 되고, VN 합성 실측에서 그것이 오히려 옳았다.
+  for (const ov of (o.overlays || [])) {
+    const img = decode(abs(ov.src));
+    const [ox, oy] = ov.at;
+    let drawn = 0, outside = 0;
+    for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) {
+      const si = (y * img.w + x) * 4;
+      if (!img.rgba[si + 3]) continue;
+      const X = ox + x, Y = oy + y;
+      if (X < 0 || Y < 0 || X >= cw || Y >= outH) { outside++; continue; }
+      const di = (Y * cw + X) * 4;
+      img.rgba.copy(b, di, si, si + 4);
+      b[di + 3] = 255;
+      drawn++;
+    }
+    if (!drawn) die(`${o.file}: overlay ${ov.src} 가 한 픽셀도 그려지지 않았다`);
+    if (outside > 0 && !ov.allow_crop) fail(`${o.file}: overlay ${ov.src} 가 ${outside}px 화면 밖이다 — allow_crop 선언 필요`);
+    console.log(`      · overlay ${path.basename(ov.src)} ${drawn}px${outside ? ` (밖 ${outside}px)` : ''}`);
   }
   inPal(b, cw, outH, o.file);
   const png = encode(cw, outH, b);
