@@ -1176,9 +1176,13 @@ func _run_v8_key_grammar() -> void:
 # 소재 = `tools/assets/cut_layout.json`(생성기의 산출). FXPL 이 `bg_spec.json` 을 읽는 것과
 # 같은 자리이며, 같은 이유로 스위트가 아니라 검증기다.
 #
-# **성격 = 경고형(신설).** 차단/경고는 총괄 판정을 경유한다(불변규칙 7) — FONT·PAL·ANCH·
-# FXPL 이 밟은 절차 그대로 상신한다. **경고형은 스스로 죽어도 빌드를 멈추지 못하므로**
-# 실재는 UISCR ⑬축이 받친다.
+# **성격 = 차단형** (경고형 신설 31차 → 전환 총괄 판정 ㊳ · IMPL-450). FXPL·FONT·PAL·ANCH
+# 와 같은 절차·같은 근거 — **표와 도구 산출의 값 비교**라 미적 판단이 없고, 오검출 0
+# (16자리 + 7섀시 전건 통과)·검출 성립(Q11)·**그 검출이 경고형에서는 `exit=0` 이었다**.
+#
+# **판정 불가도 실패다** (FXPL 과 같은 축) — 소재를 읽지 못하면 *위반 없음*이 아니라
+# *판정 없음*이고, 종료코드는 둘을 구분하지 못한다. 도구 산출이 비는 것도 같다:
+# 대조가 공허해지는 방향의 침묵이라 통과가 늘어난다.
 const CUTM_SPEC := "tools/assets/cut_layout.json"
 const CUTM_TABLE := "scene_cut_machines.csv"
 const CUTM_BASELINES := "machine_baselines.csv"
@@ -1190,7 +1194,7 @@ func _run_cut_layout_scan() -> void:
 	var checked := 0
 	var parsed: Variant = JSON.parse_string(_read_text(CUTM_SPEC))
 	if typeof(parsed) != TYPE_DICTIONARY:
-		_warn("CUTM", "%s 를 읽지 못했다 — 전사 대조 불가" % CUTM_SPEC)
+		_fail("CUTM", "%s 를 읽지 못했다 — 판정 없음은 위반 없음이 아니다" % CUTM_SPEC)
 		_report("CUTM", "cut machine layout transcription", checked, before_fail, before_warn)
 		return
 	# 도구 산출 → {cut_id: {slot_name: {order, sprite, cx, road_y}}}
@@ -1209,35 +1213,35 @@ func _run_cut_layout_scan() -> void:
 			}
 	checked += 1
 	if spec_slots.is_empty():
-		_warn("CUTM", "도구 산출에 슬롯이 없다 — 대조가 공허해진다")
+		_fail("CUTM", "도구 산출에 슬롯이 없다 — 대조가 공허해진다")
 	var seen: Dictionary = {}
 	for row in _tables.get(CUTM_TABLE, []):
 		var key := "%s/%s" % [String(row.get("cut_id", "")), String(row.get("slot_name", ""))]
 		seen[key] = true
 		checked += 1
 		if not spec_slots.has(key):
-			_warn("CUTM", "%s: 도구 산출에 없는 자리다 — 손 전사 의심" % key)
+			_fail("CUTM", "%s: 도구 산출에 없는 자리다 — 손 전사 의심" % key)
 			continue
 		var want: Dictionary = spec_slots[key]
 		for column in [["slot_order", "order"], ["anchor_x", "cx"], ["anchor_road_y", "road_y"]]:
 			var got := String(row.get(String(column[0]), "")).strip_edges().to_int()
 			if got != int(want[String(column[1])]):
-				_warn("CUTM", "%s.%s: 표 %d ≠ 도구 %d"
+				_fail("CUTM", "%s.%s: 표 %d ≠ 도구 %d"
 					% [key, String(column[0]), got, int(want[String(column[1])])])
 		if String(row.get("sprite", "")).strip_edges() != String(want["sprite"]):
-			_warn("CUTM", "%s.sprite: 표 '%s' ≠ 도구 '%s'"
+			_fail("CUTM", "%s.sprite: 표 '%s' ≠ 도구 '%s'"
 				% [key, row.get("sprite", ""), want["sprite"]])
 	# 역방향 — 도구가 낸 자리가 표에 전부 있는가 (빠진 슬롯은 컷이 조용히 좁아진다)
 	for key in spec_slots:
 		checked += 1
 		if not seen.has(String(key)):
-			_warn("CUTM", "%s: 도구가 낸 자리가 표에 없다" % String(key))
+			_fail("CUTM", "%s: 도구가 낸 자리가 표에 없다" % String(key))
 	# 섀시 대장 — **오버레이 혼입 0** (총괄 재확인 ① — 오버레이에 오프셋을 적용하면
 	# 리어윙이 25px 밀린다). 도구는 오버레이를 "적용 금지" 참고 행으로만 뱉는다.
 	for row in _tables.get(CUTM_BASELINES, []):
 		checked += 1
 		if String(row.get("sprite", "")).contains("_overlay_"):
-			_warn("CUTM", "%s: 오버레이가 섀시 대장에 있다 — 오프셋 오적용 경로"
+			_fail("CUTM", "%s: 오버레이가 섀시 대장에 있다 — 오프셋 오적용 경로"
 				% String(row.get("id", "")))
 	_report("CUTM", "cut machine layout transcription", checked, before_fail, before_warn)
 

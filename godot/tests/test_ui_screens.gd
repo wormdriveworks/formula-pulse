@@ -130,8 +130,8 @@ func _process(_delta: float) -> bool:
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 646:
-		print("UI_SCREENS_FAIL checks=%d < 하한 646 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 647:
+		print("UI_SCREENS_FAIL checks=%d < 하한 647 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1370,12 +1370,12 @@ func _anch_check_present() -> void:
 	# 지형 소재를 잃으면 검사가 조용히 무대상이 된다 — 소재 경로까지 본다.
 	_ok("FXPL 지형 소재 = bg_spec", source.contains("tools/assets/bg_spec.json"))
 	_ok("FXPL = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("FXPL"'))
-	# ── CUTM (신설 31차 — **경고형** · 성격은 총괄 판정 대기) ──
-	# 경고형이라 스스로 죽어도 빌드가 멈추지 않는다 — 실재를 여기가 받친다.
-	# **성격은 못박지 않는다**(차단형 전환 전이므로) — 정의·등록·소재만 본다.
+	# ── CUTM (신설 31차 경고형 → **차단형** 전환 · 총괄 판정 ㊳ IMPL-450) ──
+	# 실재를 받치는 이유는 ANCH·STRF·FXPL 과 같고, 전환됐으므로 **성격까지** 못박는다.
 	_ok("CUTM 검사 정의 실재", source.contains("func _run_cut_layout_scan("))
 	_ok("CUTM 검사 등록(호출) 실재", source.contains("\t_run_cut_layout_scan()"))
 	_ok("CUTM 전사 소재 = cut_layout", source.contains("tools/assets/cut_layout.json"))
+	_ok("CUTM = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("CUTM"'))
 	# ── 선택지 자수 규칙 (총괄 판정 IMPL-257 ②) ──
 	# **검사가 아니라 규칙 행이다.** V3·V7 은 그대로 살아 있으므로 행이 지워져도 검사는 죽지
 	# 않고 **그 도메인만 조용히 규율 밖으로 나간다** — 종료코드가 구분하지 못하는 자리가
