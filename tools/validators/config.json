@@ -340,7 +340,7 @@
    "root": true,
    "columns": {
     "id": "id",
-    "vn_id": "string",
+    "vn_id": "structure_entry_ref:act_vn.json:entries",
     "after_text_key": "string_key",
     "option_count": "int:2,3"
    }
@@ -362,6 +362,17 @@
     "trigger_milestone": "fk_optional:milestones.csv",
     "trigger_crew": "fk_optional:crew.csv",
     "trigger_act": "int:0,4"
+   }
+  },
+  "cg_cutins.csv": {
+   "id_prefix": "cgcut_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "asset": "string",
+    "source_achievement": "fk_optional:achievements.csv",
+    "source_act_vn": "structure_entry_ref_optional:act_vn.json:entries",
+    "source_beat": "fk_optional:vn_beats.csv"
    }
   },
   "vn_beat_lines.csv": {

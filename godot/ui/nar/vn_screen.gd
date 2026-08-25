@@ -30,6 +30,17 @@ const TOUR_BRIEF_SLOT := "vnslot_tour_brief"
 const CHOICE_OVERLAY_NAME := "ChoiceOverlay"
 const CHOICE_LIST_NAME := "ChoiceList"
 
+# ── 히든 내러티브 CG (D10 §7 CG-04~06 · 유입 IMPL-418) ──
+#
+# 조우 CG(01~03)와 **성격이 다르다.** 저쪽은 레이스 위에 스팅 길이만큼 뜨는 컷인이고,
+# 이쪽은 **그 장면의 그림**이다 — 장면이 서 있는 동안 남고 화면과 함께 내려간다.
+# 그래서 지속 인자를 주지 않는다(`hold_sec = 0` = 비자동 해제).
+#
+# 자리 = 바탕(`Background`) **바로 위, 스탠딩 아래**. 스탠딩을 가리면 인물이 사라지고
+# 대사창을 가리면 문면이 사라진다 — 층 순서가 곧 계약이다.
+const CG_LAYER_NAME := "CgArt"
+const CG_LAYER_INDEX := 1
+
 # 라인 = `{"speaker_key": String, "text_key": String}` 로 정규화해 둔다.
 # 문자열 항목도 그대로 받는다 — 골격·아카이브 재열람 등 기존 호출부가 문자열 배열을 넘긴다.
 var _lines: Array = []
@@ -80,12 +91,26 @@ func _on_bound(payload: Dictionary) -> void:
 	# 화자는 **라인 단위**다 (총괄 판정 IMPL-249 ② — 신설안 C 승인).
 	# 페이로드의 `speaker_key` 는 라인이 화자를 지정하지 않았을 때의 기본값으로만 남는다.
 	_default_speaker_key = String(payload.get("speaker_key", VANE_SPEAKER_KEY))
+	_mount_cg(vn_id)
 	_lines = _normalize_lines(payload.get("line_keys", ["ui.vn.placeholderLine01"]))
 	_line_index = 0
 	_show_line()
 	(%AdvanceButton as Button).grab_focus()
 	(%AdvanceButton as Button).pressed.connect(_advance)
 	(%CalendarPanel as Control).visible = false
+
+
+# **재열람에서도 뜬다.** 아카이브는 놓친 서사의 회수 경로이고(D07 §6.3 무상·상시),
+# 그림 없는 회수는 같은 장면이 아니다. 조회 창구가 `vn_id` 하나라 재열람 경로가 별도 분기를
+# 갖지 않는 것이 그 보장이다 — 갈래를 만들면 한쪽만 낡는다.
+func _mount_cg(vn_id: String) -> void:
+	var row := session.data.cg_cutin_for_vn(vn_id)
+	if row.is_empty():
+		return   # CG 가 없는 VN 이 정상이다 (6종 중 VN 경로는 3종)
+	var art := CgCutIn.new(String(row["asset"]))
+	art.name = CG_LAYER_NAME
+	add_child(art)
+	move_child(art, CG_LAYER_INDEX)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:

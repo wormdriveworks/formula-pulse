@@ -1,0 +1,7 @@
+id,asset,source_achievement,source_act_vn,source_beat
+cgcut_throne,cg01_throne_lorentz,achievement_l3_throne,,
+cgcut_reunion,cg02_reunion_sherwood,achievement_l3_reunion,,
+cgcut_kinship,cg03_rival_jude,achievement_l3_kinship,,
+cgcut_origin,cg04_origin_reveal,,vn_origin,
+cgcut_sasha,cg05_sasha_return,,,vnbeat_crew_sasha
+cgcut_champion,cg06_first_champion,,vn_epilogue,

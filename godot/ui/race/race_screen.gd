@@ -38,6 +38,8 @@ const PAD_RB := 10
 const PAD_DPAD_LEFT := 13
 const PAD_DPAD_RIGHT := 14
 const ICON_DIR := "res://assets/ui/icons/"
+# 컷인 노드 이름 — 검사가 실물을 찾는 지점이다(존재를 이름으로 세지 않으면 거동을 못 잰다).
+const CG_CUTIN_NAME := "CgCutIn"
 
 # 엔진 로그 키 → 사운드 이벤트 id (D11 §1.4 이벤트 결속 · §2.4 SE-E 계열 정의).
 # **화면은 SFX id 를 들지 않는다** — 무엇이 울릴지는 `sound_map` 이 정한다. 여기 있는 것은
@@ -756,20 +758,32 @@ func _refresh_skill_slots() -> void:
 			button.disabled = true
 			continue
 		var slot: Dictionary = slots[i]
-		button.text = s.text("ui.race.actionWithCost", {
-			"label": slot_label,
-			"cost": s.text("ui.race.costFormat", {"cost": int(slot["charge_cost"])}),
-		})
-		button.tooltip_text = s.text("ui.race.actionWithCost", {
-			"label": s.text(String(slot["name_key"])),
-			"cost": s.text("ui.race.costFormat", {"cost": int(slot["charge_cost"])}),
-		})
-		# **잔여 횟수 배지는 붙이지 못했다 (26차 보고).** 문면(`ui.race.skillUsesFormat`)은
-		# 유입됐으나 버튼 문면이 이미 `actionWithCost` 로 조립돼 있어 배지를 이어 붙이려면
-		# 코드에서 문자열을 합성해야 하고, 그것은 V4(표시 문자열 = 키 참조 전속)가 막는다 —
-		# **막는 것이 옳다.** 필요한 것은 조립 키 1건(`{label}`·`{cost}`·`{left}`)이거나
-		# 배지 전용 노드(씬 층)다. 회신 §키 계약으로 올린다.
+		var cost_text := s.text("ui.race.costFormat", {"cost": int(slot["charge_cost"])})
+		button.text = _action_label(slot_label, cost_text, slot)
+		button.tooltip_text = _action_label(s.text(String(slot["name_key"])), cost_text, slot)
 		button.disabled = not open or not bool(slot["usable"])
+
+
+# 액션 라벨 — **잔여 횟수가 있으면 확장형 키를 쓴다** (조립 키 유입 IMPL-425).
+#
+# 26차에 붙이지 못했던 배지다. 버튼 문면이 `actionWithCost` 로 이미 조립돼 있어 배지를 이어
+# 붙이려면 코드가 문자열을 합성해야 했고 V4 가 그것을 막았다 — **막는 것이 옳았다.**
+# 답은 우회가 아니라 확장형 키 1건이었고, 그것이 들어왔다.
+#
+# **무제한(`uses_left = -1`)에는 이 키를 쓰지 않는다.** 20차 계약("0 = 소진"과 같은 값을
+# 쓸 수 없다)의 표시 층 귀결이다 — 무제한을 숫자로 그리면 어떤 숫자든 거짓말이 된다.
+func _action_label(label: String, cost_text: String, slot: Dictionary) -> String:
+	var s := data.strings
+	var uses_left := int(slot.get("uses_left", -1))
+	if uses_left < 0:
+		return s.text("ui.race.actionWithCost", {"label": label, "cost": cost_text})
+	return s.text("ui.race.actionWithUses", {
+		"label": label,
+		"cost": cost_text,
+		"left": s.text("ui.race.skillUsesFormat", {
+			"remaining": uses_left, "limit": int(slot.get("uses_per_tour", 0)),
+		}),
+	})
 
 
 # 릴 인자는 **홀드 선택을 그대로 읽는다** — 이 화면의 릴 지정 어포던스는 E05 클릭·E06 토글·
@@ -852,9 +866,10 @@ const SKILL_REJECT_KEYS := {
 	"charge": "ui.race.skillRejectedCharge",
 	"uses": "ui.race.skillRejectedUses",
 	"respin_cap": "ui.race.skillRejectedHoldCap",
-	# `limit_hold` 는 **문면 대기**다 (26차 재검 — 도달 가능 실측: `_on_respin` 이
-	# `hold_used` 를 보지 않고 키·패드 액션 경로가 버튼 `disabled` 를 우회한다).
-	# 키가 유입되면 여기 한 행이다 — 그때까지는 미고지 대장에 남는다.
+	# 도달 가능 실측(26차 재검): `_on_respin` 이 `hold_used` 를 보지 않고 키·패드 액션
+	# 경로가 버튼 `disabled` 를 우회한다 — 버튼 비활성은 마우스만 막는다. 규칙 거부이므로
+	# `respin_cap` 과 같은 성격이고, 문면 유입(내러티브 10차)으로 고지에 편입됐다.
+	"limit_hold": "ui.race.skillRejectedLimitHold",
 	"already_hold": "ui.race.skillRejectedAlreadyHold",
 	"already_mod": "ui.race.skillRejectedAlreadyMod",
 	"duel_turn": "ui.race.skillRejectedDuelTurn",
@@ -1405,8 +1420,8 @@ func _l3_encounter_id(events: Array) -> String:
 
 func _run_presentation(events: Array) -> void:
 	var triggers := _collect_triggers(events)
-	# 조우 기록은 연출(CG)과 별개 채널이다 — 도트 CG 미유입이어도 조우 자체는 성립했으므로
-	# 정보·기록 축은 지금 닫는다. 업적 판정은 GP·투어·시즌 경계의 evaluate_achievements() 몫.
+	# 조우 기록은 연출(CG)과 별개 채널이다 — 조우 자체는 CG 와 무관하게 성립하므로
+	# 정보·기록 축을 먼저 닫는다. 업적 판정은 GP·투어·시즌 경계의 evaluate_achievements() 몫.
 	var encounter := _l3_encounter_id(events)
 	if not encounter.is_empty():
 		session.outgame.record_discovery(encounter)
@@ -1418,6 +1433,7 @@ func _run_presentation(events: Array) -> void:
 	for resolved in session.presentation.resolve(triggers):
 		var channels: Dictionary = session.presentation.channels(String(resolved["grade"]))
 		_fire_channels(channels)
+		apply_illustration_channel(channels, encounter)
 
 
 func _fire_channels(channels: Dictionary) -> void:
@@ -1436,9 +1452,41 @@ func _fire_channels(channels: Dictionary) -> void:
 		_start_shake(data.param("param_fx_shake_strong_px"))
 		if bool(channels.get("flash_slow", false)):
 			_fire_flash()
-	# L3 전용 일러스트 컷인: 도트 CG(CG-01~03) 미유입이라 컷인 재생 소비부는 아직 없다 —
-	# 실물 유입 시 결선(T6). 조우 **기록**은 `_l3_encounter_id()` 가 이미 닫았고,
-	# 정보 채널(로그)도 보존된다.
+	# L3 전용 일러스트 컷인은 **여기서 뜨지 않는다** — 등급만으로는 어느 장인지 모른다.
+	# 발화는 `_run_presentation()` 이 조우 id 와 함께 건다(바로 위 호출부 주석).
+
+
+# ── L3 전용 일러스트 채널 (D09 §3.6 · D10 §7 · D11 §6.5) ──
+#
+# **상대 식별은 채널 밖이다** (에셋 결선 경고 — 유입 계약 IMPL-418).
+# `illustration` 플래그는 *일러스트를 띄우는가*만 말하고 *어느 장인가*는 말하지 않는다.
+# 등급이 띄우라고 했을 때 무엇을 띄울지는 **이 턴의 조우**가 정한다 — 그래서 두 사실이
+# 함께 서야 컷인이 뜬다: 플래그(등급 판정 결과) ∧ 조우 id(상대 판정 결과).
+#
+# **강등된 등급으로는 뜨지 않는다** — `resolve()` 가 상한 초과분을 L1 로 내리면
+# `channels.illustration` 이 false 다. GP당 1회 상한(D08 §8.5)이 컷인에도 그대로 걸린다.
+#
+# **지속은 인자로 받는다** — 여기서 2.5 를 적으면 확정 기준값이 코드로 새고(불변규칙 2),
+# 무엇보다 검사가 "표에서 왔다"와 "손으로 적었다"를 구분하지 못한다.
+#
+# `static` 이 아니라 공개 메서드인 것은 씬(부모)이 있어야 자식을 붙일 수 있기 때문이다.
+func apply_illustration_channel(channels: Dictionary, encounter_id: String) -> void:
+	if not bool(channels.get("illustration", false)):
+		return
+	if encounter_id.is_empty():
+		return
+	_show_cg_cutin(encounter_id, float(channels.get("sting_length_sec", 0.0)))
+
+
+# 조우 CG 컷인 — 발견 id 로 대장을 조회한다. **여기서 다시 짖지 않는다**: 대장 대조는 CG
+# 스위트가 양방향으로 지므로(6행 ↔ 6파일 ↔ 조우 3종) 미등재는 그쪽에서 이미 실패한다.
+func _show_cg_cutin(discovery_id: String, hold_sec: float) -> void:
+	var row := data.cg_cutin_for_discovery(discovery_id)
+	if row.is_empty():
+		return
+	var cutin := CgCutIn.new(String(row["asset"]), hold_sec)
+	cutin.name = CG_CUTIN_NAME
+	add_child(cutin)
 
 
 # 게이지 섬광 (L1 — D09 §3.6). 플래시(O2)와 별개 채널이라 감쇠 대상이 아니다 —

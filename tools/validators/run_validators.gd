@@ -405,7 +405,8 @@ func _check_value(file_name: String, type_spec: String, value: String, row_id: S
 			if trimmed != "" and not Array(parts[1].split(",")).has(trimmed):
 				_fail("V1", "%s[%s].%s: '%s' not in enum {%s}" % [file_name, row_id, column_name, trimmed, parts[1]])
 		"string_key", "fk", "fk_optional", "fk_array", "string", \
-		"structure_ref", "structure_ref_optional", "structure_ref_array", "string_key_optional":
+		"structure_ref", "structure_ref_optional", "structure_ref_array", "string_key_optional", \
+		"structure_entry_ref", "structure_entry_ref_optional":
 			pass  # V2 소관
 		_:
 			_warn("V1", "unknown type spec '%s'" % type_spec)
@@ -531,6 +532,23 @@ func _check_reference(location: String, type_spec: String, value: String, struct
 		if not structure_ids.has(value):
 			_fail("V2", "%s: structure ref '%s' not found" % [location, value])
 		return 1
+	# ── 구조 JSON **항목** 참조 (28차 신설) ──
+	# `structure_ref` 는 구조 **파일**의 최상위 id 만 본다(`act_vn`). 그런데 CG 대장이 가리키는
+	# 것은 파일이 아니라 그 안의 항목(`vn_origin`)이라 기존 타입으로는 검사가 값을 보지 못한다 —
+	# 문자열 열로 두면 오타가 조용히 통과하고, 그것이 27차에 트리거 3열을 나눈 것과 같은 사유다.
+	# 형식 = `structure_entry_ref[_optional]:<파일>:<배열 필드>`.
+	if type_spec.begins_with("structure_entry_ref"):
+		var spec_parts := type_spec.split(":")
+		if spec_parts.size() < 3:
+			_fail("V2", "%s: malformed structure entry ref spec '%s'" % [location, type_spec])
+			return 1
+		if value == "" and String(spec_parts[0]).ends_with("_optional"):
+			return 0
+		var entry_ids := _structure_entry_ids(String(spec_parts[1]), String(spec_parts[2]))
+		if not entry_ids.has(value):
+			_fail("V2", "%s: structure entry '%s' not found in %s.%s"
+				% [location, value, spec_parts[1], spec_parts[2]])
+		return 1
 	if type_spec.begins_with("fk_optional:"):
 		if value == "":
 			return 0
@@ -549,6 +567,18 @@ func _has_file_suffix(literal: String) -> bool:
 		if literal.ends_with(String(suffix)):
 			return true
 	return false
+
+
+func _structure_entry_ids(file_name: String, array_field: String) -> Array:
+	var ids: Array = []
+	var structure: Dictionary = _structures.get(file_name, {})
+	for entry in Array(structure.get(array_field, [])):
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var entry_id := String((entry as Dictionary).get("id", ""))
+		if entry_id != "":
+			ids.append(entry_id)
+	return ids
 
 
 func _table_ids(file_name: String) -> Array:
@@ -975,7 +1005,13 @@ func _run_v6_id_hygiene() -> void:
 		var columns: Dictionary = _config["tables"][file_name]["columns"]
 		for row in _tables[file_name]:
 			for column_name in columns:
-				if String(columns[column_name]).begins_with("fk:"):
+				# **선택형 FK 도 참조다** (28차 자기 점검 — 27차 `string_key_optional` 과 동형).
+				# `fk:` 만 모으면 **`fk_optional:` 로만 가리켜지는 행이 고아로 잡힌다.** 지금은
+				# 대상 3표(ai_teams·ai_rivals·sector_attributes)가 선택형 FK 의 대상이 아니라
+				# 잠복 상태지만, 구멍의 형태는 22차 V2 표 열·27차 V6 선택 키와 같다 —
+				# **새 타입을 한 자리에만 넣는** 그 형태다.
+				var column_type := String(columns[column_name])
+				if column_type.begins_with("fk:") or column_type.begins_with("fk_optional:"):
 					all_referenced[String(row.get(column_name, "")).strip_edges()] = true
 	# 구조 JSON은 중첩 깊이를 가정하지 않고 전 문자열 값을 참조로 수집한다 —
 	# 배열 안(서킷 sectors의 main_attr 등)의 참조가 고아 오탐으로 새지 않게.

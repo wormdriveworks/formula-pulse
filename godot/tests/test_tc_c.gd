@@ -3127,7 +3127,9 @@ func _reject_code_ledger() -> void:
 	for code in ledger:
 		if screen.contains('"%s": "ui.race.skillRejected' % String(code)):
 			announced.append(String(code))
-	_ok("고지 사유 수집 성립", announced.size() >= 7, str(announced.size()))
+	# 하한 8 — 27차 7 에서 `limit_hold` 문면 유입(IMPL-425)으로 +1. **하한이지 계수 핀이
+	# 아니다**: 문면이 들어오는 만큼 늘어나는 값이라 상한을 고정하면 유입마다 검사가 붉어진다.
+	_ok("고지 사유 수집 성립", announced.size() >= 8, str(announced.size()))
 	for code in announced:
 		_ok("고지 사유는 침묵이 아니다: %s" % code,
 			not RaceEngine.SEAL_SILENT_ERRORS.has(String(code)))

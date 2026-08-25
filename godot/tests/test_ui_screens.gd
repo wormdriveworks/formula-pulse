@@ -117,10 +117,13 @@ func _process(_delta: float) -> bool:
 	_tutorial_callout_placement()
 	_skill_slots(data)
 	_skill_snapshot_pairing(data)
+	_cg_cutin_channel(data)
+	_vn_cg_layer(data)
+	_skill_label_and_notice(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 459:
-		print("UI_SCREENS_FAIL checks=%d < 하한 459 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 488:
+		print("UI_SCREENS_FAIL checks=%d < 하한 488 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -2375,7 +2378,10 @@ func _skill_slots(data: GameData) -> void:
 	var s5 := _fresh_session(data)
 	var wide := _mount(RACE_SCENE, s5)
 	if wide != null:
-		wide.engine.deck = ["skill_sh1", "skill_sc1", "skill_sa1", "skill_si1", "skill_sh2"]
+		# **표에서 가장 넓어지는 덱을 고른다** — 잔여 배지(28차)가 라벨을 늘리므로 무제한
+		# 5기로 재면 실기 최악을 재지 않는다. `uses_per_tour > 0` 인 전 스킬을 앞에 채우고
+		# 나머지를 무제한으로 메운다(표가 바뀌면 이 덱도 함께 바뀐다 — 리터럴 고정 아님).
+		wide.engine.deck = _widest_deck(data, 5)
 		wide.engine.charge = 10
 		wide._refresh_skill_slots()
 		var actions := wide.find_child("E08Actions", true, false) as Control
@@ -2396,6 +2402,11 @@ func _skill_slots(data: GameData) -> void:
 				"budget=%.1f" % budget)
 			_ok("5슬롯 만재에서도 액션 열이 폭 예산 안", needed <= budget,
 				"needed=%.1f budget=%.1f" % [needed, budget])
+			# 비공허성 — 배지가 실제로 붙은 덱을 재고 있는가. 무제한만 뽑히면 이 축은
+			# 28차 이전과 같은 것을 재면서 최악을 잰다고 말하게 된다.
+			_ok("전제: 최광 덱에 잔여 배지가 실제로 붙었다",
+				_badged_count(wide.engine.skill_slots()) > 0,
+				str(_badged_count(wide.engine.skill_slots())))
 			# 라벨을 스킬명으로 바꾸면 넘친다 — `S{n}` 판단의 근거를 대조군으로 못박는다.
 			var slots5: Array = wide.engine.skill_slots()
 			for i in range(mini(slots5.size(), wide._skill_buttons.size())):
@@ -2674,3 +2685,211 @@ func _season_open_wiring(data: GameData) -> void:
 	# 그 다음 `param()` 부터 조용한 0 이 나온다.
 	_ok("⑳ 표제 도출 후 데이터 건전", data.is_ok())
 	_unmount(records)
+
+
+# ── ㉒ L3 컷인 채널 — 플래그 ∧ 상대 (28차 · 유입 계약 IMPL-418) ──
+#
+# **두 사실이 다 필요하다.** `illustration` 은 *띄우는가*만 말하고 *어느 장인가*는 말하지
+# 않는다. 검사도 그 구조를 그대로 밟는다 — 등급을 갈아 끼우고, 조우 id 를 갈아 끼운다.
+#
+# 등급 사전은 **표에서 받는다**(`channels()`): 손으로 `{"illustration": true}` 를 만들면
+# 표의 `illustration` 열이 0 이 되어도 검사가 통과한다.
+const CG_CUTIN_NODE := "CgCutIn"
+const CG_THRONE_DISCOVERY := "cg_01_throne"
+const CG_KINSHIP_DISCOVERY := "cg_03_kinship"
+
+
+func _cg_cutin_channel(data: GameData) -> void:
+	var screen := _new_race_screen()
+	if screen == null:
+		return
+	var grade := PresentationGrade.new()
+	grade.setup(data)
+	var l2: Dictionary = grade.channels("grade_l2")
+	var l3: Dictionary = grade.channels("grade_l3")
+	_ok("전제: L2 는 일러스트 채널이 없다", not bool(l2["illustration"]), str(l2))
+	_ok("전제: L3 는 일러스트 채널이 있다", bool(l3["illustration"]), str(l3))
+
+	# ⓐ 등급이 L2 면 조우가 있어도 뜨지 않는다
+	screen.apply_illustration_channel(l2, CG_THRONE_DISCOVERY)
+	_ok("L2 + 조우 = 컷인 없음", screen.get_node_or_null(CG_CUTIN_NODE) == null)
+	# ⓑ 등급이 L3 라도 조우가 없으면 뜨지 않는다 — **상대를 모르면 띄울 장이 없다**
+	screen.apply_illustration_channel(l3, "")
+	_ok("L3 + 조우 없음 = 컷인 없음", screen.get_node_or_null(CG_CUTIN_NODE) == null)
+	# ⓒ 둘 다 서면 뜬다
+	screen.apply_illustration_channel(l3, CG_THRONE_DISCOVERY)
+	var cutin := screen.get_node_or_null(CG_CUTIN_NODE)
+	_ok("L3 + 조우 = 컷인 발화", cutin != null)
+	if cutin == null:
+		_unmount(screen)
+		return
+	# ⓓ **어느 장인지가 상대로 갈린다.** 짝을 어긋나게 고른다 — 두 조우의 파일이 같으면
+	#   식별을 지워도 통과한다(27차 K1 계열: 짝이 우연히 일치하면 축이 우회로를 본다).
+	var throne_asset := String(data.cg_cutin_for_discovery(CG_THRONE_DISCOVERY)["asset"])
+	var kinship_asset := String(data.cg_cutin_for_discovery(CG_KINSHIP_DISCOVERY)["asset"])
+	_ok("전제: 두 조우의 파일이 다르다", throne_asset != kinship_asset, throne_asset)
+	_ok("왕좌 조우 = 왕좌 CG", String(cutin.asset_id) == throne_asset, String(cutin.asset_id))
+	# ⓔ 지속은 **표의 스팅 길이**다 — 컷인이 값을 스스로 정하면 D11 §6.5 결속이 끊긴다.
+	_ok("컷인 지속 = L3 스팅 길이",
+		is_equal_approx(cutin.hold_sec, float(l3["sting_length_sec"])),
+		"%f vs %f" % [cutin.hold_sec, float(l3["sting_length_sec"])])
+	cutin.get_parent().remove_child(cutin)
+	cutin.free()
+	# ⓕ 인자를 바꾸면 지속도 바뀐다 — 상수 기입(2.5 하드코딩)이면 여기서 갈린다.
+	var doctored := l3.duplicate()
+	doctored["sting_length_sec"] = float(l2["sting_length_sec"])
+	screen.apply_illustration_channel(doctored, CG_KINSHIP_DISCOVERY)
+	var second := screen.get_node_or_null(CG_CUTIN_NODE)
+	_ok("동기 조우 = 동기 CG", second != null and String(second.asset_id) == kinship_asset,
+		"" if second == null else String(second.asset_id))
+	_ok("지속은 인자를 따른다 (상수 기입 아님)",
+		second != null and is_equal_approx(second.hold_sec, float(l2["sting_length_sec"])),
+		"" if second == null else str(second.hold_sec))
+	_unmount(screen)
+
+
+# ── ㉓ VN 장면 CG — 층 순서·재열람·부재 (28차) ──
+#
+# 조우 컷인과 **성격이 다르다**: 지속 인자가 없고(장면과 함께 산다) 바탕 바로 위에 선다.
+# 짝은 어긋나게 고른다 — 기원 공개와 에필로그는 같은 막(4막)이지만 다른 그림이다.
+const CG_VN_LAYER := "CgArt"
+const CG_VN_WITH := "vn_origin"
+const CG_VN_OTHER := "vn_epilogue"
+const CG_VN_WITHOUT := "vn_act1"
+
+
+func _vn_cg_layer(data: GameData) -> void:
+	var with_cg := _mount_vn_id(data, CG_VN_WITH)
+	if with_cg == null:
+		return
+	var art := with_cg.get_node_or_null(CG_VN_LAYER)
+	_ok("기원 공개 = CG 층 실재", art != null)
+	if art != null:
+		_ok("기원 공개 = 대장이 지정한 파일",
+			String(art.asset_id) == String(data.cg_cutin_for_vn(CG_VN_WITH)["asset"]),
+			String(art.asset_id))
+		# **바탕 바로 위**다. 스탠딩·대사창을 가리면 인물과 문면이 사라진다.
+		_ok("CG 층 = 바탕 바로 위", with_cg.get_child(1) == art,
+			with_cg.get_child(1).name if with_cg.get_child_count() > 1 else "")
+		# `get_node("%...")` 는 씬 밖에서 부르면 null 이다 — 이름으로 찾는다.
+		var dialogue := with_cg.find_child("DialoguePanel", false, false) as Control
+		_ok("전제: 대사창 노드 실재", dialogue != null)
+		_ok("CG 층이 대사창 아래", dialogue != null and art.get_index() < dialogue.get_index())
+		# 장면 CG 는 스스로 사라지지 않는다 — 화면이 내려갈 때 함께 내려간다.
+		_ok("장면 CG = 자동 해제 없음", is_equal_approx(art.hold_sec, 0.0), str(art.hold_sec))
+	_release_vn(with_cg)
+
+	var other := _mount_vn_id(data, CG_VN_OTHER)
+	if other != null:
+		var other_art := other.get_node_or_null(CG_VN_LAYER)
+		_ok("에필로그 = CG 층 실재", other_art != null)
+		if other_art != null:
+			_ok("에필로그 = 기원 공개와 다른 파일",
+				String(other_art.asset_id) != String(data.cg_cutin_for_vn(CG_VN_WITH)["asset"]),
+				String(other_art.asset_id))
+		_release_vn(other)
+
+	var without := _mount_vn_id(data, CG_VN_WITHOUT)
+	if without != null:
+		# **없는 것이 정상이다.** 전 VN 이 그림을 얻으면 "희귀 이벤트 한정"(D01 §8-1)이 깨진다.
+		_ok("CG 없는 VN = 층 없음", without.get_node_or_null(CG_VN_LAYER) == null)
+		_release_vn(without)
+
+
+# 재열람 경로로 세운다 — 슬롯 발생 판정·상한을 거치지 않으므로 CG 축만 남는다.
+# **재열람에서 재는 것 자체가 계약의 일부다**: 아카이브가 그림 없는 장면을 돌려주면
+# 회수 경로가 같은 장면이 아니다 (D07 §6.3).
+func _mount_vn_id(data: GameData, vn_id: String) -> Control:
+	var packed := load(VN_SCENE) as PackedScene
+	if packed == null:
+		_ok("VN 씬 로드", false)
+		return null
+	var screen := packed.instantiate() as Control
+	var session := _fresh_session(data)
+	screen.session = session
+	root.add_child(screen)
+	screen.bind(session, {"replay": true, "vn_id": vn_id, "line_keys": ["vn.act1.beat01"]})
+	return screen
+
+
+# ── ㉔ 문면 2키 소비 (내러티브 10차 유입 IMPL-425 · 28차) ──
+#
+# ⓐ 잔여 횟수 배지 — **확장형 키를 쓰는가**, 그리고 **무제한에는 쓰지 않는가.**
+# ⓑ `limit_hold` 거부 고지 — 27차에 미고지 대장에 남겨 둔 1건.
+#
+# 짝은 어긋나게 고른다: 제한 슬롯과 무제한 슬롯의 렌더가 **달라야** 하고, 거부 문면은
+# 다른 사유의 문면과 **달라야** 한다. 같으면 키를 갈아도 검사가 통과한다.
+const LIMIT_HOLD_ERROR := "limit_hold"
+const OTHER_REJECT_ERROR := "charge"
+
+
+func _skill_label_and_notice(data: GameData) -> void:
+	var screen := _new_race_screen()
+	if screen == null:
+		return
+	var s := data.strings
+	var cost_text := s.text("ui.race.costFormat", {"cost": 2})
+	var limited := String(screen._action_label("A", cost_text, {"uses_left": 1, "uses_per_tour": 3}))
+	var endless := String(screen._action_label("A", cost_text, {"uses_left": -1, "uses_per_tour": 0}))
+	_ok("제한 슬롯 = 확장형 렌더", limited != endless, limited)
+	_ok("제한 슬롯에 잔여/상한이 실린다",
+		limited.contains(s.text("ui.race.skillUsesFormat", {"remaining": 1, "limit": 3})), limited)
+	# **무제한은 숫자를 그리지 않는다** — 어떤 숫자든 거짓말이 된다 (20차 계약의 표시 층 귀결).
+	_ok("무제한 슬롯 = 기존 렌더",
+		endless == s.text("ui.race.actionWithCost", {"label": "A", "cost": cost_text}), endless)
+	# **대조군을 손으로 만든다** — 확장형 키가 무제한 슬롯에 대해 *무엇을 그릴 것인가*를
+	# 그대로 조립해 두고, 실제 렌더가 그것이 아님을 본다. 임의의 숫자("0/0")로 대조하면
+	# 실패가 그 숫자를 우연히 피하기만 해도 통과한다(-1/0 이 그랬다 — 초판 미검출분).
+	var wrong := s.text("ui.race.actionWithUses", {
+		"label": "A", "cost": cost_text,
+		"left": s.text("ui.race.skillUsesFormat", {"remaining": -1, "limit": 0}),
+	})
+	_ok("무제한에 확장형 키를 쓰지 않는다", endless != wrong, endless)
+	# ⓑ 거부 고지 — 실제로 로그 존에 문면이 실리는가.
+	var before := _rendered_log_lines(screen).size()
+	screen._notify_skill_rejected(LIMIT_HOLD_ERROR)
+	var after := _rendered_log_lines(screen)
+	_ok("limit_hold 거부 = 고지 1행", after.size() == before + 1, str(after.size()))
+	if after.size() == before + 1:
+		var expected := s.text("ui.race.skillRejectedLimitHold")
+		_ok("limit_hold 고지 문면 일치", String(after[after.size() - 1]).contains(expected),
+			String(after[after.size() - 1]))
+		_ok("전제: 다른 사유와 문면이 다르다",
+			expected != s.text("ui.race.skillRejectedCharge"), expected)
+	# 침묵 3종은 여전히 침묵이다 — 고지 편입이 봉인 계약을 밀지 않았는가.
+	var silent_before := _rendered_log_lines(screen).size()
+	for code in RaceEngine.SEAL_SILENT_ERRORS:
+		screen._notify_skill_rejected(String(code))
+	_ok("봉인 침묵 3종 = 고지 0행",
+		_rendered_log_lines(screen).size() == silent_before,
+		str(_rendered_log_lines(screen).size()))
+	_unmount(screen)
+
+
+# 표에서 라벨이 가장 넓어지는 덱 — 잔여 배지가 붙는 스킬(`uses_per_tour > 0`)을 우선 채운다.
+# **리터럴 덱을 고정하지 않는다**: 표에 제한 스킬이 늘면 최악도 함께 움직여야 한다.
+func _widest_deck(data: GameData, size: int) -> Array:
+	var limited: Array = []
+	var rest: Array = []
+	for skill_id in data.skills:
+		if CsvTable.to_int(String(data.skills[skill_id]["uses_per_tour"])) > 0:
+			limited.append(String(skill_id))
+		else:
+			rest.append(String(skill_id))
+	limited.sort()
+	rest.sort()
+	var deck: Array = []
+	for pool in [limited, rest]:
+		for skill_id in pool:
+			if deck.size() >= size:
+				break
+			deck.append(skill_id)
+	return deck
+
+
+func _badged_count(slots: Array) -> int:
+	var total := 0
+	for slot in slots:
+		if int(Dictionary(slot).get("uses_left", -1)) >= 0:
+			total += 1
+	return total

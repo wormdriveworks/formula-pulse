@@ -28,6 +28,7 @@ var tour_slot_mods: Dictionary = {}    # race_slot(int) -> 행 (슬롯 진행 �
 var season_calendar: Dictionary = {}   # 구조 JSON (D08 §2 캘린더 규칙)
 var sector_attrs: Dictionary = {}      # attr_* id -> 행 (속성 6축 — D13 별첨A §1.3)
 var presentation_grades: Dictionary = {}   # grade_* id -> 행 (연출 등급 — D12 §5.8)
+var cg_cutins: Dictionary = {}         # cgcut_* id -> 행 (전용 CG 6종 — D10 §7 결정 #6)
 var events: Dictionary = {}            # event_* id -> 행 (D08 §7 · D12 §5.4)
 var facilities: Dictionary = {}        # facility_* id -> 행 (D07 §2.2)
 var tuning_lines: Dictionary = {}      # tuning_* id -> 행 (D13 별첨A §3.5)
@@ -101,6 +102,7 @@ func load_all(initial_language := DEFAULT_LANGUAGE) -> bool:
 	_load_tour_slot_mods()
 	_load_sector_attrs()
 	_load_presentation()
+	_load_cg_cutins()
 	_load_events()
 	_load_outgame()
 	_load_narrative()
@@ -325,6 +327,59 @@ func presentation_trigger(trigger_id: String) -> Dictionary:
 		_load_ok = false
 		return {}
 	return presentation_triggers[trigger_id]
+
+
+# ── 전용 CG 대장 (D10 §7 결정 #6 — 상한 6종 · 유입 IMPL-418) ──
+#
+# **왜 표인가.** 유입 계약(에셋 대장 §4.8)이 *어느 장면이 어느 파일을 띄우는가*를 선언하는데,
+# 그 선언을 코드 리터럴로 옮기면 대장과 코드가 각자 낡는다. 27차에 거부 대장을 코드로 옮긴
+# 사유("산문은 또 틀린다")의 반대 방향이다 — 저쪽은 산문이 정본이라 코드가 받았고,
+# 이쪽은 **표가 정본이 될 수 있으므로** 코드가 아니라 표에 산다.
+#
+# **발화원 3열은 각기 다른 표를 가리킨다** (27차 트리거 3열과 같은 사유). 한 문자열 열이면
+# 어느 표의 id 인지 검사가 보지 못하고 오타가 조용히 통과한다:
+#   · `source_achievement` → `achievements.csv` (L3 조우 3종 — D10 §7 "발견형 히든 업적과 1:1")
+#   · `source_act_vn`      → `act_vn.json` 항목 (기원 공개·에필로그)
+#   · `source_beat`        → `vn_beats.csv`    (사샤 복귀)
+# **발견 id 는 업적 행이 이미 이고 있다**(`source_id`) — 대장이 그 값을 다시 적으면 같은 사실이
+# 두 곳에 살고 한쪽이 밀린다. 그래서 대장은 업적을 가리키고 발견 id 는 거기서 읽는다.
+func _load_cg_cutins() -> void:
+	cg_cutins.clear()
+	for row in CsvTable.load_rows(_table_path("cg_cutins.csv")):
+		cg_cutins[String(row["id"])] = row
+	if cg_cutins.is_empty():
+		_load_ok = false
+
+
+# 발견 id(`cg_01_throne` 등) → CG 행. **업적 행을 한 겹 거친다** — 대장의 `source_achievement`
+# 가 가리키는 업적의 `source_id` 가 곧 표현 층이 기록하는 발견 id 다.
+func cg_cutin_for_discovery(discovery_id: String) -> Dictionary:
+	if discovery_id.is_empty():
+		return {}
+	for cutin_id in cg_cutins:
+		var row: Dictionary = cg_cutins[cutin_id]
+		var achievement_id := String(row.get("source_achievement", "")).strip_edges()
+		if achievement_id.is_empty():
+			continue
+		var achievement: Dictionary = achievements.get(achievement_id, {})
+		if String(achievement.get("source_id", "")).strip_edges() == discovery_id:
+			return row
+	return {}
+
+
+# VN id → CG 행. 막 VN 항목과 비트 행이 **같은 `vn_id` 자리로 들어오므로**(둘 다 페이로드의
+# `vn_id`) 조회도 한 창구다 — 열은 갈라 두되 조회는 합친다. 값 없음이 정상이다(6종 중 3종만
+# VN 경로이고, VN 대부분은 CG 가 없다).
+func cg_cutin_for_vn(vn_id: String) -> Dictionary:
+	if vn_id.is_empty():
+		return {}
+	for cutin_id in cg_cutins:
+		var row: Dictionary = cg_cutins[cutin_id]
+		if String(row.get("source_act_vn", "")).strip_edges() == vn_id:
+			return row
+		if String(row.get("source_beat", "")).strip_edges() == vn_id:
+			return row
+	return {}
 
 
 func _load_events() -> void:
