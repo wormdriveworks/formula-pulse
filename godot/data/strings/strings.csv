@@ -237,6 +237,7 @@ ui.race.skillRejectedCharge,차지 부족,Not enough charge,チャージ不足
 ui.race.skillRejectedUses,이번 투어 사용 완료,No uses left this tour,今ツアーの使用回数なし
 ui.race.skillRejectedHoldCap,이번 턴 홀드 한도,Hold limit reached,今ターンのホールド上限
 ui.race.skillRejectedLimitHold,홀드는 턴당 1회,One hold per turn,ホールドはターンにつき1回
+ui.race.skillRejectedLimitBoost,이번 턴 부스트 한도,Boost limit reached,今ターンのブースト上限
 ui.race.skillRejectedAlreadyHold,이미 홀드를 썼다,Hold already used,ホールドを使用済み
 ui.race.skillRejectedAlreadyMod,이미 적용된 수식,Already applied,既に適用済み
 ui.race.skillRejectedDuelTurn,섹터 턴 전용,Sector turns only,セクターターン専用
