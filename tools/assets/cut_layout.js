@@ -428,18 +428,38 @@ if (TABLE) {
   for (const [cutId, decl] of Object.entries(spec.cuts)) {
     decl.slots.forEach((s, i) => console.log(`${cutId},${s.name},${i + 1},${s.cx},${s.road_y}`));
   }
-  console.log('\n--- 전사용 블록 ② 섀시 바닥 오프셋 ---');
+  console.log('\n--- 전사용 블록 ② 섀시 바닥 오프셋 (**베이스 전량** — 선언에 쓴 것만이 아니다) ---');
   console.log('#  셀 중심 y  = anchor_road_y - baseline_offset');
   console.log('#  좌상단 y   = 셀 중심 y - cell_h/2      (좌상단 x = anchor_x - cell_w/2)');
   console.log('#  baseline_offset = 불투명 바닥행 - cell_h/2  (셀 중심에서 바퀴까지)');
+  console.log('#');
+  console.log('#  ⚠ **오버레이에는 오프셋을 적용하지 않는다.** 오버레이는 노면이 아니라');
+  console.log('#     베이스 셀에 정렬돼 있으므로 베이스와 **같은 셀 원점**에 그린다.');
+  console.log('#     스프라이트별로 재서 각각 적용하면 리어윙(오프셋 -6)이 차체(19) 대비');
+  console.log('#     25px 아래로 밀린다 — 아래 참고 행이 그 실측이다.');
+  console.log('#  ⚠ 이 표는 **런타임에 슬롯에 들어올 수 있는 전 베이스**를 싣는다. 컷 선언의');
+  console.log('#     `sprite` 는 검수용 표본이고, 실제 섀시는 대전 상대에 따라 바뀐다.');
   console.log('chassis_sprite,cell_h,opaque_top,opaque_bottom,baseline_offset');
-  const seen = new Set();
-  for (const decl of Object.values(spec.cuts)) for (const s of decl.slots) {
-    const f = s.sprite || spec.probe_sprite;
-    if (seen.has(f)) continue; seen.add(f);
-    const spr = machine(f), r = opaqueRows(spr);
-    console.log(`${path.basename(f)},${spr.h},${r.top},${r.bot},${r.bot - (spr.h >> 1)}`);
+  const dir = path.join(ROOT, 'godot/assets/machines');
+  const all = fs.readdirSync(dir).filter((f) => f.endsWith('_side.png')).sort();
+  const bases = all.filter((f) => !f.includes('_overlay_'));
+  const overlays = all.filter((f) => f.includes('_overlay_'));
+  if (!bases.length) die('베이스 측면 셀을 못 찾았다 — 경로 확인');
+  for (const f of bases) {
+    const spr = machine(`godot/assets/machines/${f}`), r = opaqueRows(spr);
+    console.log(`${f},${spr.h},${r.top},${r.bot},${r.bot - (spr.h >> 1)}`);
   }
+  console.log('#');
+  console.log('# 참고(적용 금지) — 오버레이 실측 바닥 오프셋:');
+  for (const f of overlays) {
+    const spr = machine(`godot/assets/machines/${f}`), r = opaqueRows(spr);
+    console.log(`#   ${f} → ${r.bot - (spr.h >> 1)}`);
+  }
+  // 선언 표본이 베이스 전량을 덮는지 — 덮지 않으면 검수하지 않은 섀시가 있다는 뜻이다.
+  const sampled = new Set();
+  for (const decl of Object.values(spec.cuts)) for (const s of decl.slots) sampled.add(path.basename(s.sprite || spec.probe_sprite));
+  const unsampled = bases.filter((f) => !sampled.has(f));
+  if (unsampled.length) console.log(`#\n# 검수 표본에 없는 베이스 ${unsampled.length}종 (오프셋은 위 표가 덮는다): ${unsampled.join(' ')}`);
 }
 
 if (FAILED) { console.error(`\nCUT_LAYOUT FAIL 위반 ${FAILED}건`); process.exit(1); }
