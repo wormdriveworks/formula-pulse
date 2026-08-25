@@ -120,10 +120,16 @@ func _process(_delta: float) -> bool:
 	_cg_cutin_channel(data)
 	_vn_cg_layer(data)
 	_skill_label_and_notice(data)
+	_intervention_gate(data)
+	_reject_notice_slot(data)
+	_snapshot_keep_new_button(data)
+	_options_relabel(data)
+	_focus_ring_theme(data)
+	_action_row_budget(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 488:
-		print("UI_SCREENS_FAIL checks=%d < 하한 488 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 586:
+		print("UI_SCREENS_FAIL checks=%d < 하한 586 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -2384,24 +2390,22 @@ func _skill_slots(data: GameData) -> void:
 		wide.engine.deck = _widest_deck(data, 5)
 		wide.engine.charge = 10
 		wide._refresh_skill_slots()
+		# 산정은 `_action_row_metrics()` 하나가 진다 — 14차 ㉚(3언어 축)과 **같은 유도**를
+		# 쓴다. 두 축이 각자 계산하면 언젠가 갈리고, 갈린 뒤에는 어느 예산이 참인지 알 수 없다.
 		var actions := wide.find_child("E08Actions", true, false) as Control
-		var left := wide.find_child("LeftColumn", true, false) as Control
-		var feed := wide.find_child("E10LogFeed", true, false) as Control
-		var middle := wide.find_child("Middle", true, false) as Control
-		var zone := wide.find_child("ReelZone", true, false) as Control
-		_ok("전제: 폭 산정 노드 전건 실재",
-			actions != null and left != null and feed != null and middle != null and zone != null)
-		if actions != null and left != null and feed != null and middle != null and zone != null:
-			var ratio_sum: float = left.size_flags_stretch_ratio + feed.size_flags_stretch_ratio
-			var column: float = (CANVAS.x - float(middle.get_theme_constant("separation"))) \
-				* left.size_flags_stretch_ratio / ratio_sum
-			var budget: float = column - float(zone.get_theme_constant("margin_left")) \
-				- float(zone.get_theme_constant("margin_right"))
-			var needed: float = actions.get_combined_minimum_size().x
+		var metrics := _action_row_metrics(wide)
+		_ok("전제: 폭 산정 노드 전건 실재", not metrics.is_empty())
+		if not metrics.is_empty() and actions != null:
+			var budget: float = float(metrics["budget"])
+			var needed: float = float(metrics["needed"])
 			_ok("전제: 폭 예산이 릴 열보다 넓다 (산정 실패 오탐 방지)", budget > 208.0,
 				"budget=%.1f" % budget)
-			_ok("5슬롯 만재에서도 액션 열이 폭 예산 안", needed <= budget,
-				"needed=%.1f budget=%.1f" % [needed, budget])
+			# **언어 권한은 ㉚ 이 진다.** 이 축은 저장된 o11 이 정하는 언어로 재므로 어느
+			# 언어를 재는지 스스로 정하지 못한다 — 그 상태로 `<= budget` 을 단언하면
+			# 프로필에 남은 선택지가 검사의 판정을 바꾼다(실측으로 그렇게 붉어졌다).
+			# 여기서는 발주 대기 상한과만 대조하고, 3언어 실측은 ㉚ 이 명시적으로 한다.
+			_ok("5슬롯 만재 액션 열이 발주 대기 상한 안", needed - budget <= ROW_OVERFLOW_CEILING,
+				"needed=%.1f budget=%.1f 초과=%.1f" % [needed, budget, needed - budget])
 			# 비공허성 — 배지가 실제로 붙은 덱을 재고 있는가. 무제한만 뽑히면 이 축은
 			# 28차 이전과 같은 것을 재면서 최악을 잰다고 말하게 된다.
 			_ok("전제: 최광 덱에 잔여 배지가 실제로 붙었다",
@@ -2845,24 +2849,27 @@ func _skill_label_and_notice(data: GameData) -> void:
 		"left": s.text("ui.race.skillUsesFormat", {"remaining": -1, "limit": 0}),
 	})
 	_ok("무제한에 확장형 키를 쓰지 않는다", endless != wrong, endless)
-	# ⓑ 거부 고지 — 실제로 로그 존에 문면이 실리는가.
-	var before := _rendered_log_lines(screen).size()
-	screen._notify_skill_rejected(LIMIT_HOLD_ERROR)
-	var after := _rendered_log_lines(screen)
-	_ok("limit_hold 거부 = 고지 1행", after.size() == before + 1, str(after.size()))
-	if after.size() == before + 1:
+	# ⓑ 거부 고지 — **자리가 로그 존에서 전용 슬롯으로 옮겨졌다 (14차 ①).** 관측 지점도
+	# 함께 옮긴다: 옛 축은 로그 행 수를 셌고, 그 축을 그대로 두면 슬롯으로 옮긴 순간
+	# 붉어지는 것이 아니라 **옮긴 것을 결함으로 보고**한다. 경로 자체의 못박기는 ㉖ 이
+	# 진다(키를 눌러 잰다) — 여기는 표·문면 대응만 본다.
+	var slot: Label = screen._reject_notice
+	_ok("전제: 전용 고지 슬롯 실재", slot != null)
+	if slot != null:
+		var log_before := _rendered_log_lines(screen).size()
+		screen._notify_skill_rejected(LIMIT_HOLD_ERROR)
 		var expected := s.text("ui.race.skillRejectedLimitHold")
-		_ok("limit_hold 고지 문면 일치", String(after[after.size() - 1]).contains(expected),
-			String(after[after.size() - 1]))
+		_ok("limit_hold 거부 = 전용 슬롯 문면 일치", slot.text == expected, slot.text)
+		_ok("거부 고지가 로그 존에 실리지 않는다",
+			_rendered_log_lines(screen).size() == log_before,
+			"before=%d after=%d" % [log_before, _rendered_log_lines(screen).size()])
 		_ok("전제: 다른 사유와 문면이 다르다",
 			expected != s.text("ui.race.skillRejectedCharge"), expected)
-	# 침묵 3종은 여전히 침묵이다 — 고지 편입이 봉인 계약을 밀지 않았는가.
-	var silent_before := _rendered_log_lines(screen).size()
-	for code in RaceEngine.SEAL_SILENT_ERRORS:
-		screen._notify_skill_rejected(String(code))
-	_ok("봉인 침묵 3종 = 고지 0행",
-		_rendered_log_lines(screen).size() == silent_before,
-		str(_rendered_log_lines(screen).size()))
+		# 침묵 3종은 여전히 침묵이다 — 고지 편입이 봉인 계약을 밀지 않았는가.
+		for code in RaceEngine.SEAL_SILENT_ERRORS:
+			slot.text = expected
+			screen._notify_skill_rejected(String(code))
+			_ok("봉인 침묵 %s = 슬롯 공란" % String(code), slot.text == "", slot.text)
 	_unmount(screen)
 
 
@@ -2893,3 +2900,524 @@ func _badged_count(slots: Array) -> int:
 		if int(Dictionary(slot).get("uses_left", -1)) >= 0:
 			total += 1
 	return total
+
+
+# ── 액션 열 폭 산정 (13차 ⓔ 에서 추출 · 14차 ⑧ 이 3언어로 재사용) ──
+#
+# 예산은 **씬이 스스로 선언한 값에서 끌어낸다**(캔버스 폭 · 신축 비율 · 여백 상수).
+# 두 축이 각자 계산하면 언젠가 갈리므로 산지를 하나만 둔다.
+func _action_row_metrics(screen: Control) -> Dictionary:
+	var actions := screen.find_child("E08Actions", true, false) as Control
+	var left := screen.find_child("LeftColumn", true, false) as Control
+	var feed := screen.find_child("E10LogFeed", true, false) as Control
+	var middle := screen.find_child("Middle", true, false) as Control
+	var zone := screen.find_child("ReelZone", true, false) as Control
+	if actions == null or left == null or feed == null or middle == null or zone == null:
+		return {}
+	var ratio_sum: float = left.size_flags_stretch_ratio + feed.size_flags_stretch_ratio
+	var column: float = (CANVAS.x - float(middle.get_theme_constant("separation"))) \
+		* left.size_flags_stretch_ratio / ratio_sum
+	var budget: float = column - float(zone.get_theme_constant("margin_left")) \
+		- float(zone.get_theme_constant("margin_right"))
+	return {"budget": budget, "needed": actions.get_combined_minimum_size().x, "column": column}
+
+
+# ── ㉕ 개입 창 관문 단일화 (14차 ⑦ — 원격 27차 ③ 액션 경로 전수) ──
+#
+# 27차가 `_on_respin` 하나에서 본 형태 — 키·패드 액션이 버튼 `disabled` 를 우회한다 —
+# 를 화면 층 전건에 걸쳐 훑은 결과의 못박기.
+#
+# **축은 "핸들러가 버튼과 같은 술어를 부르는가" 다.** 조건을 두 곳에 적으면 언젠가 갈리고,
+# 갈린 순간 마우스와 키보드가 다른 게임을 한다. 관측은 **엔진 상태**로 한다 — 소리나
+# 버튼 표시가 아니라 실제로 릴이 굴렀는지·차지가 나갔는지를 본다(우회의 피해가 그것이다).
+func _intervention_gate(data: GameData) -> void:
+	# ⓐ SH3 택1 대기 중 — 개입 3종이 **키 경로로도** 닫힌다.
+	#
+	# 종전 실측: 슬롯 행만 `_snapshot_pending()` 을 물었고 리스핀·차지·홀드 세 줄은 열려
+	# 있었다. 대기 중에 릴을 다시 굴리면 위에 뜬 이전 후보 줄이 두 걸음 낡은 후보를
+	# 가리키고, 그것을 누르면 방금 지불한 차지가 조용히 되돌아간다.
+	for entry in [["리스핀 R", "respin"], ["차지 개입 C", "charge"], ["홀드 토글 1", "hold"]]:
+		var session := _fresh_session(data)
+		var screen := _mount(RACE_SCENE, session)
+		if screen == null:
+			return
+		var label := String(entry[0])
+		screen.engine.turn_phase = RaceTypes.TurnPhase.T4_INTERVENTION
+		screen.engine.provisional = ["symbol_pulse", "symbol_pulse", "symbol_pulse"]
+		screen.engine.charge = 10
+		screen._timer_active = true
+		screen._revealing = false
+		# 전제 두 겹: 대기 **밖**에서는 열려 있어야 한다. 이 전제가 없으면 "닫혔다"가
+		# 애초에 닫힌 상태를 다시 확인하는 공허한 통과가 된다(M4 계열).
+		screen._refresh_action_enabled()
+		_ok("%s — 전제: 대기 밖에서는 열린다" % label, screen._intervention_open(),
+			"open=%s" % str(screen._intervention_open()))
+		screen.engine.snapshot_previous = ["symbol_line", "symbol_line", "symbol_line"]
+		screen._refresh_action_enabled()
+		_ok("%s — 대기 중 관문 닫힘" % label, not screen._intervention_open())
+		var charge_before: int = screen.engine.charge
+		var reels_before: Array = screen.engine.provisional.duplicate()
+		var hold_before: bool = screen._hold_boxes[0].button_pressed
+		match String(entry[1]):
+			"respin": screen._unhandled_key_input(_key_event(KEY_R))
+			"charge": screen._unhandled_key_input(_key_event(KEY_C))
+			_: screen._unhandled_key_input(_key_event(KEY_1))
+		_ok("%s — 대기 중 키 경로가 차지를 쓰지 않는다" % label,
+			screen.engine.charge == charge_before,
+			"before=%d after=%d" % [charge_before, screen.engine.charge])
+		_ok("%s — 대기 중 키 경로가 릴을 다시 굴리지 않는다" % label,
+			str(screen.engine.provisional) == str(reels_before),
+			"before=%s after=%s" % [str(reels_before), str(screen.engine.provisional)])
+		_ok("%s — 대기 중 키 경로가 홀드를 토글하지 않는다" % label,
+			screen._hold_boxes[0].button_pressed == hold_before)
+		_unmount(screen)
+
+	# ⓑ **반전 2건** — 택1 두 갈래는 대기 *중에만* 열린다. `_intervention_open()` 을
+	# 여기 걸면 두 갈래가 영원히 닫히므로, 가드가 다른 것이 정상이라는 사실을 못박는다.
+	var s2 := _fresh_session(data)
+	var rev := _mount(RACE_SCENE, s2)
+	if rev != null:
+		rev.engine.turn_phase = RaceTypes.TurnPhase.T4_INTERVENTION
+		rev.engine.provisional = ["symbol_pulse", "symbol_pulse", "symbol_pulse"]
+		rev._timer_active = true
+		rev.engine.snapshot_previous = []
+		_ok("전제: 대기 없음 = 되돌림 무동작", not rev._resolve_snapshot_keep_new())
+		rev.engine.snapshot_previous = ["symbol_line", "symbol_line", "symbol_line"]
+		_ok("대기 중 = 되돌림이 열린다 (관문 반전)", rev._resolve_snapshot_keep_new())
+		_unmount(rev)
+
+	# ⓒ **커서 표시와 조작 가능이 같은 조건인가** — 화면 주석이 그것을 계약으로 적어 뒀다.
+	# 갈리면 "커서는 보이는데 A 가 안 먹는" 상태가 된다.
+	var s3 := _fresh_session(data)
+	var cur := _mount(RACE_SCENE, s3)
+	if cur != null:
+		cur.engine.turn_phase = RaceTypes.TurnPhase.T4_INTERVENTION
+		cur.engine.provisional = ["symbol_pulse", "symbol_pulse", "symbol_pulse"]
+		cur._timer_active = true
+		cur._cursor_active = true
+		cur._refresh_reel_frames()
+		var lit: bool = cur._reel_frame_styles[cur._hold_cursor].border_color == UiPalette.ACCENT_ACTIVE
+		_ok("전제: 관문이 열리면 커서가 뜬다", lit)
+		cur.engine.snapshot_previous = ["symbol_line", "symbol_line", "symbol_line"]
+		cur._refresh_reel_frames()
+		_ok("관문이 닫히면 커서도 꺼진다 (조작 가능과 같은 조건)",
+			cur._reel_frame_styles[cur._hold_cursor].border_color != UiPalette.ACCENT_ACTIVE)
+		_unmount(cur)
+
+
+# ── ㉖ 거부 고지 전용 슬롯 (14차 ① — 총괄 인계 최소 100px) ──
+#
+# 26차의 로그 존 얹기가 전용 슬롯으로 옮겨졌다. **축의 핵은 경로다**: 종전 검사는
+# `_notify_skill_rejected()` 를 **직접 불렀고**, 그것은 표가 문면을 가리키는지만 증명한다.
+# 실제로는 `limit_hold` 의 유일한 산지가 `hold_respin` 이고 그 화면 호출부(`_on_respin`)가
+# 고지를 부르지 않아 **실기에 한 번도 뜬 적이 없었다.** 그래서 이 축은 **키를 눌러** 잰다.
+const NOTICE_KEYS := [
+	"ui.race.skillRejectedCharge", "ui.race.skillRejectedUses",
+	"ui.race.skillRejectedHoldCap", "ui.race.skillRejectedLimitHold",
+	"ui.race.skillRejectedAlreadyHold", "ui.race.skillRejectedAlreadyMod",
+	"ui.race.skillRejectedDuelTurn", "ui.race.skillRejectedSectorTurn",
+]
+const BODY_FONT_PATH := "res://assets/fonts/Galmuri9.ttf"
+const STRINGS_TABLE := "res://data/strings/strings.csv"
+
+
+func _reject_notice_slot(data: GameData) -> void:
+	var session := _fresh_session(data)
+	var screen := _mount(RACE_SCENE, session)
+	if screen == null:
+		return
+	var slot: Label = screen._reject_notice
+	_ok("전제: 전용 고지 슬롯이 씬에 실재", slot != null)
+	if slot == null:
+		_unmount(screen)
+		return
+	_ok("초기 상태 = 문면 없음", slot.text == "")
+	# 슬롯은 **항상 존재한다** — `visible` 개폐면 고지가 뜰 때마다 그 위의 전부가 튄다.
+	_ok("슬롯은 상시 표출 (자리를 예약한다)", slot.visible)
+	_ok("빈 문면에서도 높이를 차지한다 (예약이 성립한다)",
+		slot.get_combined_minimum_size().y > 0.0,
+		"h=%.1f" % slot.get_combined_minimum_size().y)
+
+	# ⓐ **실기 경로로 `limit_hold` 를 낸다** — 리스핀 키. 직접 호출이 아니다.
+	screen.engine.turn_phase = RaceTypes.TurnPhase.T4_INTERVENTION
+	screen.engine.provisional = ["symbol_pulse", "symbol_pulse", "symbol_pulse"]
+	screen.engine.charge = 10
+	screen.engine.hold_used = true          # 턴당 1회 소진 = limit_hold 의 유일 조건
+	screen._timer_active = true
+	screen._revealing = false
+	screen._refresh_action_enabled()
+	var log_before: int = _rendered_log_lines(screen).size()
+	screen._unhandled_key_input(_key_event(KEY_R))
+	var expected := data.strings.text("ui.race.skillRejectedLimitHold")
+	_ok("리스핀 키 거부 = 전용 슬롯에 고지", slot.text == expected,
+		"slot=%s expected=%s" % [slot.text, expected])
+	# ⓑ 로그 존은 오염되지 않는다 — 거부가 경기 기록 슬롯 4를 밀어내지 않는다.
+	_ok("거부 고지가 로그 존을 밀어내지 않는다",
+		_rendered_log_lines(screen).size() == log_before,
+		"before=%d after=%d" % [log_before, _rendered_log_lines(screen).size()])
+	# 대조군 — 다른 사유는 다른 문면이다. 같으면 키를 갈아도 검사가 통과한다.
+	_ok("전제: 다른 사유와 문면이 다르다",
+		expected != data.strings.text("ui.race.skillRejectedCharge"), expected)
+
+	# ⓒ 침묵 계열은 슬롯을 비운다 — 직전 고지가 남으면 엉뚱한 사유를 가리킨다.
+	for code in RaceEngine.SEAL_SILENT_ERRORS:
+		slot.text = expected
+		screen._notify_skill_rejected(String(code))
+		_ok("봉인 침묵 %s = 슬롯 공란" % String(code), slot.text == "", slot.text)
+
+	# ⓓ 성공이 고지를 걷는다.
+	slot.text = expected
+	screen._report_outcome(true)
+	_ok("성공하면 직전 고지가 걷힌다", slot.text == "")
+	# ⓔ 턴 경계가 고지를 걷는다 — limit_hold 는 새 턴에서 실제로 거짓이 된다.
+	slot.text = expected
+	screen._next_turn()
+	_ok("턴 경계가 고지를 걷는다", slot.text == "")
+	_unmount(screen)
+
+	# ⓕ **열 폭이 최장 문면보다 넓은가 — 3언어.** 총괄 인계는 최소 100px(ja 실측 112px)을
+	# 요구했다. 자수 상한을 숫자로 적는 대신 열이 최장 문면보다 넓다를 재므로, 문면이
+	# 자라거나 열이 좁아지면 이 축이 먼저 깨진다.
+	var body := load(BODY_FONT_PATH) as FontFile
+	_ok("전제: 본문 원도 적재", body != null)
+	if body == null:
+		return
+	var rows := CsvTable.load_rows(STRINGS_TABLE)
+	_ok("전제: 스트링 표 적재", not rows.is_empty())
+	var size := data.param_int("param_font_size_body")
+	var s6 := _fresh_session(data)
+	var probe := _mount(RACE_SCENE, s6)
+	if probe == null:
+		return
+	var metrics := _action_row_metrics(probe)
+	_ok("전제: 폭 산정 성립", not metrics.is_empty())
+	if not metrics.is_empty():
+		var column: float = float(metrics["column"])
+		for language in LANGUAGE_COLUMNS_EXPECTED:
+			var widest := 0.0
+			var widest_key := ""
+			for row in rows:
+				if not NOTICE_KEYS.has(String(row.get(StringTable.KEY_COLUMN, ""))):
+					continue
+				var w: float = body.get_string_size(
+					String(row.get(String(language), "")), 0, -1, size).x
+				if w > widest:
+					widest = w
+					widest_key = String(row[StringTable.KEY_COLUMN])
+			_ok("[%s] 고지 문면 8종이 표에 있다 (비공허)" % String(language), widest > 0.0,
+				"widest=%.1f" % widest)
+			_ok("[%s] 고지 슬롯 열이 최장 문면보다 넓다" % String(language), column > widest,
+				"열=%.1f 최장=%.1f (%s)" % [column, widest, widest_key])
+	_unmount(probe)
+
+
+# ── ㉗ SH3 신 후보 전용 버튼 (14차 ④ — `ui.race.snapshotKeepNew` 소비) ──
+#
+# 종전에는 한쪽만 버튼이었다. 그러면 화면이 **택1로 보이지 않는다** — 보이는 것은 버튼
+# 하나와, "확정을 누르면 새 것으로 간다"는 어디에도 적혀 있지 않은 사실이다.
+#
+# **축은 두 갈래가 같은 모양으로 서는가, 그리고 새 갈래가 확정과 같은 귀결인가** 다.
+# 두 번째가 특히 중요하다 — 새 버튼이 자기 구현을 가지면 병치가 두 경로로 갈린다.
+func _snapshot_keep_new_button(data: GameData) -> void:
+	var session := _fresh_session(data)
+	var screen := _mount(RACE_SCENE, session)
+	if screen == null:
+		return
+	var new_btn: Button = screen._e05_snapshot_new
+	var old_btn: Button = screen._e05_snapshot
+	_ok("전제: 신 후보 버튼이 씬에 실재", new_btn != null)
+	if new_btn == null or old_btn == null:
+		_unmount(screen)
+		return
+	_ok("대기 아님 = 두 갈래 모두 숨김", not new_btn.visible and not old_btn.visible)
+	screen.engine.turn_phase = RaceTypes.TurnPhase.T4_INTERVENTION
+	screen.engine.provisional = ["symbol_pulse", "symbol_pulse", "symbol_pulse"]
+	screen.engine.snapshot_previous = ["symbol_line", "symbol_line", "symbol_line"]
+	screen._timer_active = true
+	screen._refresh_snapshot_row()
+	_ok("대기 = 두 갈래 함께 표출 (택1로 보인다)", new_btn.visible and old_btn.visible)
+	var keep_new := data.strings.text("ui.race.snapshotKeepNew")
+	var keep_old := data.strings.text("ui.race.snapshotKeepOld")
+	_ok("전제: 두 문면이 다르다 (같으면 라벨을 갈아도 통과한다)", keep_new != keep_old)
+	_ok("신 후보 버튼 라벨 = snapshotKeepNew", new_btn.text == keep_new, new_btn.text)
+	_ok("이전 후보 버튼 라벨 = snapshotKeepOld", old_btn.text == keep_old, old_btn.text)
+	# 배치 — 신 후보가 릴 **위**, 이전 후보가 릴 **아래**. 살아 있는 릴이 신 후보의 내용이므로
+	# 그 바로 위에 서야 무엇을 유지하는지가 배치로 읽힌다.
+	var reels := screen.find_child("E05Reels", true, false) as Control
+	_ok("전제: 릴 노드 실재", reels != null)
+	if reels != null:
+		_ok("신 후보 버튼이 릴 위, 이전 후보가 릴 아래",
+			new_btn.get_index() < reels.get_index()
+				and old_btn.get_index() > reels.get_index(),
+			"new=%d reels=%d old=%d" % [new_btn.get_index(), reels.get_index(), old_btn.get_index()])
+	# **같은 귀결인가** — 버튼과 확정이 같은 상태로 끝나야 병치가 한 경로다.
+	var phase_before: int = screen.engine.turn_phase
+	new_btn.pressed.emit()
+	_ok("신 후보 버튼 = 새 후보 유지",
+		screen.engine.provisional.size() == 3
+			and String(screen.engine.provisional[0]) == "symbol_pulse",
+		str(screen.engine.provisional))
+	_ok("신 후보 버튼도 턴을 넘기지 않는다",
+		screen.engine.turn_phase == phase_before,
+		"before=%d after=%d" % [phase_before, screen.engine.turn_phase])
+	_ok("택1 해소 후 두 갈래 모두 숨김", not new_btn.visible and not old_btn.visible)
+	_unmount(screen)
+
+
+# ── ㉘ 옵션 언어 전환 재문면화 (14차 ③ — 13차 이월) ──
+#
+# 즉시 반영(§6.3 적용 버튼 없음)이 이 항목에서만 성립하지 않고 있었다: 바뀌는 것은 방금
+# 만진 값 하나뿐이고 표제·탭·항목 라벨은 진입 시점 언어로 굳어 있었다.
+#
+# **대조군을 함께 둔다** — 비언어 항목을 만졌을 때는 재구축이 *일어나지 않아야* 한다.
+# 없으면 "무조건 다시 세운다"도 통과하고, 그것은 매 조작마다 포커스를 흔드는 구현이다.
+func _options_relabel(data: GameData) -> void:
+	var before_language := data.strings.language()
+	var session := _fresh_session(data)
+	# **저장된 선택지도 되돌린다.** 런타임 언어만 복구하면 프로필에 남은 o11 이 다음
+	# `begin_career()` 의 `apply_language()` 를 타고 되살아나 **뒤 축 전부가 다른 언어로**
+	# 돌아간다. 실측으로 잡혔다: ㉚ 이 3언어를 재는데 세 번 모두 en 이 나왔고 값이 같아서
+	# 통과처럼 보이지 않았을 뿐이다(같은 값 3개가 곧 단서였다).
+	var before_index := session.options.index_of("o11")
+	var screen := _mount(OPTIONS_SCENE, session)
+	if screen == null:
+		return
+	var header := screen.get_node("%HeaderLabel") as Label
+	var tab_row := screen.get_node("%TabRow") as Control
+	_ok("전제: 표제·탭 줄 실재", header != null and tab_row != null)
+	if header == null or tab_row == null:
+		_unmount(screen)
+		return
+	var entry_header := header.text
+	_ok("전제: 진입 문면이 현행 언어",
+		entry_header == data.strings.text("ui.options.header"), entry_header)
+	# 언어 항목의 탭을 고르고 그 행의 다음 버튼을 실제로 누른다.
+	var language_tab := -1
+	for index in range(OptionsStore.TABS.size()):
+		if Array(OptionsStore.TABS[index]["options"]).has("o11"):
+			language_tab = index
+	_ok("전제: 언어 항목이 탭 대장에 있다", language_tab >= 0, "tab=%d" % language_tab)
+	if language_tab < 0:
+		_unmount(screen)
+		return
+	screen._select_tab(language_tab)
+	var panel := screen._tab_panels[language_tab] as Control
+	var next_button := panel.find_child("Next", true, false) as Button
+	_ok("전제: 언어 행의 다음 버튼 실재", next_button != null)
+	if next_button == null:
+		_unmount(screen)
+		return
+	next_button.grab_focus()
+	next_button.pressed.emit()
+	# ⓐ 화면 전체가 새 언어로 다시 선다.
+	_ok("언어 전환이 실제로 일어났다 (비공허)",
+		data.strings.language() != before_language,
+		"%s -> %s" % [before_language, data.strings.language()])
+	var new_header := screen.get_node("%HeaderLabel") as Label
+	_ok("표제가 새 언어로 재문면화",
+		new_header.text == data.strings.text("ui.options.header"), new_header.text)
+	_ok("표제가 진입 시점 문면과 다르다 (대조)", new_header.text != entry_header,
+		"%s -> %s" % [entry_header, new_header.text])
+	var new_tab_row := screen.get_node("%TabRow") as Control
+	_ok("탭 이름이 새 언어로 재문면화",
+		(new_tab_row.get_child(0) as Button).text
+			== data.strings.text(String(OptionsStore.TABS[0]["key"])),
+		(new_tab_row.get_child(0) as Button).text)
+	# ⓑ 활성 탭·포커스가 유지된다 — 재구축의 대가를 물지 않는다.
+	_ok("활성 탭 유지", screen._active_tab == language_tab,
+		"tab=%d expected=%d" % [screen._active_tab, language_tab])
+	var focused := screen.get_viewport().gui_get_focus_owner()
+	_ok("포커스 유지 (재구축 뒤에도 조작 자리가 남는다)",
+		focused != null and screen.is_ancestor_of(focused), str(focused))
+	# ⓒ 이름 충돌이 남지 않았다 — queue_free 만 하고 다시 세우면 Tab0@2 가 생긴다.
+	_ok("탭 줄에 유령 노드가 없다", new_tab_row.get_child_count() == OptionsStore.TABS.size(),
+		"count=%d expected=%d" % [new_tab_row.get_child_count(), OptionsStore.TABS.size()])
+	_unmount(screen)
+
+	# ⓓ **대조군** — 비언어 항목은 재구축하지 않는다(노드 동일성이 유지된다).
+	var s2 := _fresh_session(data)
+	var plain := _mount(OPTIONS_SCENE, s2)
+	if plain != null:
+		var target := -1
+		for index in range(OptionsStore.TABS.size()):
+			var ids: Array = Array(OptionsStore.TABS[index]["options"])
+			if not ids.is_empty() and not ids.has("o11"):
+				target = index
+				break
+		_ok("전제: 비언어 항목 탭이 있다", target >= 0, "tab=%d" % target)
+		if target >= 0:
+			plain._select_tab(target)
+			var panel2 := plain._tab_panels[target] as Control
+			var next2 := panel2.find_child("Next", true, false) as Button
+			_ok("전제: 비언어 행의 다음 버튼 실재", next2 != null)
+			if next2 != null:
+				var identity := plain.get_node("%TabRow").get_child(0)
+				next2.pressed.emit()
+				_ok("비언어 항목은 화면을 다시 세우지 않는다",
+					plain.get_node("%TabRow").get_child(0) == identity)
+		_unmount(plain)
+	# 언어를 되돌린다 — 뒤 축들이 이 축의 부작용을 상속하면 안 된다. **저장소 먼저다**:
+	# 런타임만 되돌리면 다음 세션이 저장분을 다시 적용한다.
+	var after := _fresh_session(data)
+	after.options.set_index("o11", before_index)
+	data.set_language(before_language)
+	_ok("언어 원복 (뒤 축 오염 방지)", data.strings.language() == before_language,
+		data.strings.language())
+	_ok("저장된 언어 선택지 원복 (다음 세션 오염 방지)",
+		_fresh_session(data).options.index_of("o11") == before_index,
+		"index=%d expected=%d" % [_fresh_session(data).options.index_of("o11"), before_index])
+
+
+# ── ㉙ 포커스 링 9패치 (14차 ⑤ — 화면 층 결선 제원표 IMPL-405 부분 반영) ──
+#
+# **마진을 검사에 손으로 적지 않는다.** 값의 산지는 `frame_spec.json` 의 `corner` 이고
+# 테마는 그것을 옮겨 적은 사본이므로, 검사는 **원본을 읽어 대조한다**(27차 "대장을 산문에서
+# 코드로 옮기고 원본과 기계 대조한다"와 같은 축). 사본이 갈리면 여기서 깨진다.
+const FRAME_SPEC := "res://../tools/assets/frame_spec.json"
+const FOCUS_FRAME := "focus_ring_9p"
+const FOCUS_TEXTURE := "res://assets/ui/frames/focus_ring_9p.png"
+
+
+func _focus_ring_theme(data: GameData) -> void:
+	var main_theme := load(FlowScreen.MAIN_THEME) as Theme
+	_ok("전제: 화면 층 테마 적재", main_theme != null)
+	if main_theme == null:
+		return
+	var box := main_theme.get_stylebox("focus", "Button") as StyleBoxTexture
+	_ok("Button 포커스 = 9패치 텍스처 박스", box != null)
+	if box == null:
+		return
+	_ok("포커스 링 도상 = focus_ring_9p",
+		box.texture != null and String(box.texture.resource_path) == FOCUS_TEXTURE,
+		String(box.texture.resource_path) if box.texture != null else "null")
+	# 원본 대조 — corner 를 읽어 4면 마진과 맞춘다.
+	var raw := FileAccess.get_file_as_string(FRAME_SPEC)
+	var spec: Variant = JSON.parse_string(raw)
+	var has_frames: bool = spec is Dictionary and Dictionary(spec).has("frames")
+	_ok("전제: frame_spec 적재", has_frames, "len=%d" % raw.length())
+	if has_frames:
+		var frames: Dictionary = Dictionary(spec)["frames"]
+		_ok("전제: %s 항목이 원본에 있다" % FOCUS_FRAME, frames.has(FOCUS_FRAME))
+		if frames.has(FOCUS_FRAME):
+			var corner := float(int(Dictionary(frames[FOCUS_FRAME])["corner"]))
+			_ok("texture_margin 4면 = 원본 corner (%d)" % int(corner),
+				box.texture_margin_left == corner and box.texture_margin_top == corner
+					and box.texture_margin_right == corner
+					and box.texture_margin_bottom == corner,
+				"L=%.1f T=%.1f R=%.1f B=%.1f corner=%.1f" % [box.texture_margin_left,
+					box.texture_margin_top, box.texture_margin_right,
+					box.texture_margin_bottom, corner])
+	# **레이아웃 불변 — 실측이 아니라 선언 범위로 잰다.**
+	#
+	# 처음에는 버튼 최소 크기를 테마 전후로 비교했다. 그 축은 **구조적으로 실패할 수 없다**:
+	# Godot 의 `Button` 최소 크기는 `normal` 계열 박스만 세고 `focus` 는 위에 겹쳐 그리기만
+	# 하므로, 포커스 전속 테마는 어떤 마진을 넣어도 레이아웃을 못 움직인다(돌연변이 M16 이
+	# `content_margin = -1` 로 상속을 켜도 미검출 — 28차가 정리한 "반증을 지지 않는 축").
+	#
+	# 그래서 못박을 것을 바꿨다: **이 테마가 레이아웃에 참여하는 항목을 선언하지 않는가.**
+	# `normal`·`hover`·`pressed`·`disabled` 가 들어오는 순간 액션 열 예산(㉚)이 조용히
+	# 재계산되므로, 그 유입 자체를 막는 것이 실제 계약이다.
+	var declared: Array[String] = []
+	for type_name in main_theme.get_type_list():
+		for style_name in main_theme.get_stylebox_list(String(type_name)):
+			if String(style_name) != "focus":
+				declared.append("%s/%s" % [String(type_name), String(style_name)])
+	_ok("테마 선언 = 포커스 전속 (레이아웃 참여 항목 0)", declared.is_empty(), str(declared))
+	# 테마가 **단독 인스턴스화 경로에도** 붙는가 — 검사가 실기와 다른 화면을 재지 않게.
+	var session := _fresh_session(data)
+	var screen := _mount(RACE_SCENE, session)
+	if screen != null:
+		_ok("화면에 테마가 붙는다 (단독 경로 포함)", screen.theme != null, str(screen.theme))
+		_ok("버튼이 테마 포커스 박스를 상속한다",
+			screen._e08_confirm.get_theme_stylebox("focus", "Button") is StyleBoxTexture)
+		_unmount(screen)
+
+
+# ── ㉚ 액션 열 폭 · 화면 루트 최소 크기 (14차 ⑧ + ② grow 감사) ──
+#
+# **⑧** 내러티브 10차 관측 4.1 은 영문 여유를 산술로 45px(배지 2 포함 29px)로 내고
+# "기본 테마 Button 의 좌우 content margin 이 측당 1.8px 보다 크면 넘친다"로 남겼다.
+# 그 산술은 **문면 폭만** 셌다 — 실측 content margin 은 좌우 각 10.0px 이므로 버튼 8개가
+# 160px 을 더 먹는다. 그래서 3언어 실측으로 답을 대신한다.
+#
+# **②** `anchors_preset 0 → 15` 재정규화가 `grow_*` 를 END→BOTH 로 바꾼다. 그 방향은
+# **최소 크기가 앵커 rect 를 넘을 때만** 의미를 갖는다 — 넘지 않는다를 산문으로 두지 않고
+# 화면 루트 최소 크기를 캔버스와 재서 못박는다.
+const ROOT_MIN_SCENES := [
+	"res://ui/sys/options_screen.tscn", "res://ui/sys/achievement_screen.tscn",
+	"res://ui/hub/garage_screen.tscn", "res://ui/race/race_screen.tscn",
+]
+
+# ── 발주 대기 상한 (14차 ⑧ 실측 → 내러티브 발주) ──
+#
+# **면제가 아니라 천장이다.** 영문 액션 열이 예산을 넘는다(실측 — 값은 실패 문면이 찍는다).
+# 가장 싼 지렛대는 `ui.race.chargeIntervene` 영문이고 `strings.csv` 는 내러티브 레인 배타
+# 창구이므로 화면 층이 고칠 수 없다(총괄 인계 ⑧ 이 그 발주를 예고해 뒀다).
+#
+# 그래서 초과를 **0 으로 단언하지 않고 현행 실측에 붙여 못박는다**: 지금보다 나빠지면
+# 즉시 붉어지고, 문면이 오면 이 값을 0 으로 내리는 것이 그 회차의 몫이다. 상한이 면제로
+# 굳지 않게 위 두 축이 함께 선다 — ⓐ한 언어는 상한 없이 들어와야 하고 ⓑ상한은 실측 최악과
+# 5px 안에 붙어 있어야 한다(여유를 남기면 새 초과가 조용히 흡수된다).
+const ROW_OVERFLOW_CEILING := 41.0
+
+
+func _action_row_budget(data: GameData) -> void:
+	var before_language := data.strings.language()
+	var fits := 0
+	var worst := 0.0
+	for language in LANGUAGE_COLUMNS_EXPECTED:
+		var code := String(language)
+		# **세션을 먼저 세우고 언어를 그 뒤에 바꾼다.** `begin_career()` 가
+		# `apply_language()` 를 타고 저장된 o11 로 되돌리므로 순서가 뒤집히면 세 번 모두
+		# 같은 언어를 재고, 그때 값이 같은 것은 통과가 아니라 **측정이 안 된 증거**다.
+		var session := _fresh_session(data)
+		var switched: bool = data.set_language(code)
+		var screen := _mount(RACE_SCENE, session)
+		if screen == null:
+			continue
+		# 전제는 **마운트 뒤**에 본다 — 화면이 세워지는 사이에 되돌려질 수 있고,
+		# 되돌려진 채로 재면 라벨이 다른 언어다.
+		_ok("[%s] 전제: 측정 시점 언어가 그 언어" % code,
+			switched and data.strings.language() == code, data.strings.language())
+		screen.engine.deck = _widest_deck(data, 5)
+		screen.engine.charge = 10
+		screen._refresh_skill_slots()
+		screen._apply_static_strings()
+		var metrics := _action_row_metrics(screen)
+		_ok("[%s] 전제: 폭 산정 성립" % code, not metrics.is_empty())
+		if not metrics.is_empty():
+			var budget: float = float(metrics["budget"])
+			var needed: float = float(metrics["needed"])
+			var over: float = needed - budget
+			worst = maxf(worst, over)
+			if over <= 0.0:
+				fits += 1
+			_ok("[%s] 전제: 예산이 릴 열보다 넓다 (산정 실패 오탐 방지)" % code, budget > 208.0,
+				"budget=%.1f" % budget)
+			_ok("[%s] 액션 열 초과가 발주 대기 상한 안" % code, over <= ROW_OVERFLOW_CEILING,
+				"needed=%.1f budget=%.1f 초과=%.1f 상한=%.1f"
+					% [needed, budget, over, ROW_OVERFLOW_CEILING])
+		_unmount(screen)
+	# **상한이 전 언어를 덮지 못하게 한다** — 한 언어라도 0 초과로 들어와야 상한이
+	# "특정 언어의 문면 대기"를 뜻하고, 전 언어가 넘치면 그것은 문면 사안이 아니라 배치 결함이다.
+	_ok("적어도 한 언어는 상한 없이 예산 안 (상한이 전역 결함을 가리지 않는다)", fits >= 1,
+		"fits=%d" % fits)
+	# **상한이 실측과 붙어 있게 한다** — 여유가 남으면 새 초과가 조용히 흡수된다.
+	_ok("발주 대기 상한이 실측 최악과 5px 안 (여유를 남기지 않는다)",
+		ROW_OVERFLOW_CEILING - worst <= 5.0,
+		"상한=%.1f 최악=%.1f" % [ROW_OVERFLOW_CEILING, worst])
+	var restored: bool = data.set_language(before_language)
+	_ok("언어 원복 (뒤 축 오염 방지)",
+		restored and data.strings.language() == before_language, data.strings.language())
+
+	# 화면 루트 최소 크기 ≤ 캔버스 — grow 방향이 무영향임의 근거.
+	for path in ROOT_MIN_SCENES:
+		var session2 := _fresh_session(data)
+		var screen2 := _mount(String(path), session2)
+		if screen2 == null:
+			continue
+		var minimum := screen2.get_combined_minimum_size()
+		_ok("루트 최소 크기 <= 캔버스: %s" % String(path).get_file(),
+			minimum.x <= CANVAS.x and minimum.y <= CANVAS.y,
+			"min=%s canvas=%s" % [str(minimum), str(CANVAS)])
+		_unmount(screen2)

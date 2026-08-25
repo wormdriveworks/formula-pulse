@@ -291,6 +291,12 @@ theme_override_constants/margin_bottom = 5
 layout_mode = 2
 theme_override_constants/separation = 4
 
+[node name="E05SnapshotNew" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=1490233571]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+
 [node name="E05Reels" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=362900067]
 unique_name_in_owner = true
 layout_mode = 2
@@ -484,6 +490,13 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 9
+
+[node name="RejectNotice" type="Label" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=1490233572]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
 
 [node name="E10LogFeed" type="VBoxContainer" parent="Root/Middle" unique_id=71660236]
 unique_name_in_owner = true

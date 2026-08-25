@@ -1,0 +1,18 @@
+[gd_resource type="Theme" format=3 uid="uid://2x1gvdbkinnh"]
+
+[ext_resource type="Texture2D" uid="uid://dm7c4trqqojit" path="res://assets/ui/frames/focus_ring_9p.png" id="1_focus"]
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_focus"]
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+texture = ExtResource("1_focus")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[resource]
+Button/styles/focus = SubResource("StyleBoxTexture_focus")
+CheckBox/styles/focus = SubResource("StyleBoxTexture_focus")

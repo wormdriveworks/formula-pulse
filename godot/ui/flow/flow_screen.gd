@@ -19,6 +19,29 @@ var session: RunSession
 var _body_font_size := 9
 var _head_font_size := 14
 
+# ── 화면 층 테마 (14차 ⑤ — 화면 층 결선 제원표 IMPL-405 부분 반영) ──
+#
+# **포커스 링 1종만 결선했다.** 제원표는 9패치 16종의 `texture_margin_*` 을 확정해 넘겼고
+# 그 중 포커스 링은 **Godot 슬롯과 1:1이며 다른 결정을 요구하지 않는다**: 도상이 전 링
+# 투명 + 코너 꺾쇠(제원표 예외 ⓑ)라 기존 `normal` 박스 위에 겹쳐 그려도 의장이 충돌하지
+# 않고, 엔진 기본 포커스 박스와 **같은 자리·같은 역할**을 대체한다.
+#
+# 나머지 15종은 이 회차에서 열지 않는다 — 사유는 회신 §⑤. 요약: `Button` 은 상태 5종
+# (normal·hover·pressed·disabled·focus)을 요구하는데 프레임 세트는 **의미 4종**
+# (default·primary·danger·disabled)이라 hover·pressed 에 무엇을 대응시킬지가 제원표에
+# 없다. 정본이 답하지 않는 대응을 화면이 정하면 그 순간 프레임 세트의 의미 축이 상태 축으로
+# 조용히 바뀐다(불변규칙 9). 판정 요청으로 올린다.
+#
+# **자리는 `_enter_tree()` 다.** `bind()` 에 두면 단독 인스턴스화 경로(테스트 하네스·
+# `race_screen._ready()`)가 테마 없이 서고, 그러면 검사가 실기와 다른 화면을 잰다.
+# 이미 테마가 지정된 노드는 덮지 않는다 — 씬이 명시한 것이 베이스보다 강하다.
+const MAIN_THEME := "res://ui/theme/main_theme.tres"
+
+
+func _enter_tree() -> void:
+	if theme == null:
+		theme = load(MAIN_THEME) as Theme
+
 
 func bind(run_session: RunSession, payload: Dictionary) -> void:
 	session = run_session

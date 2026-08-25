@@ -201,11 +201,55 @@ func _shift(option_id: String, direction: int, value: Label, notice: Label) -> v
 	session.apply_volume_options()
 	session.apply_haptic_options()   # O3 진동 감쇠도 같은 자리다
 	# O11 언어도 같은 성격이다 — 스트링 표는 옵션을 스스로 읽지 못한다.
-	# 전환은 즉시 반영되지만 **이미 세워진 라벨은 스스로 갱신되지 않는다**:
-	# 화면 전체 재문면화는 화면 층 몫이고, 이 화면은 아래 `_refresh_value` 로 자기 값만 고친다.
 	session.apply_language()
 	sfx("ui_toggle")   # SE-U05 토글·슬라이더 — 단계 이동과 볼륨 이동이 같은 축이다
+	# ── 언어 전환 = 이 화면 전체 재문면화 (14차 ③ · 13차 이월) ──
+	#
+	# 전환은 즉시 반영되지만 **이미 세워진 라벨은 스스로 갱신되지 않았다**: 표제·탭 5종·
+	# 항목 라벨·◀▶·O5 고지행·닫기·초기화가 전부 진입 시점 언어로 굳어 있고 바뀌는 것은
+	# 방금 만진 값 하나뿐이었다. **언어를 바꾼 화면이 바뀐 언어로 보이지 않으면 그 조작은
+	# 확인되지 않는다** — 즉시 반영(§6.3 적용 버튼 없음)의 취지가 이 항목에서만 성립하지
+	# 않고 있었다.
+	#
+	# **다시 세우고 자리를 되돌린다.** 라벨을 하나씩 찾아 고치는 방식은 만든 곳과 고치는
+	# 곳이 갈려 새 라벨이 생길 때마다 한쪽을 빠뜨린다(문면 이중 관리). `_build_tabs()` 가
+	# 문면의 유일한 산지이므로 그것을 다시 부르는 편이 갈라지지 않는다. 대가는 활성 탭과
+	# 포커스 소실이라 **그 둘만 떠서 되돌린다** — 노드 이름이 결정적이라(`Panel%d` ·
+	# `<Option>Row` · `Prev`/`Next`) 경로가 재생성 뒤에도 같은 자리를 가리킨다.
+	if option.get("languages", false):
+		_relabel_all()
+		return
 	_refresh_value(option_id, value, notice)
+
+
+func _relabel_all() -> void:
+	var tab := _active_tab
+	var focused := get_viewport().gui_get_focus_owner()
+	var focus_path := get_path_to(focused) if focused != null and is_ancestor_of(focused) else NodePath()
+	var tab_row := %TabRow as HBoxContainer
+	var body := %TabBody as Control
+	for child in tab_row.get_children():
+		tab_row.remove_child(child)
+		child.queue_free()
+	for child in body.get_children():
+		body.remove_child(child)
+		child.queue_free()
+	_tab_panels.clear()
+	var s := session.data.strings
+	(%HeaderLabel as Label).text = s.text("ui.options.header")
+	(%ResetButton as Button).text = s.text("ui.options.resetDefaults")
+	(%CloseButton as Button).text = s.text("ui.options.close")
+	_build_tabs()
+	_select_tab(mini(tab, maxi(_tab_panels.size() - 1, 0)))
+	# 포커스를 되돌린다. 되돌릴 자리가 사라졌으면(경로 부재) 초기 자리로 물러선다 —
+	# 포커스가 없는 화면은 패드에서 조작 불가가 되므로 무포커스로 끝내지 않는다.
+	var restored: Control = null
+	if not focus_path.is_empty():
+		restored = get_node_or_null(focus_path) as Control
+	if restored != null:
+		restored.grab_focus()
+	else:
+		_focus_initial()
 
 
 func _refresh_value(option_id: String, value: Label, notice: Label) -> void:
@@ -265,17 +309,15 @@ func _on_reset() -> void:
 	session.apply_volume_options()   # 기본값 복귀도 버스에 닿아야 한다
 	session.apply_haptic_options()
 	session.options.reset_onboarding()  # 1회성 툴팁 재표시 초기화 (COM-02 — §A-24)
-	# 전 행 값 갱신 — 재구축이 단순하다
-	for panel in _tab_panels:
-		for row in (panel as Control).get_children():
-			row.queue_free()
-	_tab_panels.clear()
-	for child in (%TabRow as Control).get_children():
-		child.queue_free()
-	for child in (%TabBody as Control).get_children():
-		child.queue_free()
-	_build_tabs()
-	_select_tab(0)
+	# **초기화도 언어를 되돌린다** (O11 기본값 복귀) — 그러므로 재구축만으로는 부족하고
+	# 표제·닫기·초기화 문면까지 다시 세워야 한다. `_relabel_all()` 이 그 전부를 진다.
+	#
+	# 종전 구현은 `queue_free()` 만 하고 `remove_child()` 를 하지 않은 채 곧바로
+	# `_build_tabs()` 를 불렀다 — 죽기로 예약된 노드가 한 프레임 동안 트리에 남아
+	# **이름이 충돌**하고(`Tab0` → `Tab0@2`) 그 프레임의 `get_child(0)` 는 사라질 노드를
+	# 집는다. 재문면화 경로와 같은 절차로 합쳐 그 형태를 지운다.
+	session.apply_language()
+	_relabel_all()
 
 
 func _on_close() -> void:

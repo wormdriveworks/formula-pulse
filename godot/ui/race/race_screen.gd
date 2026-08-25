@@ -137,6 +137,8 @@ var _snapshot_icons: Array[TextureRect] = []   # SH3 이전 후보 줄의 도상
 @onready var _e08_respin: Button = %E08Respin
 @onready var _e08_skills: HBoxContainer = %E08Skills
 @onready var _e05_snapshot: Button = %E05Snapshot
+@onready var _e05_snapshot_new: Button = %E05SnapshotNew
+@onready var _reject_notice: Label = %RejectNotice
 @onready var _e08_charge: Button = %E08ChargeIntervene
 @onready var _e08_confirm: Button = %E08Confirm
 @onready var _e10_log: LogFeed = %E10LogFeed
@@ -233,6 +235,7 @@ func _boot() -> void:
 	for skill_index in range(_skill_buttons.size()):
 		_skill_buttons[skill_index].pressed.connect(_on_skill_slot.bind(skill_index))
 	_e05_snapshot.pressed.connect(_on_snapshot_revert)
+	_e05_snapshot_new.pressed.connect(_on_snapshot_keep_new)
 	_collect_consumable_slots()
 	_apply_static_strings()
 	# TUT-01 — 첫 그랑프리 실주행 위 오버레이(§6 "별도 튜토리얼 스테이지 불신설").
@@ -538,6 +541,9 @@ func _start_gp() -> void:
 func _next_turn() -> void:
 	_timer_active = false
 	_revealing = false
+	# 고지는 **턴 경계에서 걷힌다** — 거부는 그 턴의 사실이고, 넘어간 턴에 남으면
+	# 아직 유효한 규칙처럼 읽힌다(`limit_hold` 는 실제로 새 턴에서 거짓이 된다).
+	_reject_notice.text = ""
 	_e04_timer_ring.set_active(false)
 	var info := engine.begin_turn()
 	if String(info.get("type", "")) == "finished":
@@ -582,18 +588,23 @@ func _exit_duel() -> void:
 
 func _refresh_boost() -> void:
 	var cap := int(data.param("param_charge_boost_max"))
-	var can_add := _timer_active and not _revealing and engine.charge >= 1 and engine.duel_boost < cap
+	var can_add := _intervention_open() and engine.charge >= 1 and engine.duel_boost < cap
 	_duel_overlay.set_boost(engine.duel_boost, cap, can_add)
 
 
 func _on_boost() -> void:
-	if not _timer_active or _revealing or not engine.current_turn_is_duel:
+	if not _intervention_open() or not engine.current_turn_is_duel:
 		return
 	# **거부에 확인음을 내지 않는다 (26차 재검 부수).** 상한에 걸린 투입에도
 	# `boost_spend` 가 울려 "썼다"는 거짓 확인을 주고 있었다 — 소리는 결과를 말해야 한다.
-	if not bool(engine.add_duel_boost().get("ok", false)):
-		sfx("input_rejected")
+	var boost := engine.add_duel_boost()
+	if not bool(boost.get("ok", false)):
+		# 부스트를 **고지 원천으로 새로 넣은 것이 아니다** — 사인 창구가 하나가 되니
+		# 등재된 사유(`charge`)는 자연히 문면을 얻고 미등재(`limit_boost`)는 침묵한다.
+		# 규칙은 한 줄뿐이다: 표에 있으면 말하고 없으면 침묵한다.
+		_report_outcome(false, String(boost.get("error", "")))
 		return
+	_report_outcome(true)
 	sfx("boost_spend")
 	_refresh_boost()
 	_refresh_resources()
@@ -615,6 +626,45 @@ func _on_gp_finished() -> void:
 
 
 # ── 개입 창 (T2~T4) ──
+# ── 개입 창 관문 · 거부 귀결 — 액션 경로 전수의 구조적 귀결 (14차 ⑦) ──
+#
+# 27차 ③ 이 `_on_respin` 하나에서 발견한 형태를 화면 층 전건에 걸쳐 훑었고, 결함이
+# **두 계열**로 갈렸다.
+#
+# **계열 A — 화면만 아는 조건.** `_timer_active`·`_revealing`·SH3 택1 대기는 엔진이 모른다.
+# 이것을 버튼 `disabled` 에만 적고 핸들러에 적지 않으면 키·패드 경로가 그대로 통과한다.
+# 실측된 구멍: **SH3 택1 대기 중 리스핀·차지 개입·홀드 토글이 열려 있었다** —
+# 슬롯 행만 `_snapshot_pending()` 을 물었고 나머지 세 줄은 묻지 않았다. 대기 중에 릴을
+# 다시 굴리면 위에 뜬 '이전 후보' 줄이 두 걸음 낡은 후보를 가리키고, 그것을 누르면
+# 방금 지불한 차지가 조용히 되돌려진다. 이 계열은 **핸들러가 버튼과 같은 술어를 부른다**
+# 로 닫는다 — 조건을 두 곳에 적으면 언젠가 갈라지므로 술어를 하나만 둔다.
+#
+# **계열 B — 엔진이 아는 규칙.** 차지 부족·턴당 1회·합산 상한·횟수 소진은 엔진이 최종
+# 판정자다(거부 시 비용·상태 전부 무변경 — 20차 계약 §1.1). 화면이 이것을 재구현하면
+# 판정이 두 곳에 살고, 그것이 곧 "버튼은 켜지는데 눌리지 않는" 상태의 씨앗이다.
+# 그래서 **핸들러는 계열 B 를 보지 않는다.** 버튼 `disabled` 는 마우스에게 사전 표식으로
+# 남기고, 키·패드 경로는 엔진에 닿아 **거부를 소리와 문면으로 되받는다.** 두 경로가
+# 같은 사실을 각자 가진 채널로 배운다 — 어느 쪽도 오해하지 않는다.
+func _intervention_open() -> bool:
+	return _timer_active and not _revealing and not _snapshot_pending()
+
+
+# 거부 귀결의 유일 창구. **소리와 문면이 갈리지 않게 한 곳에 둔다** — 26차에 부스트가
+# 상한 거부에도 `boost_spend` 를 울려 "썼다"는 거짓 확인을 준 것이 소리를 각 지점에서
+# 따로 울리던 탓이었다. 성공은 지난 고지를 걷는다: 남겨 두면 방금 성립한 조작 옆에
+# 직전의 야단이 남는다.
+#
+# 문면은 `SKILL_REJECT_KEYS` 등재분만 낸다 — 미등재 사유는 침묵이 최종형이다
+# (봉인 3종 = 결과 누출 · 조작 오류 계열 = 화면 결함이지 문면 사안이 아니다 · `limit_boost`
+# = 문면 미유입. 회신에 올린다).
+func _report_outcome(ok: bool, error: String = "") -> void:
+	if ok:
+		_reject_notice.text = ""
+		return
+	sfx("input_rejected")   # SE-I14 (D11 §2.2)
+	_notify_skill_rejected(error)
+
+
 func _on_primary_action() -> void:
 	if _revealing or engine == null or engine.finished:
 		return
@@ -690,7 +740,7 @@ func _duel_result_event(events: Array) -> Dictionary:
 
 
 func _on_respin() -> void:
-	if not _timer_active or _revealing:
+	if not _intervention_open():
 		return
 	var keep: Array = []
 	for i in range(REEL_COUNT):
@@ -698,8 +748,13 @@ func _on_respin() -> void:
 			keep.append(i)
 	var outcome := engine.hold_respin(keep)
 	if not outcome.get("ok", false):
-		sfx("input_rejected")   # SE-I14 — 잔량 부족·이미 사용 (D11 §2.2)
+		# **`limit_hold` 의 유일한 산지가 여기다** (`hold_respin` — 엔진 전수 확인).
+		# 26·28차가 문면을 유입해 `SKILL_REJECT_KEYS` 에 행을 세웠는데 그 행을 읽는
+		# 호출부는 스킬 경로뿐이었다 → **고지가 실기에 한 번도 뜬 적이 없다.**
+		# 27차가 "버튼 disabled 를 우회한다"고 적은 그 경로가 정확히 이 줄이다.
+		_report_outcome(false, String(outcome.get("error", "")))
 		return
+	_report_outcome(true)
 	_seal(true)   # 재정지도 정지 연출이다 — 그 사이의 결과 상관 사운드를 다시 막는다
 	sfx("respin")
 	_push_events(outcome.get("events", []))
@@ -718,15 +773,18 @@ func _on_respin() -> void:
 
 
 func _on_charge_intervene() -> void:
-	if not _timer_active or _revealing:
+	if not _intervention_open():
 		return
 	var outcome := engine.negate_trouble()
 	if outcome.get("ok", false):
 		sfx("charge_intervene")
+		_report_outcome(true)
 		_push_events(outcome.get("events", []))
 		_tutorial.notify_action("charge")   # 거부된 개입은 배운 것이 아니다
 	else:
-		sfx("input_rejected")
+		# `no_trouble` 은 봉인 침묵 3종이다 — 소리만 나고 문면은 없다. 있으면 그것이 곧
+		# "지금 트러블이 없다"는 결과 누출이다(불변규칙 5).
+		_report_outcome(false, String(outcome.get("error", "")))
 	_refresh_resources()
 	_refresh_action_enabled()
 
@@ -747,7 +805,7 @@ func _refresh_skill_slots() -> void:
 	var slots: Array = engine.skill_slots() if engine != null else []
 	# 개입 창 밖·정지 연출 중에는 전 슬롯이 닫힌다. `usable` 에도 국면 관문이 들어 있지만
 	# `_revealing` 은 화면 층 상태라 엔진이 모른다 — 두 겹 다 본다.
-	var open := _timer_active and not _revealing and not _snapshot_pending()
+	var open := _intervention_open()
 	for i in range(_skill_buttons.size()):
 		var button := _skill_buttons[i]
 		var slot_label := s.text("ui.race.skillSlotFormat", {"index": i + 1})
@@ -814,7 +872,7 @@ func _skill_args(family: String) -> Dictionary:
 
 
 func _on_skill_slot(index: int) -> void:
-	if not _timer_active or _revealing or _snapshot_pending():
+	if not _intervention_open():
 		return
 	if engine == null:
 		return
@@ -825,10 +883,10 @@ func _on_skill_slot(index: int) -> void:
 	var family := String(slot["family"])
 	var outcome := engine.use_skill(String(slot["id"]), _skill_args(family))
 	if not bool(outcome.get("ok", false)):
-		sfx("input_rejected")   # 거부 = 비용·횟수 무변경 (계약 §1.1)
-		_notify_skill_rejected(String(outcome.get("error", "")))
+		_report_outcome(false, String(outcome.get("error", "")))   # 거부 = 비용·횟수 무변경 (계약 §1.1)
 		_refresh_action_enabled()
 		return
+	_report_outcome(true)
 	# 계열음 4종 = SE-I05~I08. `family` 를 그대로 쓴다 — 표에 이미 서 있다(계약 §1.5).
 	sfx("skill_%s" % String(outcome["family"]))
 	_push_events(outcome.get("events", []))
@@ -877,14 +935,24 @@ const SKILL_REJECT_KEYS := {
 }
 
 
-# 고지 자리 — **잠정 조치다.** 전용 고지 슬롯은 주력 14차 몫이며(총괄 분리 · 최소 100px),
-# 그때 이 호출부 하나만 옮기면 된다. 지금 로그 존에 얹는 이유: 문면이 유입됐는데 소비부가
-# 없으면 **또 한 번 '표는 있고 소리는 없는' 상태**가 되고, 그 상태는 화면에서 정상과
-# 구분되지 않는다(AUDIO-W 대장이 반복해서 잡아 온 형태다).
+# 고지 자리 = **전용 슬롯** (14차 ①). 26차의 로그 존 얹기는 잠정이었고 그 잠정이 두 값을
+# 치르고 있었다: ⓐ거부가 경기 기록과 같은 줄에 섞여 **정산 로그를 밀어낸다**(슬롯 4)
+# ⓑ`E10LogFeed` 는 우측 열이라 방금 누른 액션 행에서 **눈이 가장 먼 자리**다.
+#
+# 슬롯은 액션 행 **바로 아래**에 선다 — 누른 자리에서 답이 온다. 항상 존재하고 문면만
+# 비운다: `visible` 로 개폐하면 고지가 뜰 때마다 릴·액션 행이 한 줄만큼 튄다(스페이서가
+# 흡수하는 것은 높이이고 튀는 것은 그 위의 전부다). 예약 자리 = 튜토리얼 콜아웃이
+# Zone A 를 예약하는 것과 같은 축이다.
+#
+# **자수 상한을 두지 않는다.** 총괄 인계 ① 은 최소 100px(ja 실측 최장 112px)을 요구했고
+# 이 슬롯의 실폭은 액션 행과 같은 열(ReelZone 안쪽 = 371.6px)이므로 **최장 문면의 3.3배**다.
+# 상한이 없으면 규칙도 필요 없다 — 대신 *열 폭이 최장 문면보다 넓다*를 UISCR 이 재고,
+# 문면이 자라면 그 축이 먼저 깨진다(상한을 숫자로 적어 두면 열이 좁아질 때 침묵한다).
 func _notify_skill_rejected(error: String) -> void:
 	if not SKILL_REJECT_KEYS.has(error):
-		return   # 침묵 3종 + 조작 오류 계열 — 소리 거부만
-	_e10_log.push_line("", session.data.strings.text(String(SKILL_REJECT_KEYS[error])))
+		_reject_notice.text = ""   # 침묵 계열 — 직전 고지를 남겨 두면 엉뚱한 사유를 가리킨다
+		return
+	_reject_notice.text = data.strings.text(String(SKILL_REJECT_KEYS[error]))
 
 
 # 변환 계열이 바꾼 잠정 결과를 릴에 다시 그린다. **정지 연출이 아니다** — 심볼이 제자리에서
@@ -911,8 +979,23 @@ func _snapshot_pending() -> bool:
 func _refresh_snapshot_row() -> void:
 	var pending := _snapshot_pending()
 	_e05_snapshot.visible = pending
+	# ── 신 후보 전용 버튼 (14차 ④ · `ui.race.snapshotKeepNew` 소비) ──
+	#
+	# 종전에는 한쪽만 버튼이었다. 그러면 화면이 **택1로 보이지 않는다** — 보이는 것은
+	# 버튼 하나와, "확정을 누르면 새 것으로 간다"는 **어디에도 적혀 있지 않은 사실**이다.
+	# SH3 의 효과 자체가 *택1* 이므로 두 갈래가 같은 모양으로 서야 성립한다.
+	#
+	# 자리는 **릴 위**다: 위 버튼 = 새 후보(바로 아래 살아 있는 릴이 그 내용) · 아래 버튼 =
+	# 이전 후보(자기 안에 도상 3기를 담는다). 새 후보 쪽에 도상을 다시 그리지 않는 이유는
+	# 릴이 이미 그것이기 때문이고, 같은 것을 두 번 그리면 어느 쪽이 실물인지 흐려진다.
+	#
+	# **병치 구조는 유지된다** — 이 버튼은 확정과 같은 함수를 부른다(§`_on_snapshot_keep_new`).
+	# 새 경로가 아니라 이름 없이 있던 경로에 이름이 붙은 것이다.
+	_e05_snapshot_new.visible = pending
 	if not pending:
 		return
+	_e05_snapshot_new.text = data.strings.text("ui.race.snapshotKeepNew")
+	_e05_snapshot_new.tooltip_text = data.strings.text("ui.skill.sh3")
 	var previous: Array = engine.snapshot_previous
 	for i in range(mini(_snapshot_icons.size(), previous.size())):
 		_snapshot_icons[i].texture = _icon_texture(String(previous[i]))
@@ -926,13 +1009,17 @@ func _refresh_snapshot_row() -> void:
 	_e05_snapshot.tooltip_text = data.strings.text("ui.skill.sh3")
 
 
+# **택1 두 갈래는 관문이 뒤집힌다** — 대기 *중에만* 열린다. `_intervention_open()` 은
+# 대기를 닫힌 조건으로 세므로 여기서 부르면 두 갈래가 영원히 닫힌다. 전수(14차 ⑦)에서
+# 이 반전을 명기해 둔다: 다음 훑기가 "가드가 다르다"를 결함으로 오독하지 않게.
 func _on_snapshot_revert() -> void:
-	if not _snapshot_pending():
+	if not _snapshot_pending() or _revealing:
 		return
 	var outcome := engine.choose_snapshot(false)
 	if not bool(outcome.get("ok", false)):
-		sfx("input_rejected")
+		_report_outcome(false, String(outcome.get("error", "")))
 		return
+	_report_outcome(true)
 	sfx("skill_hold")   # 되돌림도 홀드 계열의 귀결이다 (SH3 = hold)
 	_repaint_provisional()
 	_refresh_snapshot_row()
@@ -947,16 +1034,24 @@ func _resolve_snapshot_keep_new() -> bool:
 		return false
 	var outcome := engine.choose_snapshot(true)
 	if bool(outcome.get("ok", false)):
+		_report_outcome(true)
 		sfx("skill_hold")
 	else:
-		sfx("input_rejected")
+		_report_outcome(false, String(outcome.get("error", "")))
 	_refresh_snapshot_row()
 	_refresh_resources()
 	_refresh_action_enabled()
 	return true
 
+
+# 전용 버튼 경로 (14차 ④). `_resolve_snapshot_keep_new()` 는 확정 경로와 **같은 함수**다 —
+# "신 후보 유지 = 그냥 확정"의 병치 구조를 버튼이 밀지 않는다. 시그널은 반환값을 쓰지
+# 않으므로 void 로 감싸는 한 줄만 둔다(두 번째 구현을 만들면 두 경로가 갈린다).
+func _on_snapshot_keep_new() -> void:
+	_resolve_snapshot_keep_new()
+
 func _toggle_hold(index: int) -> void:
-	if not _timer_active or _revealing:
+	if not _intervention_open():
 		return
 	_hold_boxes[index].button_pressed = not _hold_boxes[index].button_pressed
 
@@ -1102,7 +1197,7 @@ func _hide_reels() -> void:
 func _refresh_reel_frames() -> void:
 	# 커서는 홀드 토글이 실제로 가능한 국면에서만 뜬다 — `_toggle_hold()` 의 가드와 같은 조건이다.
 	# 조건이 갈리면 "커서는 보이는데 A 가 안 먹는" 상태가 생긴다.
-	var cursor_on := _cursor_active and _timer_active and not _revealing
+	var cursor_on := _cursor_active and _intervention_open()
 	for i in range(REEL_COUNT):
 		var held: bool = _hold_boxes[i].button_pressed
 		_reel_panels[i].modulate = Color(1.0, 1.0, 1.0) if held else Color(0.78, 0.78, 0.78)
@@ -1204,21 +1299,31 @@ func _refresh_consumables() -> void:
 
 
 # T1 섹터 개시 전속 (별첨A §A-4 E13 "T1에만 활성" · D06 §3.5 R-B).
-# 엔진이 같은 가드를 다시 걸므로 여기서 새는 경로는 없다 — 화면은 활성 표시를 맞출 뿐이다.
+#
+# **`_intervention_open()` 을 쓰지 않는다 — 다른 창이다.** 소모품은 T1 에서 열리고 개입
+# 3종은 T4 에서 열린다. 전수(14차 ⑦) 결과: 이 경로는 ⓐ키·패드 바인딩이 없어 마우스
+# 전용이고 ⓑ`use_consumable` 이 `finished`·듀얼·T1·SECTOR_TURN·보유 수를 **전건 재검**한다.
+# 그래서 버튼보다 약한 가드가 우회로가 되지 않는다 — 그 사실을 확인한 것이 전수의 몫이고,
+# 확인 없이 "엔진이 다시 본다"고 적어 두는 것은 근거가 아니다(그 문장이 종전 주석이었다).
 func _on_consumable(index: int) -> void:
 	if engine == null or index >= _e13_slot_ids.size():
 		return
 	var events := engine.use_consumable(_e13_slot_ids[index])
 	if events.is_empty():
-		sfx("input_rejected")
+		# 사유 코드가 없다 — `use_consumable` 은 빈 배열로만 거부한다. 문면 없이 소리만.
+		_report_outcome(false, "")
 		return  # 거부 = 상태 무변경 (엔진 계약) — 화면도 아무것도 하지 않는다
+	_report_outcome(true)
 	_push_events(events)
 	_refresh_resources()
 	_refresh_action_enabled()
 
 
 func _refresh_action_enabled() -> void:
-	var open := _timer_active and not _revealing
+	# **버튼과 핸들러가 같은 술어를 부른다** (14차 ⑦). 종전에는 여기의 `open` 과 각 핸들러의
+	# 가드가 각기 쓰여 있었고, SH3 택1 대기가 슬롯 행에만 들어가 있어 리스핀·차지·홀드
+	# 세 줄이 대기 중에 열려 있었다. 술어를 하나로 만들면 그 갈라짐이 구조적으로 불가능해진다.
+	var open := _intervention_open()
 	_e08_respin.disabled = not open or engine == null or engine.hold_used
 	_e08_charge.disabled = not open
 	_refresh_skill_slots()
