@@ -1171,11 +1171,14 @@ func _run_v8_key_grammar() -> void:
 # 파일은 `res://` 밖이라 스위트가 읽지 못한다. 축을 갈랐다 — 데이터 안에서 끝나는 제약 ①
 # (색 치환)은 SCENE 스위트가, **무대 지형과 대조해야 하는 제약 ②는 여기가** 진다.
 #
-# **성격 = 경고형(신설).** 차단/경고는 구현이 정하지 않고 총괄 판정을 경유한다(불변규칙 7).
-# FONT(IMPL-147→148)·PAL(209→219)·ANCH(233→237)이 밟은 절차 그대로 — 오검출 0 실측을
-# 붙여 차단형 전환을 상신한다(29차 회신 §판정 요청).
+# **성격 = 차단형** (경고형 신설 29차 → 전환 총괄 판정 ㊱ · IMPL-440). 근거는 FONT·PAL·ANCH
+# 와 같다 — **앵커 y 와 무대 `split_y` 최댓값의 비교**라 문법 수준 기계 판정이고 미적 판단이
+# 없어 V7 의 사유가 적용되지 않는다. 실측 = 오검출 0(현행 앵커 2건 전건 통과) · 검출 성립
+# (y 88→40 주입) · **그리고 경고형에서는 그 검출이 `exit=0` 이었다**(반증 N15 미검출) —
+# 전환 요청의 근거가 그 미검출 자체였다.
 #
-# **경고형은 스스로 죽어도 빌드를 멈추지 못한다** — 검사의 실재는 UISCR ⑬축이 따로 받친다.
+# **판정 불가도 실패다.** 지형 소재를 읽지 못하면 검사는 *위반 없음*이 아니라 *판정 없음*이며,
+# 종료코드는 둘을 구분하지 못한다(AUD 완주 관문과 같은 축).
 #
 # 제약 ② = *"`fx_flash_burst` 는 지평선 아래(노면·바닥 대역)에 둔다 — 하늘에 두면 태양이
 # 된다"* (IMPL-396 → **IMPL-420 보강: 근본은 명도가 아니라 대역이다**). 컷은 무대를 가리지
@@ -1191,7 +1194,7 @@ func _run_fx_placement_scan() -> void:
 	var checked := 0
 	var bands: Array = _fxpl_split_values()
 	if bands.is_empty():
-		_warn("FXPL", "%s 에서 split_y 를 읽지 못했다 — 대역 판정 불가" % FXPL_BG_SPEC)
+		_fail("FXPL", "%s 에서 split_y 를 읽지 못했다 — 판정 없음은 위반 없음이 아니다" % FXPL_BG_SPEC)
 		_report("FXPL", "fx placement constraints", checked, before_fail, before_warn)
 		return
 	var horizon := 0
@@ -1200,7 +1203,7 @@ func _run_fx_placement_scan() -> void:
 	# **비공허성** — 무대 수만큼 값이 있어야 "가장 늦은 지평선"이 실제 최댓값이다.
 	checked += 1
 	if bands.size() < 5:
-		_warn("FXPL", "지형 표본 %d < 무대 5 — 대역 상한이 낮게 잡힌다" % bands.size())
+		_fail("FXPL", "지형 표본 %d < 무대 5 — 대역 상한이 낮게 잡혀 검사가 헐거워진다" % bands.size())
 	var ground: Dictionary = {}
 	for row in _tables.get(FXPL_ELEMENTS, []):
 		if String(row.get("band_ground", "0")).strip_edges() == "1":
@@ -1212,7 +1215,7 @@ func _run_fx_placement_scan() -> void:
 		checked += 1
 		var anchor_y := String(row.get("anchor_y", "0")).strip_edges().to_int()
 		if anchor_y < horizon:
-			_warn("FXPL", "%s: %s 앵커 y=%d 가 지평선 %d 위다 — 하늘의 방사 광원은 천체로 읽힌다"
+			_fail("FXPL", "%s: %s 앵커 y=%d 가 지평선 %d 위다 — 하늘의 방사 광원은 천체로 읽힌다"
 				% [String(row.get("id", "")), element_id, anchor_y, horizon])
 	_report("FXPL", "fx placement constraints", checked, before_fail, before_warn)
 

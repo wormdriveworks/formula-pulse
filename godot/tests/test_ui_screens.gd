@@ -130,8 +130,8 @@ func _process(_delta: float) -> bool:
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 621:
-		print("UI_SCREENS_FAIL checks=%d < 하한 621 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 629:
+		print("UI_SCREENS_FAIL checks=%d < 하한 629 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1362,13 +1362,14 @@ func _anch_check_present() -> void:
 	_ok("STRF = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("STRF"'))
 	# 인용 인식이 규칙의 본체다 — 산술 비교로 되돌리면 정상 데이터 2건이 오검출된다(실측).
 	_ok("STRF 인용 인식 보유", source.contains("func _strf_records("))
-	# ── FXPL (신설 29차 — **경고형**) ──
-	# **경고형은 스스로 죽어도 빌드를 멈추지 못한다**(불변규칙 7 명문) — 그래서 실재를
-	# 여기가 받친다. 차단형 전환은 총괄 판정 경유이므로 여기서 성격을 못박지 않는다.
+	# ── FXPL (신설 29차 경고형 → **차단형** 전환 · 총괄 판정 ㊱ IMPL-440) ──
+	# 실재를 받치는 이유는 ANCH·STRF 와 같고, 여기에 **성격까지** 못박는다 —
+	# 경고로 되돌리면 위반이 빌드를 멈추지 않는데 종료코드는 그것을 말해 주지 않는다.
 	_ok("FXPL 검사 정의 실재", source.contains("func _run_fx_placement_scan("))
 	_ok("FXPL 검사 등록(호출) 실재", source.contains("\t_run_fx_placement_scan()"))
 	# 지형 소재를 잃으면 검사가 조용히 무대상이 된다 — 소재 경로까지 본다.
 	_ok("FXPL 지형 소재 = bg_spec", source.contains("tools/assets/bg_spec.json"))
+	_ok("FXPL = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("FXPL"'))
 	# ── 선택지 자수 규칙 (총괄 판정 IMPL-257 ②) ──
 	# **검사가 아니라 규칙 행이다.** V3·V7 은 그대로 살아 있으므로 행이 지워져도 검사는 죽지
 	# 않고 **그 도메인만 조용히 규율 밖으로 나간다** — 종료코드가 구분하지 못하는 자리가
@@ -2413,7 +2414,7 @@ func _skill_slots(data: GameData) -> void:
 			# 언어를 재는지 스스로 정하지 못한다 — 그 상태로 `<= budget` 을 단언하면
 			# 프로필에 남은 선택지가 검사의 판정을 바꾼다(실측으로 그렇게 붉어졌다).
 			# 여기서는 발주 대기 상한과만 대조하고, 3언어 실측은 ㉚ 이 명시적으로 한다.
-			_ok("5슬롯 만재 액션 열이 발주 대기 상한 안", needed - budget <= ROW_OVERFLOW_CEILING,
+			_ok("5슬롯 만재 액션 열이 예산 안 (초과 0)", needed - budget <= 0.0,
 				"needed=%.1f budget=%.1f 초과=%.1f" % [needed, budget, needed - budget])
 			# 비공허성 — 배지가 실제로 붙은 덱을 재고 있는가. 무제한만 뽑히면 이 축은
 			# 28차 이전과 같은 것을 재면서 최악을 잰다고 말하게 된다.
@@ -3359,28 +3360,49 @@ func _focus_ring_theme(data: GameData) -> void:
 # **②** `anchors_preset 0 → 15` 재정규화가 `grow_*` 를 END→BOTH 로 바꾼다. 그 방향은
 # **최소 크기가 앵커 rect 를 넘을 때만** 의미를 갖는다 — 넘지 않는다를 산문으로 두지 않고
 # 화면 루트 최소 크기를 캔버스와 재서 못박는다.
+const UI_SCREENS_SOURCE := "res://tests/test_ui_screens.gd"
+# 초과 단언 2개소 — 만재 축과 3언어 축. **둘 다 본다**: 한쪽만 되돌려도 그 언어·그 구성이
+# 조용히 천장을 되찾는다.
+const ACTION_ROW_ZERO_ASSERTS := [
+	"5슬롯 만재 액션 열이 예산 안 (초과 0)",
+	"액션 열이 예산 안 (초과 0)\" % code",
+]
+
 const ROOT_MIN_SCENES := [
 	"res://ui/sys/options_screen.tscn", "res://ui/sys/achievement_screen.tscn",
 	"res://ui/hub/garage_screen.tscn", "res://ui/race/race_screen.tscn",
 ]
 
-# ── 발주 대기 상한 (14차 ⑧ 실측 → 내러티브 발주) ──
+# ── 발주 대기 상한 = **철거** (총괄 판정 ③ · 30차 집행) ──
 #
-# **면제가 아니라 천장이다.** 영문 액션 열이 예산을 넘는다(실측 — 값은 실패 문면이 찍는다).
-# 가장 싼 지렛대는 `ui.race.chargeIntervene` 영문이고 `strings.csv` 는 내러티브 레인 배타
-# 창구이므로 화면 층이 고칠 수 없다(총괄 인계 ⑧ 이 그 발주를 예고해 뒀다).
+# 14차 ⑧ 이 세운 `ROW_OVERFLOW_CEILING := 41.0` 은 *"문면이 오면 이 값을 0 으로 내리는 것이
+# 그 회차의 몫"* 이라고 스스로 적어 둔 값이었고, 문면이 왔다(㉝ · `chargeIntervene` en·ja
+# 단축 — IMPL-441). **발주 대기 상한은 대기가 끝나면 대기가 아니다.**
 #
-# 그래서 초과를 **0 으로 단언하지 않고 현행 실측에 붙여 못박는다**: 지금보다 나빠지면
-# 즉시 붉어지고, 문면이 오면 이 값을 0 으로 내리는 것이 그 회차의 몫이다. 상한이 면제로
-# 굳지 않게 위 두 축이 함께 선다 — ⓐ한 언어는 상한 없이 들어와야 하고 ⓑ상한은 실측 최악과
-# 5px 안에 붙어 있어야 한다(여유를 남기면 새 초과가 조용히 흡수된다).
-const ROW_OVERFLOW_CEILING := 41.0
+# 함께 철거한 것이 **"상한이 실측 최악과 5px 안" 축**이다. 그 축은 *상한이 있는 동안*
+# 상한이 면제로 굳지 않게 붙들던 보조 축이고, 상한이 사라지면 잴 대상이 없다 —
+# 남겨 두면 `41.0 - 0.0 > 5.0` 으로 **없어진 것을 지키느라 붉어진다**(실측: 문면 착지 직후
+# 그 상태였다). **가드는 자기가 지키던 것이 사라지면 함께 내려간다.**
+#
+# 대신 초과를 **상시 0 으로 단언**한다 — 천장이 없으면 초과는 결함이다.
+
+
+# 원본에서 그 문면이 든 **단언 줄**을 뜬다 — 주석에 같은 말이 있어도 `_ok(` 로 시작하는
+# 줄만 본다(문면이 주석에 남아 있고 단언은 사라진 상태를 통과시키지 않는다).
+func _suite_line_with(source: String, marker: String) -> String:
+	for line in source.split("\n"):
+		var text := String(line).strip_edges()
+		if text.begins_with("_ok(") and text.contains(marker):
+			return text
+	return ""
 
 
 func _action_row_budget(data: GameData) -> void:
 	var before_language := data.strings.language()
 	var fits := 0
-	var worst := 0.0
+	# **음수까지 담는다** — 0 으로 시작하면 여유가 얼마든 `worst` 가 0 에 붙어 관측이
+	# "딱 맞았다"로 읽힌다(철거 직후 실제로 그렇게 찍혔다).
+	var worst := -INF
 	for language in LANGUAGE_COLUMNS_EXPECTED:
 		var code := String(language)
 		# **세션을 먼저 세우고 언어를 그 뒤에 바꾼다.** `begin_career()` 가
@@ -3405,23 +3427,70 @@ func _action_row_budget(data: GameData) -> void:
 			var budget: float = float(metrics["budget"])
 			var needed: float = float(metrics["needed"])
 			var over: float = needed - budget
+			# ── ⚠ 덱 구성 전수 관측 (30차 신설 — 내러티브 11차 인계 관측의 실측) ──
+			#
+			# **판정은 만재 5기가 하고, 관측은 전 구성이 한다.** 잠금 슬롯 문면
+			# (`ui.race.locked`)이 장착 슬롯 문면보다 **넓을 수 있고**, 만재만 재면 그
+			# 조합이 측정 밖에 남는다. 실측 결과 **en 2슬롯(잠금 3) 조합이 2.4px 넘는다** —
+			# `Locked` 가 `S{n} ◆2` 보다 길다.
+			#
+			# **판정으로 올리지 않은 것은 처분이 내 경로 밖이기 때문이다** — 문면(내러티브)
+			# 이거나 배치(주력)다. 여기서 차단으로 세우면 남의 몫이 내 게이트를 붙든다.
+			# 대신 **매 주행 숫자를 찍어** 관측이 잊히지 않게 하고, 훑기가 실제로 돌았는지를
+			# 비공허성으로 못박는다(관측이 조용히 0회가 되면 그것도 침묵이다).
+			var swept := 0
+			var deck_worst := -INF
+			var deck_worst_size := 0
+			for deck_size in range(1, 6):
+				screen.engine.deck = _widest_deck(data, deck_size)
+				screen._refresh_skill_slots()
+				var m := _action_row_metrics(screen)
+				if m.is_empty():
+					continue
+				swept += 1
+				if float(m["needed"]) - float(m["budget"]) > deck_worst:
+					deck_worst = float(m["needed"]) - float(m["budget"])
+					deck_worst_size = deck_size
+			_ok("[%s] 전제: 덱 구성 전수 훑기 5회" % code, swept == 5, str(swept))
+			print("  [관측] [%s] 덱 전수 최악 = %d슬롯 · 초과 %+.1fpx"
+				% [code, deck_worst_size, deck_worst])
+			screen.engine.deck = _widest_deck(data, 5)
+			screen._refresh_skill_slots()
 			worst = maxf(worst, over)
 			if over <= 0.0:
 				fits += 1
 			_ok("[%s] 전제: 예산이 릴 열보다 넓다 (산정 실패 오탐 방지)" % code, budget > 208.0,
 				"budget=%.1f" % budget)
-			_ok("[%s] 액션 열 초과가 발주 대기 상한 안" % code, over <= ROW_OVERFLOW_CEILING,
-				"needed=%.1f budget=%.1f 초과=%.1f 상한=%.1f"
-					% [needed, budget, over, ROW_OVERFLOW_CEILING])
+			_ok("[%s] 액션 열이 예산 안 (초과 0)" % code, over <= 0.0,
+				"needed=%.1f budget=%.1f 초과=%.1f" % [needed, budget, over])
 		_unmount(screen)
-	# **상한이 전 언어를 덮지 못하게 한다** — 한 언어라도 0 초과로 들어와야 상한이
-	# "특정 언어의 문면 대기"를 뜻하고, 전 언어가 넘치면 그것은 문면 사안이 아니라 배치 결함이다.
-	_ok("적어도 한 언어는 상한 없이 예산 안 (상한이 전역 결함을 가리지 않는다)", fits >= 1,
-		"fits=%d" % fits)
-	# **상한이 실측과 붙어 있게 한다** — 여유가 남으면 새 초과가 조용히 흡수된다.
-	_ok("발주 대기 상한이 실측 최악과 5px 안 (여유를 남기지 않는다)",
-		ROW_OVERFLOW_CEILING - worst <= 5.0,
-		"상한=%.1f 최악=%.1f" % [ROW_OVERFLOW_CEILING, worst])
+	# **계수로도 센다** — 언어별 축은 `metrics` 가 비면 건너뛰므로, 세 언어가 **실제로
+	# 재였고 전건 들어왔다**는 사실은 따로 세야 한다(건너뛴 것과 통과한 것은 다른 사실이다).
+	_ok("3언어 전건 예산 안 (측정 누락 0)", fits == LANGUAGE_COLUMNS_EXPECTED.size(),
+		"fits=%d / %d" % [fits, LANGUAGE_COLUMNS_EXPECTED.size()])
+	# ── 철거가 되돌려지지 않았는가 (30차 신설) ──
+	#
+	# **느슨해지는 변경은 거동으로 잡히지 않는다** — `over <= 0` 을 `<= 41` 로 되돌려도
+	# 지금 값이 통과하므로 아무 축도 붉어지지 않고 검사 수도 그대로다(반증 P4·P6 실측
+	# 미검출). ANCH·STRF·FXPL 의 *"경고 호출 잔존 0"* 과 같은 성격의 원본 대조를 세운다.
+	#
+	# **이 축의 한계를 적어 둔다**: 상수 이름을 바꾸거나 문면을 고치면 빠져나간다.
+	# 거동 축보다 약하지만, *되돌림*은 거동으로 잴 수 없으므로 이것이 남는 도구다.
+	var suite_source := FileAccess.get_file_as_string(UI_SCREENS_SOURCE)
+	_ok("스위트 원본 적재", not suite_source.is_empty())
+	# **문자열을 쪼갠다** — 붙여 두면 이 줄 자체가 원본에 남아 검사가 자기를 잡는다
+	# (초판이 그대로 붉어졌다 — V2 접두 리터럴 분할과 같은 형태).
+	_ok("발주 대기 상한 상수 잔존 0 (선언)",
+		not suite_source.contains("const " + "ROW_OVERFLOW_CEILING"))
+	for marker in ACTION_ROW_ZERO_ASSERTS:
+		var line := _suite_line_with(suite_source, String(marker))
+		_ok("초과 단언이 0 그대로: %s" % String(marker), line.contains("<= 0.0"), line)
+	_ok("3언어 계수 축이 전건 단언 그대로",
+		_suite_line_with(suite_source, "3언어 전건 예산 안")
+			.contains("LANGUAGE_COLUMNS_EXPECTED.size()"))
+	# 최악 여유를 **관측으로 남긴다** — 판정하지 않는다(문턱이 없으므로). 철거 시점 실측:
+	# ko 가 구속 조건이고 여유가 가장 얇다(내러티브 11차 관측 — en 7.6 · ja 6.6 · ko 2.6).
+	print("  [측정] 액션 열 3언어 최악 초과 %+.1fpx (음수 = 여유)" % worst)
 	var restored: bool = data.set_language(before_language)
 	_ok("언어 원복 (뒤 축 오염 방지)",
 		restored and data.strings.language() == before_language, data.strings.language())
