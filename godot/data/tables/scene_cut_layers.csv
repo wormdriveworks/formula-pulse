@@ -1,0 +1,16 @@
+id,cut_id,element_id,layer_order,anchor_x,anchor_y,tint
+scl_solo_speed,cut_basic_solo,fxe_speed_lines,1,204,62,
+scl_group_speed,cut_basic_group,fxe_speed_lines,1,204,62,
+scl_group_slip,cut_basic_group,fxe_slipstream,2,108,62,
+scl_overtake_slip,cut_overtake,fxe_slipstream,1,108,62,
+scl_overtake_accel,cut_overtake,fxe_accel_afterimage,2,92,62,
+scl_defense_accel,cut_defense,fxe_accel_afterimage,1,92,62,
+scl_close_spark,cut_close_battle,fxe_contact_spark,1,204,62,
+scl_trouble_smoke,cut_trouble,fxe_smoke_debris,1,204,30,
+scl_trouble_warn,cut_trouble,fxe_warning_light,2,204,14,signal
+scl_start_warn,cut_start,fxe_warning_light,1,204,14,signal
+scl_start_accel,cut_start,fxe_accel_afterimage,2,92,62,
+scl_duel_aura,cut_duel_standoff,fxe_duel_aura,1,204,62,
+scl_finish_flash,cut_finish,fxe_flash_burst,1,204,88,
+scl_pulse_flash,cut_pulse_drive,fxe_flash_burst,1,204,88,
+scl_pulse_aura,cut_pulse_drive,fxe_duel_aura,2,204,62,

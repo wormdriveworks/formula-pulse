@@ -126,10 +126,12 @@ func _process(_delta: float) -> bool:
 	_options_relabel(data)
 	_focus_ring_theme(data)
 	_action_row_budget(data)
+	_scene_panel_layers(data)
+	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 586:
-		print("UI_SCREENS_FAIL checks=%d < 하한 586 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 621:
+		print("UI_SCREENS_FAIL checks=%d < 하한 621 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -1360,6 +1362,13 @@ func _anch_check_present() -> void:
 	_ok("STRF = 차단형 (경고 호출 잔존 0)", not source.contains('_warn("STRF"'))
 	# 인용 인식이 규칙의 본체다 — 산술 비교로 되돌리면 정상 데이터 2건이 오검출된다(실측).
 	_ok("STRF 인용 인식 보유", source.contains("func _strf_records("))
+	# ── FXPL (신설 29차 — **경고형**) ──
+	# **경고형은 스스로 죽어도 빌드를 멈추지 못한다**(불변규칙 7 명문) — 그래서 실재를
+	# 여기가 받친다. 차단형 전환은 총괄 판정 경유이므로 여기서 성격을 못박지 않는다.
+	_ok("FXPL 검사 정의 실재", source.contains("func _run_fx_placement_scan("))
+	_ok("FXPL 검사 등록(호출) 실재", source.contains("\t_run_fx_placement_scan()"))
+	# 지형 소재를 잃으면 검사가 조용히 무대상이 된다 — 소재 경로까지 본다.
+	_ok("FXPL 지형 소재 = bg_spec", source.contains("tools/assets/bg_spec.json"))
 	# ── 선택지 자수 규칙 (총괄 판정 IMPL-257 ②) ──
 	# **검사가 아니라 규칙 행이다.** V3·V7 은 그대로 살아 있으므로 행이 지워져도 검사는 죽지
 	# 않고 **그 도메인만 조용히 규율 밖으로 나간다** — 종료코드가 구분하지 못하는 자리가
@@ -2865,6 +2874,13 @@ func _skill_label_and_notice(data: GameData) -> void:
 			"before=%d after=%d" % [log_before, _rendered_log_lines(screen).size()])
 		_ok("전제: 다른 사유와 문면이 다르다",
 			expected != s.text("ui.race.skillRejectedCharge"), expected)
+		# `limit_boost` — 27차 2분할의 나머지 반쪽 (문면 유입 IMPL-434). **짝을 어긋나게
+		# 고른다**: 두 반쪽의 문면이 같으면 분할이 표시 층에서 무의미해진다.
+		var boost_expected := s.text("ui.race.skillRejectedLimitBoost")
+		_ok("전제: 2분할 두 반쪽의 문면이 다르다", boost_expected != expected, boost_expected)
+		slot.text = ""
+		screen._notify_skill_rejected("limit_boost")
+		_ok("limit_boost 거부 = 전용 슬롯 문면 일치", slot.text == boost_expected, slot.text)
 		# 침묵 3종은 여전히 침묵이다 — 고지 편입이 봉인 계약을 밀지 않았는가.
 		for code in RaceEngine.SEAL_SILENT_ERRORS:
 			slot.text = expected
@@ -3421,3 +3437,138 @@ func _action_row_budget(data: GameData) -> void:
 			minimum.x <= CANVAS.x and minimum.y <= CANVAS.y,
 			"min=%s canvas=%s" % [str(minimum), str(CANVAS)])
 		_unmount(screen2)
+
+
+# ── ㉕ E15 씬 패널 — 레이어 순서·요소 합성 (29차 · 사양서 v1.11 §5.2.2) ──
+#
+# **순서가 곧 계약이다**: 원경 → 머신 → 근경 → 요소. 근경이 머신 위인 것이 배경 2레이어
+# 분리의 목적이며(§5.1 "컷 합성용"), 뒤집으면 분리가 무의미해진다.
+const SCENE_PANEL_NODE := "ScenePanel"
+const SCENE_LAYER_ORDER := ["Far", "Machine", "Near", "Fx"]
+
+
+func _scene_panel_layers(data: GameData) -> void:
+	var screen := _new_race_screen()
+	if screen == null:
+		return
+	var panel := screen._scene_panel as Control
+	_ok("씬 패널 실물 실재", panel != null)
+	if panel == null:
+		_unmount(screen)
+		return
+	_ok("씬 패널 = E15 슬롯 안", panel.get_parent().name == "E15ScenePanel",
+		String(panel.get_parent().name))
+	_ok("씬 패널 비인터랙티브 (별첨A §127)",
+		panel.mouse_filter == Control.MOUSE_FILTER_IGNORE)
+	var canvas := panel.get_node_or_null("Canvas") as Control
+	_ok("합성 캔버스 실재", canvas != null)
+	if canvas == null:
+		_unmount(screen)
+		return
+	var order: Array = []
+	for child in canvas.get_children():
+		order.append(String(child.name))
+	_ok("레이어 순서 = 원경→머신→근경→요소", order == SCENE_LAYER_ORDER, str(order))
+	# 원도 그대로여야 한다 — 신축이 들어가면 도트가 뭉갠다.
+	_ok("캔버스 폭 = 제작 원도", is_equal_approx(canvas.size.x,
+		data.param("param_scene_canvas_width_px")), str(canvas.size.x))
+	var far := canvas.get_node("Far") as TextureRect
+	var machine := canvas.get_node("Machine") as TextureRect
+	var near := canvas.get_node("Near") as TextureRect
+	_ok("원경 텍스처 실재", far.texture != null)
+	_ok("근경 텍스처 실재", near.texture != null)
+	_ok("원경 ≠ 근경 (같은 파일을 두 번 얹지 않는다)", far.texture != near.texture)
+	_ok("머신 텍스처 실재", machine.texture != null)
+	_ok("머신 표준 자리 = 데이터 창구",
+		is_equal_approx(machine.position.x, data.param("param_scene_machine_x"))
+		and is_equal_approx(machine.position.y, data.param("param_scene_machine_y")),
+		str(machine.position))
+	_unmount(screen)
+
+
+# ── ㉖ 국면 거동 — 릴 고정 / 전개 매핑 / O12 / 완급 비트 스킵 ──
+#
+# **릴 국면이 결과를 모른다는 것을 거동으로 잰다.** 확정 이벤트를 넣어도 릴 국면 컷이
+# 바뀌지 않아야 한다 — 봉인의 화면 층 형태다(불변규칙 5).
+func _scene_panel_phase(data: GameData) -> void:
+	var screen := _new_race_screen()
+	if screen == null:
+		return
+	var panel: ScenePanel = screen._scene_panel
+	if panel == null:
+		_unmount(screen)
+		return
+	# ⓐ 진입 = 릴 국면 고정 컷 + 모션 정지
+	_ok("진입 = 기본 주행 고정",
+		String(panel._cut_id).begins_with("cut_basic_"), String(panel._cut_id))
+	_ok("릴 국면 = 모션 정지", not panel._motion_enabled)
+	# ⓑ 전개 국면 — **짝을 어긋나게 고른다**: 트러블과 추월은 서로 다른 컷이어야 한다.
+	screen._show_result_cut([{"key": "raceLog.troubleHit01"}], false, false)
+	var trouble_cut := String(panel._cut_id)
+	screen._show_result_cut([{"key": "raceLog.overtakeSuccess01"}], false, false)
+	var overtake_cut := String(panel._cut_id)
+	_ok("트러블 확정 = 트러블 컷", trouble_cut == "cut_trouble", trouble_cut)
+	_ok("추월 확정 = 추월 컷", overtake_cut == "cut_overtake", overtake_cut)
+	_ok("전제: 두 컷이 다르다", trouble_cut != overtake_cut)
+	_ok("전개 국면 = 모션 재개", panel._motion_enabled)
+	# ⓒ 요소 층이 실제로 섰는가 — 합성 선언이 노드로 옮겨졌는지
+	var fx_root := panel.get_node("Canvas/Fx") as Control
+	_ok("추월 컷 요소 층 = 선언 수",
+		fx_root.get_child_count() == data.scene_cut_layers_for("cut_overtake").size(),
+		str(fx_root.get_child_count()))
+	# ⓓ 릴 국면 복귀 — 결과를 넣어도 기본 주행으로 돌아온다
+	screen._show_reel_phase_cut()
+	_ok("릴 국면 복귀 = 기본 주행",
+		String(panel._cut_id).begins_with("cut_basic_"), String(panel._cut_id))
+	_ok("릴 국면 복귀 = 모션 정지", not panel._motion_enabled)
+	# ⓔ O12 정지 컷 — 접근성 폴백 (D09 §6.1)
+	screen.session.options.set_index("o12", 1)
+	screen._show_result_cut([{"key": "raceLog.overtakeSuccess01"}], false, false)
+	_ok("O12 정지 컷 = 모션 없음", not panel._motion_enabled)
+	screen.session.options.set_index("o12", 0)
+	# ⓕ 완급 비트 스킵 — 확정 입력이 즉시 통과시킨다 (D09 §3.1.1)
+	screen._pacing_beat_left = data.param("param_pacing_beat_max_sec")
+	screen._on_primary_action()
+	_ok("완급 비트 = 확정 입력으로 즉시 통과",
+		is_equal_approx(screen._pacing_beat_left, 0.0), str(screen._pacing_beat_left))
+	# ⓖ 비트 예산 — 재생 상한 × 발동 빈도 ≤ 턴당 +2초 (D09 §3.1.1 구속)
+	_ok("완급 비트 예산 = 턴당 평균 +2초 이내",
+		data.param("param_pacing_beat_max_sec")
+		* data.param("param_pacing_beat_probability") <= 2.0,
+		str(data.param("param_pacing_beat_max_sec")
+			* data.param("param_pacing_beat_probability")))
+	# ⓘ **대표 프레임을 실제로 잘라 쓰는가** (E-04 `still_frame: 2` 소비 — 사용자 판정 IMPL-390).
+	#    시트를 통째로 얹으면 5칸이 가로로 늘어선 채 뜬다 — 화면에서 "정지"로 보이지 않는다.
+	screen._show_result_cut([], false, false)
+	panel.show_cut("cut_close_battle", screen._active_stage_id())
+	var spark := (panel.get_node("Canvas/Fx") as Control).get_child(0) as TextureRect
+	var atlas := spark.texture as AtlasTexture
+	_ok("시트 요소 = AtlasTexture 로 한 칸만", atlas != null)
+	if atlas != null:
+		var element := data.fx_element("fxe_contact_spark")
+		var cell_w := CsvTable.to_int(String(element["cell_w"]))
+		var still := CsvTable.to_int(String(element["still_frame"]))
+		_ok("잘라낸 칸 = 표의 대표 프레임",
+			is_equal_approx(atlas.region.position.x, float(cell_w * still))
+			and is_equal_approx(atlas.region.size.x, float(cell_w)),
+			str(atlas.region))
+		_ok("전제: 대표 프레임이 0 이 아니다 (0 이면 축이 공허하다)", still > 0, str(still))
+	# ⓙ **움직임의 진폭이 요소 자신의 치수인가** — 상수를 적으면 여기서 갈린다.
+	#    한 바퀴(마지막 프레임)에서 스크롤 오프셋 = 셀 폭 × (frames-1)/frames.
+	panel.show_cut("cut_basic_solo", screen._active_stage_id())
+	var lines := (panel.get_node("Canvas/Fx") as Control).get_child(0) as TextureRect
+	var base_x := lines.position.x
+	var frames := CsvTable.to_int(String(data.scene_cut("cut_basic_solo")["frames"]))
+	var line_cell := CsvTable.to_int(String(data.fx_element("fxe_speed_lines")["cell_w"]))
+	panel._apply_frame(frames - 1)
+	_ok("스크롤 진폭 = 셀 폭 (루프가 구조적으로 닫힌다)",
+		is_equal_approx(lines.position.x - base_x,
+			float(line_cell) * float(frames - 1) / float(frames)),
+		"%f vs %f" % [lines.position.x - base_x,
+			float(line_cell) * float(frames - 1) / float(frames)])
+	panel._apply_frame(0)
+	_ok("0 프레임 = 원자리 복귀", is_equal_approx(lines.position.x, base_x))
+	# ⓗ 머신 다수 컷은 배치 선언이 없다 — 조용히 1대로 그리지 않고 관측에 남는다
+	_ok("머신 다수 컷 = 미배치 관측", panel.multi_machine_omissions.has("cut_overtake"),
+		str(panel.multi_machine_omissions))
+	_unmount(screen)

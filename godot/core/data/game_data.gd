@@ -29,6 +29,12 @@ var season_calendar: Dictionary = {}   # 구조 JSON (D08 §2 캘린더 규칙)
 var sector_attrs: Dictionary = {}      # attr_* id -> 행 (속성 6축 — D13 별첨A §1.3)
 var presentation_grades: Dictionary = {}   # grade_* id -> 행 (연출 등급 — D12 §5.8)
 var cg_cutins: Dictionary = {}         # cgcut_* id -> 행 (전용 CG 6종 — D10 §7 결정 #6)
+# ── 씬 컷 합성 (D12 §5.9 · D09 §3.1.1 · 사양서 v1.11 §5.2) ──
+var fx_elements: Dictionary = {}       # fxe_* id -> 행 (연출 요소 8종 — 사양서 §5.2.1)
+var stage_backdrops: Dictionary = {}   # bdrop_* id -> 행 (무대 배경 2레이어 × 5)
+var scene_cuts: Dictionary = {}        # cut_* id -> 행 (씬 컷 10종 — D10 §6.2)
+var scene_cut_triggers: Array = []     # sct_* 행 (매칭 조건 — 평가는 우선순위 순)
+var scene_cut_layers: Dictionary = {}  # cut_* id -> 합성 선언 행 배열 (layer_order 오름차순)
 var events: Dictionary = {}            # event_* id -> 행 (D08 §7 · D12 §5.4)
 var facilities: Dictionary = {}        # facility_* id -> 행 (D07 §2.2)
 var tuning_lines: Dictionary = {}      # tuning_* id -> 행 (D13 별첨A §3.5)
@@ -103,6 +109,7 @@ func load_all(initial_language := DEFAULT_LANGUAGE) -> bool:
 	_load_sector_attrs()
 	_load_presentation()
 	_load_cg_cutins()
+	_load_scene_cuts()
 	_load_events()
 	_load_outgame()
 	_load_narrative()
@@ -378,6 +385,67 @@ func cg_cutin_for_vn(vn_id: String) -> Dictionary:
 		if String(row.get("source_act_vn", "")).strip_edges() == vn_id:
 			return row
 		if String(row.get("source_beat", "")).strip_edges() == vn_id:
+			return row
+	return {}
+
+
+# ── 씬 컷 합성 적재 (D12 §5.9 스키마 이행) ──
+#
+# 표 5장이 각기 다른 사실을 이고 있고 **한 장에 몰지 않았다**:
+#   · `fx_elements`        = 요소가 무엇인가 (사양서 §5.2.1 대장의 기계 대응)
+#   · `stage_backdrops`    = 무대의 배경 2레이어가 어느 파일인가
+#   · `scene_cuts`         = 컷의 정체·우선순위·프레임 수 (D10 §6.2 · D13 §8.2)
+#   · `scene_cut_triggers` = **언제 그 컷인가** (컷 하나에 조건 여럿 — 방어 성공·실패가 같은 컷)
+#   · `scene_cut_layers`   = **어디에 무엇을 얹는가** (합성 선언 — 사양서 §5.2.2)
+# 조건을 컷 행의 열로 두면 조건이 둘 이상인 컷을 표현할 수 없고, 배치를 컷 행에 두면
+# 요소가 둘인 컷이 열 복제를 부른다.
+func _load_scene_cuts() -> void:
+	fx_elements.clear()
+	stage_backdrops.clear()
+	scene_cuts.clear()
+	scene_cut_triggers.clear()
+	scene_cut_layers.clear()
+	for row in CsvTable.load_rows(_table_path("fx_elements.csv")):
+		fx_elements[String(row["id"])] = row
+	for row in CsvTable.load_rows(_table_path("stage_backdrops.csv")):
+		stage_backdrops[String(row["id"])] = row
+	for row in CsvTable.load_rows(_table_path("scene_cuts.csv")):
+		scene_cuts[String(row["id"])] = row
+	for row in CsvTable.load_rows(_table_path("scene_cut_triggers.csv")):
+		scene_cut_triggers.append(row)
+	for row in CsvTable.load_rows(_table_path("scene_cut_layers.csv")):
+		var cut_id := String(row["cut_id"])
+		if not scene_cut_layers.has(cut_id):
+			scene_cut_layers[cut_id] = []
+		scene_cut_layers[cut_id].append(row)
+	# 표시 순서는 데이터가 정한다 — 화면이 정렬을 다시 하지 않는다 (`vn_choice_options` 규약).
+	for cut_id in scene_cut_layers:
+		scene_cut_layers[cut_id].sort_custom(func(a, b):
+			return CsvTable.to_int(String(a["layer_order"])) < CsvTable.to_int(String(b["layer_order"])))
+	if fx_elements.is_empty() or stage_backdrops.is_empty() or scene_cuts.is_empty() \
+			or scene_cut_triggers.is_empty():
+		_load_ok = false
+
+
+func scene_cut(cut_id: String) -> Dictionary:
+	return scene_cuts.get(cut_id, {})
+
+
+func fx_element(element_id: String) -> Dictionary:
+	return fx_elements.get(element_id, {})
+
+
+# 컷의 합성 선언 — **없는 것이 정상이다**(요소 없는 컷은 배경 + 머신으로 성립한다.
+# 사양서 §5.1 정지 폴백이 바로 그 형태다).
+func scene_cut_layers_for(cut_id: String) -> Array:
+	return scene_cut_layers.get(cut_id, [])
+
+
+# 무대의 배경 2레이어 — `stage_id` 로 찾는다(대장 id 가 아니라 무대가 조회 열쇠다).
+func stage_backdrop(stage_id: String) -> Dictionary:
+	for backdrop_id in stage_backdrops:
+		var row: Dictionary = stage_backdrops[backdrop_id]
+		if String(row.get("stage_id", "")) == stage_id:
 			return row
 	return {}
 

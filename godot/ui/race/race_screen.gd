@@ -40,6 +40,8 @@ const PAD_DPAD_RIGHT := 14
 const ICON_DIR := "res://assets/ui/icons/"
 # 컷인 노드 이름 — 검사가 실물을 찾는 지점이다(존재를 이름으로 세지 않으면 거동을 못 잰다).
 const CG_CUTIN_NAME := "CgCutIn"
+# E15 씬 패널 — 컷 합성 노드 이름 (검사가 실물을 찾는 지점)
+const SCENE_PANEL_NAME := "ScenePanel"
 
 # 엔진 로그 키 → 사운드 이벤트 id (D11 §1.4 이벤트 결속 · §2.4 SE-E 계열 정의).
 # **화면은 SFX id 를 들지 않는다** — 무엇이 울릴지는 `sound_map` 이 정한다. 여기 있는 것은
@@ -207,6 +209,7 @@ func _boot() -> void:
 	# 성장 단계 진폭 계수 — D13 별첨A §8.2. 1단계 고정(성장 상태는 아웃게임 층 소관).
 	_e07_wave.configure(data.param("param_vane_amp_stage1"))
 	_e10_log.configure(int(data.param("param_log_slot_cap")), int(data.param("param_font_size_body")))
+	_setup_scene_panel()
 	_duel_overlay.boost_pressed_signal().connect(_on_boost)
 	_pause_overlay.setup(session)
 	_pause_overlay.resumed.connect(func():
@@ -558,6 +561,7 @@ func _next_turn() -> void:
 	else:
 		_exit_duel()
 	_hide_reels()
+	_show_reel_phase_cut()   # 릴 국면 복귀 — 기본 주행 고정 (D09 §3.1.1)
 	_push_events(info.get("events", []))
 	_refresh_strip()
 	_refresh_resources()
@@ -612,6 +616,7 @@ func _on_boost() -> void:
 
 func _on_gp_finished() -> void:
 	sfx("gp_finish")   # SE-U19 피니시 + AMB-03 함성 (D11 SC-09)
+	_show_result_cut([], false, true)   # SC-09 피니시 (D13 §8.2 우선순위)
 	_push_events([{
 		"phase": "T5", "key": "raceLog.gpFinish01",
 		"params": {"rank": engine.result.get("player_rank", 0)},
@@ -666,6 +671,13 @@ func _report_outcome(ok: bool, error: String = "") -> void:
 
 
 func _on_primary_action() -> void:
+	# **완급 비트는 확정 입력으로 즉시 통과한다** (D09 §3.1.1 "스킵 가능"). 비트는 표현이지
+	# 요구가 아니므로, 넘기려는 입력이 비트에 먹히고 사라지면 그 자체가 지연이 된다.
+	if _pacing_beat_left > 0.0:
+		_pacing_beat_left = 0.0
+		if _pacing_beat_timer != null:
+			_pacing_beat_timer.time_left = 0.0   # 즉시 통과 — 타이머가 이번 프레임에 발화한다
+		return
 	if _revealing or engine == null or engine.finished:
 		return
 	# SH3 택1 대기 중이면 확정은 **새 후보 채택**이고 턴은 넘기지 않는다 — 한 입력이
@@ -711,6 +723,8 @@ func _on_confirm() -> void:
 		_emit_clue_axion(_last_duel_opponent)
 	_push_events(events)
 	_run_presentation(events)  # 확정 후 이벤트에서만 — 봉인 (불변규칙 5)
+	# 전개 국면(T5) 컷 — 로그와 **병행**이라 추가 대기가 0이다 (D09 §3.1.1)
+	_show_result_cut(events, not _last_duel_opponent.is_empty(), engine.finished)
 	# 듀얼 결과는 프레임 내 표기 후 해제한다 (D09 §3.5). 표기 유지 0.6초 = D13 별첨A
 	# §8.1(v1.4) 확정 기준값(총괄 회신 C항) — 다른 연출 시간(fx_*)과 같은 데이터 창구 경유.
 	if _duel_overlay.visible:
@@ -722,6 +736,7 @@ func _on_confirm() -> void:
 			)
 			_duel_overlay.show_result(result_text)
 			await get_tree().create_timer(data.param("param_fx_duel_result_hold_sec")).timeout
+	await _play_pacing_beat()
 	_next_turn()
 
 
@@ -928,6 +943,10 @@ const SKILL_REJECT_KEYS := {
 	# 경로가 버튼 `disabled` 를 우회한다 — 버튼 비활성은 마우스만 막는다. 규칙 거부이므로
 	# `respin_cap` 과 같은 성격이고, 문면 유입(내러티브 10차)으로 고지에 편입됐다.
 	"limit_hold": "ui.race.skillRejectedLimitHold",
+	# 부스트 상한 거부 — 27차 `limit` 2분할의 나머지 반쪽. 28차에 `limit_hold` 만 문면을
+	# 얻고 이쪽은 미유입이었는데, 주력 14차의 `_report_outcome` 창구 통일이 그 공백을
+	# 드러냈고(㉞) 내러티브 11차가 채웠다(IMPL-434).
+	"limit_boost": "ui.race.skillRejectedLimitBoost",
 	"already_hold": "ui.race.skillRejectedAlreadyHold",
 	"already_mod": "ui.race.skillRejectedAlreadyMod",
 	"duel_turn": "ui.race.skillRejectedDuelTurn",
@@ -1401,6 +1420,11 @@ const TRIGGER_BY_KEY := {
 	"raceLog.chanceDuel01": "trigger_chance_three_match",
 }
 
+var _scene_panel: ScenePanel
+# 완급 비트 대기 — T6→차기 T1 전이에 삽입한다(D09 §3.1.1 · 표현 층 전속·상태 머신 무개정).
+var _pacing_beat_left := 0.0
+var _pacing_beat_timer: SceneTreeTimer
+
 var _shake_left := 0.0
 var _shake_strength := 0.0
 # 릴을 움직인 행동의 튜토리얼 통지 대기분 — 정지 연출이 끝날 때까지 들고 있는다(봉인).
@@ -1559,6 +1583,107 @@ func _fire_channels(channels: Dictionary) -> void:
 			_fire_flash()
 	# L3 전용 일러스트 컷인은 **여기서 뜨지 않는다** — 등급만으로는 어느 장인지 모른다.
 	# 발화는 `_run_presentation()` 이 조우 id 와 함께 건다(바로 위 호출부 주석).
+
+
+# 완급 비트 — T6→차기 T1 전이 (D09 §3.1.1 · D13 별첨A §8.1 2.5초 · 40%).
+#
+# **표현 층 전속이다**(D05 §3 상태 머신 무개정) — 엔진은 비트가 있었는지 모른다. 삽입되는
+# 것은 기본 주행 컷 한 비트이고, 확정 입력이 오면 그 자리에서 통과한다.
+# 예산 = 턴당 평균 +1.0초(2.5 × 0.40)로 D09 의 턴당 +2초 이내를 지킨다.
+func _play_pacing_beat() -> void:
+	if _scene_panel == null or engine == null or engine.finished:
+		return
+	if not session.pacing_beat_due():
+		return
+	# **프레임 루프가 아니라 트리 타이머다.** 직접 세는 형태(`await process_frame` +
+	# `get_process_delta_time()`)를 먼저 썼다가 SEAL-E 가 180초 예산을 터뜨렸다 —
+	# 코루틴이 재개되지 못하는 프레임이 생기면 턴이 영영 넘어가지 않는다. 대기는
+	# 듀얼 결과 표기(`param_fx_duel_result_hold_sec`)가 이미 쓰는 경로와 같은 것을 쓴다.
+	_pacing_beat_timer = get_tree().create_timer(data.param("param_pacing_beat_max_sec"))
+	_pacing_beat_left = data.param("param_pacing_beat_max_sec")
+	_show_reel_phase_cut()
+	await _pacing_beat_timer.timeout
+	_pacing_beat_timer = null
+	_pacing_beat_left = 0.0
+
+
+# ── E15 레이스 씬 패널 (D09 §3.1.1 · 별첨A §127) ──
+#
+# **국면이 컷을 고르는 방식이 두 갈래다.**
+#   · 릴 국면(T1~T4) = 기본 주행 고정 — **매핑을 부르지 않는다.** 결과를 보는 경로가 없는
+#     것이 봉인의 구조적 형태다(불변규칙 5). 부르고 나서 버리는 형태로 두면 그 사이에
+#     결과 상관 값이 화면 층에 존재하게 된다.
+#   · 전개 국면(T5) = 확정 이벤트로 매핑 평가 — 로그와 **병행**이라 추가 대기가 0이다.
+#
+# **저강조(감광)는 적용하지 않았다 — 값이 없다.** D09 §3.1.1·별첨A §127 이 릴 국면에
+# *"감광"* 을 명문하지만 **감광 배율은 D13 어디에도 없다**(§8.1 화면 층 블록 전수 확인).
+# 정본이 채널의 존재만 정하고 수치를 비운 형태이므로 §8.1 v1.4 편입 전례를 따라 값을
+# 요청했다(회신 §미결). 그때까지 릴 국면은 **컷 고정 + 모션 정지**만으로 성립시킨다 —
+# 없는 값을 0.5 로 채우면 그 0.5 가 정본이 된다.
+func _setup_scene_panel() -> void:
+	var host := %E15ScenePanel as Control
+	_scene_panel = ScenePanel.new()
+	_scene_panel.name = SCENE_PANEL_NAME
+	_scene_panel.setup(data)
+	host.add_child(_scene_panel)
+	# O12 '씬 패널 모션: 표준 / 정지 컷' — 접근성 폴백 (D09 §6.1)
+	_scene_panel.set_motion_enabled(session.options.index_of("o12") == 0)
+	# **여기서 첫 컷을 세우지 않는다.** `_boot()` 는 `_start_gp()` **전에** 돌아 엔진이 아직
+	# 없으므로, 세우려는 호출은 조기 반환으로 아무 일도 하지 않는다 — 29차 반증(N7)이
+	# 그 무동작을 드러냈다. 죽은 한 줄을 남겨 두면 다음 사람이 그것을 결선의 증거로 읽는다
+	# (주력 14차가 이름 붙인 형태 — **"직접 호출은 결선의 증거가 아니다"**).
+	# 첫 컷은 `_start_gp() → _next_turn()` 이 세운다.
+
+
+# 릴 국면 고정 컷. 모션도 멈춘다 — 개입 판단을 방해하지 않는 것이 이 국면의 요건이다
+# (D09 §3.1.1 "10초 성립 원칙 보호").
+func _show_reel_phase_cut() -> void:
+	if _scene_panel == null or engine == null:
+		return
+	_scene_panel.set_motion_enabled(false)
+	_scene_panel.show_cut(session.scene_cuts.reel_phase_cut(_field_size()), _active_stage_id())
+
+
+# 전개 국면 컷 — **확정 이벤트에서만** 부른다(호출부 = `_on_confirm` 의 정산 뒤).
+func _show_result_cut(events: Array, duel_turn: bool, gp_finished: bool) -> void:
+	if _scene_panel == null or engine == null:
+		return
+	var log_keys: Array = []
+	for event in events:
+		log_keys.append(String(event.get("key", "")))
+	var cut_id := session.scene_cuts.resolve({
+		"log_keys": log_keys,
+		"duel_turn": duel_turn,
+		"front_gauge": engine.front_gauge,
+		"rear_gauge": engine.rear_gauge,
+		"gp_finished": gp_finished,
+		"field_size": _field_size(),
+	})
+	if cut_id.is_empty():
+		return   # 폴백 행이 사라진 경우 — 검사가 잡는다(코드가 기본값을 들지 않는다)
+	_scene_panel.show_cut(cut_id, _active_stage_id())
+	_scene_panel.set_motion_enabled(session.options.index_of("o12") == 0)
+
+
+func _active_stage_id() -> String:
+	return String(data.stage_of_active_circuit().get("id", ""))
+
+
+# **[가안] 단독 / 그룹 = 자신 + 앞뒤 인접.** 정본(D09 §3.1.1·D10 §6.2)은 두 컷의 존재만
+# 정하고 *무엇이 그룹인가*를 정하지 않는다. 패널이 비추는 것은 플레이어 주변이므로
+# 앞뒤 인접 순위를 세는 것을 초안으로 둔다 — 전 참가자 수로 세면 초반에 늘 그룹이라
+# 단독 컷이 **영원히 서지 않는다**(죽은 컷 — 주력 14차가 이름 붙인 형태다).
+# **폐문 조건:** 실물 플레이 검증 회차의 눈 판정 — 단독/그룹 전환이 실기에서 옳게 읽히는가.
+func _field_size() -> int:
+	var index := engine.positions.find(RaceEngine.PLAYER_ID)
+	if index < 0:
+		return 1
+	var neighbours := 0
+	if index > 0:
+		neighbours += 1
+	if index < engine.positions.size() - 1:
+		neighbours += 1
+	return 1 + neighbours
 
 
 # ── L3 전용 일러스트 채널 (D09 §3.6 · D10 §7 · D11 §6.5) ──

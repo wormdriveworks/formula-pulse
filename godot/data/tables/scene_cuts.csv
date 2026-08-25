@@ -1,0 +1,11 @@
+id,cut_code,priority,frames,machines
+cut_duel_standoff,SC-07,1,5,2
+cut_trouble,SC-06,2,6,1
+cut_overtake,SC-03,3,6,2
+cut_defense,SC-04,4,6,2
+cut_close_battle,SC-05,5,5,2
+cut_start,SC-08,6,8,4
+cut_finish,SC-09,6,8,1
+cut_basic_group,SC-02,7,4,3
+cut_basic_solo,SC-01,7,4,1
+cut_pulse_drive,SC-10,0,6,1

@@ -1,0 +1,12 @@
+id,cut_id,match_kind,log_key
+sct_duel_turn,cut_duel_standoff,duel_turn,
+sct_trouble_hit,cut_trouble,log_event,raceLog.troubleHit01
+sct_player_retire,cut_trouble,log_event,raceLog.playerRetire01
+sct_overtake,cut_overtake,log_event,raceLog.overtakeSuccess01
+sct_defend_ok,cut_defense,log_event,raceLog.defendSuccess01
+sct_defend_fail,cut_defense,log_event,raceLog.defendFail01
+sct_close_battle,cut_close_battle,close_gauge,
+sct_gp_start,cut_start,log_event,raceLog.gpStart01
+sct_gp_finish,cut_finish,gp_finish,
+sct_group_field,cut_basic_group,group_field,
+sct_solo,cut_basic_solo,fallback,

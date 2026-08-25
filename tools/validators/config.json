@@ -364,6 +364,66 @@
     "trigger_act": "int:0,4"
    }
   },
+  "fx_elements.csv": {
+   "id_prefix": "fxe_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "element_code": "string",
+    "asset": "string",
+    "cell_w": "int:8,128",
+    "cell_h": "int:8,128",
+    "frames": "int:1,10",
+    "still_frame": "int:0,9",
+    "motion": "enum:scroll_x,fade,still,rise,blink,pulse,expand",
+    "tint_required": "int:0,1",
+    "band_ground": "int:0,1"
+   }
+  },
+  "stage_backdrops.csv": {
+   "id_prefix": "bdrop_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "stage_id": "structure_ref",
+    "far_asset": "string",
+    "near_asset": "string"
+   }
+  },
+  "scene_cuts.csv": {
+   "id_prefix": "cut_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "cut_code": "string",
+    "priority": "int:0,9",
+    "frames": "int:1,10",
+    "machines": "int:1,8"
+   }
+  },
+  "scene_cut_triggers.csv": {
+   "id_prefix": "sct_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "cut_id": "fk:scene_cuts.csv",
+    "match_kind": "enum:duel_turn,log_event,close_gauge,gp_finish,group_field,fallback",
+    "log_key": "string_key_optional"
+   }
+  },
+  "scene_cut_layers.csv": {
+   "id_prefix": "scl_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "cut_id": "fk:scene_cuts.csv",
+    "element_id": "fk:fx_elements.csv",
+    "layer_order": "int:1,4",
+    "anchor_x": "int:0,408",
+    "anchor_y": "int:0,100",
+    "tint": "enum_optional:signal,pulse"
+   }
+  },
   "cg_cutins.csv": {
    "id_prefix": "cgcut_",
    "root": true,

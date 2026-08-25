@@ -131,3 +131,7 @@ param_skill_defense_mult,1.5
 param_skill_defense_duel_add,12
 param_skill_boost_per_judgment,16
 param_skill_chassis_floor,1
+param_scene_canvas_width_px,408
+param_scene_machine_x,140
+param_scene_machine_y,30
+param_scene_cut_fps,8

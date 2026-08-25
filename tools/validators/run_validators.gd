@@ -48,6 +48,7 @@ func _init() -> void:
 	_run_anchor_scan()
 	_run_string_field_scan()
 	_run_audio_asset_scan()
+	_run_fx_placement_scan()
 	# **완주 관문** — 스캔이 중도 이탈하면 실패 0·보고 0 으로 통과가 찍힌다(2026-08-20 실측:
 	# OGG 헤더의 없는 키를 `header["x"]` 로 읽자 함수가 이탈하고 게이트가 `VALIDATORS_PASS` 를 냈다).
 	# `run_tests.sh` 가 "성공 토큰의 부재 자체를 실패로 본다"고 한 것과 같은 축이다 —
@@ -1162,6 +1163,82 @@ func _run_v8_key_grammar() -> void:
 		if key_regex.search(String(key)) == null:
 			_fail("V8", "invalid key grammar: '%s'" % key)
 	_report("V8", "key grammar", checked, before_fail, before_warn)
+
+
+# ── FXPL 연출 요소 배치 제약 (신설 29차 — **경고형** · 제원표 §3.1 · `fx_spec.json` `_합성제약`) ──
+#
+# **왜 검증기인가.** 판정 소재가 `tools/assets/bg_spec.json` 의 무대별 `split_y` 인데 그
+# 파일은 `res://` 밖이라 스위트가 읽지 못한다. 축을 갈랐다 — 데이터 안에서 끝나는 제약 ①
+# (색 치환)은 SCENE 스위트가, **무대 지형과 대조해야 하는 제약 ②는 여기가** 진다.
+#
+# **성격 = 경고형(신설).** 차단/경고는 구현이 정하지 않고 총괄 판정을 경유한다(불변규칙 7).
+# FONT(IMPL-147→148)·PAL(209→219)·ANCH(233→237)이 밟은 절차 그대로 — 오검출 0 실측을
+# 붙여 차단형 전환을 상신한다(29차 회신 §판정 요청).
+#
+# **경고형은 스스로 죽어도 빌드를 멈추지 못한다** — 검사의 실재는 UISCR ⑬축이 따로 받친다.
+#
+# 제약 ② = *"`fx_flash_burst` 는 지평선 아래(노면·바닥 대역)에 둔다 — 하늘에 두면 태양이
+# 된다"* (IMPL-396 → **IMPL-420 보강: 근본은 명도가 아니라 대역이다**). 컷은 무대를 가리지
+# 않고 서므로 **가장 늦게 시작하는 지평선**(= `split_y` 최대)을 넘겨야 전 무대에서 성립한다.
+const FXPL_BG_SPEC := "tools/assets/bg_spec.json"
+const FXPL_ELEMENTS := "fx_elements.csv"
+const FXPL_LAYERS := "scene_cut_layers.csv"
+
+
+func _run_fx_placement_scan() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	var bands: Array = _fxpl_split_values()
+	if bands.is_empty():
+		_warn("FXPL", "%s 에서 split_y 를 읽지 못했다 — 대역 판정 불가" % FXPL_BG_SPEC)
+		_report("FXPL", "fx placement constraints", checked, before_fail, before_warn)
+		return
+	var horizon := 0
+	for value in bands:
+		horizon = maxi(horizon, int(value))
+	# **비공허성** — 무대 수만큼 값이 있어야 "가장 늦은 지평선"이 실제 최댓값이다.
+	checked += 1
+	if bands.size() < 5:
+		_warn("FXPL", "지형 표본 %d < 무대 5 — 대역 상한이 낮게 잡힌다" % bands.size())
+	var ground: Dictionary = {}
+	for row in _tables.get(FXPL_ELEMENTS, []):
+		if String(row.get("band_ground", "0")).strip_edges() == "1":
+			ground[String(row.get("id", ""))] = true
+	for row in _tables.get(FXPL_LAYERS, []):
+		var element_id := String(row.get("element_id", "")).strip_edges()
+		if not ground.has(element_id):
+			continue
+		checked += 1
+		var anchor_y := String(row.get("anchor_y", "0")).strip_edges().to_int()
+		if anchor_y < horizon:
+			_warn("FXPL", "%s: %s 앵커 y=%d 가 지평선 %d 위다 — 하늘의 방사 광원은 천체로 읽힌다"
+				% [String(row.get("id", "")), element_id, anchor_y, horizon])
+	_report("FXPL", "fx placement constraints", checked, before_fail, before_warn)
+
+
+# `bg_spec.json` 의 무대별 `split_y`. **파서를 얕게 둔다** — 이 검사가 필요로 하는 것은
+# 값 목록뿐이고, 구조를 따라가면 에셋 트랙의 파일 형태 변경이 곧 검사 파손이 된다.
+func _fxpl_split_values() -> Array:
+	var text := _read_text(FXPL_BG_SPEC)
+	if text == "":
+		return []
+	var parsed: Variant = JSON.parse_string(text)
+	var values: Array = []
+	_fxpl_collect_splits(parsed, values)
+	return values
+
+
+func _fxpl_collect_splits(value: Variant, sink: Array) -> void:
+	if typeof(value) == TYPE_DICTIONARY:
+		for key in (value as Dictionary):
+			if String(key) == "split_y":
+				sink.append(int((value as Dictionary)[key]))
+			else:
+				_fxpl_collect_splits((value as Dictionary)[key], sink)
+	elif typeof(value) == TYPE_ARRAY:
+		for item in (value as Array):
+			_fxpl_collect_splits(item, sink)
 
 
 # ── 혼입 0 스캔: core 디렉토리 내 플랫폼 API·분기·수익 코드 검출 (D12 §2.1) ──

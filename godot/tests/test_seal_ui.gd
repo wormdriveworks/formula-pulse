@@ -64,6 +64,14 @@ func _process(delta: float) -> bool:
 		_fail("화면 인스턴스 부재 — 초기화 중단")
 		_report()
 		return true
+	# **GP 가 끝났으면 여기서 끝난다.** 종료 판정이 `"open"` 갈래에만 있었고 `"idle"` 에는
+	# 없었다 — 확정과 차기 T1 사이에 대기가 들어가면(듀얼 결과 표기·**완급 비트**) 마지막
+	# 턴의 종료가 `"open"` 이 아니라 `"idle"` 에서 드러나고, 그러면 하네스가 정상 상태를
+	# 붙들고 예산까지 간다(29차 실측: 완급 비트 상시 발동에서 180초 예산 초과 재현).
+	# **예산이 그 구멍을 가리고 있었다** — 잡은 것은 예산이지만 잡아야 할 것은 종료였다.
+	if _screen.engine != null and _screen.engine.finished:
+		_report()
+		return true
 	match _phase:
 		"idle":
 			# 확정 후 전이 연출(듀얼 결과 프레임 내 표기 — D09 §3.5) 중에는 아직 이전 턴이다.

@@ -1,0 +1,222 @@
+# E15 레이스 씬 패널 — 컷 합성 (D09 §3.1.1 · 별첨A §127 · 사양서 v1.11 §5.2.2).
+#
+# **레이어 순서 = 원경 → 머신 → 근경 → 연출 요소** (사양서 §5.2.2). 근경이 머신 위인 것이
+# 배경 2레이어 분리의 목적이다(§5.1 *"컷 합성용"*) — 순서를 바꾸면 분리가 무의미해진다.
+#
+# ── 움직임에 고를 값이 남지 않게 했다 ──
+# 제원표 §3 은 요소별 움직임의 **종류**만 선언하고 진폭·주기를 비운다. 그 둘을 손으로
+# 채우면 정본이 정하지 않은 수치가 코드에 앉는다(불변규칙 2). 그래서 둘 다 **파생**시킨다:
+#   · 주기 = **컷이 선언한 프레임 수**(사양서 §5.2 표) ÷ **8 fps**(D13 별첨A §8.1)
+#   · 진폭 = **요소 자신의 치수** — 스크롤은 제 폭만큼 흘러 한 바퀴가 정확히 맞물리고,
+#     확대는 제 폭만큼 커지고, 상승은 제 높이만큼 오른다
+# 진폭이 요소의 치수이므로 루프가 **구조적으로 닫힌다**(잔여 오프셋 0). 고를 값이 없다.
+#
+# ── 봉인 (불변규칙 5 · 사양서 §5.2.2) ──
+# 릴 국면에는 **매핑 함수를 부르지 않는다.** 고정 컷을 데이터로 고르는 것이 아니라
+# **결과를 보는 경로 자체가 없다** — "고정"의 구조적 형태가 그것이다.
+class_name ScenePanel
+extends Control
+
+const SCENECUT_DIR := "res://assets/scenecuts/"
+const MACHINE_DIR := "res://assets/machines/"
+# 플레이어 머신 측면 셀 — 제원표 §5 베이스. 시즌 리버리 스왑은 씬 패널의 관심사가 아니다.
+const PLAYER_MACHINE := "nw01_boreas_base_s1_side"
+
+# 색 치환 역할 → 팔레트 정본 색 (사양서 §5.2.1 "생성은 중립색으로 받고 팔레트는 원장이 정한다").
+# **표가 선언한 역할 전부가 여기 있어야 한다** — 검사가 양방향으로 본다.
+# **상수가 아니라 조회 함수다** — `SYMBOL_TROUBLE` 을 직접 참조하면 O9 색각 대체가 적용되지
+# 않는다(UIOPT 축이 그 직접 참조를 잡는다). 역할 표는 이름만 이고, 색은 매 조회마다 옵션을
+# 거친 값으로 받는다.
+const TINT_ROLES := ["signal", "pulse"]
+
+
+static func tint_color(role: String) -> Color:
+	match role:
+		"signal":
+			return UiPalette.symbol_trouble()
+		"pulse":
+			return UiPalette.SYMBOL_PULSE
+	return Color.WHITE
+
+var data: GameData
+
+var _canvas: Control
+var _far: TextureRect
+var _machine: TextureRect
+var _near: TextureRect
+var _fx_root: Control
+
+var _cut_id := ""
+var _stage_id := ""
+var _frames := 1
+var _elapsed := 0.0
+var _motion_enabled := true
+# 요소 노드 ↔ 선언 행 — 프레임마다 다시 조회하지 않는다.
+var _fx_nodes: Array = []
+# **미배치 관측 지점.** 컷이 머신 2대 이상을 선언했는데 배치 선언이 없다 — 조용히 1대만
+# 그리지 않고 기계가 읽을 수 있게 남긴다 (`choice_omissions` 규약).
+var multi_machine_omissions: Array = []
+
+
+func setup(game_data: GameData) -> void:
+	data = game_data
+	clip_contents = true
+	mouse_filter = Control.MOUSE_FILTER_IGNORE   # 비인터랙티브 (별첨A §127)
+	_canvas = Control.new()
+	_canvas.name = "Canvas"
+	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.size = Vector2(_canvas_width(), _canvas_height())
+	add_child(_canvas)
+	_far = _new_layer("Far")
+	_machine = _new_layer("Machine")
+	_near = _new_layer("Near")
+	_fx_root = Control.new()
+	_fx_root.name = "Fx"
+	_fx_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.add_child(_fx_root)
+	_machine.texture = load(MACHINE_DIR + PLAYER_MACHINE + ".png") as Texture2D
+	_machine.position = Vector2(
+		data.param("param_scene_machine_x"), data.param("param_scene_machine_y"))
+	_machine.size = _machine.texture.get_size() if _machine.texture != null else Vector2.ZERO
+
+
+func _new_layer(layer_name: String) -> TextureRect:
+	var layer := TextureRect.new()
+	layer.name = layer_name
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 원도 그대로 놓는다 — 408×100 캔버스에 408×100 배경이므로 신축이 없다.
+	layer.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	layer.stretch_mode = TextureRect.STRETCH_KEEP
+	_canvas.add_child(layer)
+	return layer
+
+
+func _canvas_width() -> float:
+	return data.param("param_scene_canvas_width_px")
+
+
+func _canvas_height() -> float:
+	return data.param("param_scene_panel_height_px")
+
+
+# 패널 실폭(데스크탑 384 안팎)이 원도 408 보다 좁다 — **가운데를 남기고 잘라낸다**
+# (사양서 §5.1 "데스크탑은 384 크롭"). 왼쪽만 자르면 머신 표준 자리가 가장자리로 밀린다.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED and _canvas != null:
+		_canvas.position = Vector2(roundf((size.x - _canvas_width()) * 0.5), 0.0)
+
+
+# 컷 전환. **같은 컷이면 되감지 않는다** — 매 턴 같은 기본 주행 컷이 서는데 그때마다
+# 루프가 0 프레임으로 튀면 화면이 딸꾹질한다.
+func show_cut(cut_id: String, stage_id: String) -> void:
+	if cut_id == _cut_id and stage_id == _stage_id:
+		return
+	_cut_id = cut_id
+	_stage_id = stage_id
+	_frames = maxi(1, CsvTable.to_int(String(data.scene_cut(cut_id).get("frames", "1"))))
+	_elapsed = 0.0
+	_apply_backdrop(stage_id)
+	_build_fx(cut_id)
+	_apply_frame(0)
+
+
+func _apply_backdrop(stage_id: String) -> void:
+	var backdrop := data.stage_backdrop(stage_id)
+	if backdrop.is_empty():
+		_far.texture = null
+		_near.texture = null
+		return
+	_far.texture = load(SCENECUT_DIR + String(backdrop["far_asset"]) + ".png") as Texture2D
+	_near.texture = load(SCENECUT_DIR + String(backdrop["near_asset"]) + ".png") as Texture2D
+
+
+func _build_fx(cut_id: String) -> void:
+	for child in _fx_root.get_children():
+		_fx_root.remove_child(child)
+		child.queue_free()
+	_fx_nodes.clear()
+	# **머신 2대 이상은 배치 선언이 없다** — 제원표 §4 가 준 것은 표준 자리 1개뿐이고
+	# 그 문서 스스로 "합성 선언의 앵커 그 자체는 아니다"라고 적었다. 조용히 1대로 그리면
+	# 표의 `machines` 가 거짓이 되므로 관측 지점에 남긴다(회신 §미결).
+	var declared := CsvTable.to_int(String(data.scene_cut(cut_id).get("machines", "1")))
+	if declared > 1 and not multi_machine_omissions.has(cut_id):
+		multi_machine_omissions.append(cut_id)
+	for row in data.scene_cut_layers_for(cut_id):
+		var element := data.fx_element(String(row["element_id"]))
+		if element.is_empty():
+			continue
+		var node := TextureRect.new()
+		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		node.stretch_mode = TextureRect.STRETCH_KEEP
+		var cell := Vector2i(
+			CsvTable.to_int(String(element["cell_w"])), CsvTable.to_int(String(element["cell_h"])))
+		var texture := load(SCENECUT_DIR + String(element["asset"]) + ".png") as Texture2D
+		# 시트(E-04)는 대표 프레임 한 칸만 쓴다 — `still_frame` 소비 (사양서 §5.1 정지 폴백).
+		if texture != null and CsvTable.to_int(String(element["frames"])) > 1:
+			var atlas := AtlasTexture.new()
+			atlas.atlas = texture
+			atlas.region = Rect2(
+				cell.x * CsvTable.to_int(String(element["still_frame"])), 0, cell.x, cell.y)
+			texture = atlas
+		node.texture = texture
+		node.size = Vector2(cell)
+		# 앵커는 **요소의 중심**이다 — 좌상단으로 두면 크기가 다른 요소들의 자리가
+		# 같은 뜻을 갖지 못한다(확대 모션도 중심 기준이어야 제자리에서 커진다).
+		node.pivot_offset = Vector2(cell) * 0.5
+		node.position = Vector2(
+			CsvTable.to_int(String(row["anchor_x"])), CsvTable.to_int(String(row["anchor_y"]))
+		) - node.pivot_offset
+		var tint := String(row.get("tint", "")).strip_edges()
+		if not tint.is_empty() and TINT_ROLES.has(tint):
+			node.modulate = tint_color(tint)
+		_fx_root.add_child(node)
+		_fx_nodes.append({"node": node, "element": element, "base": node.position,
+			"cell": cell, "tint": node.modulate})
+
+
+# O12 '씬 패널 모션: 표준 / 정지 컷' (D09 §6.1 — 접근성 폴백).
+func set_motion_enabled(enabled: bool) -> void:
+	_motion_enabled = enabled
+	if not enabled:
+		_apply_frame(0)
+
+
+func _process(delta: float) -> void:
+	if not _motion_enabled or _fx_nodes.is_empty():
+		return
+	_elapsed += delta
+	_apply_frame(int(_elapsed * data.param("param_scene_cut_fps")) % _frames)
+
+
+# 프레임 적용 — 진폭은 요소 치수, 주기는 컷 프레임 수. 머리말의 파생 규칙 그대로다.
+func _apply_frame(frame: int) -> void:
+	var phase := float(frame) / float(_frames)
+	for entry in _fx_nodes:
+		var node: TextureRect = entry["node"]
+		var cell: Vector2i = entry["cell"]
+		var base: Vector2 = entry["base"]
+		node.position = base
+		node.scale = Vector2.ONE
+		node.modulate = entry["tint"]
+		node.visible = true
+		match String(Dictionary(entry["element"])["motion"]):
+			"scroll_x":
+				node.position = base + Vector2(cell.x * phase, 0.0)
+			"rise":
+				node.position = base - Vector2(0.0, cell.y * phase)
+				node.modulate.a = 1.0 - phase
+			"fade":
+				node.scale = Vector2(1.0 + phase, 1.0)
+				node.modulate.a = 1.0 - phase
+			"expand":
+				node.scale = Vector2.ONE * (1.0 + phase)
+				node.modulate.a = 1.0 - phase
+			"pulse":
+				# 맥동 = 왕복이다. 한 바퀴에 1→2→1 이어야 루프가 닫힌다(단조 증가는 튄다).
+				var swing := 1.0 - absf(phase * 2.0 - 1.0)
+				node.scale = Vector2.ONE * (1.0 + swing)
+			"blink":
+				node.visible = frame % 2 == 0   # 불투명도 2단 (제원표 §3)
+			"still":
+				pass

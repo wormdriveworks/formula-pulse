@@ -31,6 +31,7 @@ var events: EventService
 var narrative: NarrativeService
 var options: OptionsStore
 var presentation: PresentationGrade
+var scene_cuts: SceneCutMap
 var profile_index := 1
 
 # 현재 GP
@@ -144,6 +145,8 @@ func begin_career(profile: int) -> void:
 	narrative.begin_season()
 	presentation = PresentationGrade.new()
 	presentation.setup(data)
+	scene_cuts = SceneCutMap.new()
+	scene_cuts.setup(data)
 	# 개시형 막 VN(1막) — 커리어 개시의 최초 브리핑 슬롯에서 선다 (D04 §1.2 · 총괄 판정 IMPL-263 ②).
 	outgame.open_narrative_act()
 
@@ -398,6 +401,19 @@ func judge_event() -> Dictionary:
 # 순위표에 없으면(무득점 초반) 인접이 성립하지 않도록 큰 값을 낸다 — 0 은 '가장 인접'이라
 # 조용히 항상 성립하는 반대 결함이 된다.
 # **이벤트 변형(D08 §7.3)과 CG-03 조우(D10 §7)가 같은 축을 쓴다** — 두 소비부가 같은 값을 본다.
+# 완급 비트 발동 판정 (D09 §3.1.1 · D13 별첨A §8.1 — 재생 상한 2.5초 · 발동 빈도 40%).
+#
+# **`reserve` 스트림을 쓴다.** 6스트림 고정(불변규칙 4)이라 표현 층 전용 스트림을 새로
+# 만들 수 없고, 직렬화 밖의 지역 난수를 쓰면 재로드마다 다른 결과가 나온다. `reserve` 는
+# 이미 아웃게임 추첨이 쓰는 자리이며(`draw_overhaul_candidates`) **세이브에 직렬화되므로
+# 재로드가 리롤이 되지 않는다**(D12 §6). 비트는 상태 머신을 건드리지 않으므로(D05 §3
+# 무개정 · 표현 층 전속) 스트림 소비가 게임 규칙에 닿는 경로는 없다.
+func pacing_beat_due() -> bool:
+	if rng == null:
+		return false
+	return rng.randf("reserve") < data.param("param_pacing_beat_probability")
+
+
 func jude_rank_delta() -> int:
 	var order := season.championship_standings()
 	var player_index := order.find(SeasonState.PLAYER_ID)
@@ -764,4 +780,6 @@ func restore(payload: Dictionary) -> bool:
 		return false
 	presentation = PresentationGrade.new()
 	presentation.setup(data)
+	scene_cuts = SceneCutMap.new()
+	scene_cuts.setup(data)
 	return true
