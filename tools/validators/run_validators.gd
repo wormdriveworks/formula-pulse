@@ -1178,8 +1178,13 @@ func _run_v8_key_grammar() -> void:
 # 그 사이를 `pick` 이 가른다(8장을 굽고 5장을 납품). **같은 이름의 다른 양**이다.
 # 양을 맞추면(`pick` 이 있으면 그 길이) 갈림 0 이다. 31차 회신 §10.5 실측.
 #
-# **성격 = 경고형(신설).** 차단/경고는 총괄 판정 경유(불변규칙 7) — FONT·PAL·ANCH·FXPL·
-# CUTM 이 밟은 절차 그대로 상신한다. 실재는 UISCR ⑬축이 받친다.
+# **성격 = 차단형** (경고형 신설 33차 → 전환 총괄 판정 ㊴ · IMPL-459 — 7번째 동절차).
+# 근거는 CUTM·FXPL 과 같다: **표와 도구 산출의 값 비교**라 미적 판단이 없고, 오검출 0
+# (8요소·17검사 전건 — **양 정규화 적용 후**)·검출 성립·경고형에서는 그 검출이 `exit=0`
+# 이었다(반증 T5).
+#
+# **판정 불가도 실패다** — 소재를 못 읽거나 도구 산출이 비면 *위반 없음*이 아니라
+# *판정 없음*이고, 둘 다 통과가 늘어나는 방향의 침묵이다.
 const FXJ_SPEC := "tools/assets/fx_spec.json"
 const FXJ_TABLE := "fx_elements.csv"
 
@@ -1190,20 +1195,20 @@ func _run_fx_join_scan() -> void:
 	var checked := 0
 	var parsed: Variant = JSON.parse_string(_read_text(FXJ_SPEC))
 	if typeof(parsed) != TYPE_DICTIONARY:
-		_warn("FXJ", "%s 를 읽지 못했다 — 접합 대조 불가" % FXJ_SPEC)
+		_fail("FXJ", "%s 를 읽지 못했다 — 판정 없음은 위반 없음이 아니다" % FXJ_SPEC)
 		_report("FXJ", "fx element join", checked, before_fail, before_warn)
 		return
 	var elements: Dictionary = Dictionary(parsed).get("elements", {})
 	checked += 1
 	if elements.is_empty():
-		_warn("FXJ", "도구 산출에 요소가 없다 — 대조가 공허해진다")
+		_fail("FXJ", "도구 산출에 요소가 없다 — 대조가 공허해진다")
 	var seen: Dictionary = {}
 	for row in _tables.get(FXJ_TABLE, []):
 		var asset := String(row.get("asset", "")).strip_edges()
 		seen[asset] = true
 		checked += 1
 		if not elements.has(asset):
-			_warn("FXJ", "%s: 도구 산출에 없는 요소다" % asset)
+			_fail("FXJ", "%s: 도구 산출에 없는 요소다" % asset)
 			continue
 		var entry: Dictionary = elements[asset]
 		# 셀 = `cell` 우선, 없으면 `size` (도구가 두 이름을 쓴다 — 작도형·시트형)
@@ -1221,14 +1226,14 @@ func _run_fx_join_scan() -> void:
 	for asset in elements:
 		checked += 1
 		if not seen.has(String(asset)):
-			_warn("FXJ", "%s: 도구가 낸 요소가 표에 없다" % String(asset))
+			_fail("FXJ", "%s: 도구가 낸 요소가 표에 없다" % String(asset))
 	_report("FXJ", "fx element join", checked, before_fail, before_warn)
 
 
 func _fxj_compare(asset: String, column: String, row: Dictionary, want: int) -> void:
 	var got := String(row.get(column, "")).strip_edges().to_int()
 	if got != want:
-		_warn("FXJ", "%s.%s: 표 %d ≠ 도구 %d" % [asset, column, got, want])
+		_fail("FXJ", "%s.%s: 표 %d ≠ 도구 %d" % [asset, column, got, want])
 
 
 # ── CUTM 컷 머신 배치 전사 대조 (신설 31차 — **경고형** · 에셋 IMPL-444·447) ──
