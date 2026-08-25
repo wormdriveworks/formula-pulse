@@ -1,11 +1,11 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://c8r8unoveg0hr"]
 
-[ext_resource type="Script" path="res://ui/hub/strategy_screen.gd" id="1_2kika"]
-[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="2_io6wx"]
+[ext_resource type="Script" uid="uid://nbqbo5t25yk3" path="res://ui/hub/strategy_screen.gd" id="1_2kika"]
+[ext_resource type="FontFile" uid="uid://dyw2qbqpna4ub" path="res://assets/fonts/Galmuri14.ttf" id="2_io6wx"]
 
 [node name="StrategyScreen" type="Control" unique_id=726506255]
 layout_mode = 3
-anchors_preset = 0
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_2kika")
@@ -45,8 +45,8 @@ stretch_mode = 5
 [node name="CreditValue" type="Label" parent="Pad/Column/CommonBar" unique_id=362000649]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="DataIcon" type="TextureRect" parent="Pad/Column/CommonBar" unique_id=979176904]
 unique_name_in_owner = true
@@ -58,14 +58,14 @@ stretch_mode = 5
 [node name="DataValue" type="Label" parent="Pad/Column/CommonBar" unique_id=1746307094]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="ProgressLabel" type="Label" parent="Pad/Column/CommonBar" unique_id=531669091]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="BarSpacer" type="Control" parent="Pad/Column/CommonBar" unique_id=1671733314]
 layout_mode = 2
@@ -79,9 +79,9 @@ theme_override_font_sizes/font_size = 9
 [node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=2056768564]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_fonts/font = ExtResource("2_io6wx")
 theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 
 [node name="Body" type="HBoxContainer" parent="Pad/Column" unique_id=1807000366]
 layout_mode = 2
@@ -109,8 +109,8 @@ theme_override_constants/separation = 4
 [node name="DeckHeader" type="Label" parent="Pad/Column/Body/Deck" unique_id=1296892540]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="DeckList" type="VBoxContainer" parent="Pad/Column/Body/Deck" unique_id=622236280]
 unique_name_in_owner = true

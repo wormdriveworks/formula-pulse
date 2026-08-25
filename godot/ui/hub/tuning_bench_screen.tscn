@@ -1,11 +1,11 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://co3nq5yuk280t"]
 
-[ext_resource type="Script" path="res://ui/hub/tuning_bench_screen.gd" id="1_q2qov"]
-[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="2_kkibk"]
+[ext_resource type="Script" uid="uid://daugkkdjuhhdq" path="res://ui/hub/tuning_bench_screen.gd" id="1_q2qov"]
+[ext_resource type="FontFile" uid="uid://dyw2qbqpna4ub" path="res://assets/fonts/Galmuri14.ttf" id="2_kkibk"]
 
 [node name="TuningBenchScreen" type="Control" unique_id=367785939]
 layout_mode = 3
-anchors_preset = 0
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_q2qov")
@@ -45,8 +45,8 @@ stretch_mode = 5
 [node name="CreditValue" type="Label" parent="Pad/Column/CommonBar" unique_id=1745736667]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="DataIcon" type="TextureRect" parent="Pad/Column/CommonBar" unique_id=1118682095]
 unique_name_in_owner = true
@@ -58,14 +58,14 @@ stretch_mode = 5
 [node name="DataValue" type="Label" parent="Pad/Column/CommonBar" unique_id=1754343277]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="ProgressLabel" type="Label" parent="Pad/Column/CommonBar" unique_id=1703467528]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="BarSpacer" type="Control" parent="Pad/Column/CommonBar" unique_id=863658195]
 layout_mode = 2
@@ -79,9 +79,9 @@ theme_override_font_sizes/font_size = 9
 [node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=2111824283]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_fonts/font = ExtResource("2_kkibk")
 theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 
 [node name="LineList" type="VBoxContainer" parent="Pad/Column" unique_id=754587622]
 unique_name_in_owner = true

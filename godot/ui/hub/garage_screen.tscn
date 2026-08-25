@@ -1,11 +1,11 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://1irvqcgf3t6"]
 
-[ext_resource type="Script" path="res://ui/hub/garage_screen.gd" id="1_2t2sp"]
-[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="2_0sxwh"]
+[ext_resource type="Script" uid="uid://dthtr80abuy4o" path="res://ui/hub/garage_screen.gd" id="1_2t2sp"]
+[ext_resource type="FontFile" uid="uid://dyw2qbqpna4ub" path="res://assets/fonts/Galmuri14.ttf" id="2_0sxwh"]
 
 [node name="GarageScreen" type="Control" unique_id=1470492467]
 layout_mode = 3
-anchors_preset = 0
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_2t2sp")
@@ -45,8 +45,8 @@ stretch_mode = 5
 [node name="CreditValue" type="Label" parent="Pad/Column/CommonBar" unique_id=2083877011]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="DataIcon" type="TextureRect" parent="Pad/Column/CommonBar" unique_id=260269897]
 unique_name_in_owner = true
@@ -58,14 +58,14 @@ stretch_mode = 5
 [node name="DataValue" type="Label" parent="Pad/Column/CommonBar" unique_id=997778027]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="ProgressLabel" type="Label" parent="Pad/Column/CommonBar" unique_id=2004064298]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="BarSpacer" type="Control" parent="Pad/Column/CommonBar" unique_id=343106653]
 layout_mode = 2
@@ -79,9 +79,9 @@ theme_override_font_sizes/font_size = 9
 [node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=119423556]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_fonts/font = ExtResource("2_0sxwh")
 theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 
 [node name="StationGrid" type="GridContainer" parent="Pad/Column" unique_id=827401757]
 layout_mode = 2

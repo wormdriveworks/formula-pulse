@@ -1,14 +1,16 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://b4oo5plcxtgsk"]
 
-[ext_resource type="Script" path="res://ui/run/run_recap_screen.gd" id="1_dtwi0"]
-[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="2_e4p2x"]
-[ext_resource type="Script" path="res://ui/com/ghost_gauge.gd" id="3_touc3"]
+[ext_resource type="Script" uid="uid://dbjk1qfdeugby" path="res://ui/run/run_recap_screen.gd" id="1_dtwi0"]
+[ext_resource type="FontFile" uid="uid://dyw2qbqpna4ub" path="res://assets/fonts/Galmuri14.ttf" id="2_e4p2x"]
+[ext_resource type="Script" uid="uid://cb8khksssa02f" path="res://ui/com/ghost_gauge.gd" id="3_touc3"]
 
 [node name="RunRecapScreen" type="Control" unique_id=897241525]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("1_dtwi0")
 
 [node name="Background" type="ColorRect" parent="." unique_id=797872320]
@@ -34,9 +36,9 @@ theme_override_constants/separation = 6
 [node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=457190699]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_fonts/font = ExtResource("2_e4p2x")
 theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 
 [node name="Body" type="HBoxContainer" parent="Pad/Column" unique_id=711880233]
 layout_mode = 2
@@ -51,14 +53,14 @@ theme_override_constants/separation = 4
 [node name="SummaryRank" type="Label" parent="Pad/Column/Body/Summary" unique_id=282200251]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="CreditsValue" type="Label" parent="Pad/Column/Body/Summary" unique_id=1364839444]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.85098, 0.541176, 0.070588, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="Cards" type="VBoxContainer" parent="Pad/Column/Body" unique_id=2036049644]
 layout_mode = 2
@@ -73,14 +75,14 @@ theme_override_font_sizes/font_size = 9
 [node name="RepairCostValue" type="Label" parent="Pad/Column/Body/Cards" unique_id=1678732709]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="ChassisValue" type="Label" parent="Pad/Column/Body/Cards" unique_id=754620072]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="ChassisGauge" type="Control" parent="Pad/Column/Body/Cards" unique_id=1463478055]
 unique_name_in_owner = true
@@ -91,8 +93,8 @@ script = ExtResource("3_touc3")
 [node name="ConsumableTitle" type="Label" parent="Pad/Column/Body/Cards" unique_id=1652482785]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="ConsumableList" type="HBoxContainer" parent="Pad/Column/Body/Cards" unique_id=1652482786]
 unique_name_in_owner = true
@@ -102,8 +104,8 @@ theme_override_constants/separation = 3
 [node name="DeckTitle" type="Label" parent="Pad/Column/Body/Cards" unique_id=290619130]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="DeckList" type="HBoxContainer" parent="Pad/Column/Body/Cards" unique_id=290619131]
 unique_name_in_owner = true

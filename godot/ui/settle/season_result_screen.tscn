@@ -1,11 +1,11 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://gcq4bep0frjc"]
 
-[ext_resource type="Script" path="res://ui/settle/season_result_screen.gd" id="1_j3r5h"]
-[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="2_1tah2"]
+[ext_resource type="Script" uid="uid://80whcciwkjw6" path="res://ui/settle/season_result_screen.gd" id="1_j3r5h"]
+[ext_resource type="FontFile" uid="uid://dyw2qbqpna4ub" path="res://assets/fonts/Galmuri14.ttf" id="2_1tah2"]
 
 [node name="SeasonResultScreen" type="Control" unique_id=1965541573]
 layout_mode = 3
-anchors_preset = 0
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_j3r5h")
@@ -33,29 +33,29 @@ theme_override_constants/separation = 5
 [node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=609832370]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_fonts/font = ExtResource("2_1tah2")
 theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 
 [node name="VerdictLabel" type="Label" parent="Pad/Column" unique_id=662695140]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_fonts/font = ExtResource("2_1tah2")
 theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 
 [node name="EpilogueLabel" type="Label" parent="Pad/Column" unique_id=1924471526]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(1, 0.894118, 0.639216, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="SummaryLabel" type="Label" parent="Pad/Column" unique_id=1908493478]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="StandingsList" type="VBoxContainer" parent="Pad/Column" unique_id=1648821424]
 unique_name_in_owner = true

@@ -1,7 +1,7 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://lrg7q8sof8uq"]
 
-[ext_resource type="Script" path="res://ui/nar/vn_screen.gd" id="1_fdm5n"]
-[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="2_xp8kc"]
+[ext_resource type="Script" uid="uid://bb2itb8qofgh1" path="res://ui/nar/vn_screen.gd" id="1_fdm5n"]
+[ext_resource type="FontFile" uid="uid://dyw2qbqpna4ub" path="res://assets/fonts/Galmuri14.ttf" id="2_xp8kc"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_512q8"]
 content_margin_left = 10.0
@@ -29,7 +29,7 @@ border_color = Color(0.356863, 0.392157, 0.435294, 1)
 
 [node name="VnScreen" type="Control" unique_id=544504972]
 layout_mode = 3
-anchors_preset = 0
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("1_fdm5n")
@@ -84,15 +84,15 @@ theme_override_constants/separation = 3
 [node name="SpeakerLabel" type="Label" parent="DialoguePanel/DialogueColumn" unique_id=2091997148]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.247059, 0.878431, 0.960784, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="BodyLabel" type="Label" parent="DialoguePanel/DialogueColumn" unique_id=124783043]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 24)
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 autowrap_mode = 3
 
 [node name="DialogueFooter" type="HBoxContainer" parent="DialoguePanel/DialogueColumn" unique_id=956260666]
@@ -126,9 +126,9 @@ theme_override_constants/separation = 4
 [node name="CalendarTitle" type="Label" parent="CalendarPanel/CalendarColumn" unique_id=1191702317]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_fonts/font = ExtResource("2_xp8kc")
 theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 
 [node name="CalendarList" type="VBoxContainer" parent="CalendarPanel/CalendarColumn" unique_id=736271537]
 unique_name_in_owner = true

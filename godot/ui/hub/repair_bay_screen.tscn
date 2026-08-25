@@ -1,14 +1,16 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dmvk5e6o1142t"]
 
-[ext_resource type="Script" path="res://ui/hub/repair_bay_screen.gd" id="1_7chrr"]
-[ext_resource type="FontFile" path="res://assets/fonts/Galmuri14.ttf" id="2_kisjc"]
-[ext_resource type="Script" path="res://ui/com/ghost_gauge.gd" id="3_kisjc"]
+[ext_resource type="Script" uid="uid://cmbgytthij8jx" path="res://ui/hub/repair_bay_screen.gd" id="1_7chrr"]
+[ext_resource type="FontFile" uid="uid://dyw2qbqpna4ub" path="res://assets/fonts/Galmuri14.ttf" id="2_kisjc"]
+[ext_resource type="Script" uid="uid://cb8khksssa02f" path="res://ui/com/ghost_gauge.gd" id="3_kisjc"]
 
 [node name="RepairBayScreen" type="Control" unique_id=2132574989]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("1_7chrr")
 
 [node name="Background" type="ColorRect" parent="." unique_id=1533026838]
@@ -46,8 +48,8 @@ stretch_mode = 5
 [node name="CreditValue" type="Label" parent="Pad/Column/CommonBar" unique_id=334145345]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="DataIcon" type="TextureRect" parent="Pad/Column/CommonBar" unique_id=1381202982]
 unique_name_in_owner = true
@@ -59,14 +61,14 @@ stretch_mode = 5
 [node name="DataValue" type="Label" parent="Pad/Column/CommonBar" unique_id=70219590]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="ProgressLabel" type="Label" parent="Pad/Column/CommonBar" unique_id=575003197]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="BarSpacer" type="Control" parent="Pad/Column/CommonBar" unique_id=2095703369]
 layout_mode = 2
@@ -80,9 +82,9 @@ theme_override_font_sizes/font_size = 9
 [node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=155541536]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_fonts/font = ExtResource("2_kisjc")
 theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 
 [node name="Card" type="VBoxContainer" parent="Pad/Column" unique_id=629341899]
 layout_mode = 2
@@ -92,26 +94,26 @@ theme_override_constants/separation = 4
 [node name="CardLabel" type="Label" parent="Pad/Column/Card" unique_id=458786152]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="CostLabel" type="Label" parent="Pad/Column/Card" unique_id=1847224124]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="TotalCostValue" type="Label" parent="Pad/Column/Card" unique_id=1037299677]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="ChassisValue" type="Label" parent="Pad/Column/Card" unique_id=1007488062]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="ChassisGauge" type="Control" parent="Pad/Column/Card" unique_id=16591656]
 unique_name_in_owner = true
@@ -122,8 +124,8 @@ script = ExtResource("3_kisjc")
 [node name="FreeLineNote" type="Label" parent="Pad/Column/Card" unique_id=381000001]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
 
 [node name="RunButton" type="Button" parent="Pad/Column/Card" unique_id=1815584980]
 unique_name_in_owner = true
