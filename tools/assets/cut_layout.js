@@ -300,7 +300,7 @@ for (const [cutId, decl] of Object.entries(spec.cuts)) {
     // 머신 — 선언 순서대로(먼저 = 뒤). 원경 위·근경 아래 (제원표 §4).
     const placed = [];
     for (const s0 of slots) {
-      const spr = machine(s0.review_sprite || spec.probe_sprite);
+      const spr = machine(s0.sprite || spec.probe_sprite);
       // 노면선 → 셀 중심. 섀시별 바닥 오프셋이 8px 흩어져 있으므로 여기서 푼다.
       const cy = s0.road_y - (opaqueRows(spr).bot - (spr.h >> 1));
       const s = Object.assign({}, s0, { cy });
@@ -427,14 +427,16 @@ if (TABLE) {
   console.log('#  occupant       = 이 자리에 누가 오는가. player · rival · grid.');
   console.log('#                   **런타임이 물어야 할 것은 이 열이다** — 섀시는 대전 상대가 정한다.');
   console.log('#                   grid = SC-08 뿐(자리가 순위) · 플레이어의 그리드 번호는 레이스 로직 소관.');
-  console.log('#  review_sprite  = **런타임 데이터 아님. 검수 표본이다.**');
+  console.log('#  sprite         = **런타임 데이터 아님. 검수 표본이다.**');
   console.log('#                   상호 가림을 색 일치로 재려면 슬롯마다 다른 섀시가 필요해서 있는 열이고,');
   console.log('#                   그게 이 열의 유일한 용도다. 표에 그대로 옮기면 대전 상대와 무관하게');
   console.log('#                   같은 차가 나온다 — 실제로 그렇게 됐다(IMPL-450 추적분).');
-  console.log('cut_id,slot_name,slot_order,occupant,anchor_x,anchor_road_y,review_sprite');
+  console.log('#                   이름을 review_sprite 로 바꾸려 했으나 차단형 CUTM 이 이 키를 읽어');
+  console.log('#                   되돌렸다 — 개명은 CUTM 리더와 같은 회차에 한다(IMPL-453).');
+  console.log('cut_id,slot_name,slot_order,occupant,anchor_x,anchor_road_y,sprite');
   for (const [cutId, decl] of Object.entries(spec.cuts)) {
     decl.slots.forEach((s, i) => console.log(
-      `${cutId},${s.name},${i + 1},${s.occupant},${s.cx},${s.road_y},${path.basename(s.review_sprite || spec.probe_sprite, '.png')}`));
+      `${cutId},${s.name},${i + 1},${s.occupant},${s.cx},${s.road_y},${path.basename(s.sprite || spec.probe_sprite, '.png')}`));
   }
   // 전 자리가 rival 인 컷은 플레이어가 화면에서 사라진다 — 1대 폴백이 PLAYER_MACHINE 을
   // 그리는데 다대 경로가 안 그리면 같은 패널이 자기와 모순된다.
@@ -473,7 +475,7 @@ if (TABLE) {
   }
   // 선언 표본이 베이스 전량을 덮는지 — 덮지 않으면 검수하지 않은 섀시가 있다는 뜻이다.
   const sampled = new Set();
-  for (const decl of Object.values(spec.cuts)) for (const s of decl.slots) sampled.add(path.basename(s.review_sprite || spec.probe_sprite));
+  for (const decl of Object.values(spec.cuts)) for (const s of decl.slots) sampled.add(path.basename(s.sprite || spec.probe_sprite));
   const unsampled = bases.filter((f) => !sampled.has(f));
   if (unsampled.length) console.log(`#\n# 검수 표본에 없는 베이스 ${unsampled.length}종 (오프셋은 위 표가 덮는다): ${unsampled.join(' ')}`);
 }
