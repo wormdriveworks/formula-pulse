@@ -480,5 +480,37 @@ if (TABLE) {
   if (unsampled.length) console.log(`#\n# 검수 표본에 없는 베이스 ${unsampled.length}종 (오프셋은 위 표가 덮는다): ${unsampled.join(' ')}`);
 }
 
+// ── 전사 공백 고지 (경고형 · 차단하지 않는다) ─────────────────────────────
+//
+// **두 번 같은 자리에서 붉혔다.** 도구가 내는 것은 *파일과 블록*이고, 그것을 소비하는
+// 표는 남의 소관이다. 그 둘이 갈라진 상태로 커밋하면 **파일 유입 커밋 하나만으로
+// 차단 게이트가 붉는다** — SCENE 전량 등재 축이 `machines/*_base_*_side.png` 를 스캔해
+// `machine_baselines` 와 대조하기 때문이다(필러 4종 유입 = `SCENE_FAIL failures=5`).
+//
+// 그러므로 **내가 전사 의무를 만들었다는 사실을 만든 그 자리에서 알려준다.** 차단하지
+// 않는 이유: 없는 파일은 전사할 수 없으므로 산출이 먼저 오는 순서 자체는 정상이다.
+// 막아야 할 것은 순서가 아니라 **고지 없이 커밋하는 것**이다(선커밋 조율 대상).
+try {
+  const BL = path.join(ROOT, 'godot/data/tables/machine_baselines.csv');
+  const dirAll = fs.readdirSync(path.join(ROOT, 'godot/assets/machines'))
+    .filter((f) => f.endsWith('_side.png') && f.includes('_base_') && !f.includes('_overlay_'))
+    .map((f) => f.replace(/\.png$/, ''));
+  const listed = new Set(fs.existsSync(BL) ? csv(BL).map((r) => String(r.sprite || '').trim()) : []);
+  const pending = dirAll.filter((n) => !listed.has(n));
+  const orphan = [...listed].filter((n) => !dirAll.includes(n));
+  if (!fs.existsSync(BL)) {
+    console.log(`\n⚠ 전사 대상 표가 없다 (${BL}) — 대조 불가`);
+  } else if (pending.length || orphan.length) {
+    console.log('\n⚠ 전사 공백 — **커밋 전에 고지하라. 이 상태로 파일만 넣으면 SCENE 전량 등재 축이 붉는다.**');
+    if (pending.length) console.log(`   표에 없는 실물 ${pending.length}건: ${pending.join(' ')}`);
+    if (orphan.length) console.log(`   실물 없는 표 행 ${orphan.length}건: ${orphan.join(' ')}`);
+    console.log(`   → 소비부 소관이므로 도구가 고치지 않는다. 산출 커밋과 전사 커밋을 조율한다.`);
+  } else {
+    ok(`전사 정합 — 측면 베이스 ${dirAll.length}종이 machine_baselines 에 전건 등재`);
+  }
+} catch (e) {
+  console.log(`\n⚠ 전사 대조를 못 돌렸다: ${e.message} — 판정 없음은 정합이 아니다`);
+}
+
 if (FAILED) { console.error(`\nCUT_LAYOUT FAIL 위반 ${FAILED}건`); process.exit(1); }
 console.log(`\nCUT_LAYOUT PASS cuts=${Object.keys(spec.cuts).length}`);
