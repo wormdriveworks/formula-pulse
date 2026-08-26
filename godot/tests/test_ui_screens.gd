@@ -132,8 +132,8 @@ func _process(_delta: float) -> bool:
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 736:
-		print("UI_SCREENS_FAIL checks=%d < 하한 736 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 741:
+		print("UI_SCREENS_FAIL checks=%d < 하한 741 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -2852,6 +2852,55 @@ func _vn_cg_layer(data: GameData) -> void:
 		_ok("미지정 장면 = 바탕 층 없음 (검정 폴백)",
 			bare.get_node_or_null("Backdrop") == null)
 		_release_vn(bare)
+
+	# ── 화자 스탠딩 (34차 ㊵ ② — 내러티브 14차 스펙) ──
+	#
+	# **한 자리는 가장 최근 발화자가 쥔다.** 우측 경합 장면(`clue_silence` — 테오 vs 사샤)을
+	# 골라 라인을 넘기며 점유가 실제로 교대하는지 본다 — 짝을 어긋나게 고른 것이다
+	# (경합 없는 장면이면 규칙을 지워도 통과한다).
+	var standing := _mount_vn_id(data, "vnbeat_clue_silence")
+	if standing != null:
+		var lines: Array = data.vn_beat_lines_for("vnbeat_clue_silence")
+		standing._lines = standing._normalize_lines(lines)
+		standing._line_index = 0
+		var right_seen: Array = []
+		var left_seen: Array = []
+		for index in range(lines.size()):
+			standing._line_index = index
+			standing._show_line()
+			var left := standing.find_child("StandingLeft", true, false)
+			var right := standing.find_child("StandingRight", true, false)
+			var left_art := left.get_node_or_null("Standing") if left != null else null
+			var right_art := right.get_node_or_null("Standing") if right != null else null
+			if left_art != null and not left_seen.has(String(left_art.get_meta("Standing", ""))):
+				left_seen.append(String(left_art.get_meta("Standing", "")))
+			if right_art != null and not right_seen.has(String(right_art.get_meta("Standing", ""))):
+				right_seen.append(String(right_art.get_meta("Standing", "")))
+		# 좌측은 한 인물만 — 마르타 고정이 스펙의 축이다.
+		_ok("좌측 점유 = 1인 (마르타 고정)", left_seen.size() == 1, str(left_seen))
+		_ok("좌측 = 표가 지정한 인물",
+			left_seen.size() == 1
+			and String(left_seen[0]) == String(data.vn_speaker("ui.vn.speakerMarta")["char_id"]),
+			str(left_seen))
+		# **우측은 교대한다** — 한 인물만 보이면 최근 발화자 규칙이 일하지 않은 것이다.
+		_ok("우측 점유 교대 (최근 발화자 규칙)", right_seen.size() >= 2, str(right_seen))
+		# 지문·베인은 아무것도 바꾸지 않는다 — 지우지도 않는다.
+		standing._line_index = 0
+		standing._show_line()
+		var narration_left := standing.find_child("StandingLeft", true, false)
+		var kept := narration_left.get_node_or_null("Standing") if narration_left != null else null
+		# **`queue_free()` 는 그 프레임에 노드를 남긴다** — 존재만 보면 지운 것과 안 지운 것이
+		# 같은 그림이다(반증 Y3 초판 미검출). 해제 예약까지 본다.
+		_ok("지문 라인에서도 좌측이 남는다",
+			kept != null and not kept.is_queued_for_deletion(),
+			"null" if kept == null else str(kept.is_queued_for_deletion()))
+		# **base 전용 시작** (스펙 §3) — 표정 차분을 열면 위계가 거짓이 된다.
+		_ok("스탠딩 = base 차분",
+			kept != null and (kept as TextureRect).texture != null
+			and String((kept as TextureRect).texture.resource_path).ends_with("_base.png"),
+			"" if kept == null or (kept as TextureRect).texture == null
+			else String((kept as TextureRect).texture.resource_path))
+		_release_vn(standing)
 
 	var without := _mount_vn_id(data, CG_VN_WITHOUT)
 	if without != null:

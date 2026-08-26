@@ -44,6 +44,15 @@ const BACKDROP_LAYER_NAME := "Backdrop"
 const BACKDROP_LAYER_INDEX := 1
 const CG_LAYER_INDEX := 2
 const BACKGROUND_DIR := "res://assets/backgrounds/"
+const CHARACTER_DIR := "res://assets/characters/"
+# 스탠딩 자리 — 씬 실물 노드다(`StandingRow` 아래 좌·우). **씬 무접촉**: 텍스처만 얹는다.
+const STANDING_SLOTS := {"left": "StandingLeft", "right": "StandingRight"}
+const STANDING_NODE := "Standing"
+# **표정 차분은 쓰지 않는다 (base 전용 시작 — 내러티브 14차 §3).** 고를 데이터가 없다:
+# 라인 표에 표정 열이 없고 `tone` 은 전 비트 `calm` 이라 유도하면 전건 base 로 떨어진다.
+# **반만 쓰면 위계가 거짓이 된다** — 차분 수량 사정이 인물 성격으로 읽힌다.
+# 예외 후보 1개소(사샤 `_face_special`)는 판정 대기이므로 여기서 열지 않는다.
+const STANDING_SUFFIX := "_base"
 
 # 라인 = `{"speaker_key": String, "text_key": String}` 로 정규화해 둔다.
 # 문자열 항목도 그대로 받는다 — 골격·아카이브 재열람 등 기존 호출부가 문자열 배열을 넘긴다.
@@ -234,6 +243,7 @@ func _show_line() -> void:
 	var s := session.data.strings
 	var line: Dictionary = _lines[_line_index]
 	var speaker_key := String(line["speaker_key"])
+	_apply_standing(speaker_key)
 	(%BodyLabel as Label).text = s.text(String(line["text_key"]))
 	# 화자 라벨도 라인마다 바뀐다. 지문 화자(`ui.vn.speakerNarration`)는 값이 공란이라
 	# 라벨이 비는 것이 곧 지문 표기다 — 별도 분기를 두지 않는다.
@@ -246,6 +256,45 @@ func _show_line() -> void:
 		sfx("vane_cue_stage%d" % session.outgame.vane_stage())
 	else:
 		sfx("speaker_cue")
+
+
+# ── 화자 스탠딩 (내러티브 14차 스펙 · D09 별첨A §A-19 좌/우 최대 2인) ──
+#
+# **규칙 = 화자 고정 + 한 자리는 그 자리에 배정된 가장 최근 발화자가 쥔다.**
+# 등장순 구동은 데이터가 기각했다 — 막 VN 첫 발화자가 교대로 갈려(1·3막·기원 = 마르타 /
+# 2·4막·에필로그 = 테오) 등장순이면 **마르타가 막마다 좌우를 옮겨 다닌다**(스펙 §2).
+#
+# **§A-19 의 최대 2인이 구조로 지켜진다** — 자리가 둘뿐이라 넘길 방법이 없다. 3인 장면은
+# 위반이 아니라 **점유 교대**이고, 그 교대를 정하는 것이 이 규칙이다.
+#
+# `side = none`(베인·지문)은 **아무것도 바꾸지 않는다** — 베인은 파형 아바타이고(D10 §3.3)
+# 지문은 화자가 아니다. 지우지도 않는다: 지문 한 줄에 인물이 사라지면 장면이 끊긴다.
+func _apply_standing(speaker_key: String) -> void:
+	var row := session.data.vn_speaker(speaker_key)
+	var side := String(row.get("side", "none"))
+	if not STANDING_SLOTS.has(side):
+		return
+	var char_id := String(row.get("char_id", "")).strip_edges()
+	if char_id.is_empty():
+		return
+	var slot := find_child(String(STANDING_SLOTS[side]), true, false) as Control
+	if slot == null:
+		return   # 씬 노드 부재 — 선택 오버레이와 같은 규약(없는 노드를 기다리지 않는다)
+	var art := slot.get_node_or_null(STANDING_NODE) as TextureRect
+	if art == null:
+		art = TextureRect.new()
+		art.name = STANDING_NODE
+		art.set_anchors_preset(Control.PRESET_FULL_RECT)
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		slot.add_child(art)
+	var texture := load(CHARACTER_DIR + char_id + STANDING_SUFFIX + ".png") as Texture2D
+	if texture == null:
+		push_error("VnScreen: standing '%s' not found" % char_id)
+		return
+	art.texture = texture
+	art.set_meta(STANDING_NODE, char_id)
 
 
 # ── 선택 지점 (D04 §5.3 · 총괄 판정 IMPL-257) ──

@@ -450,6 +450,16 @@
     "tint": "enum_optional:signal,pulse"
    }
   },
+  "vn_speakers.csv": {
+   "id_prefix": "vnspk_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "speaker_key": "string_key",
+    "char_id": "string",
+    "side": "enum:left,right,none"
+   }
+  },
   "vn_backdrops.csv": {
    "id_prefix": "vnbg_",
    "root": true,

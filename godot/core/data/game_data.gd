@@ -36,6 +36,7 @@ var scene_cuts: Dictionary = {}        # cut_* id -> 행 (씬 컷 10종 — D10 
 var scene_cut_triggers: Array = []     # sct_* 행 (매칭 조건 — 평가는 우선순위 순)
 var scene_cut_layers: Dictionary = {}  # cut_* id -> 합성 선언 행 배열 (layer_order 오름차순)
 var vn_backdrops: Dictionary = {}      # vnbg_* id -> 행 (VN 장면 바탕 17 — 내러티브 12차 스펙)
+var vn_speakers: Dictionary = {}       # 화자 키 -> 행 (스탠딩 대응·좌우 — 내러티브 14차 스펙)
 var scene_cut_machines: Dictionary = {} # cut_* id -> 머신 자리 행 배열 (slot_order 오름차순)
 var machine_baselines: Dictionary = {}  # 스프라이트 stem -> 바닥 오프셋 행
 var events: Dictionary = {}            # event_* id -> 행 (D08 §7 · D12 §5.4)
@@ -360,8 +361,18 @@ func _load_cg_cutins() -> void:
 	vn_backdrops.clear()
 	for row in CsvTable.load_rows(_table_path("vn_backdrops.csv")):
 		vn_backdrops[String(row["id"])] = row
+	vn_speakers.clear()
+	for row in CsvTable.load_rows(_table_path("vn_speakers.csv")):
+		vn_speakers[String(row["speaker_key"])] = row
 	if cg_cutins.is_empty():
 		_load_ok = false
+
+
+# 화자 → 스탠딩 배정 (내러티브 14차 스펙). **없는 것이 정상이다** — 베인은 파형 아바타이고
+# (D10 §3.3 · `char_id` 부재가 맞다) 지문은 화자가 아니다. 둘 다 `side = none` 으로
+# **선언된 부재**이며, 미등재(행 자체가 없음)와는 다른 사실이다.
+func vn_speaker(speaker_key: String) -> Dictionary:
+	return vn_speakers.get(speaker_key, {})
 
 
 # ── VN 장면 바탕 (내러티브 12차 스펙 · 17장면 전건) ──

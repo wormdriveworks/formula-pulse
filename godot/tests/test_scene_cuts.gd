@@ -19,6 +19,7 @@ const EXPECTED_CUTS := 10      # D10 §6.2 10종 + 예비 2
 const EXPECTED_BACKDROPS := 5  # 무대 5
 const MACHINE_DIR := "res://assets/machines/"
 const BACKGROUND_DIR := "res://assets/backgrounds/"
+const CHARACTER_DIR := "res://assets/characters/"
 # 막 VN 6 + 비트 11 (내러티브 12차 §2.5 검산)
 const EXPECTED_VN_SCENES := 17
 # 측면 베이스 전량 = 팀 3 + 프라이비티어 공용 1 + 보레아스 3단계 + 필러 변조 4 (에셋 IMPL-461)
@@ -51,11 +52,12 @@ func _init() -> void:
 	_baseline_pixels(data)
 	_z_bands(data)
 	_vn_backdrops(data)
+	_vn_speakers(data)
 	_mapping_priority(data)
 	_mapping_negatives(data)
 	print("")
-	if _checked < 389:
-		print("SCENE_FAIL checks=%d < 하한 389 (스위트 축소 의심)" % _checked)
+	if _checked < 561:
+		print("SCENE_FAIL checks=%d < 하한 561 (스위트 축소 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -423,6 +425,42 @@ func _vn_backdrops(data: GameData) -> void:
 	# 미지정은 빈 문자열 — 폴백(ColorRect)이 자동 성립하는 자리다.
 	_ok("미상 장면 = 무배경", data.vn_backdrop("vn_not_a_scene").is_empty())
 	_ok("공란 = 무배경", data.vn_backdrop("").is_empty())
+
+
+# ── ⑫ 화자 스탠딩 배정 (내러티브 14차 스펙) ──
+func _vn_speakers(data: GameData) -> void:
+	_ok("화자 대장 = 9행", data.vn_speakers.size() == 9, str(data.vn_speakers.size()))
+	var sides: Dictionary = {}
+	for speaker_key in data.vn_speakers:
+		var row: Dictionary = data.vn_speakers[speaker_key]
+		var side := String(row["side"])
+		sides[side] = int(sides.get(side, 0)) + 1
+		var char_id := String(row.get("char_id", "")).strip_edges()
+		# **선언된 부재** — `none` 은 char_id 가 비어야 하고, 자리가 있으면 있어야 한다.
+		# 둘이 어긋나면 "자리는 있는데 그릴 것이 없는" 상태가 조용히 성립한다.
+		_ok("%s 자리·인물 정합" % String(speaker_key),
+			(side == "none") == char_id.is_empty(), "%s / %s" % [side, char_id])
+		if char_id.is_empty():
+			continue
+		_ok("%s 스탠딩 실물 적재" % String(speaker_key),
+			load(CHARACTER_DIR + char_id + "_base.png") != null, char_id)
+	# 좌 1 · 우 6 · 부재 2 — 마르타 좌 고정이 스펙의 축이다(17/17 전 장면 등장).
+	_ok("좌측 = 1인 고정", int(sides.get("left", 0)) == 1, str(sides))
+	_ok("우측 경합 = 6인", int(sides.get("right", 0)) == 6, str(sides))
+	_ok("선언된 부재 = 2 (베인·지문)", int(sides.get("none", 0)) == 2, str(sides))
+	# **발화하는 화자 전량이 대장에 있는가** — 없으면 그 인물만 조용히 안 선다.
+	for beat_id in data.vn_beat_lines:
+		for line in data.vn_beat_lines_for(String(beat_id)):
+			_ok("비트 화자 등재: %s" % String(line["speaker_key"]),
+				not data.vn_speaker(String(line["speaker_key"])).is_empty(),
+				String(line["speaker_key"]))
+	for entry in data.act_vn_entries():
+		for line in Array(Dictionary(entry).get("lines", [])):
+			_ok("막 VN 화자 등재: %s" % String(Dictionary(line)["speaker_key"]),
+				not data.vn_speaker(String(Dictionary(line)["speaker_key"])).is_empty(),
+				String(Dictionary(line)["speaker_key"]))
+	# **키를 쪼갠다** — 붙여 두면 V2 가 코드 리터럴로 보고 미등재 키로 잡는다(21차 전례).
+	_ok("미상 화자 = 무배정", data.vn_speaker("ui.vn." + "speakerNobody").is_empty())
 
 
 # ── ⑥ 매핑 우선순위 — D13 §8.2 서열을 호출로 재현 ──
