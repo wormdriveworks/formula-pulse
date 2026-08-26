@@ -35,6 +35,7 @@ var stage_backdrops: Dictionary = {}   # bdrop_* id -> 행 (무대 배경 2레�
 var scene_cuts: Dictionary = {}        # cut_* id -> 행 (씬 컷 10종 — D10 §6.2)
 var scene_cut_triggers: Array = []     # sct_* 행 (매칭 조건 — 평가는 우선순위 순)
 var scene_cut_layers: Dictionary = {}  # cut_* id -> 합성 선언 행 배열 (layer_order 오름차순)
+var vn_backdrops: Dictionary = {}      # vnbg_* id -> 행 (VN 장면 바탕 17 — 내러티브 12차 스펙)
 var scene_cut_machines: Dictionary = {} # cut_* id -> 머신 자리 행 배열 (slot_order 오름차순)
 var machine_baselines: Dictionary = {}  # 스프라이트 stem -> 바닥 오프셋 행
 var events: Dictionary = {}            # event_* id -> 행 (D08 §7 · D12 §5.4)
@@ -356,8 +357,35 @@ func _load_cg_cutins() -> void:
 	cg_cutins.clear()
 	for row in CsvTable.load_rows(_table_path("cg_cutins.csv")):
 		cg_cutins[String(row["id"])] = row
+	vn_backdrops.clear()
+	for row in CsvTable.load_rows(_table_path("vn_backdrops.csv")):
+		vn_backdrops[String(row["id"])] = row
 	if cg_cutins.is_empty():
 		_load_ok = false
+
+
+# ── VN 장면 바탕 (내러티브 12차 스펙 · 17장면 전건) ──
+#
+# **`vn_id` 는 안정 식별자가 아니다.** 개막·종막 비트는 아카이브가 시즌마다 한 줄을 남겨야
+# 해서 시즌 접미가 붙는다(`vn_season_open_s3`). 완전 일치 하나로 두면 **그 둘만 조용히
+# 검정으로 떨어진다** — 스펙이 그 함정을 명기했고, 여기서 두 겹으로 막는다:
+#   ⓐ 정상 경로는 화면이 **표 실체 id**(`scene_id`)를 페이로드로 받는다 — 추정이 없다
+#   ⓑ 아카이브 재열람은 실체 id 를 모르므로 **표가 선언한 접두**(`vn_id_prefix`)로 잇는다
+# 접두를 코드가 아니라 **표에 둔 것**이 요점이다 — 코드에 적으면 검사가 그 문자열을 보지 못한다.
+func vn_backdrop(scene_or_vn_id: String) -> String:
+	if scene_or_vn_id.is_empty():
+		return ""
+	for backdrop_id in vn_backdrops:
+		var row: Dictionary = vn_backdrops[backdrop_id]
+		if String(row.get("source_act_vn", "")).strip_edges() == scene_or_vn_id \
+				or String(row.get("source_beat", "")).strip_edges() == scene_or_vn_id:
+			return String(row["backdrop"])
+	for backdrop_id in vn_backdrops:
+		var row: Dictionary = vn_backdrops[backdrop_id]
+		var prefix := String(row.get("vn_id_prefix", "")).strip_edges()
+		if not prefix.is_empty() and scene_or_vn_id.begins_with(prefix):
+			return String(row["backdrop"])
+	return ""   # 미지정 = 현행 검정(ColorRect 폴백) — 표 행이 늘 때의 정상 거동이다
 
 
 # 발견 id(`cg_01_throne` 등) → CG 행. **업적 행을 한 겹 거친다** — 대장의 `source_achievement`

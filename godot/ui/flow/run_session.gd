@@ -211,6 +211,9 @@ func _beat_payload(beat_id: String, next_route: String, next_payload: Dictionary
 	var beat := data.vn_beat(beat_id)
 	return {
 		"vn_id": beat_id if vn_id_override.is_empty() else vn_id_override,
+		# **표 실체 id 를 함께 싣는다.** `vn_id` 는 시즌 접미가 붙어 표 조회 열쇠가 되지
+		# 못한다 — 화면이 추정하게 두면 개막·종막만 조용히 어긋난다(내러티브 12차 §2.1).
+		"scene_id": beat_id,
 		# 슬롯은 **비트 행이 이미 선언한다** — 호출부가 상수로 못 박으면 비트가 다른 슬롯에
 		# 붙는 날(개막 비트가 그랬다) 라인은 맞고 슬롯만 틀린 페이로드가 나간다.
 		"slot_id": String(beat.get("slot_id", ACT_VN_SLOT)),
@@ -360,6 +363,7 @@ func _act_vn_payload(vn_id: String, next_route: String, next_payload: Dictionary
 	var entry := data.act_vn_entry(vn_id)
 	return {
 		"vn_id": vn_id,
+		"scene_id": vn_id,   # 막 VN 은 인스턴스 id 가 곧 표 실체 id 다(접미 없음)
 		"slot_id": ACT_VN_SLOT,
 		# 라인별 화자 사전을 **그대로** 넘긴다 — 화면이 `_normalize_lines()` 로 받는 형태다.
 		"line_keys": entry.get("lines", []),

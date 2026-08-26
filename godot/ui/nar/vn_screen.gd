@@ -39,7 +39,11 @@ const CHOICE_LIST_NAME := "ChoiceList"
 # 자리 = 바탕(`Background`) **바로 위, 스탠딩 아래**. 스탠딩을 가리면 인물이 사라지고
 # 대사창을 가리면 문면이 사라진다 — 층 순서가 곧 계약이다.
 const CG_LAYER_NAME := "CgArt"
-const CG_LAYER_INDEX := 1
+# 바탕이 CG 아래로 들어오면서 한 칸씩 밀린다 — **바탕(1) → CG(2) → 스탠딩 → 대사창**.
+const BACKDROP_LAYER_NAME := "Backdrop"
+const BACKDROP_LAYER_INDEX := 1
+const CG_LAYER_INDEX := 2
+const BACKGROUND_DIR := "res://assets/backgrounds/"
 
 # 라인 = `{"speaker_key": String, "text_key": String}` 로 정규화해 둔다.
 # 문자열 항목도 그대로 받는다 — 골격·아카이브 재열람 등 기존 호출부가 문자열 배열을 넘긴다.
@@ -91,6 +95,7 @@ func _on_bound(payload: Dictionary) -> void:
 	# 화자는 **라인 단위**다 (총괄 판정 IMPL-249 ② — 신설안 C 승인).
 	# 페이로드의 `speaker_key` 는 라인이 화자를 지정하지 않았을 때의 기본값으로만 남는다.
 	_default_speaker_key = String(payload.get("speaker_key", VANE_SPEAKER_KEY))
+	_mount_backdrop(String(payload.get("scene_id", vn_id)), vn_id)
 	_mount_cg(vn_id)
 	_lines = _normalize_lines(payload.get("line_keys", ["ui.vn.placeholderLine01"]))
 	_line_index = 0
@@ -98,6 +103,40 @@ func _on_bound(payload: Dictionary) -> void:
 	(%AdvanceButton as Button).grab_focus()
 	(%AdvanceButton as Button).pressed.connect(_advance)
 	(%CalendarPanel as Control).visible = false
+
+
+# ── VN 장면 바탕 (내러티브 12차 스펙 · 17장면) ──
+#
+# **조회 열쇠가 둘이다.** 정상 경로는 페이로드의 `scene_id`(표 실체 id)를 쓰고, 그것이 없는
+# 경로(아카이브 재열람)는 `vn_id` 로 떨어진다 — 표의 접두 열이 그 경로를 잇는다.
+#
+# **감광을 걸지 않는다** (스펙 §4.2). 씬 패널의 0.70 은 *릴 국면 저강조* 값이라 여기 옮기면
+# 근거 없는 전용이 되고, VN 바탕 감광 값은 D13 대장에 없다(불변규칙 2). 문면은
+# `DialoguePanel` 안에 서므로 바탕에 직접 얹히지도 않는다. 실기에서 판독이 문제가 되면
+# **그것은 값 부재 사안이므로 중단·보고**가 맞다.
+#
+# **매핑이 없으면 층을 세우지 않는다** — `Background`(ColorRect)가 그대로 드러나 폴백이
+# 자동 성립한다(스펙 §4.3). 표 행이 늘 때 미지정이 검정으로 떨어지는 것이 정상 거동이다.
+func _mount_backdrop(scene_id: String, vn_id: String) -> void:
+	var asset := session.data.vn_backdrop(scene_id)
+	if asset.is_empty() and scene_id != vn_id:
+		asset = session.data.vn_backdrop(vn_id)
+	if asset.is_empty():
+		return
+	var texture := load(BACKGROUND_DIR + asset + ".png") as Texture2D
+	if texture == null:
+		push_error("VnScreen: backdrop '%s' not found" % asset)
+		return
+	var layer := TextureRect.new()
+	layer.name = BACKDROP_LAYER_NAME
+	layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	layer.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	layer.texture = texture
+	layer.set_meta(BACKDROP_LAYER_NAME, asset)
+	add_child(layer)
+	move_child(layer, BACKDROP_LAYER_INDEX)
 
 
 # **재열람에서도 뜬다.** 아카이브는 놓친 서사의 회수 경로이고(D07 §6.3 무상·상시),

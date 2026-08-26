@@ -450,6 +450,17 @@
     "tint": "enum_optional:signal,pulse"
    }
   },
+  "vn_backdrops.csv": {
+   "id_prefix": "vnbg_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "source_act_vn": "structure_entry_ref_optional:act_vn.json:entries",
+    "source_beat": "fk_optional:vn_beats.csv",
+    "backdrop": "string",
+    "vn_id_prefix": "string"
+   }
+  },
   "cg_cutins.csv": {
    "id_prefix": "cgcut_",
    "root": true,

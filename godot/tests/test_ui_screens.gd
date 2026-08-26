@@ -132,8 +132,8 @@ func _process(_delta: float) -> bool:
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 729:
-		print("UI_SCREENS_FAIL checks=%d < 하한 729 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 736:
+		print("UI_SCREENS_FAIL checks=%d < 하한 736 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -2791,15 +2791,30 @@ func _vn_cg_layer(data: GameData) -> void:
 	var with_cg := _mount_vn_id(data, CG_VN_WITH)
 	if with_cg == null:
 		return
+	# ── VN 바탕 (34차 ㊵ — 내러티브 12차 스펙) ──
+	# **층 순서 = 바탕 → CG → 스탠딩 → 대사창.** 바탕이 CG 위로 가면 CG 가 사라진다.
+	var backdrop := with_cg.get_node_or_null("Backdrop") as TextureRect
+	_ok("기원 공개 = 바탕 층 실재", backdrop != null)
+	if backdrop != null:
+		_ok("바탕 = 표가 지정한 파일",
+			String(backdrop.get_meta("Backdrop", "")) == data.vn_backdrop(CG_VN_WITH),
+			String(backdrop.get_meta("Backdrop", "")))
+		_ok("바탕이 CG 아래", backdrop.get_index() < with_cg.get_node_or_null(CG_VN_LAYER).get_index()
+			if with_cg.get_node_or_null(CG_VN_LAYER) != null else false)
+		_ok("바탕이 바탕색(ColorRect) 위",
+			backdrop.get_index() > with_cg.find_child("Background", false, false).get_index())
 	var art := with_cg.get_node_or_null(CG_VN_LAYER)
 	_ok("기원 공개 = CG 층 실재", art != null)
 	if art != null:
 		_ok("기원 공개 = 대장이 지정한 파일",
 			String(art.asset_id) == String(data.cg_cutin_for_vn(CG_VN_WITH)["asset"]),
 			String(art.asset_id))
-		# **바탕 바로 위**다. 스탠딩·대사창을 가리면 인물과 문면이 사라진다.
-		_ok("CG 층 = 바탕 바로 위", with_cg.get_child(1) == art,
-			with_cg.get_child(1).name if with_cg.get_child_count() > 1 else "")
+		# **바탕 바로 위**다 — 34차에 바탕 층이 들어오면서 인덱스가 한 칸 밀렸으므로
+		# **관계로 적는다**(리터럴 인덱스는 층이 늘 때마다 거짓이 된다).
+		_ok("CG 층 = 바탕 바로 위",
+			backdrop != null and art.get_index() == backdrop.get_index() + 1,
+			"바탕 %d · CG %d" % [-1 if backdrop == null else backdrop.get_index(),
+				art.get_index()])
 		# `get_node("%...")` 는 씬 밖에서 부르면 null 이다 — 이름으로 찾는다.
 		var dialogue := with_cg.find_child("DialoguePanel", false, false) as Control
 		_ok("전제: 대사창 노드 실재", dialogue != null)
@@ -2817,6 +2832,26 @@ func _vn_cg_layer(data: GameData) -> void:
 				String(other_art.asset_id) != String(data.cg_cutin_for_vn(CG_VN_WITH)["asset"]),
 				String(other_art.asset_id))
 		_release_vn(other)
+
+	# ⚠ **접미 붙은 인스턴스로도 바탕이 선다** — `vn_id` 완전 일치 하나로 두면 개막·종막만
+	# 조용히 검정이 된다(스펙 §2.1 함정). 재열람 경로는 `scene_id` 가 없으므로 이 축이
+	# 실기의 아카이브 경로 그 자체다.
+	var seasonal := _mount_vn_id(data, "vn_season_open_s3")
+	if seasonal != null:
+		var season_bg := seasonal.get_node_or_null("Backdrop") as TextureRect
+		_ok("접미 인스턴스 = 바탕 실재 (아카이브 경로)", season_bg != null)
+		if season_bg != null:
+			_ok("접미 인스턴스 바탕 = 개막 비트 지정",
+				String(season_bg.get_meta("Backdrop", ""))
+				== data.vn_backdrop("vnbeat_season_open"),
+				String(season_bg.get_meta("Backdrop", "")))
+		_release_vn(seasonal)
+	# **미지정 장면은 층을 세우지 않는다** — ColorRect 폴백이 자동 성립한다(스펙 §4.3).
+	var bare := _mount_vn_id(data, "vn_not_a_scene")
+	if bare != null:
+		_ok("미지정 장면 = 바탕 층 없음 (검정 폴백)",
+			bare.get_node_or_null("Backdrop") == null)
+		_release_vn(bare)
 
 	var without := _mount_vn_id(data, CG_VN_WITHOUT)
 	if without != null:

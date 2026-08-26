@@ -18,6 +18,9 @@ const EXPECTED_ELEMENTS := 8   # 사양서 §5.2.1 연출 요소 8종
 const EXPECTED_CUTS := 10      # D10 §6.2 10종 + 예비 2
 const EXPECTED_BACKDROPS := 5  # 무대 5
 const MACHINE_DIR := "res://assets/machines/"
+const BACKGROUND_DIR := "res://assets/backgrounds/"
+# 막 VN 6 + 비트 11 (내러티브 12차 §2.5 검산)
+const EXPECTED_VN_SCENES := 17
 # 측면 베이스 전량 = 팀 3 + 프라이비티어 공용 1 + 보레아스 3단계 + 필러 변조 4 (에셋 IMPL-461)
 const EXPECTED_BASELINES := 11
 
@@ -47,11 +50,12 @@ func _init() -> void:
 	_machine_layout(data)
 	_baseline_pixels(data)
 	_z_bands(data)
+	_vn_backdrops(data)
 	_mapping_priority(data)
 	_mapping_negatives(data)
 	print("")
-	if _checked < 295:
-		print("SCENE_FAIL checks=%d < 하한 295 (스위트 축소 의심)" % _checked)
+	if _checked < 389:
+		print("SCENE_FAIL checks=%d < 하한 389 (스위트 축소 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -364,6 +368,61 @@ func _z_bands(data: GameData) -> void:
 	# 검수 시트가 짚은 관통 — 스피드 라인이 후미차를 뚫었다.
 	_ok("스피드 라인 = 뒤 (후미차 관통 교정)",
 		String(data.fx_element("fxe_speed_lines")["z_band"]) == "behind")
+
+
+# ── ⑪ VN 장면 바탕 (내러티브 12차 스펙 · 17장면 전건 · 무배경 0) ──
+func _vn_backdrops(data: GameData) -> void:
+	_ok("스펙 계수 = 17장면", data.vn_backdrops.size() == EXPECTED_VN_SCENES,
+		str(data.vn_backdrops.size()))
+	var by_asset: Dictionary = {}
+	for backdrop_id in data.vn_backdrops:
+		var row: Dictionary = data.vn_backdrops[backdrop_id]
+		var act_vn := String(row.get("source_act_vn", "")).strip_edges()
+		var beat := String(row.get("source_beat", "")).strip_edges()
+		# **장면 하나에 열쇠 하나** — 둘이면 조회 순서가 표 행 순서에 달린다.
+		_ok("%s 장면 열쇠 정확히 1" % backdrop_id,
+			(act_vn.is_empty()) != (beat.is_empty()), "%s / %s" % [act_vn, beat])
+		if not act_vn.is_empty():
+			_ok("%s 막 VN 항목 실재" % backdrop_id,
+				not data.act_vn_entry(act_vn).is_empty(), act_vn)
+		if not beat.is_empty():
+			_ok("%s 비트 행 실재" % backdrop_id, not data.vn_beat(beat).is_empty(), beat)
+		var asset := String(row["backdrop"]).strip_edges()
+		by_asset[asset] = int(by_asset.get(asset, 0)) + 1
+		_ok("%s 바탕 실물 적재" % backdrop_id,
+			load(BACKGROUND_DIR + asset + ".png") != null, asset)
+		# 조회가 실제로 그 값을 낸다 — 표를 표와 맞대는 것이 아니라 창구를 통과시킨다.
+		_ok("%s 조회 일치" % backdrop_id,
+			data.vn_backdrop(act_vn if beat.is_empty() else beat) == asset, asset)
+	# 스펙 §0 계수 검산 — 개러지 9 · 패독 5 · 트랙사이드 2 · **충돌 1**.
+	# 충돌분(`vnbeat_crew_sasha`)이 사용자 판정으로 개러지가 됐으므로 **9 + 1 = 10** 이다
+	# (총괄 착수 신호 — ⓐ 문면을 CG 에). 스펙 표의 9 는 충돌을 뺀 수다.
+	_ok("바탕 배분 = 개러지 10 (스펙 9 + 판정 1)",
+		int(by_asset.get("garage_h", 0)) == 10, str(by_asset))
+	_ok("바탕 배분 = 패독 5", int(by_asset.get("vn_paddock", 0)) == 5, str(by_asset))
+	_ok("바탕 배분 = 트랙사이드 2", int(by_asset.get("vn_trackside", 0)) == 2, str(by_asset))
+	# **전 장면이 덮이는가** — 막 VN 6 + 비트 11 전량에 행이 있어야 무배경 0 이 성립한다.
+	for entry in data.act_vn_entries():
+		_ok("막 VN '%s' 바탕 지정" % String(Dictionary(entry)["id"]),
+			not data.vn_backdrop(String(Dictionary(entry)["id"])).is_empty())
+	for beat_id in data.vn_beats:
+		_ok("비트 '%s' 바탕 지정" % String(beat_id),
+			not data.vn_backdrop(String(beat_id)).is_empty())
+	# ⚠ **접미 붙은 인스턴스 id 로도 잡히는가** — 완전 일치 하나로 두면 개막·종막만
+	# 조용히 검정으로 떨어진다(스펙 §2.1 명기 함정). 접두 열이 그 경로를 잇는다.
+	var prefixed := 0
+	for backdrop_id in data.vn_backdrops:
+		var prefix := String(data.vn_backdrops[backdrop_id].get("vn_id_prefix", "")).strip_edges()
+		if prefix.is_empty():
+			continue
+		prefixed += 1
+		_ok("접미 인스턴스 조회: %s_s3" % prefix,
+			data.vn_backdrop("%s_s3" % prefix)
+			== String(data.vn_backdrops[backdrop_id]["backdrop"]), prefix)
+	_ok("접두 선언 = 2건 (개막·종막)", prefixed == 2, str(prefixed))
+	# 미지정은 빈 문자열 — 폴백(ColorRect)이 자동 성립하는 자리다.
+	_ok("미상 장면 = 무배경", data.vn_backdrop("vn_not_a_scene").is_empty())
+	_ok("공란 = 무배경", data.vn_backdrop("").is_empty())
 
 
 # ── ⑥ 매핑 우선순위 — D13 §8.2 서열을 호출로 재현 ──
