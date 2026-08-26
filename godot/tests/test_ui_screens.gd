@@ -132,8 +132,8 @@ func _process(_delta: float) -> bool:
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 722:
-		print("UI_SCREENS_FAIL checks=%d < 하한 722 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 729:
+		print("UI_SCREENS_FAIL checks=%d < 하한 729 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -3694,6 +3694,30 @@ func _scene_panel_phase(data: GameData) -> void:
 	_ok("진입 = 기본 주행 고정",
 		String(panel._cut_id).begins_with("cut_basic_"), String(panel._cut_id))
 	_ok("릴 국면 = 모션 정지", not panel._motion_enabled)
+	# ── 감광 (34차 종결 — D13 별첨A §8.1 v1.12 = 0.70) ──
+	# **값을 검사에 적지 않는다** — 데이터 창구에서 받아 대조한다. 적으면 표를 바꿔도
+	# 검사가 옛 값으로 통과하고, 그 순간 "확정 기준값 경유"라는 계약이 거짓이 된다.
+	var dim_level := data.param("param_scene_panel_dim")
+	_ok("전제: 감광 배율이 1 미만 (축 비공허)", dim_level < 1.0 and dim_level > 0.0,
+		str(dim_level))
+	_ok("릴 국면 = 감광 적용", is_equal_approx(panel.modulate.r, dim_level),
+		str(panel.modulate))
+	_ok("감광은 색이 아니라 밝기 (회색 곱연산)",
+		is_equal_approx(panel.modulate.r, panel.modulate.g)
+		and is_equal_approx(panel.modulate.g, panel.modulate.b), str(panel.modulate))
+	# **값을 갈아 끼워 거동이 따라오는지 본다.** 현행 값과 대조만 하면 상수 기입(0.7)이
+	# 그대로 통과한다 — 지금 값이 맞아서 통과하는 것과 창구를 거쳐서 통과하는 것을
+	# 구분하지 못한다(반증 W4 초판 미검출 · 섀시 임계 픽스처 축과 같은 형태).
+	# **패널이 쥔 데이터를 갈아 끼운다** — 검사가 든 `data` 와 화면이 든 것이 다른 인스턴스면
+	# 값을 바꿔도 거동이 안 바뀌고, 그 무동작이 "통과"로 보인다(초판 실측).
+	var panel_data: GameData = panel.data
+	var restore_dim: float = panel_data.params["param_scene_panel_dim"]
+	panel_data.params["param_scene_panel_dim"] = restore_dim * 0.5
+	panel.set_dim(true)
+	_ok("감광이 데이터 창구를 따른다 (상수 기입 아님)",
+		is_equal_approx(panel.modulate.r, restore_dim * 0.5), str(panel.modulate))
+	panel_data.params["param_scene_panel_dim"] = restore_dim
+	panel.set_dim(true)
 	# ⓑ 전개 국면 — **짝을 어긋나게 고른다**: 트러블과 추월은 서로 다른 컷이어야 한다.
 	screen._show_result_cut([{"key": "raceLog.troubleHit01"}], false, false)
 	var trouble_cut := String(panel._cut_id)
@@ -3703,6 +3727,7 @@ func _scene_panel_phase(data: GameData) -> void:
 	_ok("추월 확정 = 추월 컷", overtake_cut == "cut_overtake", overtake_cut)
 	_ok("전제: 두 컷이 다르다", trouble_cut != overtake_cut)
 	_ok("전개 국면 = 모션 재개", panel._motion_enabled)
+	_ok("전개 국면 = 감광 해제", is_equal_approx(panel.modulate.r, 1.0), str(panel.modulate))
 	# ⓒ 요소 층이 실제로 섰는가 — 합성 선언이 노드로 옮겨졌는지
 	var fx_root := panel.get_node("Canvas/FxBehind") as Control
 	_ok("추월 컷 요소 층 = 선언 수",
@@ -3713,6 +3738,8 @@ func _scene_panel_phase(data: GameData) -> void:
 	_ok("릴 국면 복귀 = 기본 주행",
 		String(panel._cut_id).begins_with("cut_basic_"), String(panel._cut_id))
 	_ok("릴 국면 복귀 = 모션 정지", not panel._motion_enabled)
+	_ok("릴 국면 복귀 = 감광 재적용", is_equal_approx(panel.modulate.r, dim_level),
+		str(panel.modulate))
 	# ⓔ O12 정지 컷 — 접근성 폴백 (D09 §6.1)
 	screen.session.options.set_index("o12", 1)
 	screen._show_result_cut([{"key": "raceLog.overtakeSuccess01"}], false, false)

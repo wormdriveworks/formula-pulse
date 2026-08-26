@@ -1109,6 +1109,12 @@ func _presentation_grade_caps() -> void:
 	_eq_float("D08 §8.5 L3 GP당 상한 1",
 		CsvTable.to_float(String(data.presentation_grade("grade_l3")["gp_cap"])), 1.0)
 	# D13 별첨A §8.3 등급 스팅 길이
+	# D13 별첨A §8.1 v1.12 (결정 #21) — 씬 패널 감광 배율. **접근성 감쇠 축과 별개 축**이라
+	# `param_fx_reduced_mult`(0.5)와 값이 다른 것이 정상이다(29차에 빌리지 않은 판단의 확인).
+	_eq_float("D13 §8.1 씬 패널 감광 0.70", data.param("param_scene_panel_dim"), 0.70)
+	_ok("감광 ≠ 접근성 감쇠 (축 분리)",
+		not is_equal_approx(data.param("param_scene_panel_dim"),
+			data.param("param_fx_reduced_mult")))
 	_eq_float("D13 §8.3 L1 스팅 0.8초",
 		CsvTable.to_float(String(data.presentation_grade("grade_l1")["sting_length_sec"])), 0.8)
 	_eq_float("D13 §8.3 L2 스팅 1.5초",

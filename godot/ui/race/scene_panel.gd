@@ -291,6 +291,20 @@ func _build_fx(cut_id: String) -> void:
 			"cell": cell, "tint": node.modulate})
 
 
+# 릴 국면 저강조 = **감광** (D09 §3.1.1 · 별첨A §127 · D13 별첨A §8.1 v1.12 = **0.70**).
+#
+# 29차에 값이 없어 비워 둔 자리다 — 그때 `param_fx_reduced_mult`(0.5)를 빌리지 않은 것은
+# 그것이 **접근성 감쇠 축**이기 때문이고, D13 이 신설 행에 *"접근성 감쇠 축과 별개 축"* 을
+# 명기해 그 판단을 확인해 줬다. **없는 값을 채우지 않고 기다린 자리가 정본으로 닫혔다.**
+#
+# 값이 0.70 인 근거도 눈이 냈다(주력 15차 4안 실기 — 0.50 은 대비 3.97:1 로 팔레트 정본
+# 가독 바닥 4.5:1 미달). 헤드리스가 정할 수 없는 종류의 값이었다.
+func set_dim(dimmed: bool) -> void:
+	var level := data.param("param_scene_panel_dim") if dimmed else 1.0
+	# 회색 곱연산 — 색을 칠하는 것이 아니라 밝기를 내린다(PAL 문맥 제외 축과 같은 성격).
+	modulate = Color(level, level, level)
+
+
 # O12 '씬 패널 모션: 표준 / 정지 컷' (D09 §6.1 — 접근성 폴백).
 func set_motion_enabled(enabled: bool) -> void:
 	_motion_enabled = enabled

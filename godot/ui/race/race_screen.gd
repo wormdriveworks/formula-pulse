@@ -1631,11 +1631,9 @@ func _play_pacing_beat() -> void:
 #     결과 상관 값이 화면 층에 존재하게 된다.
 #   · 전개 국면(T5) = 확정 이벤트로 매핑 평가 — 로그와 **병행**이라 추가 대기가 0이다.
 #
-# **저강조(감광)는 적용하지 않았다 — 값이 없다.** D09 §3.1.1·별첨A §127 이 릴 국면에
-# *"감광"* 을 명문하지만 **감광 배율은 D13 어디에도 없다**(§8.1 화면 층 블록 전수 확인).
-# 정본이 채널의 존재만 정하고 수치를 비운 형태이므로 §8.1 v1.4 편입 전례를 따라 값을
-# 요청했다(회신 §미결). 그때까지 릴 국면은 **컷 고정 + 모션 정지**만으로 성립시킨다 —
-# 없는 값을 0.5 로 채우면 그 0.5 가 정본이 된다.
+# **저강조(감광) = 0.70** (D13 별첨A §8.1 v1.12 · 결정 #21 — 34차 종결). 29차에 값이 없어
+# 비워 둔 자리이며 그때 `param_fx_reduced_mult` 를 빌리지 않은 판단을 정본이 확인했다
+# (신설 행에 *"접근성 감쇠 축과 별개 축"* 명기). **기다린 자리가 정본으로 닫혔다.**
 func _setup_scene_panel() -> void:
 	var host := %E15ScenePanel as Control
 	_scene_panel = ScenePanel.new()
@@ -1657,6 +1655,7 @@ func _show_reel_phase_cut() -> void:
 	if _scene_panel == null or engine == null:
 		return
 	_scene_panel.set_motion_enabled(false)
+	_scene_panel.set_dim(true)     # 릴 국면 저강조 — 개입 판단 방해 차단 (D09 §3.1.1)
 	_scene_panel.show_cut(session.scene_cuts.reel_phase_cut(_field_size()),
 		_active_stage_id(), _scene_occupants())
 
@@ -1680,6 +1679,7 @@ func _show_result_cut(events: Array, duel_turn: bool, gp_finished: bool) -> void
 		return   # 폴백 행이 사라진 경우 — 검사가 잡는다(코드가 기본값을 들지 않는다)
 	_scene_panel.show_cut(cut_id, _active_stage_id(), _scene_occupants())
 	_scene_panel.set_motion_enabled(session.options.index_of("o12") == 0)
+	_scene_panel.set_dim(false)    # 전개 국면 — 감광 해제
 
 
 # 씬 패널 점유자 배정 — **화면이 안다, 패널이 아니라.**

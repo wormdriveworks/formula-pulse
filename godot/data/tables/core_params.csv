@@ -135,3 +135,4 @@ param_scene_canvas_width_px,408
 param_scene_machine_x,140
 param_scene_machine_y,30
 param_scene_cut_fps,8
+param_scene_panel_dim,0.70
