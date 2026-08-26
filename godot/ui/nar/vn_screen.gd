@@ -53,6 +53,9 @@ const STANDING_NODE := "Standing"
 # **반만 쓰면 위계가 거짓이 된다** — 차분 수량 사정이 인물 성격으로 읽힌다.
 # 예외 후보 1개소(사샤 `_face_special`)는 판정 대기이므로 여기서 열지 않는다.
 const STANDING_SUFFIX := "_base"
+const STANDING_SUFFIX_META := "standing_suffix"
+const WAVEFORM_NODE := "VaneWaveform"
+const WAVEFORM_SCRIPT := "res://ui/race/vane_waveform.gd"
 
 # 라인 = `{"speaker_key": String, "text_key": String}` 로 정규화해 둔다.
 # 문자열 항목도 그대로 받는다 — 골격·아카이브 재열람 등 기존 호출부가 문자열 배열을 넘긴다.
@@ -64,6 +67,8 @@ var _next_route := ""
 var _next_payload: Dictionary = {}
 var _replay := false
 var _vn_id := ""
+# 표 실체 id — 표정 예외가 장면 단위라 라인 표시 시점에도 필요하다.
+var _scene_id := ""
 # 이번 재생에서 이미 처리한 지점 — 같은 라인으로 되돌아와도 두 번 묻지 않는다.
 var _choice_seen: Dictionary = {}
 # **노드 부재로 생략한 지점 id.** 생략 자체는 규격이지만 조용한 생략은 금지다 —
@@ -104,7 +109,8 @@ func _on_bound(payload: Dictionary) -> void:
 	# 화자는 **라인 단위**다 (총괄 판정 IMPL-249 ② — 신설안 C 승인).
 	# 페이로드의 `speaker_key` 는 라인이 화자를 지정하지 않았을 때의 기본값으로만 남는다.
 	_default_speaker_key = String(payload.get("speaker_key", VANE_SPEAKER_KEY))
-	_mount_backdrop(String(payload.get("scene_id", vn_id)), vn_id)
+	_scene_id = String(payload.get("scene_id", vn_id))
+	_mount_backdrop(_scene_id, vn_id)
 	_mount_cg(vn_id)
 	_lines = _normalize_lines(payload.get("line_keys", ["ui.vn.placeholderLine01"]))
 	_line_index = 0
@@ -274,12 +280,17 @@ func _apply_standing(speaker_key: String) -> void:
 	var side := String(row.get("side", "none"))
 	if not STANDING_SLOTS.has(side):
 		return
-	var char_id := String(row.get("char_id", "")).strip_edges()
-	if char_id.is_empty():
-		return
 	var slot := find_child(String(STANDING_SLOTS[side]), true, false) as Control
 	if slot == null:
 		return   # 씬 노드 부재 — 선택 오버레이와 같은 규약(없는 노드를 기다리지 않는다)
+	# **베인은 인물이 아니라 파형이다** (D10 §3.3 · 총괄 판정 2026-08-26 ② — 우측 슬롯 차용).
+	# 같은 슬롯을 쓰므로 §A-19 최대 2인이 그대로 유지되고, 씬은 건드리지 않는다.
+	if CsvTable.to_int(String(row.get("waveform", "0"))) == 1:
+		_mount_waveform(slot)
+		return
+	var char_id := String(row.get("char_id", "")).strip_edges()
+	if char_id.is_empty():
+		return
 	var art := slot.get_node_or_null(STANDING_NODE) as TextureRect
 	if art == null:
 		art = TextureRect.new()
@@ -289,12 +300,39 @@ func _apply_standing(speaker_key: String) -> void:
 		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		slot.add_child(art)
-	var texture := load(CHARACTER_DIR + char_id + STANDING_SUFFIX + ".png") as Texture2D
+	# **표정 차분은 장면이 연다** — 기본은 base 이고, 그 장면을 위해 그려진 차분이 선언된
+	# 자리에서만 갈린다(총괄 판정 ① — 단일 장면 예외라 위계 무손).
+	var variant := session.data.vn_face_variant(_scene_id, speaker_key)
+	var suffix := STANDING_SUFFIX if variant.is_empty() else "_" + variant
+	var texture := load(CHARACTER_DIR + char_id + suffix + ".png") as Texture2D
 	if texture == null:
 		push_error("VnScreen: standing '%s' not found" % char_id)
 		return
 	art.texture = texture
 	art.set_meta(STANDING_NODE, char_id)
+	art.set_meta(STANDING_SUFFIX_META, suffix)
+
+
+# 베인 파형 — **레이스 소비부를 그대로 재사용한다** (`vane_waveform.gd` · 코드 생성 Control).
+# 진폭 계수도 레이스 전례와 같은 값 창구를 쓴다(`param_vane_amp_stage1` — 1단계 고정,
+# 성장 상태는 아웃게임 층 소관). **새 값을 만들지 않았다** — 만들었다면 불변규칙 2 로
+# 중단·보고할 자리다. 인물 스탠딩과 같은 슬롯을 쓰므로 자리 계수가 늘지 않는다.
+func _mount_waveform(slot: Control) -> void:
+	# **비우는 것이 먼저다.** 초판은 파형이 이미 있으면 곧장 돌아섰는데, 그 사이에 인물이
+	# 그 슬롯에 설 수 있다(진입 시 기본 화자가 베인이라 파형이 **먼저** 서고 인물이 뒤에
+	# 온다 — 반증에서 실측). 그러면 한 슬롯에 둘이 서고, 차용이 병치가 된다.
+	var standing := slot.get_node_or_null(STANDING_NODE)
+	if standing != null:
+		slot.remove_child(standing)
+		standing.free()
+	if slot.get_node_or_null(WAVEFORM_NODE) != null:
+		return
+	var wave := (load(WAVEFORM_SCRIPT) as GDScript).new() as Control
+	wave.name = WAVEFORM_NODE
+	wave.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wave.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.add_child(wave)
+	wave.configure(session.data.param("param_vane_amp_stage1"))
 
 
 # ── 선택 지점 (D04 §5.3 · 총괄 판정 IMPL-257) ──

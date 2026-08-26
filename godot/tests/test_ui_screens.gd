@@ -132,8 +132,8 @@ func _process(_delta: float) -> bool:
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 741:
-		print("UI_SCREENS_FAIL checks=%d < 하한 741 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 748:
+		print("UI_SCREENS_FAIL checks=%d < 하한 748 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -2901,6 +2901,65 @@ func _vn_cg_layer(data: GameData) -> void:
 			"" if kept == null or (kept as TextureRect).texture == null
 			else String((kept as TextureRect).texture.resource_path))
 		_release_vn(standing)
+
+	# ── 표정 차분 예외 · 베인 파형 차용 (35차 · 총괄 판정 ①②) ──
+	var sasha := _mount_vn_id(data, "vnbeat_crew_sasha")
+	if sasha != null:
+		sasha._lines = sasha._normalize_lines(data.vn_beat_lines_for("vnbeat_crew_sasha"))
+		var sasha_key := "ui.vn.speakerSasha"
+		var variant := data.vn_face_variant("vnbeat_crew_sasha", sasha_key)
+		_ok("전제: 예외 선언이 실재한다", not variant.is_empty(), variant)
+		for index in range(sasha._lines.size()):
+			if String(sasha._lines[index]["speaker_key"]) != sasha_key:
+				continue
+			sasha._line_index = index
+			sasha._show_line()
+			break
+		var right := sasha.find_child("StandingRight", true, false)
+		var thawed := right.get_node_or_null("Standing") if right != null else null
+		_ok("예외 장면 = 해빙 차분", thawed != null
+			and String(thawed.get_meta("standing_suffix", "")) == "_" + variant,
+			"" if thawed == null else String(thawed.get_meta("standing_suffix", "")))
+		_release_vn(sasha)
+	# **타 장면의 같은 인물은 base 다** — 예외를 전역 열로 두면 여기서 갈린다(반증 Z1).
+	var sasha_other := _mount_vn_id(data, "vnbeat_clue_silence")
+	if sasha_other != null:
+		sasha_other._lines = sasha_other._normalize_lines(
+			data.vn_beat_lines_for("vnbeat_clue_silence"))
+		for index in range(sasha_other._lines.size()):
+			if String(sasha_other._lines[index]["speaker_key"]) != "ui.vn.speakerSasha":
+				continue
+			sasha_other._line_index = index
+			sasha_other._show_line()
+			break
+		var other_right := sasha_other.find_child("StandingRight", true, false)
+		var other_art := other_right.get_node_or_null("Standing") if other_right != null else null
+		_ok("타 장면의 같은 인물 = base", other_art != null
+			and String(other_art.get_meta("standing_suffix", "")) == "_base",
+			"" if other_art == null else String(other_art.get_meta("standing_suffix", "")))
+		_release_vn(sasha_other)
+	# 베인은 **인물이 아니라 파형**이고 같은 슬롯을 쓴다 — 자리 계수가 늘지 않는다.
+	var vane := _mount_vn_id(data, "vn_act1")
+	if vane != null:
+		vane._lines = vane._normalize_lines(data.act_vn_entry("vn_act1").get("lines", []))
+		# **베인 앞 라인까지 흘린다** — 인물이 먼저 서 있어야 "차용이 비운다"가 잴 것을
+		# 갖는다. 베인 라인만 보이면 슬롯이 원래 비어 있어 병치 축이 공허하다(반증 Z4).
+		var vane_line := -1
+		for index in range(vane._lines.size()):
+			vane._line_index = index
+			vane._show_line()
+			if String(vane._lines[index]["speaker_key"]) == "ui.vn.speakerVane":
+				vane_line = index
+				break
+		_ok("전제: 베인 앞에 인물 발화가 있었다", vane_line > 0, str(vane_line))
+		var vslot := vane.find_child("StandingRight", true, false)
+		_ok("베인 = 파형 노드", vslot != null and vslot.get_node_or_null("VaneWaveform") != null)
+		# **차용이지 병치가 아니다** — 한 슬롯에 인물과 파형이 함께 서지 않는다.
+		_ok("베인 슬롯에 인물 스탠딩 없음",
+			vslot != null and vslot.get_node_or_null("Standing") == null)
+		_ok("자리 계수 불변 (좌·우 둘)",
+			vane.find_child("StandingLeft", true, false) != null and vslot != null)
+		_release_vn(vane)
 
 	var without := _mount_vn_id(data, CG_VN_WITHOUT)
 	if without != null:

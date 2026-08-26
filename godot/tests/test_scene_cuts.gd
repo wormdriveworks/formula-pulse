@@ -56,8 +56,8 @@ func _init() -> void:
 	_mapping_priority(data)
 	_mapping_negatives(data)
 	print("")
-	if _checked < 561:
-		print("SCENE_FAIL checks=%d < 하한 561 (스위트 축소 의심)" % _checked)
+	if _checked < 577:
+		print("SCENE_FAIL checks=%d < 하한 577 (스위트 축소 의심)" % _checked)
 		quit(1)
 		return
 	if _failures == 0:
@@ -436,18 +436,24 @@ func _vn_speakers(data: GameData) -> void:
 		var side := String(row["side"])
 		sides[side] = int(sides.get(side, 0)) + 1
 		var char_id := String(row.get("char_id", "")).strip_edges()
-		# **선언된 부재** — `none` 은 char_id 가 비어야 하고, 자리가 있으면 있어야 한다.
-		# 둘이 어긋나면 "자리는 있는데 그릴 것이 없는" 상태가 조용히 성립한다.
-		_ok("%s 자리·인물 정합" % String(speaker_key),
-			(side == "none") == char_id.is_empty(), "%s / %s" % [side, char_id])
+		var wave := CsvTable.to_int(String(row.get("waveform", "0"))) == 1
+		# **자리가 있으면 그릴 것이 있어야 한다** — 인물이거나 파형이다(총괄 판정 ② 이후).
+		# 어긋나면 "자리는 있는데 그릴 것이 없는" 상태가 조용히 성립한다.
+		_ok("%s 자리·표현 정합" % String(speaker_key),
+			(side == "none") == (char_id.is_empty() and not wave),
+			"%s / %s / wave=%s" % [side, char_id, wave])
+		# **인물과 파형은 배타다** — 둘 다면 한 슬롯에 둘이 서려 한다.
+		_ok("%s 인물·파형 배타" % String(speaker_key), not (wave and not char_id.is_empty()),
+			"%s / wave=%s" % [char_id, wave])
 		if char_id.is_empty():
 			continue
 		_ok("%s 스탠딩 실물 적재" % String(speaker_key),
 			load(CHARACTER_DIR + char_id + "_base.png") != null, char_id)
 	# 좌 1 · 우 6 · 부재 2 — 마르타 좌 고정이 스펙의 축이다(17/17 전 장면 등장).
 	_ok("좌측 = 1인 고정", int(sides.get("left", 0)) == 1, str(sides))
-	_ok("우측 경합 = 6인", int(sides.get("right", 0)) == 6, str(sides))
-	_ok("선언된 부재 = 2 (베인·지문)", int(sides.get("none", 0)) == 2, str(sides))
+	# 베인이 우측 슬롯을 차용하면서 6→7 · 부재 2→1 (지문만). 자리 수는 여전히 둘이다.
+	_ok("우측 경합 = 7 (베인 차용 포함)", int(sides.get("right", 0)) == 7, str(sides))
+	_ok("선언된 부재 = 1 (지문)", int(sides.get("none", 0)) == 1, str(sides))
 	# **발화하는 화자 전량이 대장에 있는가** — 없으면 그 인물만 조용히 안 선다.
 	for beat_id in data.vn_beat_lines:
 		for line in data.vn_beat_lines_for(String(beat_id)):
@@ -461,6 +467,33 @@ func _vn_speakers(data: GameData) -> void:
 				String(Dictionary(line)["speaker_key"]))
 	# **키를 쪼갠다** — 붙여 두면 V2 가 코드 리터럴로 보고 미등재 키로 잡는다(21차 전례).
 	_ok("미상 화자 = 무배정", data.vn_speaker("ui.vn." + "speakerNobody").is_empty())
+	# ── 표정 차분 예외 (총괄 판정 ① — 단일 장면) ──
+	_ok("표정 예외 = 1건 (단일 장면 예외)", data.vn_face_variants.size() == 1,
+		str(data.vn_face_variants.size()))
+	for row in data.vn_face_variants:
+		var scene_id := String(row["source_beat"])
+		var speaker_key := String(row["speaker_key"])
+		var variant := String(row["face_variant"])
+		_ok("예외 장면 실재: %s" % scene_id, not data.vn_beat(scene_id).is_empty())
+		_ok("예외 화자가 그 장면에서 말한다: %s" % speaker_key,
+			_beat_has_speaker(data, scene_id, speaker_key))
+		var char_id := String(data.vn_speaker(speaker_key).get("char_id", ""))
+		_ok("예외 차분 실물 적재",
+			load(CHARACTER_DIR + char_id + "_" + variant + ".png") != null,
+			char_id + "_" + variant)
+		_ok("예외 조회 일치", data.vn_face_variant(scene_id, speaker_key) == variant)
+		# **다른 장면에서는 열리지 않는다** — 열리면 단일 장면 예외가 아니다.
+		_ok("타 장면 = 예외 없음",
+			data.vn_face_variant("vnbeat_crew_oscar", speaker_key).is_empty())
+		_ok("타 화자 = 예외 없음",
+			data.vn_face_variant(scene_id, "ui.vn.speakerMarta").is_empty())
+
+
+func _beat_has_speaker(data: GameData, beat_id: String, speaker_key: String) -> bool:
+	for line in data.vn_beat_lines_for(beat_id):
+		if String(line["speaker_key"]) == speaker_key:
+			return true
+	return false
 
 
 # ── ⑥ 매핑 우선순위 — D13 §8.2 서열을 호출로 재현 ──

@@ -37,6 +37,7 @@ var scene_cut_triggers: Array = []     # sct_* 행 (매칭 조건 — 평가는 
 var scene_cut_layers: Dictionary = {}  # cut_* id -> 합성 선언 행 배열 (layer_order 오름차순)
 var vn_backdrops: Dictionary = {}      # vnbg_* id -> 행 (VN 장면 바탕 17 — 내러티브 12차 스펙)
 var vn_speakers: Dictionary = {}       # 화자 키 -> 행 (스탠딩 대응·좌우 — 내러티브 14차 스펙)
+var vn_face_variants: Array = []       # 장면×화자 표정 예외 (총괄 판정 — 단일 장면 예외)
 var scene_cut_machines: Dictionary = {} # cut_* id -> 머신 자리 행 배열 (slot_order 오름차순)
 var machine_baselines: Dictionary = {}  # 스프라이트 stem -> 바닥 오프셋 행
 var events: Dictionary = {}            # event_* id -> 행 (D08 §7 · D12 §5.4)
@@ -364,8 +365,22 @@ func _load_cg_cutins() -> void:
 	vn_speakers.clear()
 	for row in CsvTable.load_rows(_table_path("vn_speakers.csv")):
 		vn_speakers[String(row["speaker_key"])] = row
+	vn_face_variants.clear()
+	for row in CsvTable.load_rows(_table_path("vn_face_variants.csv")):
+		vn_face_variants.append(row)
 	if cg_cutins.is_empty():
 		_load_ok = false
+
+
+# 장면×화자 표정 차분 — **단일 장면 예외**다 (총괄 판정 2026-08-26).
+# 화자 표에 열을 두면 전역이 되고, 그러면 "반만 쓰면 위계가 거짓이 된다"는 base 전용 논거가
+# 그대로 깨진다. 예외는 **예외가 서는 자리에 적는다** — 장면과 화자를 함께 여는 표다.
+func vn_face_variant(scene_id: String, speaker_key: String) -> String:
+	for row in vn_face_variants:
+		if String(row["source_beat"]) == scene_id \
+				and String(row["speaker_key"]) == speaker_key:
+			return String(row["face_variant"])
+	return ""
 
 
 # 화자 → 스탠딩 배정 (내러티브 14차 스펙). **없는 것이 정상이다** — 베인은 파형 아바타이고

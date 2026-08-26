@@ -450,6 +450,16 @@
     "tint": "enum_optional:signal,pulse"
    }
   },
+  "vn_face_variants.csv": {
+   "id_prefix": "vnfv_",
+   "root": true,
+   "columns": {
+    "id": "id",
+    "source_beat": "fk:vn_beats.csv",
+    "speaker_key": "string_key",
+    "face_variant": "string"
+   }
+  },
   "vn_speakers.csv": {
    "id_prefix": "vnspk_",
    "root": true,
@@ -457,7 +467,8 @@
     "id": "id",
     "speaker_key": "string_key",
     "char_id": "string",
-    "side": "enum:left,right,none"
+    "side": "enum:left,right,none",
+    "waveform": "int:0,1"
    }
   },
   "vn_backdrops.csv": {
