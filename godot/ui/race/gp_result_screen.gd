@@ -49,8 +49,15 @@ func _on_bound(_payload: Dictionary) -> void:
 	_prize_label.text = prize_text
 	_bonus_label.text = bonus_text
 
+	# **이월 자원은 엔진에서 온다** — 그런데 이 화면은 엔진 없이도 세워질 수 있다(15차 ㉝ 축이
+	# 마운트하면서 드러났다: `session.engine` 이 null 인 문맥에서 `.chassis` 두 줄이 널 접근으로
+	# 붉었다). **거동은 바꾸지 않는다** — 널 접근의 결과도 0 이었으므로 표시는 그대로이고,
+	# 없어지는 것은 에러 출력뿐이다. **도달성은 확인하지 않았다** — 실기 경로가 이 상태를
+	# 만드는지는 별건이며, 여기서는 검사 하네스가 만든 문맥에서 나온 잡음을 지운다.
+	var carry_chassis: int = int(session.engine.chassis) if session.engine != null else 0
+	var carry_charge: int = session.engine.charge if session.engine != null else 0
 	var carry_text := s.text("ui.gpResult.carryFormat", {
-		"chassis": int(session.engine.chassis), "charge": session.engine.charge,
+		"chassis": carry_chassis, "charge": carry_charge,
 	})
 	_carry_label.text = carry_text
 

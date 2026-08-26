@@ -35,12 +35,17 @@ var _head_font_size := 14
 # **자리는 `_enter_tree()` 다.** `bind()` 에 두면 단독 인스턴스화 경로(테스트 하네스·
 # `race_screen._ready()`)가 테마 없이 서고, 그러면 검사가 실기와 다른 화면을 잰다.
 # 이미 테마가 지정된 노드는 덮지 않는다 — 씬이 명시한 것이 베이스보다 강하다.
-const MAIN_THEME := "res://ui/theme/main_theme.tres"
+# 경로 상수의 소유는 `UiTheme` 다 — 테마를 만지는 곳이 둘이 되면 경로도 둘이 된다.
+const MAIN_THEME := UiTheme.MAIN_THEME
 
 
 func _enter_tree() -> void:
 	if theme == null:
-		theme = load(MAIN_THEME) as Theme
+		theme = UiTheme.main()
+	# 옵션에 갈리는 부분(위험 프레임 색각 교체 · 상태 라벨 색)을 여기서도 민다.
+	# `bind()` 의 `UiPalette.apply_options()` 가 정규 경로지만 **단독 인스턴스화는 그것을
+	# 거치지 않으므로**, 테마를 붙이는 자리에서 한 번 더 세워야 검사가 실기와 같은 화면을 잰다.
+	UiTheme.apply_palette(theme)
 
 
 func bind(run_session: RunSession, payload: Dictionary) -> void:

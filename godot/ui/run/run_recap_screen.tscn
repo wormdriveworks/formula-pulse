@@ -123,5 +123,6 @@ size_flags_vertical = 3
 
 [node name="NextButton" type="Button" parent="Pad/Column/Footer" unique_id=1587980750]
 unique_name_in_owner = true
+theme_type_variation = &"PrimaryButton"
 layout_mode = 2
 theme_override_font_sizes/font_size = 9

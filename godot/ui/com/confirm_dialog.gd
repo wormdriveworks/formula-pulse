@@ -43,12 +43,11 @@ func _init(strings: StringTable, summary: String, cost_text: String, irreversibl
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	panel.custom_minimum_size = Vector2(240, 0)
-	var style := StyleBoxFlat.new()
-	style.bg_color = UiPalette.BG_PANEL
-	style.border_color = UiPalette.FRAME_LINE
-	style.set_border_width_all(1)
-	style.set_content_margin_all(10)
-	panel.add_theme_stylebox_override("panel", style)
+	# COM-01 = `dialog_modal_9p` (A-FR-05 — D10 이 이 프레임의 용도를 *"모달 다이얼로그
+	# (COM-01)"* 로 못박아 뒀다. 소비처가 하나뿐이라 배정에 판단이 없다).
+	# **오버라이드를 걷고 타입 변형으로 간다** — 오버라이드가 남으면 테마가 무엇을 등록하든
+	# 이 자리는 영원히 옛 박스다(테마 결선이 조용히 무효가 되는 형태).
+	panel.theme_type_variation = &"ModalPanel"
 	add_child(panel)
 
 	var column := VBoxContainer.new()
@@ -92,6 +91,14 @@ func _init(strings: StringTable, summary: String, cost_text: String, irreversibl
 	ok.name = "OkButton"
 	ok.text = _strings.text("ui.confirm.ok")
 	ok.add_theme_font_size_override("font_size", _body_font_size)
+	# 위험 프레임(A-FR-09)의 **유일한 소비처**다 [가안]. 앱 안에서 '위험'인 버튼은
+	# 비가역 확인의 수락 하나뿐이고(§A-23 = 비가역 항목에 경고행 필수), 그 자리에는 이미
+	# 경고 문면이 `gauge_danger()` 색으로 서 있다 — 프레임은 그 사실을 되풀이할 뿐 새 개념을
+	# 들이지 않는다. **가역 확인에는 붙이지 않는다** — 붙이면 '위험'이 '확인'의 동의어가 된다.
+	#
+	# **폐문 조건:** 실물 플레이 검증 회차 눈 판정 — 비가역 수락이 가역 수락과 갈려 읽히는가.
+	if irreversible:
+		ok.theme_type_variation = &"DangerButton"
 	ok.pressed.connect(_finish.bind(true))
 	buttons.add_child(ok)
 

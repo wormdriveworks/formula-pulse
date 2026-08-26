@@ -1,6 +1,12 @@
 [gd_resource type="Theme" format=3 uid="uid://2x1gvdbkinnh"]
 
 [ext_resource type="Texture2D" uid="uid://dm7c4trqqojit" path="res://assets/ui/frames/focus_ring_9p.png" id="1_focus"]
+[ext_resource type="Texture2D" uid="uid://cupwy0imaclrn" path="res://assets/ui/frames/button_default_9p.png" id="2_default"]
+[ext_resource type="Texture2D" uid="uid://bref6d85n8blb" path="res://assets/ui/frames/button_disabled_9p.png" id="3_disabled"]
+[ext_resource type="Texture2D" uid="uid://c70w1i1xr54eu" path="res://assets/ui/frames/button_primary_9p.png" id="4_primary"]
+[ext_resource type="Texture2D" uid="uid://dhpw0kwu2a8ek" path="res://assets/ui/frames/button_danger_9p.png" id="5_danger"]
+[ext_resource type="Texture2D" uid="uid://c43iwh3ehh7v8" path="res://assets/ui/frames/tooltip_9p.png" id="6_tooltip"]
+[ext_resource type="Texture2D" uid="uid://jflo0c3lwo0v" path="res://assets/ui/frames/dialog_modal_9p.png" id="7_dialog"]
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_focus"]
 content_margin_left = 0.0
@@ -13,6 +19,120 @@ texture_margin_top = 8.0
 texture_margin_right = 8.0
 texture_margin_bottom = 8.0
 
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_default"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+texture = ExtResource("2_default")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_default_pressed"]
+content_margin_left = 4.0
+content_margin_top = 5.0
+content_margin_right = 4.0
+content_margin_bottom = 3.0
+texture = ExtResource("2_default")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_disabled"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+texture = ExtResource("3_disabled")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_primary"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+texture = ExtResource("4_primary")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_primary_pressed"]
+content_margin_left = 4.0
+content_margin_top = 5.0
+content_margin_right = 4.0
+content_margin_bottom = 3.0
+texture = ExtResource("4_primary")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_danger"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+texture = ExtResource("5_danger")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_danger_pressed"]
+content_margin_left = 4.0
+content_margin_top = 5.0
+content_margin_right = 4.0
+content_margin_bottom = 3.0
+texture = ExtResource("5_danger")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_tooltip"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+texture = ExtResource("6_tooltip")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_dialog"]
+content_margin_left = 10.0
+content_margin_top = 10.0
+content_margin_right = 10.0
+content_margin_bottom = 10.0
+texture = ExtResource("7_dialog")
+texture_margin_left = 12.0
+texture_margin_top = 12.0
+texture_margin_right = 12.0
+texture_margin_bottom = 12.0
+
 [resource]
+Button/styles/normal = SubResource("StyleBoxTexture_default")
+Button/styles/hover = SubResource("StyleBoxTexture_default")
+Button/styles/pressed = SubResource("StyleBoxTexture_default_pressed")
+Button/styles/disabled = SubResource("StyleBoxTexture_disabled")
 Button/styles/focus = SubResource("StyleBoxTexture_focus")
 CheckBox/styles/focus = SubResource("StyleBoxTexture_focus")
+PrimaryButton/base_type = &"Button"
+PrimaryButton/styles/normal = SubResource("StyleBoxTexture_primary")
+PrimaryButton/styles/hover = SubResource("StyleBoxTexture_primary")
+PrimaryButton/styles/pressed = SubResource("StyleBoxTexture_primary_pressed")
+DangerButton/base_type = &"Button"
+DangerButton/styles/normal = SubResource("StyleBoxTexture_danger")
+DangerButton/styles/hover = SubResource("StyleBoxTexture_danger")
+DangerButton/styles/pressed = SubResource("StyleBoxTexture_danger_pressed")
+TooltipPanel/styles/panel = SubResource("StyleBoxTexture_tooltip")
+ModalPanel/base_type = &"PanelContainer"
+ModalPanel/styles/panel = SubResource("StyleBoxTexture_dialog")

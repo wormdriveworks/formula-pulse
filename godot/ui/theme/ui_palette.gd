@@ -67,6 +67,18 @@ const ACCENT_ACTIVE := Color("#3FE0F5")         # 마스터 C3 시안 브라이�
 const TEXT_PRIMARY := Color("#C7D0D8")          # 마스터 N16 본문 텍스트
 const TEXT_DIM := Color("#8B949F")              # 마스터 N13 (§9.2.1 대비 조정)
 
+# 버튼 hover 라벨 — **[가안]** (15차 ① · ⓓ 방식의 상태 표현 절반).
+#
+# 판정 IMPL-439 ② 가 hover 를 *"`font_hover_color` 명도 상승"* 으로 정했으나 **어느 값인지는
+# 정하지 않았다.** 색값은 대장 밖(불변규칙 2 별첨A 위임)이고 조달 대장 안에서 골라야 하므로,
+# 중립 계조에서 본문(N16 · 휘도 206)보다 위인 것을 골랐다 — 계조 자체는 N16 이 최상단이라
+# 그 위는 마스터의 밝은 중립 계열이 진다. **색상 이동이 아니라 명도 이동**이라 판정 문면 그대로다.
+#
+# **폐문 조건 (IMPL-424 원칙):** 실물 플레이 검증 회차의 *"ⓓ 상태 표현 체감"* 관측 —
+# 9px 픽셀 UI 에서 라벨 명도만으로 hover 가 읽히는가. 부족하면 에셋 기안 §4 의 폴백
+# (`button_{default,primary,danger}_hover_9p` 3장 · 지출 0)으로 간다.
+const TEXT_HOVER := Color("#EEF3FA")            # 마스터 AX4 (중립 최상 휘도 242)
+
 # ── 색각 대체 팔레트 (A-팔레트-02 · 정본 §6 — O9 소비부, IMPL-155) ──
 #
 # **교체는 정본 §6 표의 4행이 전부다** — "색상만 교체·도상 불변 · 교체는 최소로".
@@ -94,6 +106,10 @@ static var colorblind := false
 
 static func apply_options(options: OptionsStore) -> void:
 	colorblind = options != null and options.index_of("o9") == 1
+	# 테마도 같은 지점에서 따라온다 — 위험 버튼 프레임은 **텍스처 교체**라 색 상수만 갈아서는
+	# 바뀌지 않는다(런타임 틴트로는 정본 색을 재현할 수 없다 · 심볼 `_alt` 선례와 같은 축).
+	# 여기 두지 않으면 O9 를 바꿔도 위험 버튼만 적색으로 남는다.
+	UiTheme.apply_palette()
 
 
 # 대체 대상 4슬롯의 조회 창구. 이 4개만 함수이고 나머지는 상수 그대로다 —

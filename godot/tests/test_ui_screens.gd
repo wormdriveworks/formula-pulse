@@ -125,13 +125,15 @@ func _process(_delta: float) -> bool:
 	_snapshot_keep_new_button(data)
 	_options_relabel(data)
 	_focus_ring_theme(data)
+	_danger_frame_colorblind(data)
+	_semantic_frame_consumers(data)
 	_action_row_budget(data)
 	_scene_panel_layers(data)
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 670:
-		print("UI_SCREENS_FAIL checks=%d < 하한 670 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 722:
+		print("UI_SCREENS_FAIL checks=%d < 하한 722 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -3337,22 +3339,11 @@ func _focus_ring_theme(data: GameData) -> void:
 				"L=%.1f T=%.1f R=%.1f B=%.1f corner=%.1f" % [box.texture_margin_left,
 					box.texture_margin_top, box.texture_margin_right,
 					box.texture_margin_bottom, corner])
-	# **레이아웃 불변 — 실측이 아니라 선언 범위로 잰다.**
-	#
-	# 처음에는 버튼 최소 크기를 테마 전후로 비교했다. 그 축은 **구조적으로 실패할 수 없다**:
-	# Godot 의 `Button` 최소 크기는 `normal` 계열 박스만 세고 `focus` 는 위에 겹쳐 그리기만
-	# 하므로, 포커스 전속 테마는 어떤 마진을 넣어도 레이아웃을 못 움직인다(돌연변이 M16 이
-	# `content_margin = -1` 로 상속을 켜도 미검출 — 28차가 정리한 "반증을 지지 않는 축").
-	#
-	# 그래서 못박을 것을 바꿨다: **이 테마가 레이아웃에 참여하는 항목을 선언하지 않는가.**
-	# `normal`·`hover`·`pressed`·`disabled` 가 들어오는 순간 액션 열 예산(㉚)이 조용히
-	# 재계산되므로, 그 유입 자체를 막는 것이 실제 계약이다.
-	var declared: Array[String] = []
-	for type_name in main_theme.get_type_list():
-		for style_name in main_theme.get_stylebox_list(String(type_name)):
-			if String(style_name) != "focus":
-				declared.append("%s/%s" % [String(type_name), String(style_name)])
-	_ok("테마 선언 = 포커스 전속 (레이아웃 참여 항목 0)", declared.is_empty(), str(declared))
+	# **14차의 선언 범위 축은 여기서 은퇴한다.** 그 축은 *"테마가 `focus` 밖을 선언하지
+	# 않는다"* 였고, 그것이 곧 15차 ① 이 판정에 따라 하는 일이다(IMPL-439 ② ⓓ 채택).
+	# 축을 남겨 두면 **결선 자체를 결함으로 보고**한다 — 14차에 로그 존 축을 슬롯으로 함께
+	# 옮긴 것과 같은 형태다. 대신 **ⓓ 의 계약**을 못박는다(§`_frame_theme_contract`).
+	_frame_theme_contract(main_theme)
 	# 테마가 **단독 인스턴스화 경로에도** 붙는가 — 검사가 실기와 다른 화면을 재지 않게.
 	var session := _fresh_session(data)
 	var screen := _mount(RACE_SCENE, session)
@@ -3774,3 +3765,276 @@ func _scene_panel_phase(data: GameData) -> void:
 	#    남기면 *없어진 것을 지키느라* 붉어진다(30차 상한 철거와 같은 자리).
 	#    폐문 증명은 ㉕ 이 진다: **관측이 비어 있는가**를 그쪽이 단언한다.
 	_unmount(screen)
+
+
+# ── ㉛ 프레임 결선 ⓓ 계약 (15차 ① · 총괄 판정 IMPL-439 ②) ──
+#
+# 14차는 *"테마가 `focus` 밖을 선언하지 않는다"* 로 예산 이동을 막았다. 이제 판정이
+# 선언을 지시했으므로 **막는 축이 아니라 계약을 재는 축**이 필요하다.
+#
+# ⓓ 의 계약은 세 줄이다.
+#   ① 프레임 텍스처 = **의미 전속** — `normal`·`hover`·`pressed` 가 **같은 텍스처**다.
+#      텍스처가 상태를 말하기 시작하면 의미 축이 상태 축으로 바뀐다(주력 14차 §5.2 의 경고).
+#   ② `pressed` 의 표현 = `content_margin` **종방향 1px 이동 · 상하 합 불변**.
+#      실제로 움직였는가(비공허)와 합이 같은가(예산 0)를 **둘 다** 본다 — 하나만 보면
+#      "아무것도 안 하는 pressed" 또는 "예산을 먹는 pressed" 중 하나가 통과한다.
+#   ③ 좌우 마진 = `normal` 과 동일 — 폭 예산 0.
+const FRAME_SEMANTICS := {
+	"Button": "button_default_9p",
+	"PrimaryButton": "button_primary_9p",
+	"DangerButton": "button_danger_9p",
+}
+const FRAME_DIR := "res://assets/ui/frames/"
+const STATE_STYLES := ["normal", "hover", "pressed"]
+# 소비부가 없어 **결선하지 않은** 프레임 4종. 사유를 산문으로 두지 않고 **부재를 기계로**
+# 확인한다 — 소비 노드가 생기면 이 축이 먼저 붉어져 결선을 요구한다.
+const UNWIRED_BY_ABSENCE := {
+	"input_field_9p": "LineEdit",
+	"tab_9p": "TabBar",
+	"list_row_9p": "ItemList",
+	"key_cap_9p": "Tree",
+}
+
+
+func _frame_corner(frames: Dictionary, frame_id: String) -> float:
+	if not frames.has(frame_id):
+		return -1.0
+	return float(int(Dictionary(frames[frame_id])["corner"]))
+
+
+func _frame_theme_contract(main_theme: Theme) -> void:
+	var raw := FileAccess.get_file_as_string(FRAME_SPEC)
+	var spec: Variant = JSON.parse_string(raw)
+	var has_frames: bool = spec is Dictionary and Dictionary(spec).has("frames")
+	_ok("전제: frame_spec 적재 (결선 대조)", has_frames)
+	if not has_frames:
+		return
+	var frames: Dictionary = Dictionary(spec)["frames"]
+	for type_name in FRAME_SEMANTICS:
+		var frame_id := String(FRAME_SEMANTICS[type_name])
+		var boxes: Dictionary = {}
+		for style_name in STATE_STYLES:
+			boxes[style_name] = main_theme.get_stylebox(String(style_name), String(type_name)) \
+				as StyleBoxTexture
+		_ok("[%s] 상태 3종이 전부 9패치 텍스처 박스" % String(type_name),
+			boxes["normal"] != null and boxes["hover"] != null and boxes["pressed"] != null)
+		if boxes["normal"] == null or boxes["hover"] == null or boxes["pressed"] == null:
+			continue
+		var want := FRAME_DIR + frame_id + ".png"
+		# ① 의미 전속 — 세 상태가 **같은 텍스처**.
+		var paths: Array = []
+		for style_name in STATE_STYLES:
+			var tex: Texture2D = boxes[style_name].texture
+			paths.append(String(tex.resource_path) if tex != null else "null")
+		_ok("[%s] 의미 전속 — 상태 3종이 같은 텍스처" % String(type_name),
+			paths[0] == paths[1] and paths[1] == paths[2], str(paths))
+		_ok("[%s] 그 텍스처 = %s" % [String(type_name), frame_id], paths[0] == want, str(paths[0]))
+		# 원본 대조 — texture_margin 4면 = frame_spec corner.
+		var corner := _frame_corner(frames, frame_id)
+		_ok("[%s] 전제: %s 가 원본에 있다" % [String(type_name), frame_id], corner >= 0.0)
+		if corner >= 0.0:
+			var box: StyleBoxTexture = boxes["normal"]
+			_ok("[%s] texture_margin 4면 = 원본 corner (%d)" % [String(type_name), int(corner)],
+				box.texture_margin_left == corner and box.texture_margin_top == corner
+					and box.texture_margin_right == corner and box.texture_margin_bottom == corner,
+				"L=%.1f T=%.1f R=%.1f B=%.1f" % [box.texture_margin_left, box.texture_margin_top,
+					box.texture_margin_right, box.texture_margin_bottom])
+		# ②③ pressed = 종방향 1px 이동 · 상하 합 불변 · 좌우 동일.
+		var base: StyleBoxTexture = boxes["normal"]
+		var down: StyleBoxTexture = boxes["pressed"]
+		_ok("[%s] pressed 좌우 마진 = normal (폭 예산 0)" % String(type_name),
+			down.content_margin_left == base.content_margin_left
+				and down.content_margin_right == base.content_margin_right,
+			"L %.1f→%.1f R %.1f→%.1f" % [base.content_margin_left, down.content_margin_left,
+				base.content_margin_right, down.content_margin_right])
+		_ok("[%s] pressed 상하 합 불변 (높이 예산 0)" % String(type_name),
+			is_equal_approx(down.content_margin_top + down.content_margin_bottom,
+				base.content_margin_top + base.content_margin_bottom),
+			"합 %.1f → %.1f" % [base.content_margin_top + base.content_margin_bottom,
+				down.content_margin_top + down.content_margin_bottom])
+		# **비공허성** — 합만 보면 "아무것도 안 하는 pressed" 가 통과한다.
+		_ok("[%s] pressed 가 실제로 1px 내려간다 (비공허)" % String(type_name),
+			is_equal_approx(down.content_margin_top - base.content_margin_top, 1.0),
+			"top %.1f → %.1f" % [base.content_margin_top, down.content_margin_top])
+	# ── 레이아웃 불변을 **실측으로** 잰다 ──
+	#
+	# 14차의 같은 이름 축은 포커스 전속 테마에서 **구조적으로 실패할 수 없었다**(`focus` 는
+	# `Button` 최소 크기에 참여하지 않는다 — M16 미검출). 이제 테마가 `normal` 계열을 가지므로
+	# **그 축이 살아난다** — 마진을 잘못 잡으면 여기서 즉시 붉어진다(실측: content 8 로 두면
+	# 버튼당 +8px · 액션 열 371.0 → 435.0).
+	var probe := Button.new()
+	root.add_child(probe)
+	probe.add_theme_font_size_override("font_size", 9)
+	probe.text = "S1"
+	var bare := probe.get_combined_minimum_size()
+	probe.theme = main_theme
+	var themed := probe.get_combined_minimum_size()
+	_ok("테마가 버튼 최소 크기를 바꾸지 않는다 (폭·높이 예산 0)", bare == themed,
+		"bare=%s themed=%s" % [str(bare), str(themed)])
+	root.remove_child(probe)
+	probe.queue_free()
+	# ── 미결선 4종 = 소비 노드 부재의 기계 확인 ──
+	#
+	# *"소비부가 없어서 안 걸었다"* 는 산문이면 다음 회차에 조용히 틀린다. 노드 종류가
+	# 하나라도 생기면 이 축이 먼저 붉어지고, 그때가 그 프레임을 거는 회차다.
+	for frame_id in UNWIRED_BY_ABSENCE:
+		var node_type := String(UNWIRED_BY_ABSENCE[frame_id])
+		_ok("미결선 %s — 소비 노드(%s) 부재 확인" % [String(frame_id), node_type],
+			not _scene_sources_contain('type="%s"' % node_type), node_type)
+
+
+# 씬 원본에 그 노드 종류가 실재하는가. **씬 파일을 직접 훑는다** — 마운트해서 찾으면
+# 그 회차에 마운트한 화면만 보게 되고, 안 세운 화면은 부재로 오독된다.
+const SCENE_ROOTS := ["res://ui"]
+
+
+func _scene_sources_contain(needle: String) -> bool:
+	var pending: Array = SCENE_ROOTS.duplicate()
+	while not pending.is_empty():
+		var dir_path := String(pending.pop_back())
+		var dir := DirAccess.open(dir_path)
+		if dir == null:
+			continue
+		dir.list_dir_begin()
+		var entry := dir.get_next()
+		while entry != "":
+			var full := dir_path + "/" + entry
+			if dir.current_is_dir():
+				if not entry.begins_with("."):
+					pending.append(full)
+			elif entry.ends_with(".tscn"):
+				if FileAccess.get_file_as_string(full).contains(needle):
+					dir.list_dir_end()
+					return true
+			entry = dir.get_next()
+		dir.list_dir_end()
+	return false
+
+
+# ── ㉜ 색각 대체 프레임 결속 (15차 ① · 에셋 IMPL-443) ──
+#
+# 위험 프레임만 **텍스처 교체**다 — 런타임 틴트로는 정본 §6 색을 재현할 수 없다(색상 회전은
+# 곱으로 표현되지 않는다). 그래서 O9 가 색 상수만 갈면 **위험 버튼만 적색으로 남는다.**
+# 축은 그 남음을 잡는다: 모드를 실제로 켜고 **테마가 든 텍스처**를 본다.
+const DANGER_BASE := "res://assets/ui/frames/button_danger_9p.png"
+const DANGER_ALT := "res://assets/ui/frames/button_danger_alt_9p.png"
+
+
+func _danger_frame_colorblind(data: GameData) -> void:
+	var before := UiPalette.colorblind
+	var main_theme := UiTheme.main()
+	_ok("전제: 테마 적재", main_theme != null)
+	if main_theme == null:
+		return
+	_ok("전제: 대체 원도가 실물로 있다", ResourceLoader.exists(DANGER_ALT), DANGER_ALT)
+	_ok("전제: 기본과 대체가 다른 파일 (같으면 교체가 무의미)", DANGER_BASE != DANGER_ALT)
+	for mode in [false, true, false]:
+		UiPalette.colorblind = mode
+		UiTheme.apply_palette(main_theme)
+		var want := DANGER_ALT if mode else DANGER_BASE
+		var seen: Array = []
+		for style_name in UiTheme.STATE_STYLES:
+			var box := main_theme.get_stylebox(String(style_name), UiTheme.DANGER_TYPE) \
+				as StyleBoxTexture
+			seen.append(String(box.texture.resource_path) if box != null and box.texture != null
+				else "null")
+		_ok("O9=%s — 위험 프레임 상태 3종 전부 %s" % [str(mode), want.get_file()],
+			seen.count(want) == UiTheme.STATE_STYLES.size(), str(seen))
+	# **옵션 창구를 거쳐도 따라오는가** — 화면이 `UiPalette.apply_options()` 만 부르므로
+	# 그 경로가 테마를 끌고 오지 않으면 실기에서만 어긋난다.
+	var session := _fresh_session(data)
+	var store := session.options
+	var o9_before := store.index_of("o9")
+	store.set_index("o9", 1)
+	UiPalette.apply_options(store)
+	var via_options := main_theme.get_stylebox("normal", UiTheme.DANGER_TYPE) as StyleBoxTexture
+	_ok("옵션 창구(apply_options)가 테마까지 끌고 온다",
+		via_options != null and via_options.texture != null
+			and String(via_options.texture.resource_path) == DANGER_ALT,
+		String(via_options.texture.resource_path) if via_options != null
+			and via_options.texture != null else "null")
+	store.set_index("o9", o9_before)
+	UiPalette.apply_options(store)
+	UiPalette.colorblind = before
+	UiTheme.apply_palette(main_theme)
+	_ok("원복 (뒤 축 오염 방지)", UiPalette.colorblind == before)
+
+
+# ── ㉝ 의미 프레임 소비처 (15차 ① — 정본이 이름 붙인 자리에만 건다) ──
+#
+# **`주 버튼` 은 정본 용어다** (D09 별첨A — RACE-03 `[다음으로]` · RUN-02 E05 · SET-01
+# `[개러지로]` · `[다음 대회로]`). 그 넷에만 `PrimaryButton` 을 건다.
+#
+# **위험은 비가역 확인의 수락 하나뿐이다** [가안] — §A-23 이 비가역 항목에 경고행을 필수로
+# 두었고 그 자리에 이미 위험색 문면이 서 있다. **가역 확인에는 붙이지 않는다**(대조군) —
+# 붙이면 '위험'이 '확인'의 동의어가 된다.
+const PRIMARY_SCREENS := [
+	"res://ui/race/gp_result_screen.tscn",
+	"res://ui/run/run_recap_screen.tscn",
+	"res://ui/settle/season_result_screen.tscn",
+	"res://ui/settle/tour_report_screen.tscn",
+]
+
+
+func _semantic_frame_consumers(data: GameData) -> void:
+	# ⓐ 주 버튼 4종 — **렌더된 박스**를 본다. 씬 속성만 읽으면 타입 변형이 실제로
+	# 해석됐는지는 모른다(선언은 결선의 증거가 아니다).
+	var primary_seen := 0
+	for path in PRIMARY_SCREENS:
+		var session := _fresh_session(data)
+		var screen := _mount(String(path), session)
+		if screen == null:
+			continue
+		var button := screen.get_node_or_null("%NextButton") as Button
+		_ok("전제: 주 버튼 실재 — %s" % String(path).get_file(), button != null)
+		if button != null:
+			var box := button.get_theme_stylebox("normal") as StyleBoxTexture
+			var seen: String = String(box.texture.resource_path) if box != null \
+				and box.texture != null else "null"
+			var hit: bool = seen == FRAME_DIR + "button_primary_9p.png"
+			if hit:
+				primary_seen += 1
+			_ok("주 버튼 = 강조 프레임 — %s" % String(path).get_file(), hit, seen)
+		_unmount(screen)
+	_ok("주 버튼 4종 전건 결선 (누락 0)", primary_seen == PRIMARY_SCREENS.size(),
+		"%d / %d" % [primary_seen, PRIMARY_SCREENS.size()])
+	# ⓑ **대조군** — 주 버튼이 아닌 버튼은 기본 프레임이다. 없으면 "전부 강조"도 통과한다.
+	# 레이스 화면의 확정 버튼을 쓴다: **정본이 주 버튼이라 부르지 않은 자리**이면서
+	# 그 화면에서 가장 중요한 버튼이라, 배정이 중요도가 아니라 정본 명명을 따랐음을 보인다.
+	var s2 := _fresh_session(data)
+	var probe := _mount(RACE_SCENE, s2)
+	if probe != null:
+		var box := probe._e08_confirm.get_theme_stylebox("normal") as StyleBoxTexture
+		var plain: String = String(box.texture.resource_path) if box != null \
+			and box.texture != null else "null"
+		_ok("대조군: 레이스 확정 버튼 = 기본 프레임 (정본 명명 밖)",
+			plain == FRAME_DIR + "button_default_9p.png", plain)
+		_unmount(probe)
+	# ⓒ 위험 = 비가역 수락 전속. 가역은 기본 프레임이다.
+	var s3 := _fresh_session(data)
+	var host := _mount(String(PRIMARY_SCREENS[0]), s3)
+	if host != null:
+		for entry in [["비가역", true, "button_danger_9p.png"], ["가역", false, "button_default_9p.png"]]:
+			var dialog := ConfirmDialog.ask(host, data.strings, "x", "", bool(entry[1]), 9)
+			var ok_button := dialog.get_node_or_null("Panel/VBoxContainer/HBoxContainer/OkButton") \
+				as Button
+			if ok_button == null:
+				ok_button = dialog.find_child("OkButton", true, false) as Button
+			_ok("전제: %s 확인의 수락 버튼 실재" % String(entry[0]), ok_button != null)
+			if ok_button != null:
+				var box := ok_button.get_theme_stylebox("normal") as StyleBoxTexture
+				var seen: String = String(box.texture.resource_path) if box != null \
+					and box.texture != null else "null"
+				_ok("%s 확인 수락 = %s" % [String(entry[0]), String(entry[2])],
+					seen == FRAME_DIR + String(entry[2]), seen)
+			# 모달 패널도 함께 본다 — 오버라이드가 남으면 테마가 무엇을 등록하든 옛 박스다.
+			var panel := dialog.find_child("Panel", true, false) as PanelContainer
+			if panel != null and String(entry[0]) == "비가역":
+				var pbox := panel.get_theme_stylebox("panel") as StyleBoxTexture
+				_ok("모달 패널 = dialog_modal 프레임",
+					pbox != null and pbox.texture != null
+						and String(pbox.texture.resource_path) == FRAME_DIR + "dialog_modal_9p.png",
+					String(pbox.texture.resource_path) if pbox != null and pbox.texture != null
+						else "null")
+			dialog.queue_free()
+		_unmount(host)
