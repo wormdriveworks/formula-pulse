@@ -30,6 +30,8 @@
  *    ⓓ**반복 구간 균일성** — 세로 확장에 쓰는 가장자리 행의 색 변화가 문턱 이하인지 잰다.
  *      **반복이 형태를 만들면 그것은 확장이 아니라 창작이다.**
  *    ⓔ**재현** — `--check` 가 원본+선언 → 산출물 전건 바이트 대조.
+ *    ⓕ**바탕과의 상이성** — `distinct_from` 을 선언한 산출물이 그 바탕과 얼마나 다른지 잰다.
+ *      **컷인이 자기 뒤에 이미 깔린 그림이면 화면에서 사라진다** — ㊸ 집행에서 실물로 만난 결함이다.
  *
  * 사용:  node tools/assets/kv_gen.js [--check]
  */
@@ -41,6 +43,8 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SPEC = path.join(__dirname, 'kv_spec.json');
 const STRIP = path.join(ROOT, 'tools', 'palette', 'master_60_strip.png');
+// 게이트 ⓕ 하한 — 형제 실측에서 도출(구속 형제 cg06 = 95.09% · 결함 = 23.77%/0.00%).
+const DISTINCT_MIN = 80;
 
 const KNOWN = new Set(['--check']);
 const badFlags = process.argv.slice(2).filter((a) => a.startsWith('-') && !KNOWN.has(a));
@@ -343,6 +347,33 @@ for (const o of spec.outputs) {
     console.log(`      · overlay ${path.basename(ov.src)} ${drawn}px${outside ? ` (밖 ${outside}px)` : ''}`);
   }
   inPal(b, cw, outH, o.file);
+  // ⓕ **바탕과의 상이성** — 컷인이 *자기 뒤에 이미 깔린 그림*이면 화면에서 사라진다.
+  //    ㊸ 집행에서 실물로 만난 결함이다: `cg05` 는 배경이 `garage_320`(= `garage_h` 의 원판·
+  //    같은 배수·같은 크롭)이라 **초상 오버레이만 지우면 산출이 `garage_h` 와 바이트 동일**해지고,
+  //    그 `garage_h` 가 **바로 이 비트의 VN 바탕**이다(`vn_backdrops.csv` `vnbg_crew_sasha`).
+  //    즉 판정을 문면대로 감산으로 집행하면 **상이율 0.00%** 의 투명한 컷인이 조용히 납품된다.
+  //    **문턱은 추측이 아니라 형제에서 도출했다** (garage_h 대비 상이 화소율 실측):
+  //      cg01 99.31 · cg02 97.94 · cg03 97.38 · cg04 97.31 · cg06 95.09  ← 구속 형제 = cg06
+  //      결함 = cg05 23.77 (초상판) / 0.00 (감산판)
+  //    95.09 와 23.77 사이는 **71점 간극**이라 문턱 위치가 예민하지 않다 — 80 으로 둔다.
+  //    상이율만 재고 *무엇이 다른가*는 재지 않는다(그것은 눈의 몫이다 — §9-⑦).
+  if (o.distinct_from) {
+    const ref = abs(o.distinct_from);
+    if (!fs.existsSync(ref)) die(`${o.file}: distinct_from ${o.distinct_from} 이 없다`);
+    const r = decode(ref);
+    if (r.w !== cw || r.h !== outH) {
+      die(`${o.file}: distinct_from 치수 불일치 ${r.w}×${r.h} ≠ ${cw}×${outH} — 같은 자리에 그려지는 것끼리만 비교한다`);
+    }
+    let d = 0;
+    for (let i = 0; i < cw * outH; i++) {
+      for (let c = 0; c < 4; c++) if (b[i * 4 + c] !== r.rgba[i * 4 + c]) { d++; break; }
+    }
+    const pct = 100 * d / (cw * outH);
+    if (pct < DISTINCT_MIN) {
+      fail(`${o.file}: ${path.basename(o.distinct_from)} 과 상이율 ${pct.toFixed(2)}% < 하한 ${DISTINCT_MIN}% — 컷인이 자기 바탕과 같아 화면에서 사라진다`);
+    }
+    console.log(`      · ${path.basename(o.file)} vs ${path.basename(o.distinct_from)} 상이율 ${pct.toFixed(2)}%`);
+  }
   const png = encode(cw, outH, b);
   const dst = abs(o.file);
   if (CHECK_ONLY) {
