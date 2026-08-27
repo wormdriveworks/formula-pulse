@@ -158,6 +158,47 @@ const SEASON_OPEN_SLOT := "vnslot_season_open"
 const SEASON_CLOSE_SLOT := "vnslot_season_close"
 const MILESTONE_SLOT := "vnslot_tour_milestone"
 
+# ── 시즌 VN 인스턴스 id 조립 규칙 (㊹ — 상수 승격) ──
+#
+# 경계 VN 의 `vn_id` 는 **시즌마다 다른 인스턴스**다(아카이브가 시즌당 한 줄을 남겨야 한다).
+# 붙이는 자리는 둘(개막·엔딩)이고 **떼는 자리가 하나 더 생겼다** — 아카이브 재열람은
+# 저장된 인스턴스 id 밖에 갖지 못하므로 거기서 표 실체 id 를 되찾아야 한다.
+#
+# **포맷을 리터럴로 흩으면 역방향이 앞면과 조용히 어긋난다** — 붙이는 쪽만 고치면 떼는 쪽은
+# 실패가 아니라 *조회 실패*로 나타나고, 조회 실패는 화면에서 "문면이 없다"와 구분되지 않는다.
+# 그래서 규칙을 한 곳에 두고, 역방향은 **앞면 규칙으로 되짚어** 자기를 검산한다.
+const SEASON_VN_ID_FORMAT := "%s_s%d"
+const SEASON_OPEN_VN_STEM := "vn_season_open"
+const SEASON_CLOSE_VN_STEM := "vn_season_close"
+# 줄기 → 슬롯. 역방향이 비트를 되찾으려면 **어느 슬롯의 경계 비트인지**를 알아야 한다.
+const SEASON_VN_STEM_SLOTS := {
+	SEASON_OPEN_VN_STEM: SEASON_OPEN_SLOT,
+	SEASON_CLOSE_VN_STEM: SEASON_CLOSE_SLOT,
+}
+
+
+static func season_vn_id(stem: String, season_no: int) -> String:
+	return SEASON_VN_ID_FORMAT % [stem, season_no]
+
+
+# 시즌 인스턴스 id → `{"stem", "season"}`. 규칙에 맞지 않으면 **빈 사전**이다.
+#
+# 되짚기로 판정하는 것이 요지다: `_s` 를 찾아 자르는 것만으로는 `vnbeat_clue_silence` 처럼
+# 이름 안에 `_s` 를 품은 id 가 걸린다. 잘라 낸 조각을 **앞면 포맷으로 다시 조립해** 원본과
+# 같은지 물으면, 포맷이 바뀌는 날 역방향이 스스로 실패한다.
+static func split_season_vn_id(vn_id: String) -> Dictionary:
+	var cut := vn_id.rfind("_s")
+	if cut <= 0:
+		return {}
+	var stem := vn_id.substr(0, cut)
+	var tail := vn_id.substr(cut + 2)
+	if tail.is_empty() or not tail.is_valid_int():
+		return {}
+	var season_no := int(tail)
+	if season_vn_id(stem, season_no) != vn_id:
+		return {}
+	return {"stem": stem, "season": season_no}
+
 
 # 브리핑 슬롯에서 세울 VN 사슬을 NAR-01 페이로드로 꺼낸다 — 없으면 **빈 사전**(화면은 그대로
 # 다음으로 간다). 사슬에 실리는 것은 두 종류다:
@@ -246,7 +287,7 @@ func _beat_lines(beat_id: String) -> Array:
 func season_open_payload(next_route: String, next_payload: Dictionary = {}) -> Dictionary:
 	if season == null:
 		return {}
-	var vn_id := "vn_season_open_s%d" % season.season
+	var vn_id := season_vn_id(SEASON_OPEN_VN_STEM, season.season)
 	# **시즌당 1회 가드.** 24차에 발화 지점이 HUB-01 **이탈**로 옮겨졌다(D09 §2.3 순서) —
 	# 그 자리는 투어 경계마다 지나가므로 가드 없이는 매 투어 개막이 뜬다.
 	# `vn_slots.per_season 1` 을 `trigger_vn` 이 보지 않으므로(시즌·마일스톤 상한만 본다)
@@ -341,7 +382,7 @@ func _season_open_beats() -> Array:
 func season_close_payload(next_route: String, next_payload: Dictionary = {}) -> Dictionary:
 	if season == null:
 		return {}
-	var vn_id := "vn_season_close_s%d" % season.season
+	var vn_id := season_vn_id(SEASON_CLOSE_VN_STEM, season.season)
 	if narrative != null and narrative.vn_seen.has(vn_id):
 		return {}
 	var beats := _boundary_beats(SEASON_CLOSE_SLOT)
@@ -372,6 +413,61 @@ func _act_vn_payload(vn_id: String, next_route: String, next_payload: Dictionary
 		"next": next_route,
 		"next_payload": next_payload,
 	}
+
+
+# ── 아카이브 재열람 페이로드 (D07 §6.3 · TC-O4 · ㊹) ──
+#
+# **문면 없는 회수는 같은 장면이 아니다.** 기록실이 `{vn_id, replay, next}` 만 쥐여 주던
+# 동안 바탕과 CG 는 떴지만(그 둘은 `vn_id` 로도 조회된다) 문면은 골격 폴백 1줄이었고,
+# 화자를 잃은 라인이 기본값 베인으로 떨어져 **파형까지 섰다.** 개막 경로가 정확히 같은
+# 형태로 샜던 것(22차 — `line_keys` 미전달)의 **두 번째 경로**다.
+#
+# **페이로드 조립기는 하나다 — 두 곳에 두면 한쪽만 낡는다.** 그래서 여기서 새로 조립하지
+# 않고 기존 조립기 둘(`_act_vn_payload`·`_beat_payload`)로 되돌린다. 열쇠를 되찾는 일만
+# 이 함수의 몫이고, 조립은 정상 경로와 같은 손이 한다.
+#
+# 되찾는 갈래가 셋인 것은 **아카이브에 실리는 id 계열이 셋**이기 때문이다(`vn_seen` 의 실물):
+#   ① 막 VN — 인스턴스 id 가 곧 표 실체 id (접미 없음)
+#   ② 브리핑·마일스톤 비트 — 비트 id 를 그대로 발행한다
+#   ③ 시즌 경계 — 접미가 붙은 인스턴스 id. 줄기를 떼어 슬롯으로 비트를 되찾는다
+#
+# **조회 실패는 빈 사전이다** — 골격 폴백으로 흘리면 이번 결함이 그대로 되돌아온다.
+# 호출부가 그 빈 사전을 보고 판단한다(기록실은 버튼을 죽이고 누락을 관측 지점에 남긴다).
+func archive_replay_payload(vn_id: String, next_route: String,
+		next_payload: Dictionary = {}) -> Dictionary:
+	var payload := _archive_source_payload(vn_id, next_route, next_payload)
+	if payload.is_empty():
+		return {}
+	payload["replay"] = true
+	# **캘린더는 붙지 않는다** — 시즌 구조 공개는 개막 *진행*의 장치이지 장면의 문면이 아니고,
+	# 재열람은 상태를 바꾸지 않는다는 계약(멱등)의 표시 층 대응이다.
+	#
+	# 지우는 줄을 두지 않은 것은 그 줄이 **아무것도 하지 않기 때문**이다: 플래그는
+	# `season_open_payload` 가 조립기 **밖에서** 얹으므로 이 경로에는 애초에 오지 않는다.
+	# 성질은 축이 단언한다 — 재열람이 언젠가 그 창구를 경유하게 되면 그때 축이 붉는다.
+	return payload
+
+
+func _archive_source_payload(vn_id: String, next_route: String,
+		next_payload: Dictionary) -> Dictionary:
+	if data == null:
+		return {}
+	if not data.act_vn_entry(vn_id).is_empty():
+		return _act_vn_payload(vn_id, next_route, next_payload)
+	if not data.vn_beat(vn_id).is_empty():
+		return _beat_payload(vn_id, next_route, next_payload)
+	var split := split_season_vn_id(vn_id)
+	if split.is_empty():
+		return {}
+	var slot_id := String(SEASON_VN_STEM_SLOTS.get(String(split["stem"]), ""))
+	if slot_id.is_empty():
+		return {}
+	var beats := _boundary_beats(slot_id)
+	if beats.is_empty():
+		return {}
+	# **인스턴스 id 를 유지한다** — 아카이브 목록의 그 줄이 곧 이 재생이므로, 비트 id 로
+	# 갈아 끼우면 화면이 쥔 id 와 목록의 id 가 갈린다.
+	return _beat_payload(String(beats[0]["id"]), next_route, next_payload, vn_id)
 
 
 # 이벤트 노드 판정 (D08 §7 — RACE-03 → RUN-01 사이 삽입 지점의 발생 판정)

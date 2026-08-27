@@ -10,6 +10,10 @@ extends HubScreen
 
 var _tabs: Dictionary = {}
 var _active_tab := ""
+# **재열람 페이로드를 얻지 못한 항목 id.** 아카이브에 실린 id 는 전부 되찾을 수 있어야
+# 하므로(발화한 것만 실린다) 여기 값이 남으면 표와 발행 규칙이 갈렸다는 뜻이다.
+# 사람에게는 `push_error`, 기계에는 이 배열이 관측 지점이다 (`vn_screen.choice_omissions` 전례).
+var replay_omissions: Array = []
 
 
 func _on_hub_ready(_payload: Dictionary) -> void:
@@ -149,9 +153,19 @@ func _fill_archive() -> void:
 		replay.add_theme_font_size_override("font_size", _body_font_size)
 		replay.text = s.text("ui.records.replay")
 		# 재생 모드 — 동일 화면 + 종료 시 아카이브 복귀 (§A-19). 전이 재발화 없음(멱등).
-		replay.pressed.connect(func(): go("NAR-01", {
-			"vn_id": String(vn_id), "replay": true, "next": "HUB-05",
-		}))
+		#
+		# **페이로드는 세션 창구가 조립한다** (㊹ — 22차 개막 경로와 같은 교정). 화면이
+		# 직접 `{vn_id, replay, next}` 를 쥐여 주던 동안 문면·화자·정조가 통째로 빠져
+		# 골격 폴백 1줄이 떴다. 조립기를 화면에 두지 않는 규칙이 여기에도 걸린다.
+		var replay_payload := session.archive_replay_payload(String(vn_id), "HUB-05")
+		if replay_payload.is_empty():
+			# **되찾지 못하면 누르게 두지 않는다.** 빈 페이로드로 보내면 골격 화면이 서서
+			# 이번 결함이 그대로 재현된다 — 조용한 폴백 대신 죽은 버튼과 관측 지점을 남긴다.
+			replay.disabled = true
+			replay_omissions.append(String(vn_id))
+			push_error("RecordsScreen: replay payload unresolved — '%s'" % String(vn_id))
+		else:
+			replay.pressed.connect(func(): go("NAR-01", replay_payload))
 		row.add_child(replay)
 		panel.add_child(row)
 

@@ -114,6 +114,7 @@ func _process(_delta: float) -> bool:
 	_act_vn_consumption(data)
 	_skill_session_channel(data)
 	_season_open_wiring(data)
+	_archive_replay_wiring(data)
 	_tutorial_callout_placement()
 	_skill_slots(data)
 	_skill_snapshot_pairing(data)
@@ -132,8 +133,8 @@ func _process(_delta: float) -> bool:
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 748:
-		print("UI_SCREENS_FAIL checks=%d < 하한 748 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 805:
+		print("UI_SCREENS_FAIL checks=%d < 하한 805 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:
@@ -4227,3 +4228,211 @@ func _semantic_frame_consumers(data: GameData) -> void:
 						else "null")
 			dialog.queue_free()
 		_unmount(host)
+
+
+# ── ㊹ 아카이브 재열람 문면 결선 · NAR-01 페이로드 발신처 전수 ──
+#
+# **문면 없는 회수는 같은 장면이 아니다.** 기록실이 `{vn_id, replay, next}` 만 쥐여 주던
+# 동안 바탕·CG 는 떴고(그 둘은 `vn_id` 로도 조회된다) 문면만 골격 폴백 1줄로 떨어졌다.
+# 화자를 잃은 라인은 기본값 베인으로 내려가 **파형까지 섰다** — 즉 화면은 죽지 않고
+# *다른 장면*을 그렸다. 개막 경로가 정확히 같은 형태로 샜던 것(22차)의 **두 번째 경로**다.
+#
+# 그래서 축이 셋이다:
+#   ⓐ **되찾기** — 아카이브에 실리는 id 계열 3종 전부에서 문면·화자·정조가 돌아오는가
+#   ⓑ **구분력** — 옛 형태를 그대로 넣으면 축이 *실패해야* 한다(대조군이 없으면 ⓐ 는
+#      "무엇을 넣어도 통과"와 구분되지 않는다)
+#   ⓒ **전수** — 같은 결함의 세 번째 경로가 없는가. 화면이 NAR-01 페이로드를 **직접 조립하는
+#      자리**가 어디에도 없어야 하고, 창구가 늘면 이 축이 먼저 붉어야 한다
+const RUN_SESSION_SRC := "res://ui/flow/run_session.gd"
+const NAR_DISPATCH := 'go("NAR-01",'
+# 세션이 발행하는 NAR-01 페이로드 창구 — **못박아 둔다.** 새 창구가 생기면 이 축이 먼저
+# 붉어지고, 그때 "이 창구도 전수 규칙을 지키는가"를 사람이 한 번 본다.
+const PAYLOAD_MAKERS := [
+	"take_brief_payload",
+	"season_open_payload",
+	"milestone_payload",
+	"season_close_payload",
+	"archive_replay_payload",
+]
+
+
+func _archive_replay_wiring(data: GameData) -> void:
+	var session := _fresh_session(data)
+	session.begin_career(1)
+	# ⓐ 계열 3종 — 막 VN(접미 없음) · 비트 id 직행 · 시즌 경계 인스턴스(접미)
+	var families := [
+		["막 VN", "vn_act1", "vnslot_tour_brief", 12],
+		["비트 직행", "vnbeat_crew_nadia", "vnslot_tour_milestone", 9],
+		["시즌 개막 인스턴스", RunSession.season_vn_id(RunSession.SEASON_OPEN_VN_STEM, 1),
+			"vnslot_season_open", 3],
+		["시즌 엔딩 인스턴스", RunSession.season_vn_id(RunSession.SEASON_CLOSE_VN_STEM, 1),
+			"vnslot_season_close", 3],
+	]
+	for entry in families:
+		var label := String(entry[0])
+		var vn_id := String(entry[1])
+		var payload := session.archive_replay_payload(vn_id, "HUB-05")
+		_ok("㊹ %s — 재열람 페이로드 발행" % label, not payload.is_empty())
+		if payload.is_empty():
+			continue
+		_ok("㊹ %s — 재생 플래그" % label, bool(payload.get("replay", false)))
+		_ok("㊹ %s — 인스턴스 id 유지" % label, String(payload.get("vn_id", "")) == vn_id,
+			String(payload.get("vn_id", "")))
+		_ok("㊹ %s — 슬롯 동반" % label, String(payload.get("slot_id", "")) == String(entry[2]),
+			String(payload.get("slot_id", "")))
+		var lines: Array = payload.get("line_keys", [])
+		_ok("㊹ %s — 라인 %d (폴백 1줄이 아니다)" % [label, int(entry[3])],
+			lines.size() == int(entry[3]), str(lines.size()))
+		var with_speaker := 0
+		for line in lines:
+			if typeof(line) == TYPE_DICTIONARY and not String(Dictionary(line)
+					.get("speaker_key", "")).is_empty():
+				with_speaker += 1
+		_ok("㊹ %s — 전 라인이 화자를 갖는다" % label, with_speaker == lines.size(),
+			"%d/%d" % [with_speaker, lines.size()])
+		_ok("㊹ %s — 정조 동반" % label, not String(payload.get("tone", "")).is_empty(),
+			String(payload.get("tone", "")))
+		# 캘린더는 **개막 진행의 장치**이지 장면의 문면이 아니다. 재열람은 상태를 바꾸지 않는다.
+		_ok("㊹ %s — 캘린더 미동반" % label, not bool(payload.get("calendar", false)))
+		# 표 실체 id — 바탕 조회의 정상 열쇠. 접미가 붙은 계열에서 이것이 없으면 접두 폴백에
+		# 기대게 되고, 그 폴백은 표 행이 늘 때 조용히 어긋난다.
+		_ok("㊹ %s — 표 실체 id 동반" % label,
+			not String(payload.get("scene_id", "")).is_empty(),
+			String(payload.get("scene_id", "")))
+	# ⓑ 실화면 — 데이터 문면이 그려지는가. 그리고 **옛 형태는 폴백으로 떨어지는가**.
+	var fixed := session.archive_replay_payload(
+		RunSession.season_vn_id(RunSession.SEASON_OPEN_VN_STEM, 1), "HUB-05")
+	var placeholder := data.strings.text("ui.vn." + "placeholderLine01")
+	var vane := data.strings.text("ui.vn." + "speakerVane")
+	var screen := _mount_payload(data, session, fixed)
+	var body := (screen.get_node("%BodyLabel") as Label).text
+	var speaker := (screen.get_node("%SpeakerLabel") as Label).text
+	_ok("㊹ 실화면 1라인 = 데이터 문면",
+		body == data.strings.text("vn.seasonOpen." + "beat01"), body)
+	_ok("㊹ 실화면 폴백 문면 미노출", body != placeholder)
+	_ok("㊹ 실화면 화자 = 라인 선언 화자 (기본값 베인이 아니다)",
+		speaker == data.strings.text("ui.vn." + "speakerNarration") and speaker != vane, speaker)
+	_unmount(screen)
+	# **대조군 — 결함 형태를 그대로 재현한다.** 이것이 폴백을 내지 않으면 위 축은 무엇을
+	# 넣어도 통과하는 검사다(자기 충족 단언 방지).
+	var legacy := _mount_payload(data, session, {
+		"vn_id": RunSession.season_vn_id(RunSession.SEASON_OPEN_VN_STEM, 1),
+		"replay": true, "next": "HUB-05",
+	})
+	_ok("㊹ 대조군: 옛 형태는 폴백 1줄",
+		(legacy.get_node("%BodyLabel") as Label).text == placeholder,
+		(legacy.get_node("%BodyLabel") as Label).text)
+	_ok("㊹ 대조군: 옛 형태는 화자를 잃는다 (기본값 베인)",
+		(legacy.get_node("%SpeakerLabel") as Label).text == vane)
+	_unmount(legacy)
+	# ⓒ-1 역방향 규칙 — **되짚기로 판정한다.** `_s` 를 찾아 자르기만 하면 이름 안에 `_s` 를
+	# 품은 비트 id 가 걸린다(`vnbeat_clue_silence` 가 그 실물).
+	for season_no in [1, 2, 9, 12]:
+		var built := RunSession.season_vn_id(RunSession.SEASON_OPEN_VN_STEM, int(season_no))
+		var split := RunSession.split_season_vn_id(built)
+		_ok("㊹ 왕복 s%d" % int(season_no),
+			String(split.get("stem", "")) == RunSession.SEASON_OPEN_VN_STEM
+				and int(split.get("season", -1)) == int(season_no), str(split))
+	# `vn_season_open_s01` 은 **되짚기만이 잡는다** — 잘라 보면 `_s` 뒤가 정수로 읽히므로
+	# 자르기 판정에는 걸리지 않고, 앞면 포맷으로 다시 조립해야 원본과 다름이 드러난다.
+	for stray in ["vnbeat_clue_silence", "vn_act1", "vnbeat_season_open", "vn_season_open_sx",
+			"vn_season_open_s01"]:
+		_ok("㊹ 접미 아님 — %s" % String(stray),
+			RunSession.split_season_vn_id(String(stray)).is_empty(),
+			str(RunSession.split_season_vn_id(String(stray))))
+	# ⓒ-2 기록실 관측 지점 — 아카이브에 실린 것은 전부 되찾을 수 있어야 한다.
+	var shelf := _fresh_session(data)
+	shelf.begin_career(1)
+	for seen in ["vn_act1", "vnbeat_crew_nadia",
+			RunSession.season_vn_id(RunSession.SEASON_CLOSE_VN_STEM, 1)]:
+		shelf.narrative.vn_seen[String(seen)] = true
+	var records := _mount(RECORDS_SCENE, shelf)
+	if records != null:
+		_ok("㊹ 재열람 누락 관측 0 (실린 것은 전부 되찾는다)",
+			records.replay_omissions.is_empty(), str(records.replay_omissions))
+		_unmount(records)
+	# **대조군 — 관측 지점이 살아 있는가.** 되찾을 수 없는 id 를 하나 심는다. 이것이 안 잡히면
+	# 위의 "누락 0"은 가드가 죽어도 같은 값을 낸다.
+	var broken := _fresh_session(data)
+	broken.begin_career(1)
+	broken.narrative.vn_seen["vn_bogus_s9"] = true
+	var broken_records := _mount(RECORDS_SCENE, broken)
+	if broken_records != null:
+		_ok("㊹ 대조군: 되찾지 못한 id 가 관측에 남는다",
+			broken_records.replay_omissions.has("vn_bogus_s9"),
+			str(broken_records.replay_omissions))
+		_unmount(broken_records)
+	# ⓒ-3 발신처 전수 — **세 번째 경로가 없는가.**
+	var sources := _ui_gd_sources()
+	_ok("㊹ 전제: 화면 원본 적재", sources.size() >= 20, str(sources.size()))
+	var dispatch_files: Array = []
+	var inline_assembly: Array = []
+	var dispatches := 0
+	for path in sources:
+		var text := String(sources[path])
+		var at := text.find(NAR_DISPATCH)
+		if at < 0:
+			continue
+		dispatch_files.append(String(path))
+		while at >= 0:
+			dispatches += 1
+			# 인자는 **사전 리터럴이면 안 된다** — 그것이 화면이 직접 조립하는 형태다.
+			var arg := text.substr(at + NAR_DISPATCH.length()).strip_edges()
+			if arg.begins_with("{"):
+				inline_assembly.append("%s: %s" % [String(path).get_file(), arg.substr(0, 40)])
+			at = text.find(NAR_DISPATCH, at + 1)
+	# 축이 스스로 비면 실패해야 한다 — 발신처를 하나도 못 찾은 상태에서 "위반 0"은 무의미하다.
+	_ok("㊹ 발신처 실재 (축의 대상이 있다)", dispatches >= 5, str(dispatches))
+	_ok("㊹ 인라인 사전 조립 0", inline_assembly.is_empty(), "; ".join(inline_assembly))
+	var without_maker: Array = []
+	for path in dispatch_files:
+		var text := String(sources[path])
+		var uses_maker := false
+		for maker in PAYLOAD_MAKERS:
+			if text.contains("session." + String(maker) + "("):
+				uses_maker = true
+				break
+		if not uses_maker:
+			without_maker.append(String(path).get_file())
+	_ok("㊹ 전 발신처가 세션 창구를 경유", without_maker.is_empty(), "; ".join(without_maker))
+	# 창구 대장이 낡지 않게 — 원본의 공개 `*_payload` 집합과 못박은 목록을 대조한다.
+	var declared: Array = []
+	for raw_line in FileAccess.get_file_as_string(RUN_SESSION_SRC).split("\n"):
+		var line := String(raw_line)
+		if not line.begins_with("func "):
+			continue
+		var paren := line.find("(")
+		if paren < 0:
+			continue
+		var fn := line.substr(5, paren - 5)
+		if not fn.begins_with("_") and fn.ends_with("_payload"):
+			declared.append(fn)
+	declared.sort()
+	var pinned: Array = PAYLOAD_MAKERS.duplicate()
+	pinned.sort()
+	_ok("㊹ 창구 대장 = 원본 실제 (새 창구가 생기면 축이 먼저 붉는다)",
+		declared == pinned, "%s vs %s" % [str(declared), str(pinned)])
+
+
+# `res://ui` 아래 전 `.gd` 원본 — 경로 → 본문. 마운트한 화면만 보면 안 세운 화면이
+# 부재로 오독되므로(`_scene_sources_contain` 과 같은 사유) 원본을 직접 훑는다.
+func _ui_gd_sources() -> Dictionary:
+	var found: Dictionary = {}
+	var pending: Array = SCENE_ROOTS.duplicate()
+	while not pending.is_empty():
+		var dir_path := String(pending.pop_back())
+		var dir := DirAccess.open(dir_path)
+		if dir == null:
+			continue
+		dir.list_dir_begin()
+		var entry := dir.get_next()
+		while entry != "":
+			var full := dir_path + "/" + entry
+			if dir.current_is_dir():
+				if not entry.begins_with("."):
+					pending.append(full)
+			elif entry.ends_with(".gd"):
+				found[full] = FileAccess.get_file_as_string(full)
+			entry = dir.get_next()
+		dir.list_dir_end()
+	return found
