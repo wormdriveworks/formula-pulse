@@ -2959,6 +2959,25 @@ func _vn_cg_layer(data: GameData) -> void:
 			vslot != null and vslot.get_node_or_null("Standing") == null)
 		_ok("자리 계수 불변 (좌·우 둘)",
 			vane.find_child("StandingLeft", true, false) != null and vslot != null)
+		# **거울상을 함께 잰다 (36차 신설).** 위 축은 *인물 → 파형* 순서만 본 뒤 그 라인에서
+		# 멈춘다. 실기 데이터는 반대 순서도 만든다 — 베인이 말한 **뒤에** 그 자리 인물이
+		# 돌아온다(`vn_act1` 9행 · `feat_*` 3종). 한 방향만 비우면 차용이 그 순서에서
+		# 병치가 되고, 위 축은 이미 지난 라인이라 그것을 보지 못한다.
+		var back_line := -1
+		for index in range(vane_line + 1, vane._lines.size()):
+			vane._line_index = index
+			vane._show_line()
+			var key := String(vane._lines[index]["speaker_key"])
+			if String(data.vn_speaker(key).get("side", "none")) == "right" \
+					and not String(data.vn_speaker(key).get("char_id", "")).is_empty():
+				back_line = index
+				break
+		_ok("전제: 베인 뒤에 그 자리 인물이 돌아온다", back_line > vane_line, str(back_line))
+		var back_art := vslot.get_node_or_null("Standing") if vslot != null else null
+		_ok("복귀 인물 = 스탠딩 실재", back_art != null)
+		var back_wave := vslot.get_node_or_null("VaneWaveform") if vslot != null else null
+		_ok("복귀 라인에 파형 잔존 없음 (차용의 거울상)", back_wave == null,
+			"" if back_wave == null else "VaneWaveform 잔존")
 		_release_vn(vane)
 
 	var without := _mount_vn_id(data, CG_VN_WITHOUT)

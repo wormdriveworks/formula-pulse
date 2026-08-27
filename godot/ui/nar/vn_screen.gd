@@ -291,6 +291,18 @@ func _apply_standing(speaker_key: String) -> void:
 	var char_id := String(row.get("char_id", "")).strip_edges()
 	if char_id.is_empty():
 		return
+	# **비우는 것은 양쪽 방향이다** (36차 교정). `_mount_waveform` 이 인물을 걷는 것과 짝으로
+	# 여기서 파형을 걷는다 — 한쪽만 걷으면 차용이 *인물 → 파형* 순서에서만 차용이고
+	# **반대 순서에서는 병치**가 된다. 실기 데이터가 그 순서를 실제로 만든다: 베인이 말한
+	# 뒤에 그 자리 인물이 돌아온다(`vn_act1` 9행 · `feat_finish`·`feat_point`·`feat_tourwin`).
+	# 해제 방식도 짝이다 — `remove_child` 로 슬롯에서 빼고 `free()` 로 즉시 놓는다.
+	# (`queue_free` 로도 그림은 같다: 슬롯에서 이미 빠졌으므로 거기 그려지지 않는다.
+	#  차이는 고아 노드가 한 프레임 남는지뿐이고, 파형이 다시 설 때 `_mount_waveform` 이
+	#  같은 방식으로 인물을 놓는다 — 두 방향을 다르게 둘 이유가 없다.)
+	var wave := slot.get_node_or_null(WAVEFORM_NODE)
+	if wave != null:
+		slot.remove_child(wave)
+		wave.free()
 	var art := slot.get_node_or_null(STANDING_NODE) as TextureRect
 	if art == null:
 		art = TextureRect.new()
