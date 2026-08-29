@@ -105,7 +105,7 @@ ui.event.teamDinner,팀 저녁 식사,Team Dinner,チームの夕食
 ui.event.weatherBrief,기상 브리핑,Weather Briefing,気象ブリーフィング
 ui.event.circuitWalk,서킷 답사,Circuit Walk,サーキット下見
 ui.event.rivalData,라이벌 데이터 열람,Rival Data Review,ライバルデータの閲覧
-ui.event.gridRumor,그리드 소문,Grid Rumor,グリッドのうわさ
+ui.event.gridRumor,그리드 소문,Rumor on the Grid,グリッドのうわさ
 ui.event.gridNightscape,그리드 야경,Grid at Night,グリッドの夜景
 ui.event.fanLetter,팬레터,Fan Letter,ファンレター
 ui.event.oldPoster,옛 포스터 발견,An Old Poster,古いポスターの発見
