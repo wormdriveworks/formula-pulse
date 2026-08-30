@@ -131,6 +131,33 @@ else
 	printf '  [ok] 결제·광고 SDK 심볼 0\n'
 fi
 
+# ── ⑥ 출하 디렉토리 지문 — 콘솔 래퍼 동반 (총괄 판정 IMPL-503 §3-4) ──
+#
+# **선언 축과 산출물 축은 짝이고 어느 쪽도 혼자서는 IMPL-500 사고를 막지 못한다.** EXP 의
+# 결선 축은 *뒤바뀐 프리셋이 커밋되는 것*을 막지만, 에디터가 그 순간 미커밋 상태로 다르게
+# 내보내는 창은 못 막는다. 그 창을 닫는 것이 산출물 지문이고, 그중 가장 값싼 것이 이것이다.
+#
+# `debug/export_console_wrapper=1` 은 **디버그 전용 산출**이라 출시 산출에는 나오지 않는다.
+# 그래서 출하 디렉토리에 `*.console.exe` 가 있으면 그 자체로 디버그 빌드의 표지다.
+#
+# **검증 팩 모드에서는 걸지 않는다** — 그쪽은 출시 산출물이 아니고, 같은 디렉토리에 놓이는
+# 것도 이 저장소의 운용 관행일 뿐 계약이 아니다(계약으로 만들면 배치를 바꾸는 날 거짓이 된다).
+#
+# **템플릿 크기 지문은 기계화하지 않았다.** 출시 exe 는 아이콘·메타데이터 기입으로 템플릿과
+# 크기가 갈리는데(`modify_resources=true`) 디버그 쪽은 우연히 템플릿과 같았을 뿐이다 —
+# 등식으로 적으면 **그 우연을 계약으로 굳힌다.** 사람이 읽는 지문으로 머리말에 남겨 둔다.
+if [ "$MODE" != "--verify" ]; then
+	ship_dir=$(dirname "$TARGET")
+	wrappers=$(find "$ship_dir" -maxdepth 1 -name '*.console.exe' 2>/dev/null)
+	if [ -n "$wrappers" ]; then
+		printf '  [FAIL] 출하 디렉토리에 콘솔 래퍼 — 디버그 빌드의 표지\n'
+		printf '%s\n' "$wrappers" | sed 's/^/         /'
+		fail=$((fail + 1))
+	else
+		printf '  [ok] 콘솔 래퍼 0 (출하 디렉토리)\n'
+	fi
+fi
+
 printf '  검침 대상: %s (%s bytes · %d files)\n' \
 	"$(basename "$TARGET")" "$(stat -c%s "$TARGET")" "$files"
 

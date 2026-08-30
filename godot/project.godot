@@ -15,6 +15,21 @@ config/version="0.2.0"
 run/main_scene="res://ui/flow/app_root.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
+; ── 부트 스플래시 (배치 대장 §6.1 참조처 이행 · 총괄 판정 IMPL-499 ②) ──
+;
+; 기본 Godot 스플래시로는 제출할 수 없다. 실물은 키 비주얼 리프레임 640×360 이며
+; 캔버스와 같은 치수라 1920×1080 창에서 정수 3배로 놓인다.
+;
+; ⚠ `use_filter=false` 가 규격이다 — 부트 스플래시는 씬 트리 이전에 그려지므로
+; `default_texture_filter=0`(전역 니어리스트)의 적용을 받지 않는다. 켜 두면 도트가
+; 보간되어 D10 §2.2 믹셀 금지에 저촉한다. 전역 설정과 별개의 축이라 여기 명시한다.
+;
+; `bg_color` 는 팔레트 `BG_DEEP`(마스터 N01 `#080B11`) 전사다 — 창 종횡비가 16:9 가
+; 아닐 때만 보이는 여백색이고, 값의 출처는 조달 대장이다(불변규칙 2 별첨A 위임).
+boot_splash/bg_color=Color(0.0313726, 0.0431373, 0.0666667, 1)
+boot_splash/image="res://assets/platform/boot_splash.png"
+boot_splash/use_filter=false
+
 [display]
 
 window/size/viewport_width=640
