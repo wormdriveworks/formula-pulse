@@ -26,6 +26,12 @@
  *    "표지가 있는 헬멧"으로 읽힌다.** 아이콘은 확대해서 쓰는 물건이 아니므로 소비 크기가
  *    판정 크기다. 두 번의 되재기가 없었으면 48 을 피하고 32 를 믿었을 것이다 — 정확히 거꾸로.
  *
+ * ── ⚠ **16 만 예외다 (IMPL-504 · 총괄 발주).** 32 는 살았지만 16 은 살아남지 못했다
+ *    (불투명 87px · 숫자 소멸 · 세로 막대 2개 — IMPL-502 실측). 대장 §6.1 이 이 크기를
+ *    처음부터 *"16px 전용 단순화 파생"* 으로 선언해 뒀고, 그 행의 이행이 `ico_art.json` 이다.
+ *    **그래서 이 도구의 산출물은 두 개다** — `.ico` 와 `icon_win_16.png`. 후자는 ICO 의 재료이면서
+ *    동시에 대장이 가리키는 독립 파일이라, 한쪽만 쓰면 표와 실행 파일이 갈린다.
+ *
  * ── PNG 엔트리 전속. ICO 는 엔트리마다 BMP(DIB) 또는 PNG 를 담을 수 있다. 전량 PNG 로 둔다:
  *    ⓐ **되읽기 검산이 성립한다** — 우리 디코더로 그대로 열어 원판 재산출과 바이트 대조가 된다.
  *      BMP 를 섞으면 검산기에 두 번째 코덱이 필요하고, 그 코덱은 아무도 검산하지 않는다.
@@ -50,6 +56,8 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SRC = path.join(ROOT, 'godot', 'assets', 'platform', 'icon_master_128.png');
 const DST = path.join(ROOT, 'godot', 'assets', 'platform', 'icon_win.ico');
 const STRIP = path.join(ROOT, 'tools', 'palette', 'master_60_strip.png');
+const ART = path.join(__dirname, 'ico_art.json');
+const ART_PNG = path.join(ROOT, 'godot', 'assets', 'platform', 'icon_win_16.png');
 
 // Windows 셸 규약. 256 은 원판의 ×2 이고 나머지는 축소다.
 const SIZES = [16, 32, 48, 256];
@@ -158,15 +166,54 @@ function nearestResize(src, sw, sh, t) {
   return b;
 }
 
+// ── 16px 전용 단순화 파생 (총괄 발주 IMPL-503 · 대장 §6.1 선언 파일의 이행).
+//    **반쪽만 선언하고 미러한다** — 좌우 대칭이 검사가 아니라 자료 구조의 성질이 된다.
+//    도상 근거·비례 실측은 `ico_art.json` 의 `_geometry` 가 진다.
+function renderArt(art) {
+  const n = art.size;
+  if (!Number.isInteger(n) || n <= 0 || n % 2) die('ico_art: size 는 짝수 양의 정수다');
+  if (art.half.length !== n) die(`ico_art: half 행 수 ${art.half.length} != ${n}`);
+  const rgba = Buffer.alloc(n * n * 4);
+  art.half.forEach((h, y) => {
+    if (h.length !== n / 2) die(`ico_art: half[${y}] 길이 ${h.length} != ${n / 2}`);
+    const row = [...h].reverse().join('') + h;
+    [...row].forEach((ch, x) => {
+      if (ch === '.') return;
+      const hexv = art.palette[ch];
+      if (!hexv) die(`ico_art: 미지의 키 '${ch}' (half[${y}])`);
+      const m2 = /^#([0-9a-fA-F]{6})$/.exec(hexv);
+      if (!m2) die(`ico_art: 색 표기 '${hexv}' 가 #RRGGBB 가 아니다`);
+      const v = parseInt(m2[1], 16), i = (y * n + x) * 4;
+      rgba[i] = (v >> 16) & 255; rgba[i + 1] = (v >> 8) & 255; rgba[i + 2] = v & 255; rgba[i + 3] = 255;
+    });
+  });
+  return rgba;
+}
+
 const master = decode(SRC);
 if (master.w !== MASTER || master.h !== MASTER) {
   die(`${path.basename(SRC)} 가 ${master.w}×${master.h} 다 — ${MASTER}×${MASTER} 전제가 깨졌다`);
 }
 console.log(`원판 ${path.basename(SRC)} ${master.w}×${master.h}`);
 
+const art = JSON.parse(fs.readFileSync(ART, 'utf8'));
+const artRgba = renderArt(art);
+// 미러가 보장하지만 **자료 구조가 바뀌었을 때를 위해** 한 번 되잰다(구성 보장의 이중 안전장치).
+{
+  const n = art.size;
+  let asym = 0;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n / 2; x++) {
+    const p = (y * n + x) * 4, q = (y * n + (n - 1 - x)) * 4;
+    for (let c = 0; c < 4; c++) if (artRgba[p + c] !== artRgba[q + c]) { asym++; break; }
+  }
+  if (asym) fail(`${path.basename(ART_PNG)}: 좌우 비대칭 ${asym}px — 미러 보장이 깨졌다`);
+}
+
 const entries = [];
 for (const t of SIZES) {
-  const rgba = nearestResize(master.rgba, master.w, master.h, t);
+  // 16 은 원판 축소가 아니라 손 작화 도상이다 — 평이한 축소가 이 크기에서 '13' 을 잃기 때문이고,
+  //   그 사실은 IMPL-502 가 실측했다(불투명 87px · 숫자 소멸). 나머지 크기는 원판 파생 그대로다.
+  const rgba = t === art.size ? Buffer.from(artRgba) : nearestResize(master.rgba, master.w, master.h, t);
   let opaque = 0;
   const outside = new Set();
   for (let i = 0; i < t * t; i++) {
@@ -179,7 +226,7 @@ for (const t of SIZES) {
   if (outside.size) fail(`${t}×${t}: 대장 밖 색 ${outside.size}종 — ${[...outside].slice(0, 3).join(' / ')}`);
   const png = encode(t, t, rgba);
   const ratio = MASTER / t;
-  const tag = Number.isInteger(ratio) ? `÷${ratio}` : (Number.isInteger(t / MASTER) ? `×${t / MASTER}` : `÷${ratio.toFixed(3)} (비정수)`);
+  const tag = t === art.size ? '손 작화 (ico_art)' : (Number.isInteger(ratio) ? `÷${ratio}` : (Number.isInteger(t / MASTER) ? `×${t / MASTER}` : `÷${ratio.toFixed(3)} (비정수)`));
   console.log(`  · ${String(t).padStart(3)}×${String(t).padEnd(3)} ${tag.padEnd(16)} 불투명 ${String(opaque).padStart(6)}px · PNG ${String(png.length).padStart(6)}B`);
   entries.push({ size: t, png });
 }
@@ -233,11 +280,19 @@ const ico = buildIco(entries);
 
 if (fails) { console.log(`\nICO_GEN ${CHECK_ONLY ? 'CHECK ' : ''}FAIL fails=${fails}`); process.exit(1); }
 
+// `icon_win_16.png` 는 ICO 의 재료이면서 **대장 §6.1 이 선언한 독립 산출물**이다. 둘 다 쓴다 —
+//   한쪽만 쓰면 표가 가리키는 파일과 실행 파일이 쥔 그림이 갈릴 수 있다.
+const artPng = encode(art.size, art.size, artRgba);
 if (CHECK_ONLY) {
+  if (!fs.existsSync(ART_PNG)) { console.log(`  ✗ ${path.relative(ROOT, ART_PNG)}: 산출물 없음`); fails++; }
+  else if (!fs.readFileSync(ART_PNG).equals(artPng)) { console.log(`  ✗ ${path.relative(ROOT, ART_PNG)}: 재산출 불일치`); fails++; }
+  if (fails) { console.log(`\nICO_GEN CHECK FAIL fails=${fails}`); process.exit(1); }
   if (!fs.existsSync(DST)) { console.log(`  ✗ ${path.relative(ROOT, DST)}: 산출물 없음`); console.log('\nICO_GEN CHECK FAIL fails=1'); process.exit(1); }
   if (!fs.readFileSync(DST).equals(ico)) { console.log(`  ✗ ${path.relative(ROOT, DST)}: 재산출 불일치`); console.log('\nICO_GEN CHECK FAIL fails=1'); process.exit(1); }
   console.log(`\nICO_GEN PASS entries=${entries.length}`);
 } else {
+  fs.writeFileSync(ART_PNG, artPng);
+  console.log(`  → ${path.relative(ROOT, ART_PNG)}  ${art.size}×${art.size}  ${artPng.length}B`);
   fs.writeFileSync(DST, ico);
   console.log(`  → ${path.relative(ROOT, DST)}  ${ico.length}B`);
   console.log(`\nICO_GEN OK entries=${entries.length}`);
