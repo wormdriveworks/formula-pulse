@@ -1263,6 +1263,8 @@ const EXP_VERIFY_PRESET := "Windows Verify"
 # 필터의 생존을 진다 — 어느 트리에서 돌든 같은 답을 낸다.
 const EXP_TEST_PATH := "tests/*"
 const EXP_REQUIRED_EXCLUDES := ["tests/*", "addons/*"]
+# 검증 프리셋의 산출 경로가 반드시 담아야 하는 표식 — 출시 경로를 물 수 없다.
+const EXP_VERIFY_PATH_MARK := "verify"
 # 두 프리셋이 **갈라져도 되는** 열. 나머지가 같아야 한다 — 검증 빌드가 출시 빌드와
 # 다른 설정으로 돌면 "출시 후보 빌드로 재실행"이 이름만 남는다(D14 §5.6 방법 ②).
 const EXP_ALLOWED_DIFF := ["name", "custom_features", "exclude_filter", "export_path"]
@@ -1359,12 +1361,72 @@ func _run_export_preset_scan() -> void:
 			checked += 1
 			if String(opts[key]) == "true" and not EXP_ALLOWED_PERMISSIONS.has(perm):
 				_fail("EXP", "%s: 허용 목록 밖 권한 '%s'" % [String(preset_name), perm])
+	# ── ⓕ `[runnable_presets]` 결선 (IMPL-501 발주 ⓐ) ──
+	#
+	# **필터도 검침도 이 자리를 보지 않는다.** 그것들은 팩의 *내용*을 보는데, 이 사고는
+	# 내용이 아니라 **어느 프리셋이 어디로 나가는가**에서 났다: 에디터 수동 익스포트가
+	# `"Windows Desktop"="Windows Verify"` 로 결선을 뒤바꿔, 사람이 고른 이름과 실제로 나간
+	# 프리셋이 갈렸다(IMPL-500). 리포지토리의 프리셋은 옳았고 나간 물건이 틀렸다.
+	var runnable := _exp_parse_runnable(text)
+	checked += 1
+	if runnable.is_empty():
+		_fail("EXP", "[runnable_presets] 가 비었다 — 결선 대조가 공허해진다")
+	for entry_name in runnable:
+		var bound := String(runnable[entry_name])
+		checked += 1
+		if bound != String(entry_name):
+			_fail("EXP", "[runnable_presets] 결선 뒤바뀜: '%s' → '%s' (자기 프리셋이어야 한다)"
+				% [String(entry_name), bound])
+		checked += 1
+		if not presets.has(String(entry_name)):
+			_fail("EXP", "[runnable_presets] 의 '%s' 는 실재하지 않는 프리셋이다" % String(entry_name))
+	# ── ⓖ 검증 프리셋의 산출 경로 (IMPL-501 발주 ⓑ) ──
+	#
+	# 검증 빌드가 **출시 경로로 나가면** 출하 디렉토리에 검증물이 놓인다 — 이번 사고의
+	# 실제 피해가 그것이었다. 비었거나(에디터가 그때그때 묻는다) 표식을 담아야 한다.
+	if not verify.is_empty():
+		var verify_path := String(verify.get("export_path", ""))
+		checked += 1
+		if not verify_path.is_empty() and not verify_path.to_lower().contains(EXP_VERIFY_PATH_MARK):
+			_fail("EXP", "%s: 산출 경로가 검증 전용이 아니다 — '%s'"
+				% [EXP_VERIFY_PRESET, verify_path])
+		# 두 프리셋이 같은 곳으로 나가면 나중 것이 앞 것을 덮는다.
+		for preset_name in presets:
+			if String(preset_name) == EXP_VERIFY_PRESET:
+				continue
+			var other_path := String(Dictionary(presets[preset_name]).get("export_path", ""))
+			checked += 1
+			if not verify_path.is_empty() and verify_path == other_path:
+				_fail("EXP", "%s 와 %s 의 산출 경로가 같다 — '%s'"
+					% [EXP_VERIFY_PRESET, String(preset_name), verify_path])
 	# ⓔ 렌더러 (D12 §1 Compatibility 단일)
 	var project := _read_text(EXP_PROJECT)
 	checked += 1
 	if not project.contains("renderer/rendering_method=\"gl_compatibility\""):
 		_fail("EXP", "project.godot 렌더러가 gl_compatibility 가 아니다 (D12 §1 확정)")
 	_report("EXP", "export preset hygiene", checked, before_fail, before_warn)
+
+
+# `[runnable_presets]` 파서 — `"이름"="결선"` (따옴표는 이름에 공백이 있을 때만 붙는다).
+# 본문 파서(`_exp_parse`)는 이 섹션을 건너뛴다 — 프리셋 블록이 아니라 결선 표라서
+# 같은 손으로 읽으면 헤더 열과 섞인다.
+func _exp_parse_runnable(text: String) -> Dictionary:
+	var found: Dictionary = {}
+	var inside := false
+	for raw_line in text.split("\n"):
+		var line := String(raw_line).strip_edges()
+		if line.begins_with("["):
+			inside = line == "[runnable_presets]"
+			continue
+		if not inside or line.is_empty() or line.begins_with(";"):
+			continue
+		var eq := line.find("=")
+		if eq <= 0:
+			continue
+		var key := line.substr(0, eq).strip_edges().trim_prefix("\"").trim_suffix("\"")
+		var value := line.substr(eq + 1).strip_edges().trim_prefix("\"").trim_suffix("\"")
+		found[key] = value
+	return found
 
 
 # `export_presets.cfg` 파서 — 이름 -> {헤더 열…, "options": {…}}.
