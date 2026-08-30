@@ -4,12 +4,15 @@
 #   godot --headless --path . --script tools/validators/run_validators.gd
 #
 # 차단 규칙: V1~V6·V8 + 혼입 0 스캔 = 위반 1건이면 실패(exit 1).
-# 구현 층 신설 검사 **MIX0·ARCH·FONT·PAL·ANCH·STRF·AUD 도 차단형**이다 (불변규칙 7 —
+# 구현 층 신설 검사 **MIX0·ARCH·FONT·PAL·ANCH·STRF·AUD·FXPL·CUTM·FXJ·EXP 도 차단형**이다 (불변규칙 7 —
 #   FONT = 총괄 판정 IMPL-148 · PAL = 조건부 기승인 IMPL-209 → 발동 IMPL-219 ·
 #   ANCH = 경고형 신설 IMPL-233 → 규칙 확대 + 차단형 전환 IMPL-237 ·
 #   STRF = 차단형 즉시 신설 IMPL-249 ③).
 #   (AUD = 경고형 신설 IMPL-260 → **차단형 전환 IMPL-262** — 실측 깨끗(위반 0·오검출 0·돌연변이 10종) 후
 #    총괄 판정 승인. FONT·PAL·ANCH·STRF 와 같은 절차다.)
+#   (EXP = 경고형 신설 IMPL-495 → **차단형 전환 IMPL-496 ⓐ** — 같은 절차의 8번째.
+#    다른 점은 실측이 깨끗하지 않았다는 것이다: 세운 자리에 이미 위반이 있었다(출시 팩
+#    검증 코드 68파일). FXPL·CUTM·FXJ 도 같은 계보의 차단형이다.)
 # V7(금칙 어휘)은 경고 전용 — 빌드를 차단하지 않는다 (D12 §4.2 V7 행 · D14 TL-1 명문).
 # V6 내부: ID 중복·접두 위반 = 차단 / 고아 데이터 = 경고 (D12 §4.2 V6 행 "고아 데이터 … 경고").
 #
@@ -1232,10 +1235,14 @@ func _run_fx_join_scan() -> void:
 
 
 
-# ── EXP 익스포트 프리셋 검사 (G-6 ① · G-7 ②) — **경고형 신설** ──
+# ── EXP 익스포트 프리셋 검사 (G-6 ① · G-7 ②) — **차단형** ──
 #
-# 불변규칙 7 절차대로 경고형으로 세운다(FONT·PAL·ANCH·AUD 전례). 차단/경고 성격은
-# 구현이 정하지 않고 총괄 판정을 경유한다 — 위반 0·오검출 0 실측을 회신에 상신한다.
+# 경고형 신설(IMPL-495) → **차단형 전환(총괄 판정 IMPL-496 ⓐ)**. FONT 계보 8번째이며
+# 절차가 같다: 경고형으로 세우고 실측을 상신한 뒤 판정을 경유한다 — 차단/경고 성격은
+# 구현이 정하지 않는다(불변규칙 7).
+#
+# **이 검사에는 실위반 검출 실적이 있다.** 신설 회차에 출시 팩의 검증 코드 68파일을
+# 적발했다(IMPL-495) — 세운 자리에 이미 위반이 있었던 검사다.
 #
 # **이 검사가 보는 것은 선언이다.** 팩에 무엇이 실제로 들어갔는지는 `tools/export/probe_pack.sh`
 # 가 산출물을 열어 본다. 둘은 짝이며 한쪽만으로는 부족하다 — 필터를 적었는데 문법이 틀려
@@ -1261,24 +1268,24 @@ func _run_export_preset_scan() -> void:
 	var text := _read_text(EXP_PRESETS)
 	checked += 1
 	if text.is_empty():
-		_warn("EXP", "%s 를 읽지 못했다 — 판정 없음은 위반 없음이 아니다" % EXP_PRESETS)
+		_fail("EXP", "%s 를 읽지 못했다 — 판정 없음은 위반 없음이 아니다" % EXP_PRESETS)
 		_report("EXP", "export preset hygiene", checked, before_fail, before_warn)
 		return
 	var presets := _exp_parse(text)
 	checked += 1
 	# **대상 실재 관문** — 프리셋을 하나도 못 읽었는데 "위반 0"은 통과가 아니다.
 	if presets.size() < 2:
-		_warn("EXP", "프리셋 %d개 — 파싱이 공허하다" % presets.size())
+		_fail("EXP", "프리셋 %d개 — 파싱이 공허하다" % presets.size())
 		_report("EXP", "export preset hygiene", checked, before_fail, before_warn)
 		return
 	var release: Dictionary = presets.get(EXP_RELEASE_PRESET, {})
 	var verify: Dictionary = presets.get(EXP_VERIFY_PRESET, {})
 	checked += 1
 	if release.is_empty():
-		_warn("EXP", "출시 프리셋 '%s' 부재" % EXP_RELEASE_PRESET)
+		_fail("EXP", "출시 프리셋 '%s' 부재" % EXP_RELEASE_PRESET)
 	checked += 1
 	if verify.is_empty():
-		_warn("EXP", "검증 프리셋 '%s' 부재 — G-6 방법 ② 재실행 경로가 없다" % EXP_VERIFY_PRESET)
+		_fail("EXP", "검증 프리셋 '%s' 부재 — G-6 방법 ② 재실행 경로가 없다" % EXP_VERIFY_PRESET)
 	# ⓐ 출시 = 검증 코드 제외
 	for preset_name in presets:
 		var preset: Dictionary = presets[preset_name]
@@ -1286,17 +1293,17 @@ func _run_export_preset_scan() -> void:
 			continue
 		checked += 1
 		if not String(preset.get("exclude_filter", "")).contains(EXP_TEST_PATH):
-			_warn("EXP", "%s: exclude_filter 에 '%s' 없음 — 검증 코드가 출시 빌드에 실린다"
+			_fail("EXP", "%s: exclude_filter 에 '%s' 없음 — 검증 코드가 출시 빌드에 실린다"
 				% [String(preset_name), EXP_TEST_PATH])
 	# ⓑ 검증 = 검증 코드 포함
 	if not verify.is_empty():
 		checked += 1
 		if String(verify.get("exclude_filter", "")).contains(EXP_TEST_PATH):
-			_warn("EXP", "%s: 검증 프리셋이 검증 코드를 제외한다 — 하네스 재실행이 성립하지 않는다"
+			_fail("EXP", "%s: 검증 프리셋이 검증 코드를 제외한다 — 하네스 재실행이 성립하지 않는다"
 				% EXP_VERIFY_PRESET)
 		checked += 1
 		if String(verify.get("custom_features", "")) != "verify":
-			_warn("EXP", "%s: custom_features 가 'verify' 가 아니다 — 빌드가 자기 정체를 알 수 없다"
+			_fail("EXP", "%s: custom_features 가 'verify' 가 아니다 — 빌드가 자기 정체를 알 수 없다"
 				% EXP_VERIFY_PRESET)
 	# ⓒ **두 프리셋의 옵션 동일성** — 갈라지면 "출시 후보 빌드로 재실행"이 이름만 남는다.
 	if not release.is_empty() and not verify.is_empty():
@@ -1304,7 +1311,7 @@ func _run_export_preset_scan() -> void:
 		var v_opts: Dictionary = verify.get("options", {})
 		checked += 1
 		if r_opts.is_empty():
-			_warn("EXP", "출시 프리셋 옵션이 비었다 — 동일성 대조가 공허해진다")
+			_fail("EXP", "출시 프리셋 옵션이 비었다 — 동일성 대조가 공허해진다")
 		var drift: Array = []
 		for key in r_opts:
 			if String(v_opts.get(key, "\u0000")) != String(r_opts[key]):
@@ -1314,7 +1321,7 @@ func _run_export_preset_scan() -> void:
 				drift.append(String(key))
 		checked += 1
 		if not drift.is_empty():
-			_warn("EXP", "출시·검증 프리셋 옵션 이탈 %d건: %s"
+			_fail("EXP", "출시·검증 프리셋 옵션 이탈 %d건: %s"
 				% [drift.size(), ", ".join(drift.slice(0, 6))])
 		# 헤더 열의 허용 차이 밖 이탈
 		for key in release:
@@ -1322,7 +1329,7 @@ func _run_export_preset_scan() -> void:
 				continue
 			checked += 1
 			if String(verify.get(key, "\u0000")) != String(release[key]):
-				_warn("EXP", "출시·검증 프리셋 '%s' 이탈: %s vs %s"
+				_fail("EXP", "출시·검증 프리셋 '%s' 이탈: %s vs %s"
 					% [String(key), String(release[key]), String(verify.get(key, ""))])
 	# ⓓ 권한 선언 (D14 §5.7) — 허용 목록 밖 `true` 0 · 커스텀 권한 0
 	for preset_name in presets:
@@ -1336,16 +1343,16 @@ func _run_export_preset_scan() -> void:
 			if perm == "custom_permissions":
 				checked += 1
 				if String(opts[key]) != "PackedStringArray()":
-					_warn("EXP", "%s: 커스텀 권한 선언 = %s" % [String(preset_name), String(opts[key])])
+					_fail("EXP", "%s: 커스텀 권한 선언 = %s" % [String(preset_name), String(opts[key])])
 				continue
 			checked += 1
 			if String(opts[key]) == "true" and not EXP_ALLOWED_PERMISSIONS.has(perm):
-				_warn("EXP", "%s: 허용 목록 밖 권한 '%s'" % [String(preset_name), perm])
+				_fail("EXP", "%s: 허용 목록 밖 권한 '%s'" % [String(preset_name), perm])
 	# ⓔ 렌더러 (D12 §1 Compatibility 단일)
 	var project := _read_text(EXP_PROJECT)
 	checked += 1
 	if not project.contains("renderer/rendering_method=\"gl_compatibility\""):
-		_warn("EXP", "project.godot 렌더러가 gl_compatibility 가 아니다 (D12 §1 확정)")
+		_fail("EXP", "project.godot 렌더러가 gl_compatibility 가 아니다 (D12 §1 확정)")
 	_report("EXP", "export preset hygiene", checked, before_fail, before_warn)
 
 
