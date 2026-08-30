@@ -91,12 +91,14 @@ func _init(strings: StringTable, summary: String, cost_text: String, irreversibl
 	ok.name = "OkButton"
 	ok.text = _strings.text("ui.confirm.ok")
 	ok.add_theme_font_size_override("font_size", _body_font_size)
-	# 위험 프레임(A-FR-09)의 **유일한 소비처**다 [가안]. 앱 안에서 '위험'인 버튼은
+	# 위험 프레임(A-FR-09)의 **유일한 소비처**다. 앱 안에서 '위험'인 버튼은
 	# 비가역 확인의 수락 하나뿐이고(§A-23 = 비가역 항목에 경고행 필수), 그 자리에는 이미
 	# 경고 문면이 `gauge_danger()` 색으로 서 있다 — 프레임은 그 사실을 되풀이할 뿐 새 개념을
 	# 들이지 않는다. **가역 확인에는 붙이지 않는다** — 붙이면 '위험'이 '확인'의 동의어가 된다.
 	#
-	# **폐문 조건:** 실물 플레이 검증 회차 눈 판정 — 비가역 수락이 가역 수락과 갈려 읽히는가.
+	# **폐문 (37차 · 사용자 눈 판정 2026-08-28):** 실물 플레이 검증 회차 관측 = **적합**
+	# (총괄 IMPL-481 §2 ① — 대장 16항 전항 적합·교정 없음). 비가역 수락이 가역 수락과
+	# 갈려 읽힌다. 배정을 넓히지 않는 것(가역 불부착)도 그대로 확정된다.
 	if irreversible:
 		ok.theme_type_variation = &"DangerButton"
 	ok.pressed.connect(_finish.bind(true))

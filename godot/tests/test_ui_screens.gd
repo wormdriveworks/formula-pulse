@@ -2921,6 +2921,49 @@ func _vn_cg_layer(data: GameData) -> void:
 		_ok("예외 장면 = 해빙 차분", thawed != null
 			and String(thawed.get_meta("standing_suffix", "")) == "_" + variant,
 			"" if thawed == null else String(thawed.get_meta("standing_suffix", "")))
+		# ── 차분 = **얼굴 영역 레이어**다 (37차 신설 — D10 §3.1 "전신 재작화 금지") ──
+		#
+		# 위 축은 **접미 문자열만** 본다. 그래서 차분을 통째로 갈아 끼워도 통과했고,
+		# 실물 차분은 112×112 얼굴 레이어라 슬롯에 **얼굴만** 떴다(몸 소실·턱에서 잘림).
+		# 문자열은 무엇이 그려졌는지 말하지 않는다 — **그린 것을 재는 축**을 함께 둔다.
+		var sheet := load("res://assets/characters/crew_sasha_base.png") as Texture2D
+		var layer := load("res://assets/characters/crew_sasha_%s.png" % variant) as Texture2D
+		_ok("전제: 기본·차분 실물이 갈린 치수다",
+			sheet != null and layer != null and sheet.get_size() != layer.get_size(),
+			"" if sheet == null or layer == null
+			else "%s vs %s" % [str(sheet.get_size()), str(layer.get_size())])
+		var drawn: Image = null
+		if thawed != null and (thawed as TextureRect).texture != null:
+			drawn = (thawed as TextureRect).texture.get_image()
+		# ⓐ 합성물은 **기본 시트 치수**다. 교체판은 여기서 얼굴 치수를 돌려준다.
+		_ok("합성 결과 = 기본 시트 치수", drawn != null and sheet != null
+			and drawn.get_size() == Vector2i(sheet.get_size()),
+			"null" if drawn == null else str(drawn.get_size()))
+		if drawn != null and sheet != null and layer != null \
+				and drawn.get_size() == Vector2i(sheet.get_size()):
+			var base_image := sheet.get_image()
+			if base_image.get_format() != drawn.get_format():
+				base_image = base_image.duplicate() as Image
+				base_image.convert(drawn.get_format())
+			var origin := Vector2i(
+				(base_image.get_width() - layer.get_width()) / 2,
+				CsvTable.to_int(String(data.vn_speaker(sasha_key).get("face_offset_y", "-1"))))
+			var inside := 0
+			var outside := 0
+			for y in range(base_image.get_height()):
+				for x in range(base_image.get_width()):
+					if drawn.get_pixel(x, y) == base_image.get_pixel(x, y):
+						continue
+					var in_face: bool = x >= origin.x and x < origin.x + layer.get_width() \
+						and y >= origin.y and y < origin.y + layer.get_height()
+					if in_face:
+						inside += 1
+					else:
+						outside += 1
+			# ⓑ **공허하지 않다** — 차분이 얼굴 구획을 실제로 바꾼다.
+			_ok("얼굴 구획이 기본과 갈린다", inside > 0, "%d px" % inside)
+			# ⓒ **전신 재작화 금지의 기계 확인** — 구획 밖은 기본 그대로다.
+			_ok("얼굴 구획 밖 = 기본과 동일", outside == 0, "%d px" % outside)
 		_release_vn(sasha)
 	# **타 장면의 같은 인물은 base 다** — 예외를 전역 열로 두면 여기서 갈린다(반증 Z1).
 	var sasha_other := _mount_vn_id(data, "vnbeat_clue_silence")

@@ -54,6 +54,8 @@ const STANDING_NODE := "Standing"
 # 예외 후보 1개소(사샤 `_face_special`)는 판정 대기이므로 여기서 열지 않는다.
 const STANDING_SUFFIX := "_base"
 const STANDING_SUFFIX_META := "standing_suffix"
+# 얼굴 레이어 합성 y — 인물별 실측값(배치 대장 §4.4.3). 코드가 값을 갖지 않는다.
+const FACE_OFFSET_COLUMN := "face_offset_y"
 const WAVEFORM_NODE := "VaneWaveform"
 const WAVEFORM_SCRIPT := "res://ui/race/vane_waveform.gd"
 
@@ -314,15 +316,57 @@ func _apply_standing(speaker_key: String) -> void:
 		slot.add_child(art)
 	# **표정 차분은 장면이 연다** — 기본은 base 이고, 그 장면을 위해 그려진 차분이 선언된
 	# 자리에서만 갈린다(총괄 판정 ① — 단일 장면 예외라 위계 무손).
+	# **차분은 교체가 아니라 얼굴 영역 레이어다** (36차 교정 — D10 §3.1 *"차분 = 얼굴 영역
+	# 레이어 교체 방식(전신 재작화 금지)"*). 초판은 `char_id + suffix` 를 통째로 적재했고,
+	# `_base` 는 180×240 버스트업인데 차분 실물은 **112×112 얼굴 레이어**라(실측) 슬롯에
+	# 얼굴만 뜬다 — 몸이 사라지고 턱에서 잘린다. 검사는 접미 문자열만 봤으므로 통과했다.
 	var variant := session.data.vn_face_variant(_scene_id, speaker_key)
-	var suffix := STANDING_SUFFIX if variant.is_empty() else "_" + variant
-	var texture := load(CHARACTER_DIR + char_id + suffix + ".png") as Texture2D
-	if texture == null:
+	var base := load(CHARACTER_DIR + char_id + STANDING_SUFFIX + ".png") as Texture2D
+	if base == null:
 		push_error("VnScreen: standing '%s' not found" % char_id)
 		return
+	var suffix := STANDING_SUFFIX
+	var texture := base
+	if not variant.is_empty():
+		var composed := _compose_face(base, char_id, variant, row)
+		if composed != null:
+			texture = composed
+			suffix = "_" + variant
 	art.texture = texture
 	art.set_meta(STANDING_NODE, char_id)
 	art.set_meta(STANDING_SUFFIX_META, suffix)
+
+
+# 표정 차분 합성 — 기본 시트 위에 얼굴 레이어를 얹는다.
+#
+# **x 는 값이 아니라 유도다** — 배치 대장 §4.4.3 이 *"x = (180−112)÷2 = 34(중앙 정렬)"* 로
+# 두 확정 기준값에서 뽑으므로, 상수를 적지 않고 두 실물의 폭에서 그 자리에서 구한다.
+# **y 는 인물별 실측값이라 표에서 온다** — 같은 문서가 *"크롭 y 가 3~27 로 흩어진 것이
+# 공용 템플릿이 서지 않는 증거"* 라고 적어 뒀다(얼굴 위치가 인물마다 ±6px 흔들린다).
+# 값의 거처가 D13 이 아닌 것은 D10 §3.1 이 이 값을 *"조정 창구 = 원화 실작업"* 으로
+# 위임했기 때문이다 — 팔레트 실색상이 에셋 실물 소관인 것과 같은 자리다.
+#
+# **합성 실패는 기본으로 떨어진다** — 인물은 서고 차분만 빠진다. 조용하지 않게:
+# 사람에게 `push_error`, 기계에는 접미 메타가 `_base` 로 남아 축이 붉는다.
+func _compose_face(base: Texture2D, char_id: String, variant: String,
+		row: Dictionary) -> Texture2D:
+	var layer := load(CHARACTER_DIR + char_id + "_" + variant + ".png") as Texture2D
+	if layer == null:
+		push_error("VnScreen: face variant '%s_%s' not found" % [char_id, variant])
+		return null
+	var offset_y := CsvTable.to_int(String(row.get(FACE_OFFSET_COLUMN, "-1")))
+	if offset_y < 0:
+		push_error("VnScreen: face offset missing for '%s'" % char_id)
+		return null
+	var sheet := base.get_image().duplicate() as Image
+	var face := layer.get_image()
+	# 두 실물의 임포트 포맷이 갈리면 `blit_rect` 가 서지 않는다 — 시트 쪽에 맞춘다.
+	if face.get_format() != sheet.get_format():
+		face = face.duplicate() as Image
+		face.convert(sheet.get_format())
+	sheet.blit_rect(face, Rect2i(Vector2i.ZERO, face.get_size()),
+		Vector2i((sheet.get_width() - face.get_width()) / 2, offset_y))
+	return ImageTexture.create_from_image(sheet)
 
 
 # 베인 파형 — **레이스 소비부를 그대로 재사용한다** (`vane_waveform.gd` · 코드 생성 Control).

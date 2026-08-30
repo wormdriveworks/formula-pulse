@@ -40,7 +40,12 @@ const VN_STORE_LINE := 2
 #   ③ CG 차폐 + 해빙 차분 — `crew_sasha` 가 둘을 한 장에 진다(그 장면 전용 차분 · CG 실재).
 #   ④ ⑤ 베인 파형 자리와 **그 뒤 인물 복귀** — 36차 거울상 교정의 실물 확인분.
 #   ⑥ ⑦ 남은 CG 장면 둘 — **차폐는 한 장으로 판정할 수 없다.** 한 원도가 우연히 겹친 것과
-#      CG·스탠딩 공존 규칙이 없는 것은 3장면을 다 봐야 갈린다(CG 있는 VN = 정확히 3종).
+#      공존 규칙이 없는 것은 3장면을 다 봐야 갈린다(CG 있는 VN = 정확히 3종).
+#      ⚠ **판독 전제 정정 (총괄 IMPL-484 §1 등재).** 36차는 형제 규약을 *"CG = 장소·사물,
+#      인물은 스탠딩"* 으로 적었는데 **그런 정본 문면은 없고**(grep 0 — D10 §7 은 구도를
+#      구속하지 않는다), 실체는 *"인물 없음"* 이 아니라 **"얼굴 없음"** 이다(cg01 관중·
+#      cg06 군중이 실재한다 — A-CG-02 '맨얼굴 금지'). 결론은 그대로다: cg06 은 얼굴이
+#      0 이라 스탠딩과 충돌하지 않는다. 실루엣까지 위반으로 읽지 않기 위한 정정이다.
 const VN_LAYER_PLAN := [
 	["vn1_handover_before", "vnbeat_clue_silence", 1],
 	["vn2_handover_after", "vnbeat_clue_silence", 4],
@@ -380,11 +385,18 @@ func _stage_vn_layer() -> Control:
 	return _stage_vn_scene(String(row[1]), int(row[2]))
 
 
-# 기록실 재열람 경로 — 표 조회를 거치지 않고 **호출부가 실제로 넘기는 것만** 넘긴다.
+# 기록실 재열람 경로 — **호출부가 실제로 쓰는 창구를 부른다.** 36차 초판은 기록실이 그때
+# 넘기던 사전(`{vn_id, replay, next}`)을 손으로 적었고, 그것이 문면 공백(㊹)의 증거였다.
+# 원격이 그 결함을 고쳐 조립을 `archive_replay_payload()` 로 옮겼으므로, 손으로 적은
+# 사전은 이제 **생산에 없는 형태**다 — 그대로 두면 하네스가 고쳐진 결함을 계속 그린다.
+# 이것이 16차 VN 컷과 같은 교훈의 두 번째 자리다: **컷은 생산 경로를 지나야 한다.**
 func _stage_vn_archive() -> Control:
-	return _mount(VN_SCENE, _rich_session(1),
-		{"vn_id": VN_ARCHIVE_SCENE, "replay": true, "next": "HUB-05"})
-
+	var session := _rich_session(1)
+	var payload := session.archive_replay_payload(VN_ARCHIVE_SCENE, "HUB-05")
+	if payload.is_empty():
+		printerr("STORESHOT_FAIL 재열람 페이로드 조회 실패: %s" % VN_ARCHIVE_SCENE)
+		return null
+	return _mount(VN_SCENE, session, payload)
 
 # 재열람 경로로 세운다 — 슬롯 발생 판정·상한을 거치지 않으므로 어떤 장면이든 그대로 선다.
 func _stage_vn_scene(scene_id: String, line_index: int) -> Control:

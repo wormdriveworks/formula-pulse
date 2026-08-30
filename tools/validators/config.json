@@ -468,7 +468,8 @@
     "speaker_key": "string_key",
     "char_id": "string",
     "side": "enum:left,right,none",
-    "waveform": "int:0,1"
+    "waveform": "int:0,1",
+    "face_offset_y": "int:-1,128"
    }
   },
   "vn_backdrops.csv": {
