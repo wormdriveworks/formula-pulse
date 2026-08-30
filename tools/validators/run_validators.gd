@@ -1252,8 +1252,17 @@ const EXP_PRESETS := "godot/export_presets.cfg"
 const EXP_PROJECT := "godot/project.godot"
 const EXP_RELEASE_PRESET := "Windows Desktop"
 const EXP_VERIFY_PRESET := "Windows Verify"
-# 검증 전용 경로 — 출시 프리셋이 반드시 제외해야 하는 것.
+# 출시 프리셋이 반드시 제외해야 하는 경로.
+#   · `tests/*`   — 스위트·캡처 하네스·TL-5 러너 (IMPL-495 적발분)
+#   · `addons/*`  — 에디터 애드온. **`.gitignore` 로는 막히지 않는다** — 커밋되지 않을 뿐
+#     작업 트리에는 실재해서 익스포트가 담는다(IMPL-499 적발분: 주력 895 vs 원격 889).
+#     **커밋을 막는 것과 팩에 담기는 것을 막는 것은 다른 일이다.**
+#
+# 검침(`probe_pack.sh`)은 팩에 그것이 없음을 보는데, **애드온이 없는 트리에서는 그 통과가
+# 필터를 증명하지 않는다**(없는 것이 안 담기는 건 당연하다). 그래서 선언 축인 이쪽이
+# 필터의 생존을 진다 — 어느 트리에서 돌든 같은 답을 낸다.
 const EXP_TEST_PATH := "tests/*"
+const EXP_REQUIRED_EXCLUDES := ["tests/*", "addons/*"]
 # 두 프리셋이 **갈라져도 되는** 열. 나머지가 같아야 한다 — 검증 빌드가 출시 빌드와
 # 다른 설정으로 돌면 "출시 후보 빌드로 재실행"이 이름만 남는다(D14 §5.6 방법 ②).
 const EXP_ALLOWED_DIFF := ["name", "custom_features", "exclude_filter", "export_path"]
@@ -1291,10 +1300,12 @@ func _run_export_preset_scan() -> void:
 		var preset: Dictionary = presets[preset_name]
 		if String(preset_name) == EXP_VERIFY_PRESET:
 			continue
-		checked += 1
-		if not String(preset.get("exclude_filter", "")).contains(EXP_TEST_PATH):
-			_fail("EXP", "%s: exclude_filter 에 '%s' 없음 — 검증 코드가 출시 빌드에 실린다"
-				% [String(preset_name), EXP_TEST_PATH])
+		var filter := String(preset.get("exclude_filter", ""))
+		for required in EXP_REQUIRED_EXCLUDES:
+			checked += 1
+			if not filter.contains(String(required)):
+				_fail("EXP", "%s: exclude_filter 에 '%s' 없음 — 제품 아닌 것이 출시 빌드에 실린다"
+					% [String(preset_name), String(required)])
 	# ⓑ 검증 = 검증 코드 포함
 	if not verify.is_empty():
 		checked += 1
