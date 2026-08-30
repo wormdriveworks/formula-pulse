@@ -1,0 +1,12 @@
+; PCK 검침용 최소 프로젝트 — **본 게임 프로젝트가 아니다.**
+;
+; `res://` 밖에 두는 이유: 검침기가 게임 프로젝트 안에 있으면 그 검침기 자신이 팩에 실린다
+; (이번 회차에 실측한 `res://tests/` 혼입과 같은 형태다). 검침 대상과 검침 도구는 갈라야 한다.
+;
+; autoload 0 · 씬 0 — 팩을 마운트할 빈 그릇만 있으면 된다.
+config_version=5
+
+[application]
+
+config/name="pck_probe"
+config/features=PackedStringArray("4.7")

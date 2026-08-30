@@ -133,8 +133,8 @@ func _process(_delta: float) -> bool:
 	_scene_panel_phase(data)
 	print("")
 	# 검사 수 하한 — 씬 로드 실패로 스위트가 쪼그라들면 "통과"가 아니다.
-	if _checked < 805:
-		print("UI_SCREENS_FAIL checks=%d < 하한 805 (스위트 축소·씬 로드 실패 의심)" % _checked)
+	if _checked < 812:
+		print("UI_SCREENS_FAIL checks=%d < 하한 812 (스위트 축소·씬 로드 실패 의심)" % _checked)
 		quit(1)
 		return true
 	if _failures == 0:

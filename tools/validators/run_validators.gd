@@ -51,6 +51,7 @@ func _init() -> void:
 	_run_fx_placement_scan()
 	_run_cut_layout_scan()
 	_run_fx_join_scan()
+	_run_export_preset_scan()
 	# **완주 관문** — 스캔이 중도 이탈하면 실패 0·보고 0 으로 통과가 찍힌다(2026-08-20 실측:
 	# OGG 헤더의 없는 키를 `header["x"]` 로 읽자 함수가 이탈하고 게이트가 `VALIDATORS_PASS` 를 냈다).
 	# `run_tests.sh` 가 "성공 토큰의 부재 자체를 실패로 본다"고 한 것과 같은 축이다 —
@@ -1228,6 +1229,166 @@ func _run_fx_join_scan() -> void:
 		if not seen.has(String(asset)):
 			_fail("FXJ", "%s: 도구가 낸 요소가 표에 없다" % String(asset))
 	_report("FXJ", "fx element join", checked, before_fail, before_warn)
+
+
+
+# ── EXP 익스포트 프리셋 검사 (G-6 ① · G-7 ②) — **경고형 신설** ──
+#
+# 불변규칙 7 절차대로 경고형으로 세운다(FONT·PAL·ANCH·AUD 전례). 차단/경고 성격은
+# 구현이 정하지 않고 총괄 판정을 경유한다 — 위반 0·오검출 0 실측을 회신에 상신한다.
+#
+# **이 검사가 보는 것은 선언이다.** 팩에 무엇이 실제로 들어갔는지는 `tools/export/probe_pack.sh`
+# 가 산출물을 열어 본다. 둘은 짝이며 한쪽만으로는 부족하다 — 필터를 적었는데 문법이 틀려
+# 아무것도 걸러지지 않는 상태는 선언만 봐서는 통과하고, 검침만 봐서는 CI 에서 매 회차
+# 40MB 를 굽게 된다.
+const EXP_PRESETS := "godot/export_presets.cfg"
+const EXP_PROJECT := "godot/project.godot"
+const EXP_RELEASE_PRESET := "Windows Desktop"
+const EXP_VERIFY_PRESET := "Windows Verify"
+# 검증 전용 경로 — 출시 프리셋이 반드시 제외해야 하는 것.
+const EXP_TEST_PATH := "tests/*"
+# 두 프리셋이 **갈라져도 되는** 열. 나머지가 같아야 한다 — 검증 빌드가 출시 빌드와
+# 다른 설정으로 돌면 "출시 후보 빌드로 재실행"이 이름만 남는다(D14 §5.6 방법 ②).
+const EXP_ALLOWED_DIFF := ["name", "custom_features", "exclude_filter", "export_path"]
+# 모바일 권한 허용 목록 (D14 §5.7 확정 기준값). 그 외 선언 = 불통과.
+const EXP_ALLOWED_PERMISSIONS := ["access_network_state", "internet", "vibrate"]
+
+
+func _run_export_preset_scan() -> void:
+	var before_fail := _fail_count
+	var before_warn := _warn_count
+	var checked := 0
+	var text := _read_text(EXP_PRESETS)
+	checked += 1
+	if text.is_empty():
+		_warn("EXP", "%s 를 읽지 못했다 — 판정 없음은 위반 없음이 아니다" % EXP_PRESETS)
+		_report("EXP", "export preset hygiene", checked, before_fail, before_warn)
+		return
+	var presets := _exp_parse(text)
+	checked += 1
+	# **대상 실재 관문** — 프리셋을 하나도 못 읽었는데 "위반 0"은 통과가 아니다.
+	if presets.size() < 2:
+		_warn("EXP", "프리셋 %d개 — 파싱이 공허하다" % presets.size())
+		_report("EXP", "export preset hygiene", checked, before_fail, before_warn)
+		return
+	var release: Dictionary = presets.get(EXP_RELEASE_PRESET, {})
+	var verify: Dictionary = presets.get(EXP_VERIFY_PRESET, {})
+	checked += 1
+	if release.is_empty():
+		_warn("EXP", "출시 프리셋 '%s' 부재" % EXP_RELEASE_PRESET)
+	checked += 1
+	if verify.is_empty():
+		_warn("EXP", "검증 프리셋 '%s' 부재 — G-6 방법 ② 재실행 경로가 없다" % EXP_VERIFY_PRESET)
+	# ⓐ 출시 = 검증 코드 제외
+	for preset_name in presets:
+		var preset: Dictionary = presets[preset_name]
+		if String(preset_name) == EXP_VERIFY_PRESET:
+			continue
+		checked += 1
+		if not String(preset.get("exclude_filter", "")).contains(EXP_TEST_PATH):
+			_warn("EXP", "%s: exclude_filter 에 '%s' 없음 — 검증 코드가 출시 빌드에 실린다"
+				% [String(preset_name), EXP_TEST_PATH])
+	# ⓑ 검증 = 검증 코드 포함
+	if not verify.is_empty():
+		checked += 1
+		if String(verify.get("exclude_filter", "")).contains(EXP_TEST_PATH):
+			_warn("EXP", "%s: 검증 프리셋이 검증 코드를 제외한다 — 하네스 재실행이 성립하지 않는다"
+				% EXP_VERIFY_PRESET)
+		checked += 1
+		if String(verify.get("custom_features", "")) != "verify":
+			_warn("EXP", "%s: custom_features 가 'verify' 가 아니다 — 빌드가 자기 정체를 알 수 없다"
+				% EXP_VERIFY_PRESET)
+	# ⓒ **두 프리셋의 옵션 동일성** — 갈라지면 "출시 후보 빌드로 재실행"이 이름만 남는다.
+	if not release.is_empty() and not verify.is_empty():
+		var r_opts: Dictionary = release.get("options", {})
+		var v_opts: Dictionary = verify.get("options", {})
+		checked += 1
+		if r_opts.is_empty():
+			_warn("EXP", "출시 프리셋 옵션이 비었다 — 동일성 대조가 공허해진다")
+		var drift: Array = []
+		for key in r_opts:
+			if String(v_opts.get(key, "\u0000")) != String(r_opts[key]):
+				drift.append(String(key))
+		for key in v_opts:
+			if not r_opts.has(key):
+				drift.append(String(key))
+		checked += 1
+		if not drift.is_empty():
+			_warn("EXP", "출시·검증 프리셋 옵션 이탈 %d건: %s"
+				% [drift.size(), ", ".join(drift.slice(0, 6))])
+		# 헤더 열의 허용 차이 밖 이탈
+		for key in release:
+			if key == "options" or EXP_ALLOWED_DIFF.has(String(key)):
+				continue
+			checked += 1
+			if String(verify.get(key, "\u0000")) != String(release[key]):
+				_warn("EXP", "출시·검증 프리셋 '%s' 이탈: %s vs %s"
+					% [String(key), String(release[key]), String(verify.get(key, ""))])
+	# ⓓ 권한 선언 (D14 §5.7) — 허용 목록 밖 `true` 0 · 커스텀 권한 0
+	for preset_name in presets:
+		var preset: Dictionary = presets[preset_name]
+		var opts: Dictionary = preset.get("options", {})
+		for key in opts:
+			var name := String(key)
+			if not name.begins_with("permissions/"):
+				continue
+			var perm := name.substr("permissions/".length())
+			if perm == "custom_permissions":
+				checked += 1
+				if String(opts[key]) != "PackedStringArray()":
+					_warn("EXP", "%s: 커스텀 권한 선언 = %s" % [String(preset_name), String(opts[key])])
+				continue
+			checked += 1
+			if String(opts[key]) == "true" and not EXP_ALLOWED_PERMISSIONS.has(perm):
+				_warn("EXP", "%s: 허용 목록 밖 권한 '%s'" % [String(preset_name), perm])
+	# ⓔ 렌더러 (D12 §1 Compatibility 단일)
+	var project := _read_text(EXP_PROJECT)
+	checked += 1
+	if not project.contains("renderer/rendering_method=\"gl_compatibility\""):
+		_warn("EXP", "project.godot 렌더러가 gl_compatibility 가 아니다 (D12 §1 확정)")
+	_report("EXP", "export preset hygiene", checked, before_fail, before_warn)
+
+
+# `export_presets.cfg` 파서 — 이름 -> {헤더 열…, "options": {…}}.
+# 엔진 포맷이라 순서·공백이 고정이지만 **키=값만 읽는다**(정규식 없이) — 포맷이 흔들려도
+# 조용히 빈 사전을 내지 않도록 섹션 인식을 명시적으로 둔다.
+func _exp_parse(text: String) -> Dictionary:
+	var presets: Dictionary = {}
+	var order: Array = []          # preset.N 순서 -> 이름
+	var index := -1
+	var in_options := false
+	for raw_line in text.split("\n"):
+		var line := String(raw_line).strip_edges()
+		if line.begins_with("[preset."):
+			var body := line.trim_prefix("[preset.").trim_suffix("]")
+			in_options = body.ends_with(".options")
+			index = int(body.trim_suffix(".options"))
+			while order.size() <= index:
+				order.append("")
+			continue
+		if line.begins_with("[") or line.is_empty() or line.begins_with(";"):
+			if line.begins_with("["):
+				index = -1
+			continue
+		if index < 0:
+			continue
+		var eq := line.find("=")
+		if eq <= 0:
+			continue
+		var key := line.substr(0, eq).strip_edges()
+		var value := line.substr(eq + 1).strip_edges().trim_prefix("\"").trim_suffix("\"")
+		if not in_options and key == "name":
+			order[index] = value
+			if not presets.has(value):
+				presets[value] = {"options": {}}
+		var preset_name := String(order[index]) if index < order.size() else ""
+		if preset_name.is_empty() or not presets.has(preset_name):
+			continue
+		if in_options:
+			presets[preset_name]["options"][key] = value
+		else:
+			presets[preset_name][key] = value
+	return presets
 
 
 func _fxj_compare(asset: String, column: String, row: Dictionary, want: int) -> void:
