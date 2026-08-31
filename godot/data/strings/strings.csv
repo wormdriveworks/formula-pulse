@@ -77,6 +77,14 @@ vane.brief.timeout01,궤도 재계산. 계속합니다.,Trajectory recomputed. C
 vane.brief.duel01,결판 국면. 연산 집중.,Decisive phase. Computation focused.,決着局面。演算集中。
 raceLog.resonanceEnter01,미승인 출력이 감지된다.,Unsanctioned output detected.,未承認の出力を検知。
 raceLog.resonanceProc01,레조넌스 — 출력이 넘친다.,Resonance — output overflows.,レゾナンス — 出力があふれる。
+raceLog.timeout02,판단이 늦었다. 머신이 먼저 갔다.,Too slow — the machine went first.,判断が遅れた。マシンが先に行った。
+raceLog.timeout03,개입 없이 코너를 받아냈다.,Took the corner with no input.,介入なしでコーナーを受けた。
+raceLog.troubleHit02,차체가 비명을 지른다. 섀시 {amount}.,The chassis screams. Chassis {amount}.,車体が悲鳴を上げる。シャシー{amount}。
+raceLog.troubleHit03,충격을 못 받아냈다. 섀시 {amount}.,Impact not absorbed. Chassis {amount}.,衝撃を受け切れない。シャシー{amount}。
+raceLog.stableSector02,라인이 깨끗하다. 차지 +{amount}.,Clean line. Charge +{amount}.,ラインがきれいだ。チャージ+{amount}。
+raceLog.stableSector03,리듬을 지켰다. 차지 +{amount}.,Held the rhythm. Charge +{amount}.,リズムを守った。チャージ+{amount}。
+raceLog.momentum02,기세가 붙는다. 전방 +{amount}.,Carrying speed. Front +{amount}.,勢いがつく。前方+{amount}。
+raceLog.chassisCritical01,섀시 임계. 한계가 가깝다.,Chassis critical. The limit is near.,シャシー臨界。限界が近い。
 ui.eventCategory.c1,정비·머신,Service & Machine,整備・マシン
 ui.eventCategory.c2,크레딧·스폰서,Credits & Sponsors,クレジット・スポンサー
 ui.eventCategory.c3,관계·조우,Relations & Encounters,関係・遭遇
@@ -213,7 +221,6 @@ ui.race.positionFormat,P{rank}/{total},P{rank}/{total},P{rank}/{total}
 ui.race.lapSectorFormat,LAP {lap}/{laps} · S{sector}/{sectors},LAP {lap}/{laps} · S{sector}/{sectors},LAP {lap}/{laps} · S{sector}/{sectors}
 ui.race.gaugeFront,전방,Front,前方
 ui.race.gaugeRear,후방,Rear,後方
-ui.race.hold,홀드,Hold,ホールド
 ui.race.respin,리스핀,Re-spin,リスピン
 ui.race.chargeIntervene,차지 개입,Step In,介入
 ui.race.confirm,확정,Confirm,確定
@@ -245,6 +252,11 @@ ui.race.skillRejectedSectorTurn,듀얼 턴 전용,Duel turns only,デュエル�
 ui.race.speakerRelay,중계,Relay,実況
 ui.race.actionWithCost,{label} {cost},{label} {cost},{label} {cost}
 ui.race.actionWithUses,{label} {cost} {left},{label} {cost} {left},{label} {cost} {left}
+ui.race.holdKeyFormat,홀드 {index},Hold {index},ホールド{index}
+ui.race.hintHold,릴 홀드 토글 — 키 1·2·3 | 패드 X 홀드+십자키→A,Toggle reel hold — keys 1·2·3 | pad: hold X + D-pad → A,リールホールド — キー1・2・3 | パッドX長押し+十字キー→A
+ui.race.hintRespin,단축키 R | 패드 X,Shortcut R | pad X,ショートカットR | パッドX
+ui.race.hintCharge,단축키 C | 패드 Y,Shortcut C | pad Y,ショートカットC | パッドY
+ui.race.skillHintFormat,{body} — F{index} | 패드 RB 조합,{body} — F{index} | pad RB combo,{body} — F{index} | パッドRBコンボ
 ui.title.gameTitle,FORMULA PULSE,FORMULA PULSE,FORMULA PULSE
 ui.title.subtitle,SPIN THE GRID,SPIN THE GRID,SPIN THE GRID
 ui.title.continueRun,계속하기,Continue,つづきから
@@ -260,6 +272,14 @@ ui.save.empty,빈 슬롯,Empty Slot,空きスロット
 ui.save.progressFormat,시즌 {season} · 투어 {tour} · 제{race}전,Season {season} · Tour {tour} · Race {race},シーズン{season} · ツアー{tour} · 第{race}戦
 ui.save.hintNew,새 커리어를 시작할 슬롯을 고르세요.,Choose a slot to start a new career.,新しいキャリアを始めるスロットを選んでください。
 ui.save.hintContinue,이어할 커리어를 고르세요.,Choose a career to continue.,続けるキャリアを選んでください。
+ui.save.cardBodyFormat,"{progress}
+{detail}","{progress}
+{detail}","{progress}
+{detail}"
+ui.save.detailFormat,{credits} Cr · 저장 {saved},{credits} Cr · saved {saved},{credits} Cr・保存 {saved}
+ui.save.savedAtFormat,{month}/{day} {hour}:{minute},{month}/{day} {hour}:{minute},{month}/{day} {hour}:{minute}
+ui.save.delete,삭제,Delete,削除
+ui.save.deleteConfirm,한 번 더 누르면 삭제됩니다,Press again to delete,もう一度押すと削除します
 ui.gpResult.header,그랑프리 결산,Grand Prix Results,グランプリ決算
 ui.gpResult.finalRank,최종 순위,Final Position,最終順位
 ui.gpResult.tourPoints,투어 포인트,Tour Points,ツアーポイント
@@ -274,12 +294,23 @@ ui.gpResult.carryFormat,섀시 {chassis} · 차지 {charge},Chassis {chassis} ·
 ui.gpResult.next,다음으로,Next,次へ
 ui.gpResult.toTourReport,투어 결산으로,To Tour Results,ツアー決算へ
 ui.gpResult.saved,저장됨,Saved,保存しました
+ui.gpResult.gridDelta,순위 변동,Position Change,順位変動
+ui.gpResult.gridDeltaFormat,P{start} → P{finish},P{start} → P{finish},P{start} → P{finish}
+ui.gpResult.duelRecord,듀얼 전적,Duel Record,デュエル戦績
+ui.gpResult.duelRecordFormat,{count}전 {wins}승 {losses}패,{count} duels — {wins}W {losses}L,{count}戦{wins}勝{losses}敗
+ui.gpResult.duelRecordNone,없음,None,なし
+ui.gpResult.troubleTurns,트러블,Troubles,トラブル
+ui.gpResult.troubleTurnsFormat,{count}턴,{count} turns,{count}ターン
+ui.gpResult.standingsHeader,최종 순위표,Final Standings,最終順位表
+ui.gpResult.standingRowFormat,P{rank} {name},P{rank} {name},P{rank} {name}
+ui.gpResult.standingRetired,P{rank} {name} — 리타이어,P{rank} {name} — DNF,P{rank} {name} — リタイア
 ui.recap.header,간이 정산,Quick Settlement,簡易精算
 ui.recap.summaryFormat,직전 P{rank} · 투어 포인트 +{points},Last race P{rank} · Tour Points +{points},直前 P{rank} · ツアーポイント +{points}
 ui.recap.creditsFormat,{amount} Cr,{amount} Cr,{amount} Cr
 ui.recap.fieldRepair,필드 정비,Field Service,フィールドサービス
 ui.recap.consumableHeaderFormat,소모품 보충 {held}/{cap},Consumables {held}/{cap},消耗品の補充 {held}/{cap}
 ui.recap.consumableBuyFormat,{item} {amount} Cr,{item} {amount} Cr,{item} {amount} Cr
+ui.recap.consumableBuyOwnedFormat,{item} {amount} Cr · 보유 {held},{item} {amount} Cr · owned {held},{item} {amount} Cr・所持{held}
 ui.recap.deckHeaderFormat,덱 교체 {used}/{slots},Deck Change {used}/{slots},デッキ変更 {used}/{slots}
 ui.recap.deckEntryFormat,{mark} {skill},{mark} {skill},{mark} {skill}
 ui.recap.deckEquipped,●,●,●
@@ -455,7 +486,27 @@ ui.options.stepPrev,◀,◀,◀
 ui.options.stepNext,▶,▶,▶
 ui.options.resetDefaults,기본값 복원,Restore Defaults,初期値に戻す
 ui.options.close,닫기,Close,閉じる
-ui.options.controlsNote,조작 리매핑은 주요 키 한정으로 제공 예정입니다. 현재 매핑 — 스핀·확정 Space / 홀드 1·2·3 / 리스핀 R / 차지 개입 C / 일시정지 Esc,Remapping will be offered for primary keys only. Current mapping — Spin·Confirm Space / Hold 1·2·3 / Re-spin R / Charge Intervene C / Pause Esc,操作のリマップは主要キーに限り提供予定です。現在の割り当て — スピン・確定 Space / ホールド 1・2・3 / リスピン R / チャージ介入 C / 一時停止 Esc
+ui.options.controlsNote,조작 리매핑은 주요 키 한정으로 제공 예정입니다.,Remapping will be offered for primary keys only.,操作のリマップは主要キーに限り提供予定です。
+ui.controls.rowConfirm,확인·진행,Confirm / Advance,決定・進行
+ui.controls.valConfirm,Enter · Space | 패드 A,Enter · Space | Pad A,Enter・Space | パッドA
+ui.controls.rowCancel,취소·닫기,Cancel / Close,キャンセル・閉じる
+ui.controls.valCancel,Esc | 패드 B,Esc | Pad B,Esc | パッドB
+ui.controls.rowPause,일시정지,Pause,ポーズ
+ui.controls.valPause,Esc | 패드 스타트,Esc | Pad Start,Esc | パッドスタート
+ui.controls.rowTabs,탭 전환,Switch Tabs,タブ切替
+ui.controls.valTabs,Q · E | LB · RB,Q · E | LB · RB,Q・E | LB・RB
+ui.controls.rowDetail,상세 정보,Details,詳細情報
+ui.controls.valDetail,T | LB 홀드 + Y,T | hold LB + Y,T | LB長押し+Y
+ui.controls.rowHold,릴 홀드 토글,Toggle Reel Hold,リールホールド
+ui.controls.valHold,1 · 2 · 3 | X 홀드 + 십자키 → A,1 · 2 · 3 | hold X + D-pad → A,1・2・3 | X長押し+十字キー→A
+ui.controls.rowRespin,리스핀,Re-spin,リスピン
+ui.controls.valRespin,R | X 짧게,R | tap X,R | X短押し
+ui.controls.rowCharge,차지 개입,Step In,介入
+ui.controls.valCharge,C | Y,C | Y,C | Y
+ui.controls.rowSkills,스킬 슬롯 1~5,Skill Slots 1–5,スキルスロット1~5
+ui.controls.valSkills,F1~F5 | RB 홀드 + 십자키 → A,F1–F5 | hold RB + D-pad → A,F1~F5 | RB長押し+十字キー→A
+ui.controls.rowFocus,포커스 이동,Move Focus,フォーカス移動
+ui.controls.valFocus,방향키 | 십자키·좌스틱,Arrow keys | D-pad / Left stick,方向キー | 十字キー・左スティック
 ui.pause.resume,재개,Resume,再開
 ui.pause.options,옵션,Options,オプション
 ui.pause.achievements,업적,Achievements,実績

@@ -267,6 +267,21 @@ static func _migrate_2_to_3(payload: Dictionary) -> Dictionary:
 	return migrated
 
 
+# ── 프로필 삭제 (개선 2026-09-01 — SYS-02 슬롯 관리) ──
+# 진행·백업·스냅샷·격리 4파일 전부를 걷는다 — 진행만 지우면 백업이 '빈 슬롯'을 거짓으로
+# 만들지는 않지만(로드는 progress 부재 = not_found), 다음 커리어의 첫 백업 회전이 남의
+# 세대를 물려받는다. 확인 UI 는 호출 층 몫이다 — 여기는 실행만 한다.
+static func delete_progress(profile_index: int) -> bool:
+	if not _in_configured_range(profile_index):
+		push_error("SaveManager: profile %d out of configured range" % profile_index)
+		return false
+	for path in [progress_path(profile_index), backup_path(profile_index),
+			snapshot_path(profile_index), quarantine_path(profile_index)]:
+		if FileAccess.file_exists(String(path)):
+			SaveService.delete_save(String(path))
+	return true
+
+
 # ── 클라우드 충돌 정책 (D12 §7.3) ──
 # "최신 진행 우선(진행도 비교 → 동률 시 최신 타임스탬프) + 불일치 시 사용자 선택"
 # [가안] '불일치'의 판정: 진행도와 타임스탬프의 순서가 서로 어긋나는 경우로 읽는다.

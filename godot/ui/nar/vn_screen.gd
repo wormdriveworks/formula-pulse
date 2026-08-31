@@ -58,6 +58,12 @@ const STANDING_SUFFIX_META := "standing_suffix"
 const FACE_OFFSET_COLUMN := "face_offset_y"
 const WAVEFORM_NODE := "VaneWaveform"
 const WAVEFORM_SCRIPT := "res://ui/race/vane_waveform.gd"
+# 비발화 스탠딩 감광 = 0.62 등채널 (개선 2026-09-01) — 두 인물이 항상 같은 밝기로 서 있어
+# 발화자 구분이 이름표 하나뿐이었다. 색상을 건드리지 않고 밝기만 낮춘다(릴 비홀드 감광
+# 0.78 과 같은 축 — 색 정보가 아니라 상태 표시이므로 색상 이동은 잡음이다). 릴보다 한 단
+# 깊은 것은 스탠딩이 면적이 크고 배경이 밝아 0.78 로는 갈림이 서지 않아서다.
+# 값은 modulate 대입줄에 직접 둔다 — 감광은 도색이 아니라 게인이라 조달 대장 밖이고(PAL
+# 문맥 제외 ①), 그 제외가 대입줄 단위라 상수로 빼면 오히려 대장 위반으로 읽힌다.
 
 # 라인 = `{"speaker_key": String, "text_key": String}` 로 정규화해 둔다.
 # 문자열 항목도 그대로 받는다 — 골격·아카이브 재열람 등 기존 호출부가 문자열 배열을 넘긴다.
@@ -289,6 +295,7 @@ func _apply_standing(speaker_key: String) -> void:
 	# 같은 슬롯을 쓰므로 §A-19 최대 2인이 그대로 유지되고, 씬은 건드리지 않는다.
 	if CsvTable.to_int(String(row.get("waveform", "0"))) == 1:
 		_mount_waveform(slot)
+		_set_active_side(side)
 		return
 	var char_id := String(row.get("char_id", "")).strip_edges()
 	if char_id.is_empty():
@@ -335,6 +342,22 @@ func _apply_standing(speaker_key: String) -> void:
 	art.texture = texture
 	art.set_meta(STANDING_NODE, char_id)
 	art.set_meta(STANDING_SUFFIX_META, suffix)
+	_set_active_side(side)
+
+
+# 발화자 자리만 원광, 반대 자리는 감광 (개선 2026-09-01). `side = none`(베인 없는 지문 등)은
+# 이 함수에 오지 않으므로 마지막 강조가 유지된다 — 지문 한 줄에 장면 밝기가 출렁이지 않는다.
+# 빈 슬롯(인물·파형 모두 부재)은 건드리지 않는다 — 감광은 서 있는 것에만 뜻이 있다.
+func _set_active_side(active_side: String) -> void:
+	for slot_side in STANDING_SLOTS:
+		var slot := find_child(String(STANDING_SLOTS[slot_side]), true, false) as Control
+		if slot == null:
+			continue
+		var occupied := slot.get_node_or_null(STANDING_NODE) != null \
+			or slot.get_node_or_null(WAVEFORM_NODE) != null
+		if not occupied:
+			continue
+		slot.modulate = Color(1.0, 1.0, 1.0) if String(slot_side) == active_side else Color(0.62, 0.62, 0.62)
 
 
 # 표정 차분 합성 — 기본 시트 위에 얼굴 레이어를 얹는다.

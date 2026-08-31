@@ -62,9 +62,13 @@ func _refresh_consumables() -> void:
 		var row: Dictionary = session.data.consumables[id]
 		var cost := CsvTable.to_int(String(row["cost_cr"]))
 		var button := Button.new()
+		# 재생성 후 포커스 복원의 주소 — 목록이 다시 서도 같은 품목은 같은 이름이다
+		button.name = "Buy_" + String(id)
 		button.add_theme_font_size_override("font_size", _body_font_size)
-		button.text = s.text("ui.recap.consumableBuyFormat", {
-			"item": s.text(String(row["name_key"])), "amount": cost,
+		var owned := int(outgame.consumables.get(id, 0))
+		var label_key := "ui.recap.consumableBuyOwnedFormat" if owned > 0 else "ui.recap.consumableBuyFormat"
+		button.text = s.text(label_key, {
+			"item": s.text(String(row["name_key"])), "amount": cost, "held": owned,
 		})
 		button.disabled = held >= cap or outgame.credits < cost
 		button.focus_mode = Control.FOCUS_NONE if button.disabled else Control.FOCUS_ALL
@@ -80,8 +84,37 @@ func _on_buy_consumable(consumable_id: String) -> void:
 	(%CreditsValue as Label).text = s.text("ui.recap.creditsFormat", {
 		"amount": session.outgame.credits,
 	})
+	_flash_credits()
 	_refresh_consumables()
 	_refresh_repair_button()  # 잔액이 줄면 정비 지불 능력도 바뀐다
+	# 재생성이 포커스를 가진 버튼을 free 하므로 여기서 되잡는다 — 없으면 패드가
+	# 이 화면에서 갇힌다(ui_focus_next 가 패드에 없다). 같은 품목 → 첫 가용 → 주 버튼 순.
+	_restore_list_focus(_consumable_list, "Buy_" + consumable_id)
+
+
+# 목록 재생성 후 포커스 복귀 창구 — 소모품·덱이 같은 형태를 쓴다.
+# 이름이 같은 버튼이 살아 있고 포커스 가능하면 그 자리, 아니면 목록의 첫 가용 버튼,
+# 그것도 없으면 주 버튼(다음 대회로)로 물러선다. 무포커스로 끝내지 않는다.
+func _restore_list_focus(list: Control, preferred_name: String) -> void:
+	var preferred := list.get_node_or_null(NodePath(preferred_name)) as Control
+	if preferred != null and preferred.focus_mode != Control.FOCUS_NONE:
+		preferred.grab_focus()
+		return
+	for child in list.get_children():
+		var control := child as Control
+		if control != null and control.focus_mode != Control.FOCUS_NONE:
+			control.grab_focus()
+			return
+	_next_button.grab_focus()
+
+
+# 결제 피드백 — 잔액 라벨 1회 점멸 (색을 만들지 않는다: 알파만 움직여 폰트색 불변)
+func _flash_credits() -> void:
+	var label := %CreditsValue as Label
+	label.modulate = Color(1.0, 1.0, 1.0)
+	var tween := create_tween()
+	tween.tween_property(label, "modulate:a", 0.2, 0.08)
+	tween.tween_property(label, "modulate:a", 1.0, 0.24)
 
 
 # ── E04 덱 교체 (§A-9 — 인라인 요약 + 슬롯 교체, HUB-04 비전환) ──
@@ -106,6 +139,8 @@ func _refresh_deck() -> void:
 		var equipped := outgame.deck.has(skill_id)
 		var mark := s.text("ui.recap.deckEquipped" if equipped else "ui.recap.deckUnequipped")
 		var button := Button.new()
+		# 재생성 후 포커스 복원의 주소 — 소모품 목록과 같은 규약
+		button.name = "Deck_" + String(skill_id)
 		button.add_theme_font_size_override("font_size", _body_font_size)
 		button.text = s.text("ui.recap.deckEntryFormat", {
 			"mark": mark, "skill": s.text(String(session.data.skills[skill_id]["name_key"])),
@@ -122,6 +157,8 @@ func _on_toggle_deck(skill_id: String) -> void:
 		next_deck.append(skill_id)
 	if session.outgame.set_deck(next_deck):
 		_refresh_deck()
+		# 재생성이 포커스를 free 한다 — 소모품 구매와 같은 결함 계열이라 같은 창구로 되잡는다
+		_restore_list_focus(_deck_list, "Deck_" + skill_id)
 
 
 func _on_repair_pressed() -> void:
@@ -131,6 +168,7 @@ func _on_repair_pressed() -> void:
 	var s := session.data.strings
 	var credits_text := s.text("ui.recap.creditsFormat", {"amount": session.outgame.credits})
 	(%CreditsValue as Label).text = credits_text
+	_flash_credits()
 	_refresh_repair_cost()
 	_refresh_chassis()
 	_refresh_repair_button()
@@ -142,8 +180,13 @@ func _refresh_repair_button() -> void:
 	var line := float(outgame.free_restore_line())
 	var recoverable := outgame.chassis < line
 	var affordable := outgame.credits >= outgame.field_repair_cost()
+	var had_focus := _repair_button.has_focus()
 	_repair_button.disabled = not (recoverable and affordable)
 	_repair_button.focus_mode = Control.FOCUS_NONE if _repair_button.disabled else Control.FOCUS_ALL
+	# 포커스를 가진 채 FOCUS_NONE 이 되면 포커스가 허공에 떨어진다(구매 재생성과 같은 계열) —
+	# 잃는 쪽이 스스로 주 버튼에 넘긴다
+	if had_focus and _repair_button.focus_mode == Control.FOCUS_NONE:
+		_next_button.grab_focus()
 
 
 # 이번 비용 → 다음 회차 비용 병기 (D07 §3.3 필수 규격). 체증 계산은 코어가 한다.

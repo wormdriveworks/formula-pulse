@@ -296,8 +296,13 @@ func _apply_static_strings() -> void:
 	_e08_respin.text = s.text("ui.race.respin")
 	_e08_charge.text = s.text("ui.race.chargeIntervene")
 	(%E14Menu as Button).text = s.text("ui.race.menu")
-	for box in _hold_boxes:
-		box.text = s.text("ui.race.hold")
+	# 홀드 토글은 번호를 라벨에 단다 (개선 2026-09-01) — 키 1·2·3 이 코드에만 있고 화면
+	# 어디에도 적혀 있지 않아 발견 가능성이 0 이었다. 번호가 곧 키 힌트다. 상세(패드 조합
+	# 포함)는 툴팁과 옵션 조작 탭이 진다.
+	for hold_index in range(_hold_boxes.size()):
+		var box := _hold_boxes[hold_index]
+		box.text = s.text("ui.race.holdKeyFormat", {"index": hold_index + 1})
+		box.tooltip_text = s.text("ui.race.hintHold")
 	# 스킬 슬롯 문면은 **정적이 아니다** — 덱 내용·잔여 횟수·차지에 따라 매 갱신마다
 	# 바뀌므로 `_refresh_skill_slots()` 가 진다(여기서 잠금으로 덮어쓰면 첫 프레임이
 	# 잠금으로 깜빡인다). 13차에 덱이 결선되며 이 자리의 정적 잠금 표기를 걷었다.
@@ -305,6 +310,10 @@ func _apply_static_strings() -> void:
 	var negate_label := _with_cost("ui.race.chargeIntervene", "param_charge_negate_cost")
 	_e08_respin.text = respin_label
 	_e08_charge.text = negate_label
+	# 단축키 힌트는 라벨이 아니라 툴팁에 둔다 — 액션 열 실폭(371px)에 키 표기까지 얹으면
+	# ja 최장 문면이 밀린다. 패드 사용자는 옵션 조작 탭이 같은 정보를 진다.
+	_e08_respin.tooltip_text = s.text("ui.race.hintRespin")
+	_e08_charge.tooltip_text = s.text("ui.race.hintCharge")
 	_refresh_consumables()
 
 
@@ -833,7 +842,11 @@ func _refresh_skill_slots() -> void:
 		var slot: Dictionary = slots[i]
 		var cost_text := s.text("ui.race.costFormat", {"cost": int(slot["charge_cost"])})
 		button.text = _action_label(slot_label, cost_text, slot)
-		button.tooltip_text = _action_label(s.text(String(slot["name_key"])), cost_text, slot)
+		# 툴팁 꼬리에 키 힌트(F1~F5·패드 조합)를 단다 — 라벨은 S{n} 폭 계약이라 못 싣는다
+		button.tooltip_text = s.text("ui.race.skillHintFormat", {
+			"body": _action_label(s.text(String(slot["name_key"])), cost_text, slot),
+			"index": i + 1,
+		})
 		button.disabled = not open or not bool(slot["usable"])
 
 
@@ -1285,8 +1298,15 @@ func _refresh_resources() -> void:
 	fill.bg_color = UiPalette.gauge_danger() if critical else UiPalette.CHASSIS_OK
 	_e11_chassis_bar.add_theme_stylebox_override("fill", fill)
 	# SE-D06 = **진입 시 1회** (D11 §2.7 — 반복 경보 아님). 회복해 임계를 벗어나면 재무장한다.
+	# 로그 한 줄도 같은 판정·같은 1회 규약을 탄다 (개선 2026-09-01) — 게이지 색과 소리만으로는
+	# 임계 진입 순간이 중계 기록에 남지 않아, 로그를 되짚어도 위기가 언제 시작됐는지 안 보였다.
+	# 값 전이는 확정 정산 뒤에만 일어나므로 봉인(불변규칙 5)과 무접촉이다.
 	if critical and not _chassis_warned:
 		sfx("chassis_warning")
+		_e10_log.push_line(
+			s.text("ui.race.speakerRelay"), s.text("raceLog.chassisCritical01"),
+			LogFeed.Speaker.RELAY
+		)
 	_chassis_warned = critical
 	# SE-I13 = ◆ 스택 +1 동기. 획득원(심볼·안정 완주·듀얼 승리 보너스)이 여럿이라
 	# 발생원마다 걸지 않고 **표시 수치의 증가**를 본다 — 소비(감소)는 대상이 아니다.
@@ -1341,6 +1361,12 @@ func _refresh_consumables() -> void:
 # 그래서 버튼보다 약한 가드가 우회로가 되지 않는다 — 그 사실을 확인한 것이 전수의 몫이고,
 # 확인 없이 "엔진이 다시 본다"고 적어 두는 것은 근거가 아니다(그 문장이 종전 주석이었다).
 func _on_consumable(index: int) -> void:
+	# 정지 중 차단 (실기 결함 교정 — 2026-09-01). 종전 전수(14차 ⑦)는 "키·패드 바인딩이
+	# 없어 마우스 전용"이라 적었지만 **포커스 경로가 남아 있었다** — 정지 중 Tab 으로 이
+	# 슬롯에 포커스가 넘어가고 확정 입력이 눌렸다(정지 상태에서 리페어 키트 실소비 실측).
+	# 오버레이 쪽 포커스 트랩과 겹으로 막는다 — 가드 하나는 언젠가 우회된다.
+	if _paused:
+		return
 	if engine == null or index >= _e13_slot_ids.size():
 		return
 	var events := engine.use_consumable(_e13_slot_ids[index])
@@ -1415,9 +1441,12 @@ func _process_timer_sound(delta: float) -> void:
 
 
 func _update_timer_value() -> void:
-	# 수치는 기본 비표시 — 압박의 아날로그화(D04 §8.2). O6 옵션으로만 켠다 (즉시 반영).
-	# 소수 자리도 문면이므로 서식은 스트링 키가 갖는다 (IMPL-027 전례).
-	_e04_timer_value.visible = session.options.index_of("o6") == 1 and not _timer_disabled
+	# 수치 표시는 O6 옵션 (기본 켬 — 2026-09-01 개선·소수 서식은 스트링 키, IMPL-027 전례).
+	# `_timer_active` 를 함께 본다 — 창이 닫힌 국면(프리스핀·정산)에 직전 잔량이 굳은 채
+	# 남아 있었다(기본 끔이던 시절에는 아무도 못 본 잠복 결함 — 기본 켬 전환이 드러냈다).
+	_e04_timer_value.visible = (
+		session.options.index_of("o6") == 1 and not _timer_disabled and _timer_active
+	)
 	var seconds := snappedf(_timer_remaining, 0.1)
 	var timer_text := data.strings.text("ui.race.timerFormat", {"value": seconds})
 	_e04_timer_value.text = timer_text
@@ -1839,6 +1868,35 @@ func _announce_matches(provisional: Array) -> void:
 
 
 # ── 이벤트 → 표시 경로 분기 (D09 §3.1 국면 분리) ──
+# ── 로그 문구 변형 대장 (개선 2026-09-01) ──
+#
+# 같은 사건 키가 매 섹터 같은 문면으로 반복돼 중계가 단조로웠다(타임아웃·트러블·안정이
+# 한 GP 에 수 회씩 선다). 변형은 **표시 층 전속**이다: 소리(SOUND_BY_KEY)·연출(TRIGGER_BY_KEY)·
+# 듀얼 프레임(DUEL_RESULT_KEYS)은 전부 원 키로 대조하므로 기계 거동이 갈리지 않는다.
+# **열거형 대장이다** — 접미 조립(`%02d`)로 탐침하면 V6 가 변형 키를 고아로 읽고 V2 의
+# 실재 검사도 비켜 간다. 여기 적힌 리터럴은 두 검사가 전부 물어 준다(등재 = 실재 보증).
+# 변형 문면은 원 키와 **같은 매개 집합**을 써야 한다 — params 가 그대로 넘어간다.
+const LOG_VARIANT_KEYS := {
+	"raceLog.timeout01": ["raceLog.timeout02", "raceLog.timeout03"],
+	"raceLog.troubleHit01": ["raceLog.troubleHit02", "raceLog.troubleHit03"],
+	"raceLog.stableSector01": ["raceLog.stableSector02", "raceLog.stableSector03"],
+	"raceLog.momentum01": ["raceLog.momentum02"],
+}
+
+
+# 선택은 **결정적**이다 — 턴·섹터·랩에서 유도하므로 같은 진행을 다시 밟으면 같은 문면이
+# 나오고(재로드 리롤 무효와 같은 방향), RNG 6스트림(D12 §6 — 게임 로직 전속)을 소비하지 않는다.
+func _log_display_key(key: String) -> String:
+	if not LOG_VARIANT_KEYS.has(key):
+		return key
+	var variants: Array = [key]
+	variants.append_array(LOG_VARIANT_KEYS[key])
+	var basis := 0
+	if engine != null:
+		basis = engine.turn_number * 7 + engine.sector * 3 + engine.lap
+	return String(variants[posmod(basis + key.hash(), variants.size())])
+
+
 func _push_events(events: Array) -> void:
 	for event in events:
 		var key := String(event.get("key", ""))
@@ -1860,7 +1918,7 @@ func _push_events(events: Array) -> void:
 			if typeof(value) == TYPE_STRING and data.strings.has_key(String(value)):
 				# 참조 키의 문면에 매개(필러의 {number} 등)가 있으면 같은 params 로 치환한다
 				params[param_name] = data.strings.text(String(value), params)
-		var body := data.strings.text(key, params)
+		var body := data.strings.text(_log_display_key(key), params)
 		if key.begins_with("vane."):
 			_e07_text.text = body  # 릴 존 콜아웃 전속 — 로그 피드로 흘리지 않는다
 		else:

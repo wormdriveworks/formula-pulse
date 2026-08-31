@@ -28,7 +28,10 @@ const OPTIONS := {
 	"o3": {"label": "ui.options.o3", "steps": ["ui.options.stepStandard", "ui.options.stepReduced", "ui.options.stepOff"], "default": 0},
 	"o4": {"label": "ui.options.o4", "steps": ["ui.options.stepStandard", "ui.options.stepFast", "ui.options.stepInstant"], "default": 0},
 	"o5": {"label": "ui.options.o5", "steps": ["ui.options.stepTimerBase", "ui.options.stepTimer15", "ui.options.stepTimer20", "ui.options.stepTimerOff"], "default": 0, "notice": "ui.options.o5Notice"},
-	"o6": {"label": "ui.options.o6", "steps": ["ui.options.stepOff", "ui.options.stepOn"], "default": 0},
+	# O6 타이머 수치 기본값 = 켬 (개선 2026-09-01 — 사용자 지시). D04 §8.2 "압박의 아날로그화"는
+	# 기본 끔을 전제했으나, 실기에서 개입 창의 잔량 판독이 링 소진만으로는 약해 기본을 뒤집는다.
+	# 원문 지향 플레이어는 옵션에서 끌 수 있다 — 항목 자체는 유지.
+	"o6": {"label": "ui.options.o6", "steps": ["ui.options.stepOff", "ui.options.stepOn"], "default": 1},
 	"o7": {"label": "ui.options.o7", "steps": ["ui.options.stepScale100", "ui.options.stepScale115", "ui.options.stepScale130"], "default": 0},
 	"o8": {"label": "ui.options.o8", "steps": ["ui.options.stepScale100", "ui.options.stepScale110", "ui.options.stepScale125"], "default": 0},
 	"o9": {"label": "ui.options.o9", "steps": ["ui.options.stepPaletteBase", "ui.options.stepPaletteAlt"], "default": 0},

@@ -61,6 +61,11 @@ func _on_bound(_payload: Dictionary) -> void:
 	})
 	_carry_label.text = carry_text
 
+	# 레이스 요약·순위표 (개선 2026-09-01) — 결산이 P{n} 한 줄만 말해 레이스의 경과가
+	# 화면에 남지 않았다. 소재는 엔진 result 가 이미 세던 값 전용 — 새 판정 없음.
+	_mount_race_digest(result)
+	_mount_standings(result)
+
 	# 리타이어 = 런 오버 → 투어 탈락 (D05 §9.2·9.3). 투어 층에 먼저 알린다.
 	if retired:
 		session.season.mark_dropout()
@@ -113,3 +118,121 @@ func _on_next(to_tour_report: bool) -> void:
 		go("RUN-02", {"occurrence": occurrence})
 		return
 	go("RUN-01", {})
+
+
+# ── 레이스 다이제스트 — 순위 변동·듀얼 전적·트러블 (개선 2026-09-01) ──
+#
+# 씬 무접촉: 기존 Column 의 행 문법(라벨 110px 감광 + 값)을 코드로 복제해 최종 순위 행
+# 바로 아래에 끼운다. 코드 생성 Control 이므로 폰트 크기를 명시한다(엔진 기본 16 함정 —
+# IMPL-125 계열). start_rank = 0 은 도입 전 스냅샷 재개 표식이라 그 행만 생략한다.
+func _mount_race_digest(result: Dictionary) -> void:
+	var s := session.data.strings
+	var rank_row := _rank_label.get_parent() as Control
+	var column := rank_row.get_parent() as Control
+	var anchor_index := rank_row.get_index() + 1
+	var start_rank := int(result.get("start_rank", 0))
+	if start_rank > 0:
+		var delta_text := s.text("ui.gpResult.gridDeltaFormat", {
+			"start": start_rank, "finish": int(result.get("player_rank", 0)),
+		})
+		var delta_row := _digest_row("ui.gpResult.gridDelta", delta_text)
+		column.add_child(delta_row)
+		column.move_child(delta_row, anchor_index)
+		anchor_index += 1
+	var duels := int(result.get("duels", 0))
+	var wins := int(result.get("duel_wins", 0))
+	var duel_text := s.text("ui.gpResult.duelRecordNone")
+	if duels > 0:
+		duel_text = s.text("ui.gpResult.duelRecordFormat", {
+			"count": duels, "wins": wins, "losses": duels - wins,
+		})
+	var duel_row := _digest_row("ui.gpResult.duelRecord", duel_text)
+	column.add_child(duel_row)
+	column.move_child(duel_row, anchor_index)
+	anchor_index += 1
+	var trouble_text := s.text("ui.gpResult.troubleTurnsFormat", {
+		"count": int(result.get("trouble_turns", 0)),
+	})
+	var trouble_row := _digest_row("ui.gpResult.troubleTurns", trouble_text)
+	column.add_child(trouble_row)
+	column.move_child(trouble_row, anchor_index)
+
+
+func _digest_row(label_key: String, value_text: String) -> Control:
+	var s := session.data.strings
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var label := Label.new()
+	label.custom_minimum_size = Vector2(110, 0)
+	label.text = s.text(label_key)
+	label.add_theme_font_size_override("font_size", _body_font_size)
+	label.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+	row.add_child(label)
+	var value := Label.new()
+	value.text = value_text
+	value.add_theme_font_size_override("font_size", _body_font_size)
+	value.add_theme_color_override("font_color", UiPalette.TEXT_PRIMARY)
+	row.add_child(value)
+	return row
+
+
+# ── 최종 순위표 — 전 참가자 (개선 2026-09-01) ──
+#
+# 소재 = result.standings(완주 순 + 리타이어 최하위 역순 — 엔진 `_finish_gp` 조립 그대로).
+# 표기 참조(name_key·number·is_player·retired)는 엔진 entrants 에서 읽는다 — 이 화면은
+# GP 직후에만 서므로 엔진이 살아 있고, 없으면(검사 하네스 단독 마운트) 표를 생략한다.
+# 자리 = 우측: 좌측 요약 열은 종전대로 서고, 비어 있던 오른쪽 절반이 표를 진다.
+# 필러 name_key 는 문면 자체가 `No.{number} 머신`이라 number 를 같은 params 로 넘긴다
+# (엔진 `_entrant_params` 와 같은 짝 규약).
+func _mount_standings(result: Dictionary) -> void:
+	if session.engine == null:
+		return
+	var standings: Array = result.get("standings", [])
+	if standings.is_empty():
+		return
+	var s := session.data.strings
+	var pad := (_rank_label.get_parent().get_parent() as Control).get_parent() as Control
+	var pane := Control.new()
+	pane.name = "StandingsPane"
+	pane.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pad.add_child(pane)
+	var table := VBoxContainer.new()
+	table.name = "StandingsTable"
+	# 우측 절반 앵커 — 성장 방향·오프셋을 짝으로 명시한다 (ANCH 규약)
+	table.anchor_left = 0.55
+	table.anchor_right = 1.0
+	table.anchor_top = 0.0
+	table.anchor_bottom = 1.0
+	table.offset_left = 0.0
+	table.offset_right = 0.0
+	table.offset_top = 26.0   # 표제(14px 폰트) 줄 아래에서 시작
+	table.offset_bottom = 0.0
+	table.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	table.grow_vertical = Control.GROW_DIRECTION_BOTH
+	table.add_theme_constant_override("separation", 1)
+	pane.add_child(table)
+	var header := Label.new()
+	header.text = s.text("ui.gpResult.standingsHeader")
+	header.add_theme_font_size_override("font_size", _body_font_size)
+	header.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+	table.add_child(header)
+	for index in range(standings.size()):
+		var entrant_id := String(standings[index])
+		var entrant: Dictionary = session.engine.entrants.get(entrant_id, {})
+		if entrant.is_empty():
+			continue
+		var was_retired := bool(entrant.get("retired", false))
+		var row_key := "ui.gpResult.standingRetired" if was_retired else "ui.gpResult.standingRowFormat"
+		var display_name := s.text(String(entrant.get("name_key", "")), {
+			"number": entrant.get("number", 0),
+		})
+		var row := Label.new()
+		row.text = s.text(row_key, {"rank": index + 1, "name": display_name})
+		row.add_theme_font_size_override("font_size", _body_font_size)
+		if bool(entrant.get("is_player", false)):
+			row.add_theme_color_override("font_color", UiPalette.ACCENT_ACTIVE)
+		elif was_retired:
+			row.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+		else:
+			row.add_theme_color_override("font_color", UiPalette.TEXT_PRIMARY)
+		table.add_child(row)

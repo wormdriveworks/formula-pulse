@@ -83,6 +83,7 @@ var trouble_turns: int = 0        # 트러블이 발화한 섹터 턴 수 (0 = �
 var hold_uses: int = 0            # 홀드/리스핀 사용 횟수 (0 = 무개입)
 var chance_three_matches: int = 0 # 찬스 3매치 성립 횟수
 var final_lap_entry_rank: int = 0 # 최종 랩 진입 시점 순위 (역전 우승 판정 소재)
+var start_rank: int = 0           # 스타트 그리드 순위 (결산 '순위 변동' 표기 소재 — 2026-09-01)
 var ai_retire_count: int = 0
 var _retire_order: int = 0
 
@@ -204,6 +205,7 @@ func start_gp() -> Array:
 	result = {}
 	_build_entrants()
 	_build_start_grid()
+	start_rank = player_position()   # 그리드 확정 직후 1회 — 결산 순위 변동 표기의 기준선
 	_retarget(true, true)
 	events.append(_ev("T5", "raceLog.gpStart01", {"circuit": data.circuit_str("name_key")}))
 	_transition(RaceTypes.GpState.LAP_LOOP)
@@ -1340,6 +1342,7 @@ func _finish_gp() -> void:
 		"hold_uses": hold_uses,
 		"chance_three_matches": chance_three_matches,
 		"final_lap_entry_rank": final_lap_entry_rank,
+		"start_rank": start_rank,
 		"circuit_id": String(data.circuit.get("id", "")),
 	}
 
@@ -1415,6 +1418,7 @@ func serialize() -> Dictionary:
 		"duel_opponents": duel_opponents.duplicate(),
 		"duel_wins": duel_wins, "trouble_turns": trouble_turns, "hold_uses": hold_uses,
 		"chance_three_matches": chance_three_matches, "final_lap_entry_rank": final_lap_entry_rank,
+		"start_rank": start_rank,
 		"ai_retire_count": ai_retire_count, "retire_order_counter": _retire_order,
 		"entrants": entrants.duplicate(true),
 		"positions": positions.duplicate(),
@@ -1459,6 +1463,7 @@ func restore(payload: Dictionary) -> bool:
 	hold_uses = int(payload.get("hold_uses", 0))
 	chance_three_matches = int(payload.get("chance_three_matches", 0))
 	final_lap_entry_rank = int(payload.get("final_lap_entry_rank", 0))
+	start_rank = int(payload.get("start_rank", 0))   # 도입(2026-09-01) 전 스냅샷 = 0 (미기록 표식)
 	ai_retire_count = int(payload["ai_retire_count"])
 	_retire_order = int(payload["retire_order_counter"])
 	entrants = payload["entrants"]

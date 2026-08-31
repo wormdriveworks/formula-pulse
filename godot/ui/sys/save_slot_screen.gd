@@ -11,6 +11,10 @@ const SLOT_CONTAINER := "%SlotRow"
 
 var _mode := "new"
 var _slot_buttons: Array[Button] = []
+# 슬롯 삭제 2단 확인 상태 — 모달을 세우지 않는 것이 의도다 (2026-09-01): 이 리포의 실기
+# 결함 계열이 전부 오버레이 포커스 관리에서 나왔고, 같은 버튼의 재확인은 포커스가
+# 이동할 일 자체가 없다. 포커스가 떠나면 무장 해제 — 오조작이 이월되지 않는다.
+var _delete_armed: Dictionary = {}
 
 
 func _on_bound(payload: Dictionary) -> void:
@@ -26,11 +30,25 @@ func _on_bound(payload: Dictionary) -> void:
 func _build_slots() -> void:
 	var s := session.data.strings
 	var row := get_node(SLOT_CONTAINER)
+	# 삭제 후 재구축 경로 — 첫 진입에서는 빈 순회다
+	for child in row.get_children():
+		row.remove_child(child)
+		child.queue_free()
+	_slot_buttons.clear()
+	_delete_armed.clear()
 	var count := int(session.data.param("param_save_profile_count"))
 	for profile in range(1, count + 1):
-		var card := _card_for(profile)
-		row.add_child(card)
+		var loaded := SaveManager.load_progress(profile)
+		var has_save := bool(loaded.get("ok", false))
+		var column := VBoxContainer.new()
+		column.name = "SlotColumn%d" % profile
+		column.add_theme_constant_override("separation", 3)
+		var card := _card_for(profile, loaded, has_save)
+		column.add_child(card)
 		_slot_buttons.append(card)
+		if has_save:
+			column.add_child(_delete_button_for(profile))
+		row.add_child(column)
 	if not _slot_buttons.is_empty():
 		_slot_buttons[0].grab_focus()
 	# 슬롯이 데이터 값보다 적게 서면 조용히 넘어가지 않는다
@@ -41,7 +59,7 @@ func _build_slots() -> void:
 	)
 
 
-func _card_for(profile: int) -> Button:
+func _card_for(profile: int, loaded: Dictionary, has_save: bool) -> Button:
 	var s := session.data.strings
 	var button := Button.new()
 	button.add_theme_font_size_override("font_size", _body_font_size)
@@ -49,9 +67,8 @@ func _card_for(profile: int) -> Button:
 	button.custom_minimum_size = Vector2(170, 90)
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var label := s.text("ui.save.slotFormat", {"index": profile})
-	var loaded := SaveManager.load_progress(profile)
 	var body := ""
-	if bool(loaded.get("ok", false)):
+	if has_save:
 		var payload: Dictionary = loaded.get("payload", {})
 		var season_payload: Dictionary = payload.get("season", {})
 		body = s.text("ui.save.progressFormat", {
@@ -59,12 +76,70 @@ func _card_for(profile: int) -> Button:
 			"tour": int(season_payload.get("tour_slot", 1)),
 			"race": int(season_payload.get("race_slot", 1)),
 		})
+		# 카드 상세 (개선 2026-09-01) — 시즌·투어·전만으로는 두 커리어가 갈리지 않았다.
+		# 크레딧(진행의 경제 단면)과 저장 시각(어느 쪽이 최근인가)을 한 줄 보탠다.
+		# 소재는 세이브 봉투가 이미 가진 값(outgame.credits · saved_at 스탬프) — 새 기록 없음.
+		var saved_at := int(payload.get("saved_at", 0))
+		if saved_at > 0:
+			var outgame_payload: Dictionary = payload.get("outgame", {})
+			var stamp := Time.get_datetime_dict_from_unix_time(
+				saved_at + Time.get_time_zone_from_system().get("bias", 0) * 60
+			)
+			var saved_text := s.text("ui.save.savedAtFormat", {
+				"month": int(stamp.get("month", 0)),
+				"day": int(stamp.get("day", 0)),
+				"hour": "%02d" % int(stamp.get("hour", 0)),
+				"minute": "%02d" % int(stamp.get("minute", 0)),
+			})
+			var detail := s.text("ui.save.detailFormat", {
+				"credits": int(outgame_payload.get("credits", 0)),
+				"saved": saved_text,
+			})
+			body = s.text("ui.save.cardBodyFormat", {"progress": body, "detail": detail})
 	else:
 		body = s.text("ui.save.empty")
 	var card_text := s.text("ui.save.cardFormat", {"label": label, "body": body})
 	button.text = card_text
-	button.pressed.connect(_on_slot_pressed.bind(profile, bool(loaded.get("ok", false))))
+	button.pressed.connect(_on_slot_pressed.bind(profile, has_save))
 	return button
+
+
+# 슬롯 삭제 — 같은 버튼 2회 누름 확인 (모달 불신설 근거는 `_delete_armed` 주석).
+# 실행은 SaveManager 전속(ARCH 규약) — 진행·백업·스냅샷·격리 4파일을 걷는다.
+func _delete_button_for(profile: int) -> Button:
+	var s := session.data.strings
+	var button := Button.new()
+	button.name = "Delete%d" % profile
+	button.add_theme_font_size_override("font_size", _body_font_size)
+	button.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+	button.text = s.text("ui.save.delete")
+	button.set_meta(AUDIO_EVENT_META, "ui_cancel")   # 파괴 조작 — 결정음이 아니라 취소·닫기 축
+	button.pressed.connect(_on_delete_pressed.bind(profile, button))
+	button.focus_exited.connect(_on_delete_disarmed.bind(profile, button))
+	button.mouse_exited.connect(_on_delete_disarmed.bind(profile, button))
+	return button
+
+
+func _on_delete_pressed(profile: int, button: Button) -> void:
+	var s := session.data.strings
+	if not bool(_delete_armed.get(profile, false)):
+		_delete_armed[profile] = true
+		button.text = s.text("ui.save.deleteConfirm")
+		return
+	_delete_armed.erase(profile)
+	if not SaveManager.delete_progress(profile):
+		return
+	# 카드·삭제 버튼 전부 새 상태로 다시 세운다 — 포커스는 재구축이 첫 슬롯에 되잡는다
+	# (버튼이 free 되므로 되잡지 않으면 포커스 소실 계열 결함이 재현된다)
+	_build_slots()
+
+
+func _on_delete_disarmed(profile: int, button: Button) -> void:
+	if not bool(_delete_armed.get(profile, false)):
+		return
+	_delete_armed.erase(profile)
+	if is_instance_valid(button):
+		button.text = session.data.strings.text("ui.save.delete")
 
 
 func _on_slot_pressed(profile: int, has_save: bool) -> void:

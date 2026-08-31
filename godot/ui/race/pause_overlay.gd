@@ -20,6 +20,32 @@ var _countin_total := 3.0
 @onready var _menu: Control = %MenuColumn
 
 
+# ── 모달 포커스 트랩 (실기 결함 교정 — 2026-09-01) ──
+#
+# 정지 중 Tab(ui_focus_next)이 **배면 레이스 UI 로 포커스를 끌고 나갔다** — 그 상태의 확정
+# 입력이 정지 중인 게임의 소모품을 실제로 소비했다(실측: 리페어 키트 소진·섀시 +15).
+# `_unhandled_input` 차단(race_screen:398)은 액션 층만 막고 GUI 포커스 경로는 못 막는다.
+# 오버레이가 떠 있는 동안 포커스가 밖으로 나가면 그 자리에서 되끌어온다 — 옵션·업적
+# 오버레이는 이 노드의 자식이므로 트랩에 걸리지 않는다.
+# 연결은 트리 재적 기간과 1:1 로 묶는다(_enter/_exit_tree 쌍) — _ready 단발 연결은 화면이
+# 트리에서 내려간 뒤에도 뷰포트에 남아, 하네스가 다른 화면을 세울 때 트리 밖 grab_focus 를
+# 쏘는 잔향이 됐다(UISCR 마운트 로그 실측).
+func _enter_tree() -> void:
+	get_viewport().gui_focus_changed.connect(_on_focus_changed)
+
+
+func _exit_tree() -> void:
+	get_viewport().gui_focus_changed.disconnect(_on_focus_changed)
+
+
+func _on_focus_changed(control: Control) -> void:
+	if not is_inside_tree() or not visible or not _menu.visible or control == null:
+		return
+	if is_ancestor_of(control):
+		return
+	(%ResumeButton as Button).grab_focus()
+
+
 func setup(run_session: RunSession) -> void:
 	_session = run_session
 	_countin_total = _session.data.param("param_pause_countin_sec")
@@ -73,7 +99,11 @@ func _open_options() -> void:
 	var options: Control = packed.instantiate()
 	add_child(options)
 	options.open_as_overlay(_session)
-	# 닫힘은 options 쪽 closed 시그널 — 오버레이 회수는 options 가 스스로 한다 (queue_free)
+	# 닫힘은 options 쪽 closed 시그널 — 오버레이 회수는 options 가 스스로 한다 (queue_free).
+	# **포커스는 돌려받아야 한다** (실기 결함 — 2026-09-01): 오버레이가 queue_free 되면
+	# 그 안의 포커스가 허공에 떨어져, 메뉴가 떠 있는데 방향키·확인이 전부 무반응이 된다.
+	# 패드에는 ui_focus_next 가 없어 복구 수단도 없다 — 닫힘 시그널에서 되잡는다.
+	options.closed.connect(func(): (%OptionsButton as Button).grab_focus())
 
 
 func _open_achievements() -> void:
@@ -81,3 +111,5 @@ func _open_achievements() -> void:
 	var achievements: Control = packed.instantiate()
 	add_child(achievements)
 	achievements.open_as_overlay(_session)
+	# 옵션과 같은 계열 — 닫힘 시 포커스 복원 (같은 결함·같은 교정)
+	achievements.closed.connect(func(): (%AchievementsButton as Button).grab_focus())

@@ -113,19 +113,62 @@ func _build_tabs() -> void:
 		panel.add_theme_constant_override("separation", 4)
 		panel.visible = false
 		body.add_child(panel)
+		# 패널이 본문 실폭을 가져야 한다 (결함 교정 — 2026-09-01). `TabBody` 는 컨테이너가
+		# 아닌 Control 이라 자식 VBox 의 폭이 내용 최소폭으로 잡히는데, 자동 줄바꿈 라벨은
+		# 최소폭이 0 이다 — 조작 탭 안내문이 **폭 0 에서 글자 단위로 꺾여 세로 한 줄**로
+		# 흘러내렸다(화면 밖까지). 전폭 앵커로 패널을 본문에 맞춘다.
+		panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 		_tab_panels.append(panel)
 		var option_ids: Array = tab["options"]
 		if option_ids.is_empty():
-			# 조작 탭 — 리매핑은 주요 키 한정(결정 #6)이며 골격은 매핑 안내만 (§1.3 데스크탑)
-			var note := Label.new()
-			note.text = s.text("ui.options.controlsNote")
-			note.add_theme_font_size_override("font_size", _body_font_size)
-			note.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
-			note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			panel.add_child(note)
+			# 조작 탭 — 리매핑은 주요 키 한정(결정 #6)이며 골격은 매핑 안내만 (§1.3 데스크탑).
+			# 안내 한 줄이던 자리에 실제 바인딩 목록을 세운다 (개선 2026-09-01) — 홀드 1·2·3 /
+			# R / C / F1~F5 / 패드 조합이 코드에만 있고 게임 어디에도 적혀 있지 않았다.
+			_build_controls_panel(panel)
 			continue
 		for option_id in option_ids:
 			panel.add_child(_build_row(String(option_id)))
+
+
+# 조작 탭 바인딩 대장 — 표시 전용 (리매핑은 결정 #6 범위 — 추후). 순서는 공통 층 → 레이스
+# 컨텍스트 층 (D09 §1.3 두 표의 순서 그대로). 문면 전량 스트링 키 — 값 열은 키 이름이라
+# 언어 간 대부분 동일하고, 장치 표기(패드/Pad/パッド)만 갈린다.
+const CONTROL_ROWS := [
+	["ui.controls.rowConfirm", "ui.controls.valConfirm"],
+	["ui.controls.rowCancel", "ui.controls.valCancel"],
+	["ui.controls.rowPause", "ui.controls.valPause"],
+	["ui.controls.rowTabs", "ui.controls.valTabs"],
+	["ui.controls.rowDetail", "ui.controls.valDetail"],
+	["ui.controls.rowFocus", "ui.controls.valFocus"],
+	["ui.controls.rowHold", "ui.controls.valHold"],
+	["ui.controls.rowRespin", "ui.controls.valRespin"],
+	["ui.controls.rowCharge", "ui.controls.valCharge"],
+	["ui.controls.rowSkills", "ui.controls.valSkills"],
+]
+
+
+func _build_controls_panel(panel: VBoxContainer) -> void:
+	var s := session.data.strings
+	for pair in CONTROL_ROWS:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		var name_label := Label.new()
+		name_label.custom_minimum_size = Vector2(150, 0)
+		name_label.text = s.text(String(pair[0]))
+		name_label.add_theme_font_size_override("font_size", _body_font_size)
+		name_label.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+		row.add_child(name_label)
+		var value_label := Label.new()
+		value_label.text = s.text(String(pair[1]))
+		value_label.add_theme_font_size_override("font_size", _body_font_size)
+		row.add_child(value_label)
+		panel.add_child(row)
+	var note := Label.new()
+	note.text = s.text("ui.options.controlsNote")
+	note.add_theme_font_size_override("font_size", _body_font_size)
+	note.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	panel.add_child(note)
 
 
 func _build_row(option_id: String) -> Control:
