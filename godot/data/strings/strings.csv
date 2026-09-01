@@ -436,6 +436,19 @@ ui.vn.calendarTitle,리그 공식 발표 — 시즌 캘린더,League Announcemen
 ui.vn.calendarRowFormat,투어 {tour} — {stage},Tour {tour} — {stage},ツアー{tour} — {stage}
 ui.vn.calendarAnchorFormat,투어 {tour} — {stage} ★,Tour {tour} — {stage} ★,ツアー{tour} — {stage} ★
 ui.records.replay,재생,Replay,再生
+ui.records.statGps,출전 그랑프리,Grands Prix Entered,出走グランプリ
+ui.records.statFinishes,완주,Finishes,完走
+ui.records.statWins,우승,Wins,優勝
+ui.records.statPodiums,포디움,Podiums,表彰台
+ui.records.statDuels,듀얼 전적,Duel Record,デュエル戦績
+ui.records.statTourWins,투어 종합 우승,Tour Titles,ツアー総合優勝
+ui.records.statSeasons,완료 시즌,Seasons Completed,完了シーズン
+ui.records.statBestRank,최고 챔피언십 순위,Best Championship Rank,最高選手権順位
+ui.records.statCircuits,제패 서킷,Circuits Conquered,制覇サーキット
+ui.records.statCountFormat,{value},{value},{value}
+ui.records.duelRecordFormat,{wins}승 / {total}전,{wins}W / {total} duels,{wins}勝 / {total}戦
+ui.records.bestRankFormat,P{rank},P{rank},P{rank}
+ui.records.statNone,—,—,—
 ui.options.header,옵션,Options,オプション
 ui.options.tabGameplay,게임플레이,Gameplay,ゲームプレイ
 ui.options.tabAccessibility,연출·접근성,Presentation & Access,演出・アクセシビリティ
@@ -507,6 +520,8 @@ ui.controls.rowSkills,스킬 슬롯 1~5,Skill Slots 1–5,スキルスロット1
 ui.controls.valSkills,F1~F5 | RB 홀드 + 십자키 → A,F1–F5 | hold RB + D-pad → A,F1~F5 | RB長押し+十字キー→A
 ui.controls.rowFocus,포커스 이동,Move Focus,フォーカス移動
 ui.controls.valFocus,방향키 | 십자키·좌스틱,Arrow keys | D-pad / Left stick,方向キー | 十字キー・左スティック
+ui.controls.rowConsumable,소모품 슬롯 1~2,Consumable Slots 1–2,消耗品スロット1~2
+ui.controls.valConsumable,4 · 5 | 포커스 이동 + A,4 · 5 | focus + A,4・5 | フォーカス+A
 ui.pause.resume,재개,Resume,再開
 ui.pause.options,옵션,Options,オプション
 ui.pause.achievements,업적,Achievements,実績

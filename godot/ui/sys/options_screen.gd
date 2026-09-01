@@ -144,6 +144,7 @@ const CONTROL_ROWS := [
 	["ui.controls.rowRespin", "ui.controls.valRespin"],
 	["ui.controls.rowCharge", "ui.controls.valCharge"],
 	["ui.controls.rowSkills", "ui.controls.valSkills"],
+	["ui.controls.rowConsumable", "ui.controls.valConsumable"],
 ]
 
 

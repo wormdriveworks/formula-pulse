@@ -883,3 +883,31 @@ func restore(payload: Dictionary) -> bool:
 	scene_cuts = SceneCutMap.new()
 	scene_cuts.setup(data)
 	return true
+
+
+# ── 로드 착지 판정 (개선 2026-09-02 — 실기 검증 L1·L2) ──
+#
+# **로드가 무조건 RACE-01 로 착지하던 것이 두 결함의 공통 근인이다.**
+#   L1: 투어 마지막 GP 의 RACE-03 진입 저장은 `close_gp()` 로 race_slot 이 이미 캘린더를
+#       초과한 뒤라, RACE-01 착지가 `begin_gp()` 실패 → 빈 화면 → **커리어 재개 불가**
+#       (실측: race_screen.gd "season layer produced no circuit"). 시즌 최종 투어의
+#       SET-01 진입 저장분(tour_slot 초과)도 같은 기제다.
+#   L2: 리타이어 결산 저장분은 `tour_dropped_out` 이 참인데 RACE-01 착지가 그것을 보지
+#       않아 **탈락한 투어의 잔여 GP 를 재개**했다 — 유령 GP 가 챔피언십에 계상된다.
+#
+# 착지를 상태에서 도출한다 — 대기열·플래그 신설 없이, 저장 시점에 밀려 있던 경계 처리
+# (close_tour / close_season)를 재개 시점에 그대로 수행한다. 원 흐름과 같은 손이다:
+# RACE-03 → close_tour → SET-01, SET-01 → close_season → SET-02 (tour_report_screen._on_next).
+# RACE-03 재표시는 불가 — last_gp_result 는 직렬화되지 않는다. 투어 결산부터가 최소 충실 재개다.
+func resume_route() -> String:
+	if season == null:
+		return "RACE-01"
+	if season.season_finished():
+		# 시즌 최종 SET-01 진입 저장분 — close_tour 는 이미 저장 전에 끝났고 close_season 만
+		# 남은 상태다 (시즌 경계 저장은 HUB-08 확정 시점이라 그 사이 전 구간이 이 상태를 로드한다)
+		close_season()
+		return "SET-02"
+	if season.tour_dropped_out or season.race_slot > season.races_per_tour():
+		close_tour()
+		return "SET-01"
+	return "RACE-01"

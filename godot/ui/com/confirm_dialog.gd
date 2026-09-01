@@ -14,6 +14,9 @@ var _strings: StringTable
 # 640×360 캔버스에서 16 은 레이아웃을 깨뜨리므로 본문 계열 값을 데이터 창구에서 받아 명시 적용한다
 # (불변규칙 2 — 코드 기입 금지 · FONT 정적 검사 대상 · IMPL-147).
 var _body_font_size := 9
+# 닫힐 때 포커스를 돌려줄 호출 지점 (개선 2026-09-02 H2 — 실기: 확정·취소 양 경로에서
+# 포커스가 허공에 떨어져 패드가 잠겼다. 전 소비처가 이 창을 쓰므로 여기 한 곳이 전부를 받는다).
+var _return_focus: Control
 
 
 func _init(strings: StringTable, summary: String, cost_text: String, irreversible: bool, body_font_size: int) -> void:
@@ -107,14 +110,34 @@ func _init(strings: StringTable, summary: String, cost_text: String, irreversibl
 	cancel.call_deferred("grab_focus")  # 초기 포커스 = 취소 (오입력 방어)
 
 
+# 취소 = Esc·패드 B (D09 §1.3 공통 층 "취소/뒤로"). 모달이 키 입력을 소비하지 않으면
+# 같은 Esc 가 배후 화면의 뒤로가기(HubScreen)로 흘러 창을 띄운 채 화면이 전이된다.
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	get_viewport().set_input_as_handled()
+	_finish(false)
+
+
 func _finish(accepted: bool) -> void:
+	# **복원 대상은 emit 앞에 갈무리한다** — resolved 핸들러가 목록을 재구축하며 대상 버튼을
+	# free 하거나 화면을 전이시킬 수 있다. 복원은 emit 뒤: 핸들러가 상태(비활성 전환 등)를
+	# 끝낸 다음의 사실을 기준으로 되잡아야 한다. 대상이 죽었거나 포커스 불능이면 두지 않는다 —
+	# 잘못된 자리에 세우는 것이 소실보다 나쁘다(허브 화면은 Tab 순회로 복구 가능).
+	var target := _return_focus
 	resolved.emit(accepted)
+	if is_instance_valid(target) and target.is_inside_tree() \
+		and target.focus_mode != Control.FOCUS_NONE:
+		target.grab_focus()
 	queue_free()
 
 
 # 호출 편의 — 부모에 붙이고 결과 시그널을 돌려준다.
 static func ask(host: Control, strings: StringTable, summary: String, cost_text: String, irreversible: bool, body_font_size: int) -> ConfirmDialog:
 	var dialog := ConfirmDialog.new(strings, summary, cost_text, irreversible, body_font_size)
+	# 여는 시점의 포커스 소유자 = 닫힐 때 돌아갈 자리 (H2). 호출부가 넘기게 하지 않는 이유:
+	# 소비처가 넷이고 하나라도 빠뜨리면 그 화면만 옛 결함이 남는다 — 창구가 스스로 갈무리한다.
+	dialog._return_focus = host.get_viewport().gui_get_focus_owner()
 	host.add_child(dialog)
 	# 다이얼로그는 화면 결속(`bind`) 이후에 태어나므로 조작음 자동 결속에 잡히지 않는다 —
 	# 만든 자리에서 결속한다. 화면이 아닌 곳에서 띄운 경우(호스트가 FlowScreen 이 아님)는

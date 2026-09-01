@@ -8,6 +8,9 @@
 extends HubScreen
 
 var _tier_boxes: Dictionary = {}
+# 스킬 행 대장 — DP 소비(해금·확장) 시 **전 행**의 지불 가능성을 갱신하기 위한 참조
+# (개선 2026-09-02 — 튜닝 H3 와 같은 스테일 계열)
+var _skill_rows: Dictionary = {}
 
 
 func _on_hub_ready(_payload: Dictionary) -> void:
@@ -46,6 +49,7 @@ func _build_skill_list() -> void:
 		_tier_boxes[tier] = box
 	for skill_id in session.data.skills:
 		var row := _skill_row(String(skill_id))
+		_skill_rows[String(skill_id)] = row
 		var tier := CsvTable.to_int(String(session.data.skills[skill_id]["skill_tier"]))
 		(_tier_boxes.get(tier, _tier_boxes[1]) as VBoxContainer).add_child(row)
 
@@ -115,7 +119,7 @@ func _on_unlock(skill_id: String, row: Control) -> void:
 			return
 		if session.outgame.unlock_skill(skill_id):
 			sfx("skill_unlock")   # SE-U12 스킬 해금
-			_refresh_skill_row(skill_id, row)
+			_refresh_all_rows()   # DP 소비 — 타 행 해금 버튼의 지불 가능성이 함께 낡는다 (H3 계열)
 			refresh_currency())
 
 
@@ -163,4 +167,10 @@ func _refresh_deck() -> void:
 func _on_expand() -> void:
 	if session.outgame.expand_deck():
 		_refresh_deck()
+		_refresh_all_rows()   # DP 소비 — 해금 버튼 지불 가능성 갱신 (H3 계열)
 		refresh_currency()
+
+
+func _refresh_all_rows() -> void:
+	for skill_id in _skill_rows:
+		_refresh_skill_row(String(skill_id), _skill_rows[skill_id] as Control)

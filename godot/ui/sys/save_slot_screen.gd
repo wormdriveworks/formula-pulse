@@ -165,4 +165,6 @@ func _on_slot_pressed(profile: int, has_save: bool) -> void:
 		go("NAR-01", session.season_open_payload(
 			"NAR-01" if not after_open.is_empty() else "RACE-01", after_open))
 		return
-	go("RACE-01", {})
+	# 착지는 상태가 정한다 (개선 2026-09-02 L1·L2) — 경계 저장분을 무조건 RACE-01 로 보내면
+	# 투어 마지막 결산 저장분이 벽돌이 되고(서킷 인덱스 초과) 리타이어 저장분이 유령 투어를 재개한다.
+	go(session.resume_route(), {})

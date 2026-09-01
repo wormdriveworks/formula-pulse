@@ -5,6 +5,9 @@
 # 갱신 가능 시점(투어 결산 연동)은 스폰서 정산 층 결선 후 — 골격은 체결·열람까지.
 extends HubScreen
 
+# 체결 버튼 대장 — 체결 성공 시 **전 카드**를 갱신하기 위한 참조 (개선 2026-09-02 H4)
+var _signs: Dictionary = {}
+
 
 func _on_hub_ready(_payload: Dictionary) -> void:
 	var s := session.data.strings
@@ -52,6 +55,7 @@ func _card(sponsor_id: String) -> Control:
 	sign.add_theme_font_size_override("font_size", _body_font_size)
 	sign.name = "Sign"
 	row.add_child(sign)
+	_signs[sponsor_id] = sign
 	_refresh_sign(sponsor_id, sign)
 	return row
 
@@ -81,5 +85,8 @@ func _on_sign(sponsor_id: String, sign: Button) -> void:
 		# 스폰서 체결에 대응하는 행이 `sound_map` 에 없다 — 확정 다이얼로그의 일반 결정음이
 		# 전부다. 표에 없는 행동은 울리지 않는 것이 정상이며, 임의로 다른 SFX 를 빌려 쓰지 않는다.
 		if session.outgame.sign_sponsor(sponsor_id):
-			_refresh_sign(sponsor_id, sign)
+			# **전 카드 갱신** (개선 2026-09-02 H4) — 자기 카드만 갱신하면 슬롯이 소진된 뒤에도
+			# 타 카드 체결 버튼이 산 채로 남아, 확인 창까지 띄우고 확정해도 무반응이 된다.
+			for other_id in _signs:
+				_refresh_sign(String(other_id), _signs[other_id] as Button)
 			_refresh_slots())

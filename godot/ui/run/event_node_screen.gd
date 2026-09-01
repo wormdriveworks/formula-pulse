@@ -24,11 +24,15 @@ func _on_bound(payload: Dictionary) -> void:
 	var title_key := String(occurrence.get("name_key", ""))
 	var title_text := s.text(title_key)
 	(%TitleLabel as Label).text = title_text
-	# 변형 문면 — 변형이 있으면 변형 키, 없으면 본문 없음 (실문안 D04 트랙)
+	# 변형 문면 — 변형이 있으면 변형 키, 없으면 본문 없음 (실문안 D04 트랙).
+	# **열쇠는 `text_key` 다** (개선 2026-09-02 E2 — 서비스 `_select_variant` 의 반환 키).
+	# 종전에는 `name_key` 를 읽어 **집필돼 있던 변형 문안 10키가 한 번도 표시된 적이 없었다** —
+	# 무일치 폴백도 `{"tag":"","text_key":""}` 라 빈 키 가드가 함께 서야 한다.
 	var variant: Dictionary = occurrence.get("variant", {})
 	var body := %BodyLabel as Label
-	if variant.has("name_key"):
-		body.text = s.text(String(variant["name_key"]))
+	var body_key := String(variant.get("text_key", ""))
+	if not body_key.is_empty():
+		body.text = s.text(body_key)
 		body.visible = true
 	else:
 		body.visible = false

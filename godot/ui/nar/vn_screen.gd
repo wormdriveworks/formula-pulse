@@ -175,6 +175,17 @@ func _mount_cg(vn_id: String) -> void:
 	move_child(art, CG_LAYER_INDEX)
 
 
+# 스킵 = Esc · 패드 B (개선 2026-09-02 N1 — 종전에는 스킵 버튼이 마우스 전용이라 키보드·패드가
+# 세 입력 규격(D09 §1.3)에서 빠져 있었다). 닫기 축(ui_cancel)에 앉는 것은 버튼의 조작음
+# 결속(SE-U03)과 같은 판단이다. 발생 처리는 버튼과 같은 손(_on_skip)이 한다 — 경로가 하나다.
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	get_viewport().set_input_as_handled()
+	sfx("ui_cancel")   # SE-U03 — 스킵 버튼의 조작음 결속과 같은 축
+	_on_skip(_vn_id, "")
+
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:

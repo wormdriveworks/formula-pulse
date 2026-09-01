@@ -27,6 +27,10 @@ const TUTORIAL_ACTIONS := ["spin", "hold", "respin", "charge", "confirm"]
 const HOLD_KEYS := [KEY_1, KEY_2, KEY_3]
 # 스킬 슬롯 1~5 = F1~F5 (D09 §1.3 확정 기준값)
 const SKILL_KEYS := [KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5]
+# E13 소모품 슬롯 1~2 = 4·5 (개선 2026-09-02 — 종전 마우스·포커스 전용이던 슬롯의 키 결선.
+# 홀드 1~3 의 숫자열 연장이라 배우기 비용이 낮다. 패드 열은 조합 공간이 소진돼 이번 결선 밖 —
+# 패드는 종전대로 포커스 경유. D09 §1.3 두 번째 표의 개정 사안으로 기록).
+const CONSUMABLE_KEYS := [KEY_4, KEY_5]
 
 # ── 레이스 컨텍스트 층 패드 (D09 v1.3 §1.3 두 번째 표 · 총괄 판정 IMPL-200 ③) ──
 # 버튼 인덱스는 엔진 실측 확정(IMPL-186): A=0 · X=2 · Y=3 · LB=9 · RB=10 · D패드 좌13/우14.
@@ -495,6 +499,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if key.keycode == KEY_C:
 		get_viewport().set_input_as_handled()
 		_on_charge_intervene()
+		return
+	# E13 소모품 4·5 — 같은 핸들러(_on_consumable)를 탄다: 클릭·포커스 확정과 경로가 하나다.
+	# T1 밖·듀얼·빈 슬롯 거부는 핸들러와 엔진(use_consumable 전건 재검)이 이미 쥐고 있다.
+	var consumable_index := CONSUMABLE_KEYS.find(key.keycode)
+	if consumable_index >= 0:
+		get_viewport().set_input_as_handled()
+		_on_consumable(consumable_index)
 		return
 	# 스킬 슬롯 F1~F5. **소비 표시가 분기의 첫 줄이다** (IMPL-299) — 동작이 화면을
 	# 이탈시킨 뒤 뷰포트를 만지면 null 참조로 죽는다.

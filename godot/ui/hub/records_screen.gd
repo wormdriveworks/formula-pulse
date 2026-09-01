@@ -16,7 +16,7 @@ var _active_tab := ""
 var replay_omissions: Array = []
 
 
-func _on_hub_ready(_payload: Dictionary) -> void:
+func _on_hub_ready(payload: Dictionary) -> void:
 	var s := session.data.strings
 	(%HeaderLabel as Label).text = s.text("ui.records.title")
 	_tabs = {
@@ -37,14 +37,31 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 	_fill_rivals()
 	_fill_career()
 	_fill_archive()
-	_select_tab("rivals")
-	(%TabRivals as Button).grab_focus()
+	# 진입 탭은 페이로드가 정한다 (개선 2026-09-02 H9) — 재열람 복귀는 아카이브 탭으로
+	# 돌아와야 한다(§A-19 "종료 시 아카이브 복귀"). 종전에는 항상 첫 탭이라 연속 재생마다
+	# 라이벌 파일에서 아카이브까지 되걸어야 했다. 기본은 종전 그대로 첫 탭이다.
+	var initial_tab := String(payload.get("tab", "rivals"))
+	if not _tabs.has(initial_tab):
+		initial_tab = "rivals"
+	_select_tab(initial_tab)
+	(_tabs[initial_tab]["button"] as Button).grab_focus()
 
 
 func _select_tab(tab_name: String) -> void:
 	_active_tab = tab_name
 	for entry_name in _tabs:
-		(_tabs[entry_name]["panel"] as Control).visible = String(entry_name) == tab_name
+		var active := String(entry_name) == tab_name
+		(_tabs[entry_name]["panel"] as Control).visible = active
+		# 활성 탭 색 표시 (개선 2026-09-02 H8) — 없으면 Q/E 순회가 내용만 바꿔 "안 먹는 것처럼"
+		# 보인다. 문법·색 슬롯은 업적 화면 `_mark_active_tab` 그대로다(활성 = ACCENT_ACTIVE ·
+		# 비활성 = TEXT_PRIMARY — 감광하면 잠긴 것으로 오독되므로 밝기가 아니라 색상으로 가른다).
+		var tab_button := _tabs[entry_name]["button"] as Button
+		tab_button.add_theme_color_override("font_color",
+			UiPalette.ACCENT_ACTIVE if active else UiPalette.TEXT_PRIMARY)
+		tab_button.add_theme_color_override("font_hover_color",
+			UiPalette.ACCENT_ACTIVE if active else UiPalette.TEXT_PRIMARY)
+		tab_button.add_theme_color_override("font_focus_color",
+			UiPalette.ACCENT_ACTIVE if active else UiPalette.TEXT_PRIMARY)
 
 
 # ── 탭 순회 (D09 §1.3 '탭 전환 = Q·E | LB·RB' · 총괄 판정 IMPL-190 ②) ──
@@ -60,6 +77,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("tab_next"):
 		get_viewport().set_input_as_handled()
 		_cycle_tab(1)
+		return
+	# 오버라이드가 공통 층(H7 — Esc/B 뒤로)을 삼키지 않게 나머지는 베이스로 넘긴다
+	super(event)
 
 
 func _cycle_tab(step: int) -> void:
@@ -126,6 +146,45 @@ func _fill_career() -> void:
 	total.text = total_text
 	row.add_child(total)
 	panel.add_child(row)
+	# ── 통산 지표 (개선 2026-09-02 R1) — 소재는 코어가 이미 세던 career_stats 전용, 신규 판정 0.
+	# 값이 0 이어도 행은 선다: 커리어 초반에 목록의 모양이 바뀌면 "생기는 기록"이 아니라
+	# "빠졌던 행"으로 읽힌다(업적 화면 무커리어 0 진척 표기와 같은 취지).
+	var stats := session.outgame
+	_career_row(panel, "ui.records.statGps", _count_text(stats.career_stat("gps")))
+	_career_row(panel, "ui.records.statFinishes", _count_text(stats.career_stat("finishes")))
+	_career_row(panel, "ui.records.statWins", _count_text(stats.career_stat("wins")))
+	_career_row(panel, "ui.records.statPodiums", _count_text(stats.career_stat("podiums")))
+	_career_row(panel, "ui.records.statDuels", session.data.strings.text(
+		"ui.records.duelRecordFormat",
+		{"wins": stats.career_stat("duel_wins"), "total": stats.career_stat("duels")}))
+	_career_row(panel, "ui.records.statTourWins", _count_text(stats.career_stat("tour_wins")))
+	_career_row(panel, "ui.records.statSeasons", _count_text(stats.career_stat("seasons")))
+	var best_rank := stats.career_stat("best_championship_rank")
+	_career_row(panel, "ui.records.statBestRank",
+		session.data.strings.text("ui.records.bestRankFormat", {"rank": best_rank})
+		if best_rank > 0 else session.data.strings.text("ui.records.statNone"))
+	_career_row(panel, "ui.records.statCircuits", _count_text(stats.career_stat("circuits_won")))
+
+
+func _count_text(value: int) -> String:
+	return session.data.strings.text("ui.records.statCountFormat", {"value": value})
+
+
+func _career_row(panel: VBoxContainer, label_key: String, value_text: String) -> void:
+	var s := session.data.strings
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var label := Label.new()
+	label.add_theme_font_size_override("font_size", _body_font_size)
+	label.custom_minimum_size = Vector2(150, 0)
+	label.text = s.text(label_key)
+	label.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+	row.add_child(label)
+	var value := Label.new()
+	value.add_theme_font_size_override("font_size", _body_font_size)
+	value.text = value_text
+	row.add_child(value)
+	panel.add_child(row)
 
 
 func _fill_archive() -> void:
@@ -157,7 +216,9 @@ func _fill_archive() -> void:
 		# **페이로드는 세션 창구가 조립한다** (㊹ — 22차 개막 경로와 같은 교정). 화면이
 		# 직접 `{vn_id, replay, next}` 를 쥐여 주던 동안 문면·화자·정조가 통째로 빠져
 		# 골격 폴백 1줄이 떴다. 조립기를 화면에 두지 않는 규칙이 여기에도 걸린다.
-		var replay_payload := session.archive_replay_payload(String(vn_id), "HUB-05")
+		# 복귀 페이로드에 탭 힌트 — 재생 종료가 아카이브 탭으로 돌아온다 (H9 · §A-19)
+		var replay_payload := session.archive_replay_payload(String(vn_id), "HUB-05",
+			{"tab": "archive"})
 		if replay_payload.is_empty():
 			# **되찾지 못하면 누르게 두지 않는다.** 빈 페이로드로 보내면 골격 화면이 서서
 			# 이번 결함이 그대로 재현된다 — 조용한 폴백 대신 죽은 버튼과 관측 지점을 남긴다.

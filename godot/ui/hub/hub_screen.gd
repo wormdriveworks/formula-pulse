@@ -56,6 +56,21 @@ func _fill_common_bar() -> void:
 		(back as Button).pressed.connect(func(): go("HUB-01", {}))
 
 
+# 취소 / 뒤로 = Esc · 패드 B (D09 §1.3 공통 층 매핑 — 개선 2026-09-02 H7 결선).
+# 실기: 허브 7화면 전부 Esc·B 가 무반응이었다 — 버튼 포커스 없이는 나갈 수 없었다.
+# 뒤로 버튼이 없거나(개러지) 숨겨진 화면(시즌 체인의 오버홀 — 1회 전용 진입 보호)은 그대로 무동작.
+# 모달(ConfirmDialog)이 떠 있으면 창이 먼저 소비한다(창 쪽 _unhandled_input) — 여기 오지 않는다.
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	var back := get_node_or_null("%BackButton") as Button
+	if back == null or not back.visible:
+		return
+	get_viewport().set_input_as_handled()
+	sfx("ui_cancel")   # SE-U03 — 버튼 경로의 취소음 결속과 같은 축
+	go("HUB-01", {})
+
+
 # 재화 갱신 — 구매 후 호출 (증감 피드백 규격의 최소형. 플로트·펄스는 아트 유입 시)
 func refresh_currency() -> void:
 	var s := session.data.strings

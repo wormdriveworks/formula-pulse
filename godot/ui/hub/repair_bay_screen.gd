@@ -55,5 +55,11 @@ func _refresh_run_button() -> void:
 	var damaged := outgame.chassis < session.data.param("param_chassis_max")
 	var affordable := outgame.credits >= outgame.full_repair_cost()
 	var run := %RunButton as Button
+	var had_focus := run.has_focus()
 	run.disabled = not (damaged and affordable)
 	run.focus_mode = Control.FOCUS_NONE if run.disabled else Control.FOCUS_ALL
+	# 포커스를 가진 채 FOCUS_NONE 이 되면 포커스가 허공에 떨어진다 (개선 2026-09-02 H1 —
+	# 실기: 정비 실행 직후 방향키·Esc 전부 무반응, 패드는 복구 수단이 없다).
+	# 잃는 쪽이 스스로 뒤로가기에 넘긴다 — run_recap._refresh_repair_button 과 같은 수법.
+	if had_focus and run.focus_mode == Control.FOCUS_NONE:
+		(%BackButton as Button).grab_focus()

@@ -61,7 +61,11 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 	var depart := %DepartButton as Button
 	depart.text = s.text("ui.hub.depart")
 	depart.pressed.connect(_on_depart)
-	depart.grab_focus()  # 초기 포커스 = E09 (재방문 시 — §A-11)
+	# 초기 포커스 = 첫 스테이션 (개선 2026-09-02 H6 — §A-11 "초기 포커스 = E09" 를 사용자
+	# 지시로 뒤집음). 출발은 **비가역 전이**다(저장 + 브리핑 소비 + 허브 복귀 불가) — 직전
+	# VN 을 확정 연타로 넘기던 관성 입력 1회가 그대로 출발을 눌러 허브 전체가 건너뛰어졌다
+	# (실기 검증 중 4회 연속 재현). 출발 자체는 한 칸 아래 이웃이라 의도 도달 비용은 낮다.
+	(%StRepair as Button).grab_focus()
 	_show_currency_onboarding()
 
 

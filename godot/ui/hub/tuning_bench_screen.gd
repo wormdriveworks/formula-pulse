@@ -105,5 +105,8 @@ func _on_buy(tuning_id: String) -> void:
 	if not session.outgame.buy_tuning(tuning_id):
 		return
 	sfx("tuning_install")
-	_refresh_row(tuning_id)
+	# **전 행을 갱신한다** (개선 2026-09-02 H3) — 자기 행만 갱신하면 잔액이 부족해진 타 계통의
+	# 강화 버튼이 산 채로 남아, 누르면 코어 거부로 소리 없이 무반응이 된다.
+	for row_id in _rows:
+		_refresh_row(String(row_id))
 	refresh_currency()
