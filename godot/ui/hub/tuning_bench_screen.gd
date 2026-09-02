@@ -96,8 +96,10 @@ func _refresh_row(tuning_id: String) -> void:
 		var cost := session.outgame.tuning_cost(tuning_id, step + 1)
 		var cost_text := s.text("ui.tuningBench.costFormat", {"amount": cost})
 		cost_label.text = cost_text
+		# 통화 = **크레딧** (D13 별첨A §3.5 "단계별 비용 (Cr)" · 코어 `buy_tuning` 이 `_spend_credits`).
+		# 개선 회차 4 T1 — 종전에는 DP 잔액으로 잠가서 Cr 2000 을 쥐고도 700 단계가 잠겼고, 표기도 'DP' 였다.
 		if not buy.disabled:
-			buy.disabled = session.outgame.drive_data < cost
+			buy.disabled = session.outgame.credits < cost
 
 
 func _on_buy(tuning_id: String) -> void:

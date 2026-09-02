@@ -92,6 +92,12 @@ func _cycle_tab(step: int) -> void:
 	if _tab_panels.is_empty():
 		return
 	_select_tab(wrapi(_active_tab + step, 0, _tab_panels.size()))
+	# 순회 뒤 포커스 = 활성 탭 버튼 (개선 회차 4 O1). 포커스가 패널 **안**(스테퍼)에 있을 때 탭을 넘기면
+	# 숨겨진 컨트롤이 포커스를 놓아 `none` 이 되고, 패드는 십자키가 무반응이 된다(B 로만 탈출 — 회차 2 H1 계열).
+	# 탭 버튼은 항상 보이는 자리이고 순회 문맥에서 자연스러운 출발점이다.
+	var tab_row := %TabRow as Control
+	if _active_tab < tab_row.get_child_count():
+		(tab_row.get_child(_active_tab) as Control).grab_focus()
 
 
 func _build_tabs() -> void:

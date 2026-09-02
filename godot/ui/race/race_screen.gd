@@ -622,6 +622,21 @@ func _next_turn() -> void:
 	_refresh_resources()
 	_refresh_action_enabled()
 	_update_timer_value()
+	_ensure_default_focus()
+
+
+# 초기 포커스 = 스핀(=확정) — 별첨A §A-6 (개선 회차 4 R-F1). 종전에는 조합(RB·LB) 해제 경로에서만 확정으로
+# 되돌렸고 GP 개시에는 아무 데도 포커스가 없었다(실측: 개시 150프레임 뒤 `focus=none`, 소모품 키 사용 뒤도 동일).
+# A/Space 는 액션 경로라 스핀은 됐지만 십자키 이동의 출발점이 없었다. 턴 개시마다 **비어 있을 때만** 세운다 —
+# 조합 커서가 잡은 슬롯 포커스나 오버레이(튜토리얼·일시정지)의 포커스는 건드리지 않는다.
+func _ensure_default_focus() -> void:
+	if _paused:
+		return
+	var owner := get_viewport().gui_get_focus_owner()
+	if owner != null and owner.is_visible_in_tree():
+		return
+	if _e08_confirm.focus_mode != Control.FOCUS_NONE:
+		_e08_confirm.grab_focus()
 
 
 # 릴 표시 배열을 오버레이로 스왑한다 — 공개·은닉·봉인 검사(SEAL-E)가 전부 같은 경로로

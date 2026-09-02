@@ -90,6 +90,9 @@ func _cycle_tab(step: int) -> void:
 	if at < 0:
 		at = 0
 	_select_tab(String(names[wrapi(at + step, 0, names.size())]))
+	# 순회 뒤 포커스 = 활성 탭 버튼 (개선 회차 4 O1). 아카이브 재생 버튼에 포커스를 둔 채 Q/E 를 누르면
+	# 패널이 숨겨지며 포커스가 `none` 이 되어 패드 십자키가 죽는다 — 옵션·업적과 같은 손.
+	(_tabs[_active_tab]["button"] as Button).grab_focus()
 
 
 func _fill_rivals() -> void:

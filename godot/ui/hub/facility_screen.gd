@@ -36,8 +36,10 @@ func _card(facility_id: String) -> Control:
 	row.add_child(icon)
 	var cost_label := Label.new()
 	cost_label.add_theme_font_size_override("font_size", _body_font_size)
+	# 표시 가격 = **실제 차감액** (`unlock_cost` — 사샤 패시브 −10% 반영). 개선 회차 4 F1: 종전에는 원가를
+	# 표시·게이트하고 차감만 할인돼 45 표시 → 41 차감이 어긋났다. 전략실의 해금 표기와 같은 손.
 	var cost_text := s.text("ui.hub.amountFormat", {
-		"amount": CsvTable.to_int(String(facility_row["cost_dp"])),
+		"amount": _facility_cost(facility_id),
 	})
 	cost_label.text = cost_text
 	cost_label.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
@@ -69,8 +71,14 @@ func _refresh_buy(facility_id: String, buy: Button) -> void:
 		buy.focus_mode = Control.FOCUS_NONE
 		return
 	buy.text = s.text("ui.facilityPanel.buy")
-	buy.disabled = session.outgame.drive_data < CsvTable.to_int(String(facility_row["cost_dp"]))
+	buy.disabled = session.outgame.drive_data < _facility_cost(facility_id)
 	buy.pressed.connect(_on_buy.bind(facility_id, buy))
+
+
+# 실제 차감액 — 코어 `unlock_facility` 가 쓰는 산식 그대로 (`unlock_cost` = 크루 패시브 할인 포함).
+func _facility_cost(facility_id: String) -> int:
+	var base := CsvTable.to_int(String(session.data.facilities[facility_id]["cost_dp"]))
+	return session.outgame.unlock_cost(base)
 
 
 func _on_buy(facility_id: String, buy: Button) -> void:
@@ -78,7 +86,7 @@ func _on_buy(facility_id: String, buy: Button) -> void:
 	var facility_name := s.text(String(session.data.facilities[facility_id]["name_key"]))
 	var summary := s.text("ui.facilityPanel.buyConfirm", {"facility": facility_name})
 	var cost_text := s.text("ui.hub.amountFormat", {
-		"amount": CsvTable.to_int(String(session.data.facilities[facility_id]["cost_dp"])),
+		"amount": _facility_cost(facility_id),
 	})
 	var dialog := ConfirmDialog.ask(self, s, summary, cost_text, true, _body_font_size)
 	dialog.resolved.connect(func(accepted: bool):

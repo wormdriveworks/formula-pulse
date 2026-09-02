@@ -47,6 +47,10 @@ func _fill_common_bar() -> void:
 		"tour": session.season.tour_slot,
 		"race": session.season.race_slot,
 	})
+	# 시즌 마감 상태(SET-02 → HUB-08 체인)는 tour_slot 이 상한을 넘어 '투어 6 · 제5전' 으로 읽혔다
+	# (개선 회차 4 H8-O1 실측). 마감 문면으로 갈음한다 — 다음 시즌 개시(`begin_next_season`) 뒤에는 종전 문면.
+	if session.season.season_finished():
+		progress_text = s.text("ui.hub.progressClosedFormat", {"season": session.season.season})
 	(%ProgressLabel as Label).text = progress_text
 	var back := get_node_or_null("%BackButton")
 	if back != null:

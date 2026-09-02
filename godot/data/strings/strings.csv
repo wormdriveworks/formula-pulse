@@ -417,6 +417,7 @@ ui.confirm.cancel,취소,Cancel,キャンセル
 ui.hub.garageTitle,개러지,Garage,ガレージ
 ui.hub.amountFormat,{amount},{amount},{amount}
 ui.hub.progressFormat,시즌 {season} · 투어 {tour} · 제{race}전,Season {season} · Tour {tour} · Race {race},シーズン{season} · ツアー{tour} · 第{race}戦
+ui.hub.progressClosedFormat,시즌 {season} 마감,Season {season} closed,シーズン{season} 終了
 ui.hub.back,개러지로,To Garage,ガレージへ
 ui.hub.depart,다음 투어 출발,Depart for Next Tour,次のツアーへ出発
 ui.hub.lockedByCrew," — {crew} 합류 시"," — on {crew} joining"," — {crew}加入時"
@@ -441,7 +442,7 @@ ui.tuningBench.buy,강화,Upgrade,強化
 ui.tuningBench.maxed,최대 단계,Max Level,最大段階
 ui.tuningBench.stepFilled,●,●,●
 ui.tuningBench.stepEmpty,○,○,○
-ui.tuningBench.costFormat,{amount} DP,{amount} DP,{amount} DP
+ui.tuningBench.costFormat,{amount} Cr,{amount} Cr,{amount} Cr
 ui.tuningBench.redistribute,재배분,Redistribute,再配分
 ui.strategy.title,전략실,Strategy Room,戦略室
 ui.strategy.tierFormat,스킬 티어 {tier},Skill Tier {tier},スキルティア {tier}
@@ -487,7 +488,15 @@ ui.duel.boostFilled,◆,◆,◆
 ui.duel.boostEmpty,◇,◇,◇
 ui.seasonResult.headerFormat,시즌 {season} 결산,Season {season} Results,シーズン{season} 決算
 ui.seasonResult.rowFormat,P{rank} {name} — {points},P{rank} {name} — {points},P{rank} {name} — {points}
-ui.seasonResult.summaryFormat,챔피언십 P{rank} · {points}점,Championship P{rank} · {points} pts,チャンピオンシップ P{rank} · {points}点
+ui.seasonResult.standingsHeader,최종 스탠딩,Final Standings,最終スタンディング
+ui.seasonResult.rankLabel,챔피언십 순위,Championship Rank,チャンピオンシップ順位
+ui.seasonResult.rankFormat,P{rank},P{rank},P{rank}
+ui.seasonResult.pointsLabel,챔피언십 포인트,Championship Points,チャンピオンシップポイント
+ui.seasonResult.pointsFormat,{points},{points},{points}
+ui.seasonResult.tourWinsLabel,투어 우승,Tour Wins,ツアー優勝
+ui.seasonResult.countFormat,{value},{value},{value}
+ui.seasonResult.gridLabel,다음 시즌 그리드 레벨,Next Season Grid Level,次シーズンのグリッドレベル
+ui.seasonResult.gridFormat,Lv.{level},Lv.{level},Lv.{level}
 ui.seasonResult.champion,시즌 챔피언,Season Champion,シーズンチャンピオン
 ui.seasonResult.epilogue,2연속 챔피언 — 에필로그 개방,Back-to-back champion — epilogue unlocked,2連続チャンピオン — エピローグ開放
 ui.seasonResult.carryOn,시즌 마감 — 다음 시즌으로 이어집니다.,Season closed — carrying on to the next season.,シーズン終了 — 次のシーズンへ続きます。

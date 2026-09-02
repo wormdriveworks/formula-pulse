@@ -122,6 +122,11 @@ func _cycle_tab(step: int) -> void:
 	if _tab_panels.is_empty():
 		return
 	_select_tab(wrapi(_active_tab + step, 0, _tab_panels.size()))
+	# 순회 뒤 포커스 = 활성 탭 버튼 (개선 회차 4 O1 — 옵션·기록실과 같은 손). 패널 안 포커스가 숨겨지며
+	# 사라지는 잠금을 막는다.
+	var tab_row := %TabRow as Control
+	if _active_tab < tab_row.get_child_count():
+		(tab_row.get_child(_active_tab) as Control).grab_focus()
 
 
 # 플랫폼 도전과제 미연동 고지 (D09 §6.5 필수 항목 — 업적 1:1 매핑).
