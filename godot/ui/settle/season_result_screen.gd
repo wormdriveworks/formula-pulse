@@ -37,7 +37,7 @@ func _on_bound(_payload: Dictionary) -> void:
 		row.add_theme_font_size_override("font_size", _body_font_size)
 		var row_text := s.text("ui.seasonResult.rowFormat", {
 			"rank": index + 1,
-			"name": _entrant_name(entrant_id),
+			"name": entrant_name(entrant_id),
 			"points": int(session.season.championship_points.get(entrant_id, 0)),
 		})
 		row.text = row_text
@@ -72,22 +72,9 @@ func _on_bound(_payload: Dictionary) -> void:
 	_next_button.text = s.text("ui.seasonResult.toOverhaul")
 	_next_button.pressed.connect(_on_next.bind(player_position))
 	_next_button.grab_focus()
-
-
-func _entrant_name(entrant_id: String) -> String:
-	var s := session.data.strings
-	if session.engine != null and session.engine.entrants.has(entrant_id):
-		var entrant: Dictionary = session.engine.entrants[entrant_id]
-		if bool(entrant["is_filler"]):
-			return s.text(String(entrant["name_key"]), {"number": int(entrant["number"])})
-		return s.text(String(entrant["name_key"]))
-	# 엔진 부재 폴백 — 네임드·플레이어는 데이터에서 이름을 얻는다 (필러 번호만 엔진 소관)
-	if entrant_id == SeasonState.PLAYER_ID:
-		return s.text("ui.race.playerName")
-	for rival_row in session.data.rivals:
-		if String(rival_row["id"]) == entrant_id:
-			return s.text(String(rival_row["name_key"]))
-	return entrant_id
+	# 진입 직후 오입력 방어 창 (개선 2026-09-03 — 회차 1 이월) — 투어 결산에서 이어 누른 확정
+	# 입력이 시즌 결산을 지나쳐 오버홀 화면까지 밀고 가지 않게 한다 (결산 3화면 공통).
+	InputGuard.arm(self, session.data.param("param_settle_input_guard_sec"))
 
 
 func _on_next(player_position: int) -> void:

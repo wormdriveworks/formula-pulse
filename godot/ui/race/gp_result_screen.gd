@@ -75,6 +75,9 @@ func _on_bound(_payload: Dictionary) -> void:
 	)
 	_next_button.pressed.connect(_on_next.bind(to_tour_report))
 	_next_button.grab_focus()
+	# 진입 직후 오입력 방어 창 (개선 2026-09-03 — 회차 1 이월) — 레이스 끝까지 연타한 확정 입력이
+	# 결산을 지나치지 않게 한다. 값 창구 = D13 `param_settle_input_guard_sec`.
+	InputGuard.arm(self, session.data.param("param_settle_input_guard_sec"))
 
 	var saved := session.save_progress()
 	_save_badge.visible = bool(saved.get("ok", false))

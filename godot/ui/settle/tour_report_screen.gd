@@ -9,6 +9,10 @@
 #
 # 블록 5(소멸 고지)를 블록 4(환전)와 분리하는 이유는 D09 §5.1 명문이다 —
 # 환전 후 잔여 0이라는 문맥으로 제시해야 소멸이 손실로 오독되지 않는다.
+#
+# 조판 (개선 2026-09-03): 좌측 = 블록 열(순위 값은 표제 계열·강조색 — 화면의 주역), 우측 = 투어
+# 순위표(RACE-03 순위표와 같은 문법 — 결산이 P{n} 한 줄만 말하고 화면 절반이 비어 있던 자리).
+# 상단 = 탈락 배지 · 시즌/투어 부제 · 저장 배지 (RACE-03 헤더 행과 동형).
 extends FlowScreen
 
 @onready var _block4: Control = %Block4
@@ -28,6 +32,15 @@ func _on_bound(_payload: Dictionary) -> void:
 	var position := int(report.get("player_position", 0))
 
 	(%HeaderLabel as Label).text = s.text("ui.tourReport.header")
+	# 탈락 배지 — 사실 표기 한 단어. 소프트 실패 원칙상 실패·GAME OVER 계열 문면은 쓰지 않는다.
+	(%DropoutBadge as Label).visible = dropped
+	(%DropoutBadge as Label).text = s.text("ui.tourReport.dropout")
+	# 어느 투어의 결산인가 — `SeasonState.close_tour()` 가 tour_slot 을 이미 다음 투어로 올렸으므로
+	# 시즌 층의 현재값이 아니라 리포트가 쥔 마감 투어 번호를 읽는다.
+	(%SubHeaderLabel as Label).text = s.text("ui.tourReport.subheaderFormat", {
+		"season": session.season.season,
+		"tour": int(report.get("tour_slot", 0)),
+	})
 	(%Block1Label as Label).text = s.text("ui.tourReport.block1")
 	(%Block2Label as Label).text = s.text("ui.tourReport.block2")
 	(%Block3Label as Label).text = s.text("ui.tourReport.block3")
@@ -61,10 +74,67 @@ func _on_bound(_payload: Dictionary) -> void:
 		(%Block4Value as Label).text = exchanged_text
 	(%Block5Value as Label).text = s.text("ui.tourReport.chargeExpired")
 
+	_mount_standings(report)
+
 	_next_button.text = s.text("ui.tourReport.toGarage")
 	_next_button.pressed.connect(_on_next)
 	_next_button.grab_focus()
-	session.save_progress()  # 투어 경계 저장 지점 (D09 §2.4)
+	var saved := session.save_progress()  # 투어 경계 저장 지점 (D09 §2.4)
+	(%SaveBadge as Label).visible = bool(saved.get("ok", false))
+	(%SaveBadge as Label).text = s.text("ui.tourReport.saved")
+	# 진입 직후 오입력 방어 창 (개선 2026-09-03 — 회차 1 이월) — 마지막 GP 결산에서 연타한 확정
+	# 입력이 이 화면을 지나치지 않게 한다. 값 창구 = D13 `param_settle_input_guard_sec`.
+	InputGuard.arm(self, session.data.param("param_settle_input_guard_sec"))
+
+
+# ── 투어 순위표 — 전 참가자 (개선 2026-09-03 조판) ──
+#
+# 소재 = report.standings(`close_tour()` 가 투어 포인트 내림차순으로 조립한 순서) +
+# report.tour_points(마감 투어 누계 스냅숏 — 시즌 층은 결산 직후 다음 투어를 열며 누계를 비우므로
+# 리포트가 함께 싣는다). 표기명은 `entrant_name()`(엔진 → 데이터 폴백). 신규 판정 0.
+# 자리 = 우측 절반 — RACE-03 순위표와 같은 앵커 문법(성장 방향·오프셋을 짝으로 명시, ANCH 규약).
+func _mount_standings(report: Dictionary) -> void:
+	var standings: Array = report.get("standings", [])
+	if standings.is_empty():
+		return
+	var s := session.data.strings
+	var points: Dictionary = report.get("tour_points", {})
+	var pad := get_node("Pad") as Control
+	var pane := Control.new()
+	pane.name = "StandingsPane"
+	pane.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pad.add_child(pane)
+	var table := VBoxContainer.new()
+	table.name = "StandingsTable"
+	table.anchor_left = 0.55
+	table.anchor_right = 1.0
+	table.anchor_top = 0.0
+	table.anchor_bottom = 1.0
+	table.offset_left = 0.0
+	table.offset_right = 0.0
+	table.offset_top = 40.0   # 표제 행(14px 폰트) + 부제 행 아래에서 시작
+	table.offset_bottom = 0.0
+	table.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	table.grow_vertical = Control.GROW_DIRECTION_BOTH
+	table.add_theme_constant_override("separation", 1)
+	pane.add_child(table)
+	var header := Label.new()
+	header.text = s.text("ui.tourReport.standingsHeader")
+	header.add_theme_font_size_override("font_size", _body_font_size)
+	header.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+	table.add_child(header)
+	for index in range(standings.size()):
+		var entrant_id := String(standings[index])
+		var row := Label.new()
+		row.text = s.text("ui.tourReport.standingRowFormat", {
+			"rank": index + 1,
+			"name": entrant_name(entrant_id),
+			"points": int(points.get(entrant_id, 0)),
+		})
+		row.add_theme_font_size_override("font_size", _body_font_size)
+		row.add_theme_color_override("font_color",
+			UiPalette.ACCENT_ACTIVE if entrant_id == SeasonState.PLAYER_ID else UiPalette.TEXT_PRIMARY)
+		table.add_child(row)
 
 
 func _on_next() -> void:

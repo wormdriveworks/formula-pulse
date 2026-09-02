@@ -292,6 +292,9 @@ func close_tour() -> Dictionary:
 		"s3_paid": not tour_dropped_out,
 		"s10_paid": not tour_dropped_out,
 		"gp_wins": tour_gp_wins,
+		# 순위표 표시용 스냅숏 (개선 2026-09-03 SET-01 조판) — 아래에서 다음 투어를 열면
+		# `begin_tour()` 가 누계를 비우므로 결산 화면이 읽을 값을 리포트에 함께 싣는다. 판정에는 쓰지 않는다.
+		"tour_points": tour_points.duplicate(),
 	}
 	if player_position == 1:
 		season_tour_wins += 1

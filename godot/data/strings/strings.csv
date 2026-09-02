@@ -184,6 +184,26 @@ ui.relation.succession,계승,Succession,継承
 ui.relation.throne,왕좌,Throne,王座
 ui.relation.reunion,재회,Reunion,再会
 ui.relation.successionMaro,계승 — 셀린,Succession — Celine,継承 — セリーヌ
+ui.relationStage.kinship0,동행,Companions,同行
+ui.relationStage.kinship1,병주,Side by Side,並走
+ui.relationStage.kinship2,경쟁,Rivalry,競争
+ui.relationStage.kinship3,호적수,Worthy Rival,好敵手
+ui.relationStage.succession0,무시,Dismissal,無視
+ui.relationStage.succession1,동요,Unsettled,動揺
+ui.relationStage.succession2,경계,Wary,警戒
+ui.relationStage.succession3,인정,Recognition,認定
+ui.relationStage.throne0,노이즈,Noise,ノイズ
+ui.relationStage.throne1,변수,Variable,変数
+ui.relationStage.throne2,위협,Threat,脅威
+ui.relationStage.throne3,대등,On Equal Terms,対等
+ui.relationStage.successionMaro0,견제,Holding in Check,けん制
+ui.relationStage.successionMaro1,동요,Unsettled,動揺
+ui.relationStage.successionMaro2,주시,Watching Closely,注視
+ui.relationStage.successionMaro3,집착,Fixation,執着
+ui.relationStage.reunion0,회피,Avoidance,回避
+ui.relationStage.reunion1,대면,Face to Face,対面
+ui.relationStage.reunion2,응어리,Old Wounds,わだかまり
+ui.relationStage.reunion3,화해,Reconciliation,和解
 ui.consumable.p1,리페어 키트,Repair Kit,リペアキット
 ui.consumable.p2,이머전시 실런트,Emergency Sealant,エマージェンシーシーラント
 ui.consumable.p3,쿨런트 차지,Coolant Charge,クーラントチャージ
@@ -334,6 +354,11 @@ ui.tourReport.dataFormat,{amount} DP,{amount} DP,{amount} DP
 ui.tourReport.dropoutNote,탈락 — 완주 보너스 미지급 · 순위 보상 축소,Out — no finish bonus · reduced position reward,脱落 — 完走ボーナスなし · 順位報酬は縮小
 ui.tourReport.chargeExpired,잔여 차지는 투어 경계에서 소멸합니다.,Remaining charge expires at the tour boundary.,残りのチャージはツアー境界で消滅します。
 ui.tourReport.toGarage,개러지로,To Garage,ガレージへ
+ui.tourReport.subheaderFormat,시즌 {season} · 투어 {tour},Season {season} · Tour {tour},シーズン{season} · ツアー{tour}
+ui.tourReport.dropout,탈락,Out,脱落
+ui.tourReport.saved,저장됨,Saved,保存済み
+ui.tourReport.standingsHeader,투어 순위표,Tour Standings,ツアー順位表
+ui.tourReport.standingRowFormat,P{rank} {name} — {points},P{rank} {name} — {points},P{rank} {name} — {points}
 ui.save.cardFormat,"{label}
 {body}","{label}
 {body}","{label}
@@ -401,8 +426,10 @@ ui.overhaulScreen.title,시즌 오버홀,Season Overhaul,シーズンオーバ�
 ui.overhaulScreen.gradeFormat,시즌 P{rank} — 슬롯 {slots} · 후보 {candidates},Season P{rank} — Slots {slots} · Candidates {candidates},シーズン P{rank} — スロット {slots} · 候補 {candidates}
 ui.overhaulScreen.confirm,오버홀 확정,Confirm Overhaul,オーバーホール確定
 ui.overhaulScreen.installConfirm,{overhaul} 오버홀을 확정합니다.,Confirm the {overhaul} overhaul.,{overhaul} オーバーホールを確定します。
+ui.overhaulScreen.passThrough,오버홀 없이 진행,Continue Without Overhaul,オーバーホールなしで進む
+ui.overhaulScreen.noCandidates,장착할 수 있는 후보가 없습니다.,No candidates available to install.,装着できる候補がありません。
 ui.hub.stationLockedFormat,{station} — {crew} 합류 시,{station} — on {crew} joining,{station} — {crew}加入時
-ui.records.relationFormat,{axis} {stage}단계,{axis} Stage {stage},{axis} 第{stage}段階
+ui.records.relationFormat,{axis} · {stage},{axis} · {stage},{axis} · {stage}
 ui.duel.playerFormat,No.{number},No.{number},No.{number}
 ui.duel.namedFormat,No.{number} {name},No.{number} {name},No.{number} {name}
 ui.duel.overtake,추월 듀얼,Overtake Duel,追い抜きデュエル

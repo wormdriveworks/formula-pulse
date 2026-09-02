@@ -107,11 +107,16 @@ func _fill_rivals() -> void:
 		var axis := _relation_axis_for(String(rival_row["id"]))
 		if not axis.is_empty():
 			var stage := session.outgame.relation_stage(axis)
+			var axis_row: Dictionary = session.data.relation_axes[axis]
+			# 단계 명칭 (개선 2026-09-03 R2) — 숫자 "0단계" 대신 D04 §4.2 의 상태 명칭을 보인다
+			# (D07 §6.1 "상태 명칭은 D04 §4.2 정의 그대로"). 명칭 키는 표의 `stage{n}_key` 열이 쥔다 —
+			# 조립한 키는 V6 가 못 보므로 참조를 표 열(string_key)에 둔다. 열이 비면 종전 숫자로 물러난다.
+			var stage_key := String(axis_row.get("stage%d_key" % stage, ""))
 			var stage_label := Label.new()
 			stage_label.add_theme_font_size_override("font_size", _body_font_size)
 			var relation_text := s.text("ui.records.relationFormat", {
-				"axis": s.text(String(session.data.relation_axes[axis]["name_key"])),
-				"stage": stage,
+				"axis": s.text(String(axis_row["name_key"])),
+				"stage": s.text(stage_key) if not stage_key.is_empty() else str(stage),
 			})
 			stage_label.text = relation_text
 			stage_label.add_theme_color_override("font_color", UiPalette.TEXT_DIM)

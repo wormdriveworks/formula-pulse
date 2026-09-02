@@ -276,7 +276,11 @@
     "counter_source": "string",
     "threshold1": "int:1,99",
     "threshold2": "int:1,99",
-    "threshold3": "int:1,99"
+    "threshold3": "int:1,99",
+    "stage0_key": "string_key",
+    "stage1_key": "string_key",
+    "stage2_key": "string_key",
+    "stage3_key": "string_key"
    }
   },
   "consumables.csv": {

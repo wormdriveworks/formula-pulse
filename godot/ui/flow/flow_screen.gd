@@ -247,3 +247,24 @@ func detail_text() -> String:
 	if _detail_panel == null:
 		return ""
 	return (_detail_panel.get_node("DetailText") as Label).text
+
+
+# ── 참가자 표시명 (결산 화면 공용 — 개선 2026-09-03, SET-02 전용 함수를 베이스로 끌어올림) ──
+#
+# 엔진이 살아 있으면 엔진 entrants 에서 얻는다 — 필러의 번호는 엔진 소관이라 그 문면
+# (`No.{number} 머신`)은 엔진 없이는 완성되지 않는다. 엔진 부재 폴백은 데이터에서 네임드·플레이어
+# 이름을 얻고, 필러는 id 그대로 보인다(SET-02 종전 거동 그대로 — 결산은 GP 직후라 실기에서는
+# 엔진이 산다).
+func entrant_name(entrant_id: String) -> String:
+	var s := session.data.strings
+	if session.engine != null and session.engine.entrants.has(entrant_id):
+		var entrant: Dictionary = session.engine.entrants[entrant_id]
+		if bool(entrant.get("is_filler", false)):
+			return s.text(String(entrant["name_key"]), {"number": int(entrant["number"])})
+		return s.text(String(entrant["name_key"]))
+	if entrant_id == SeasonState.PLAYER_ID:
+		return s.text("ui.race.playerName")
+	for rival_row in session.data.rivals:
+		if String(rival_row["id"]) == entrant_id:
+			return s.text(String(rival_row["name_key"]))
+	return entrant_id
