@@ -50,8 +50,16 @@ theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_fonts/font = ExtResource("2_i3lhm")
 theme_override_font_sizes/font_size = 14
 
+[node name="VariantLabel" type="Label" parent="Center/Panel/Column" unique_id=1489021733]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
+theme_override_font_sizes/font_size = 9
+
 [node name="BodyLabel" type="Label" parent="Center/Panel/Column" unique_id=603617870]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(280, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_font_sizes/font_size = 9

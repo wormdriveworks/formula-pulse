@@ -165,7 +165,8 @@
     "id": "id",
     "category_id": "fk:event_categories.csv",
     "name_key": "string_key",
-    "scope": "enum:common,stage"
+    "scope": "enum:common,stage",
+    "body_key": "string_key"
    }
   },
   "points_tier2.csv": {
@@ -842,6 +843,14 @@
    ],
    "max_lines": 2,
    "max_chars_full": 24
+  },
+  {
+   "domain_prefixes": [
+    "ui.eventBody."
+   ],
+   "max_lines": 1,
+   "max_chars_full": 64,
+   "source": "RUN-02 본문 라벨 280px 자동 줄바꿈 (event_node_screen.tscn — Galmuri9 @ 9px). 명시 줄바꿈 없이 한 문단으로 쓰므로 max_lines 1 · 폭 상한 = 2줄 예산(전각 62 상당) + 라틴 반각 여유. 개선 회차 3 E1 선등재 (2026-09-03)."
   }
  ],
  "v7_domains": [
@@ -851,7 +860,8 @@
   "vane.",
   "vnChoice.",
   "ui.vnTitle.",
-  "vn."
+  "vn.",
+  "ui.eventBody."
  ],
  "v7_terms": {
   "ko": [

@@ -168,6 +168,11 @@ var _pad_combo_used: Dictionary = {}   # button_index -> 이 홀드가 조합으
 # X 홀드 중 D패드 좌우가 고르는 릴. **선택 표시는 아직 없다** — 입력 판독 층만 결선했다.
 var _hold_cursor := 0
 var _skill_cursor := 0        # RB 조합 중 고른 스킬 슬롯 (포커스로 표시)
+# LB 조합 중 고른 소모품 슬롯 (개선 2026-09-03 E13 패드 열). 조합 소비 표지는 `_pad_combo_used[PAD_LB]`
+# 와 따로 둔다 — 그 표지는 LB 홀드 + Y(상세 정보)도 세우는데, 상세는 LB 를 놓을 때 포커스를 옮기면
+# 안 된다(포커스 이동이 곧 상세 패널 해제다). 소모품 조합만 뗌 시점에 확정 버튼으로 되돌린다.
+var _consumable_cursor := 0
+var _consumable_combo_used := false
 
 # 통상 턴의 릴 표시 배열 — 듀얼 중에는 오버레이의 릴로 스왑된다 (아래 _enter_duel 참조)
 var _base_reel_icons: Array[TextureRect] = []
@@ -465,6 +470,36 @@ func _handle_pad_context(event: InputEvent) -> bool:
 			_on_skill_slot(_skill_cursor)
 			_pad_combo_used[PAD_RB] = true
 			return true
+	# ── LB 홀드 + D패드 좌우 → A : 소모품 슬롯 1~2 (개선 2026-09-03 E13 패드 열 — 사용자 선택 ⓐ) ──
+	#
+	# 스킬(RB 홀드) 문법의 거울이다. LB 는 공통 층에서 상세 정보(LB 홀드 + Y — `_shortcut_input`)만
+	# 쥐고 있어 좌우·A 와 충돌하지 않는다. 커서는 스킬과 같은 어휘 — **포커스**로 보인다.
+	# 키보드 4·5 와 같은 핸들러(`_on_consumable`)를 타므로 T1 밖·듀얼·빈 슬롯 거부는 한 곳이 쥔다.
+	if pad.pressed and _pad_is_held(PAD_LB) and not _e13_slots.is_empty():
+		if pad.button_index == PAD_DPAD_LEFT or pad.button_index == PAD_DPAD_RIGHT:
+			get_viewport().set_input_as_handled()
+			var consumable_step := -1 if pad.button_index == PAD_DPAD_LEFT else 1
+			_consumable_cursor = wrapi(_consumable_cursor + consumable_step, 0, _e13_slots.size())
+			var slot := _e13_slots[_consumable_cursor]
+			if slot.focus_mode != Control.FOCUS_NONE:
+				slot.grab_focus()
+			_pad_combo_used[PAD_LB] = true
+			_consumable_combo_used = true
+			return true
+		if pad.button_index == PAD_A:
+			get_viewport().set_input_as_handled()
+			_on_consumable(_consumable_cursor)
+			_pad_combo_used[PAD_LB] = true
+			_consumable_combo_used = true
+			return true
+	# LB 를 놓으면(소모품 조합을 썼을 때만) 포커스를 확정으로 돌린다 — 슬롯에 포커스가 남으면
+	# 그 다음 A 가 조합 없이 소모품을 쓴다(RB 뗌 처리와 같은 사유). 상세 정보(LB+Y)만 쓴 뗌은
+	# 건드리지 않는다 — 포커스 이동이 상세 패널을 닫아 버린다.
+	if not pad.pressed and pad.button_index == PAD_LB and _consumable_combo_used:
+		_consumable_combo_used = false
+		_e08_confirm.grab_focus()
+		get_viewport().set_input_as_handled()
+		return true
 	# RB 를 놓으면 포커스를 기본 자리(확정)로 돌린다 — 별첨A §A-6 "초기 포커스: 스핀(=확정)".
 	# 스킬 버튼에 포커스가 남으면 그 다음 A 가 조합 없이 스킬을 쏜다.
 	if not pad.pressed and pad.button_index == PAD_RB:

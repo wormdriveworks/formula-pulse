@@ -87,6 +87,11 @@ const WRAP_DOMAIN_LEDGER := [
 		"consumer": "res://ui/com/confirm_dialog.gd"},
 	{"domain": "ui.tip.", "width": 260.0, "max_lines": 8,
 		"source": "garage_screen.gd 온보딩 팁 (autowrap)", "consumer": "res://ui/hub/garage_screen.gd"},
+	# 이벤트 본문 (개선 회차 3 E1 · 2026-09-03) — 패널 300 − 여백 10×2 = 280. 규격은 2줄(전각 62)이나
+	# en 은 반각이라 3줄로 접힌다(패널이 세로로 자란다 — 기능 정상). 상한 3 = 그 여유까지다.
+	{"domain": "ui.eventBody.", "width": 280.0, "max_lines": 3,
+		"source": "event_node_screen.tscn BodyLabel (custom_minimum_size 280 · autowrap_mode 3)",
+		"consumer": "res://ui/run/event_node_screen.tscn"},
 ]
 
 var _failures := 0

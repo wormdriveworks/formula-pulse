@@ -47,6 +47,9 @@ func judge(stage_id: String, context: Dictionary) -> Dictionary:
 		"event_id": picked,
 		"category_id": category_id,
 		"name_key": String(event_row["name_key"]),
+		# 기본 본문 키 (개선 2026-09-03 E1 — `events.csv body_key` 열). 화면이 표를 다시 찾지 않게
+		# 판정 결과에 함께 싣는다 — 화면의 재조회는 미등재 id 에서 적재 상태(`_load_ok`)를 떨어뜨린다.
+		"body_key": String(event_row.get("body_key", "")),
 		"variant": _select_variant(picked, context),
 		"reward": reward,
 	}
