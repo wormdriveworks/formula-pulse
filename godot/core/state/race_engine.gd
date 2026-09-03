@@ -403,7 +403,7 @@ func use_consumable(consumable_id: String) -> Array:
 			push_error("RaceEngine: unknown consumable effect '%s'" % row["effect"])
 			return []
 	consumables_held[consumable_id] = int(consumables_held[consumable_id]) - 1
-	return [_ev("T1", "raceLog.consumableUse01", {"item": String(row["name_key"])})]
+	return [_ev("T1", "raceLog.consumableUse01", {"item": String(row["name_key"])}, SPEAKER_CREW)]
 
 
 # ── T2 스핀: reel 스트림 소비 = 스핀 커밋 시점 (D12 §6.2) ──
@@ -886,7 +886,7 @@ func _settle_sector(momentum: bool) -> Array:
 					if bool(skill_mods.get(MOD_TROUBLE_REAR_ZERO, false)):
 						trouble_rear = 0.0   # SI3 카운터 스티어 (섀시 소모는 유지 — SI2 와 상보)
 					rear_gauge += trouble_rear
-					events.append(_ev("T5", "raceLog.troubleHit01", {"amount": chassis_delta}))
+					events.append(_ev("T5", "raceLog.troubleHit01", {"amount": chassis_delta}, SPEAKER_CREW))
 			RaceTypes.SettleStage.STAGE_2_RESOURCE:
 				var pulse_count := _count_symbol(RaceTypes.SYMBOL_PULSE)
 				if pulse_count > 0:
@@ -898,7 +898,7 @@ func _settle_sector(momentum: bool) -> Array:
 				if not trouble_fired:
 					var stable_gain := data.param_int("param_charge_stable_sector")
 					_gain_charge(stable_gain)
-					events.append(_ev("T5", "raceLog.stableSector01", {"amount": stable_gain}))
+					events.append(_ev("T5", "raceLog.stableSector01", {"amount": stable_gain}, SPEAKER_CREW))
 				events.append_array(_apply_resonance_bonus(gauge_mult))
 			RaceTypes.SettleStage.STAGE_3_DEFENSE:
 				var braking_count := _count_symbol(RaceTypes.SYMBOL_BRAKING)
@@ -956,7 +956,7 @@ func _settle_sector(momentum: bool) -> Array:
 					duel_opponent = front_target if _armed_duel == RaceTypes.DuelType.OVERTAKE else rear_target
 					duel_opponents.append(duel_opponent)
 					var log_key := "raceLog.duelStartOvertake01" if _armed_duel == RaceTypes.DuelType.OVERTAKE else "raceLog.duelStartDefense01"
-					events.append(_ev("T5", log_key, _entrant_params(duel_opponent)))
+					events.append(_ev("T5", log_key, {}, SPEAKER_RIVAL, duel_opponent))
 			RaceTypes.SettleStage.STAGE_7_RANK_UPDATE:
 				pass  # 섹터 턴의 플레이어 순위 변동은 듀얼 전속 (D05 §4)
 			RaceTypes.SettleStage.STAGE_8_BACKGROUND_AI:
@@ -1060,10 +1060,9 @@ func _resolve_duel() -> Array:
 		events.append(_ev("T5", "raceLog.duelWin01", {"amount": bonus}))
 		if duel_type == RaceTypes.DuelType.OVERTAKE:
 			_swap_with(opponent_id)
-			events.append(_ev("T5", "raceLog.overtakeSuccess01",
-				_entrant_params(opponent_id, {"rank": player_position()})))
+			events.append(_ev("T5", "raceLog.overtakeSuccess01", {}, SPEAKER_RIVAL, opponent_id))
 		else:
-			events.append(_ev("T5", "raceLog.defendSuccess01", _entrant_params(opponent_id)))
+			events.append(_ev("T5", "raceLog.defendSuccess01", {}, SPEAKER_RIVAL, opponent_id))
 	elif bool(skill_mods.get(MOD_DUEL_PENALTY_WAIVED, false)):
 		# SI1 임팩트 가드 — 패배 페널티 면제 (별첨A §4.2 "섀시 −5 / 피추월 무효").
 		# 기존 패배 문면 3종은 **전부 못 쓴다**: `duelLoseDefense01`("피추월")·
@@ -1082,7 +1081,7 @@ func _resolve_duel() -> Array:
 		else:
 			_swap_with(opponent_id)
 			events.append(_ev("T5", "raceLog.duelLoseDefense01", {}))
-			events.append(_ev("T5", "raceLog.defendFail01", _entrant_params(opponent_id)))
+			events.append(_ev("T5", "raceLog.defendFail01", {}, SPEAKER_RIVAL, opponent_id))
 	resonance_duel_bonus = 0.0  # 차기 듀얼 1회 소비 (D13 별첨A §6.6 '차기 듀얼 판정')
 	front_gauge = 0.0
 	rear_gauge = 0.0
@@ -1239,7 +1238,7 @@ func _retire_entrant(id: String) -> void:
 func _after_settlement(events: Array) -> void:
 	if chassis <= 0.0:
 		chassis = 0.0
-		events.append(_ev("T5", "raceLog.playerRetire01", {}))
+		events.append(_ev("T5", "raceLog.playerRetire01", {}, SPEAKER_CREW))
 		_retire_entrant(PLAYER_ID)
 		_transition(RaceTypes.GpState.RETIRE)
 		_finish_gp()
@@ -1381,8 +1380,18 @@ func _gain_charge(amount: int) -> void:
 	charge = clampi(charge + amount, 0, data.param_int("param_charge_cap"))
 
 
-func _ev(phase: String, key: String, params: Dictionary) -> Dictionary:
-	return {"phase": phase, "key": key, "params": params}
+# 화자 축 (개선 회차 6 — 2026-09-04). 표시 층(로그 피드)이 줄마다 화자 도상을 갈라 붙이므로 사건이
+# **누구의 말인가**를 발행 지점이 적는다: `relay`(중계 · 기본) · `crew`(피트 크루) · `rival`(상대 참가자 —
+# `speaker_id` = 참가자 id · 필러 여부는 표시 층이 `entrants` 에서 읽는다). 문면 키와 화자는 같은 지점에서
+# 정해진다 — 갈라 두면 중계 어투의 문면에 라이벌 배지가 붙는다. 플랫폼 무관 데이터 필드다(혼입 0).
+const SPEAKER_RELAY := "relay"
+const SPEAKER_CREW := "crew"
+const SPEAKER_RIVAL := "rival"
+
+
+func _ev(phase: String, key: String, params: Dictionary, speaker: String = SPEAKER_RELAY,
+		speaker_id: String = "") -> Dictionary:
+	return {"phase": phase, "key": key, "params": params, "speaker": speaker, "speaker_id": speaker_id}
 
 
 # 대상 참가자 표기 매개 한 벌 — `name_key` 와 `number` 는 **반드시 함께 간다.**

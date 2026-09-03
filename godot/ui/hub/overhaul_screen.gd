@@ -38,6 +38,14 @@ func _on_hub_ready(payload: Dictionary) -> void:
 	confirm.text = s.text("ui.overhaulScreen.confirm")
 	confirm.disabled = true
 	confirm.pressed.connect(_on_confirm)
+	# ── 포기 동선 (개선 2026-09-04 회차 6) ──
+	# 종전에는 잔여 슬롯과 후보가 남으면 설치 외에 나갈 길이 없었다(종전 가안 "선택 필수").
+	# 오버홀은 보상이지 의무가 아니다 — 남은 슬롯을 버리고 체인을 잇는 출구를 둔다.
+	# 비가역(COM-01)이므로 확정 창을 거친다. 무후보·무슬롯 상태에서는 확정 버튼이 이미
+	# 출구('오버홀 없이 진행')라 포기 버튼을 숨긴다 — 같은 뜻의 버튼이 둘 서면 읽는 값이 없다.
+	var skip := %SkipButton as Button
+	skip.text = s.text("ui.overhaulScreen.skip")
+	skip.pressed.connect(_on_skip)
 	# ── 무후보 출구 (개선 2026-09-03 H5) ──
 	# 후기 시즌에 전 오버홀을 보유하면 추첨이 후보 0 을 돌려주고(`draw_overhaul_candidates` 풀
 	# 고갈) 화면은 전 보유 목록을 비활성으로 그린다. 시즌 체인은 뒤로가 숨겨져 있으므로 **고를
@@ -45,6 +53,7 @@ func _on_hub_ready(payload: Dictionary) -> void:
 	# 슬롯 0(등급표 밖 rank)도 같은 상태다: 어느 후보를 눌러도 설치가 거부되므로 함께 묶는다.
 	if _selectable_count() == 0 or _remaining_slots() <= 0:
 		_arm_pass_through()
+		skip.visible = false
 	_focus_initial()
 
 
@@ -113,13 +122,23 @@ func _on_confirm() -> void:
 		if session.outgame.install_overhaul(_selected, _rank):
 			sfx("overhaul_install")   # SE-U14 시즌 오버홀 적용
 			# 상위권 = 슬롯 2 (D13 §7.1) — 잔여 슬롯과 고를 후보가 남으면 화면에 머문다.
-			# [가안] 잔여 슬롯은 후보 잔존 시 선택 필수 (포기 동선은 씬 개편 사안 — 주력 몫)
+			# 잔여 슬롯과 후보가 남으면 화면에 머문다 — 포기 동선은 SkipButton(`_on_skip`)이 맡는다.
 			if _remaining_slots() > 0 and _selectable_count() > 0:
 				_selected = ""
 				(%ConfirmButton as Button).disabled = true
 				_rebuild_candidates()
 				_focus_initial()
 				return
+			_leave())
+
+
+# 포기 — 남은 슬롯을 버리고 체인 출구(`_leave`)로 간다. 설치와 같은 비가역 확정 창을 탄다.
+func _on_skip() -> void:
+	var s := session.data.strings
+	var summary := s.text("ui.overhaulScreen.skipConfirm", {"slots": _remaining_slots()})
+	var dialog := ConfirmDialog.ask(self, s, summary, "", true, _body_font_size)
+	dialog.resolved.connect(func(accepted: bool):
+		if accepted:
 			_leave())
 
 

@@ -18,11 +18,12 @@ enum Speaker { RELAY, CREW, RIVAL, FILLER }
 
 const ICON_DIR := "res://assets/ui/icons/"
 
-# 화자 → 도상. **4종 중 2종만 실물이 있다** — `CREW`(크루 미니 초상)·`RIVAL`(카 넘버 배지)는
-# D09 §3.3 이 아이콘이 아니라 **초상·배지**로 규정한 축이라 A-UI 아이콘 27종에 애초에 없다.
-# 표에 없는 화자는 텍스트 표지로 되돌아간다 — 실물이 서면 여기 한 줄이 붙는다.
+# 화자 → 도상. 크루 초상(`speaker_crew_16`)과 네임드 배지(`speaker_rival_<id>_16` 8종)는 에셋 유입으로
+# 실물이 섰다(개선 회차 6 결선). 라이벌은 개인 배지라 표가 아니라 `_speaker_asset()` 이 id 로 고른다.
+# 표에 없는 화자는 텍스트 표지로 되돌아간다.
 const ICON_BY_SPEAKER := {
 	Speaker.RELAY: "speaker_relay_16",
+	Speaker.CREW: "speaker_crew_16",
 	Speaker.FILLER: "speaker_filler_16",
 }
 
@@ -51,8 +52,9 @@ func configure(cap: int, font_size: int) -> void:
 	_font_size = font_size
 
 
-func push_line(speaker_mark: String, body: String, speaker: int = SPEAKER_NONE) -> void:
-	var slot := _build_slot(speaker_mark, body, speaker)
+func push_line(speaker_mark: String, body: String, speaker: int = SPEAKER_NONE,
+		speaker_id: String = "") -> void:
+	var slot := _build_slot(speaker_mark, body, speaker, speaker_id)
 	add_child(slot)
 	_slots.append(slot)
 	while _slots.size() > slot_cap:
@@ -68,13 +70,14 @@ func clear_feed() -> void:
 	_slots.clear()
 
 
-func _build_slot(speaker_mark: String, body: String, speaker: int = SPEAKER_NONE) -> Control:
+func _build_slot(speaker_mark: String, body: String, speaker: int = SPEAKER_NONE,
+		speaker_id: String = "") -> Control:
 	if _font_size == UNCONFIGURED:
 		# 값 누락은 "중단·보고" 사안이다 (불변규칙 2) — 임의 대체값으로 그리지 않는다.
 		push_error("LogFeed: configure() not called — font size must come from D13 (param_font_size_body)")
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 3)
-	row.add_child(_build_mark(speaker_mark, speaker))
+	row.add_child(_build_mark(speaker_mark, speaker, speaker_id))
 
 	var text := Label.new()
 	text.text = body
@@ -93,8 +96,20 @@ func _build_slot(speaker_mark: String, body: String, speaker: int = SPEAKER_NONE
 # **텍스트 경로를 지우지 않는 이유:** 도상이 있는 화자는 2종뿐이고 나머지 2종(크루 초상·
 # 카 넘버 배지)은 아이콘 축이 아니다. 텍스트를 걷어내면 그 두 화자가 표지 없이 나온다.
 # 도상 적재가 실패한 경우도 같은 자리로 떨어진다 — 빈 칸으로 조용히 나가지 않게.
-func _build_mark(speaker_mark: String, speaker: int) -> Control:
-	var asset_id := String(ICON_BY_SPEAKER.get(speaker, ""))
+# 화자 → 도상 id. 라이벌은 **개인 배지**이고, 배지가 없는 참가자(필러·미등재 id)는 공용 헬멧으로
+# 되돌아간다 — 빈 표지보다 공용 도상이 열 정렬을 지킨다.
+func _speaker_asset(speaker: int, speaker_id: String) -> String:
+	if speaker == Speaker.RIVAL:
+		if not speaker_id.is_empty():
+			var badge := "speaker_rival_%s_16" % speaker_id
+			if ResourceLoader.exists("%s%s.png" % [ICON_DIR, badge]):
+				return badge
+		return String(ICON_BY_SPEAKER[Speaker.FILLER])
+	return String(ICON_BY_SPEAKER.get(speaker, ""))
+
+
+func _build_mark(speaker_mark: String, speaker: int, speaker_id: String = "") -> Control:
+	var asset_id := _speaker_asset(speaker, speaker_id)
 	if not asset_id.is_empty():
 		var path := "%s%s.png" % [ICON_DIR, asset_id]
 		if ResourceLoader.exists(path):

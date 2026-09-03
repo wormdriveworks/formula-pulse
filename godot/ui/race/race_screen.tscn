@@ -308,15 +308,15 @@ layout_mode = 2
 theme_override_constants/separation = 2
 
 [node name="Frame" type="PanelContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel0" unique_id=1205074632]
-custom_minimum_size = Vector2(64, 62)
+custom_minimum_size = Vector2(72, 70)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_oeioa")
 
 [node name="Symbol" type="TextureRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel0/Frame" unique_id=1536678697]
 texture_filter = 1
-custom_minimum_size = Vector2(32, 32)
+custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
-stretch_mode = 3
+stretch_mode = 5
 
 [node name="Hold" type="CheckBox" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel0" unique_id=415543253]
 layout_mode = 2
@@ -327,15 +327,15 @@ layout_mode = 2
 theme_override_constants/separation = 2
 
 [node name="Frame" type="PanelContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel1" unique_id=418590221]
-custom_minimum_size = Vector2(64, 62)
+custom_minimum_size = Vector2(72, 70)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_livyn")
 
 [node name="Symbol" type="TextureRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel1/Frame" unique_id=2036792606]
 texture_filter = 1
-custom_minimum_size = Vector2(32, 32)
+custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
-stretch_mode = 3
+stretch_mode = 5
 
 [node name="Hold" type="CheckBox" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel1" unique_id=1794864978]
 layout_mode = 2
@@ -346,15 +346,15 @@ layout_mode = 2
 theme_override_constants/separation = 2
 
 [node name="Frame" type="PanelContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel2" unique_id=612467930]
-custom_minimum_size = Vector2(64, 62)
+custom_minimum_size = Vector2(72, 70)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_lyb8d")
 
 [node name="Symbol" type="TextureRect" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel2/Frame" unique_id=1959857268]
 texture_filter = 1
-custom_minimum_size = Vector2(32, 32)
+custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
-stretch_mode = 3
+stretch_mode = 5
 
 [node name="Hold" type="CheckBox" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/E05Reels/Reel2" unique_id=1868634926]
 layout_mode = 2
@@ -491,12 +491,34 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 9
 
-[node name="RejectNotice" type="Label" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=1490233572]
+[node name="NoticeRow" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn" unique_id=1781234600]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="RejectNotice" type="Label" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/NoticeRow" unique_id=1490233572]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_font_sizes/font_size = 9
 horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Sc3DirectionRow" type="HBoxContainer" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/NoticeRow" unique_id=1781234601]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Sc3Left" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/NoticeRow/Sc3DirectionRow" unique_id=1781234602]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
+
+[node name="Sc3Right" type="Button" parent="Root/Middle/LeftColumn/E04TimerRing/ReelZone/ReelColumn/NoticeRow/Sc3DirectionRow" unique_id=1781234603]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 9
 
 [node name="E10LogFeed" type="VBoxContainer" parent="Root/Middle" unique_id=71660236]
 unique_name_in_owner = true

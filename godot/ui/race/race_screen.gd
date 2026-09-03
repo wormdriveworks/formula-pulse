@@ -81,8 +81,9 @@ const SOUND_BY_KEY := {
 # 게이지 위험·주의는 런타임 색이라 `UiPalette` 조회 창구가 바로 처리한다.
 const ALT_ICON_IDS := ["symbol_line", "symbol_trouble"]
 
-# 섹터 속성(A존)의 치수 접미. **릴 심볼에는 붙이지 않는다** — 릴은 `KEEP_CENTERED` 무배율로
-# 32 를 그대로 쓰는 것이 계약이고(D10 §2.2 · 대장 §4.1.1 경고), A존 속성은 슬롯이 16 이라
+# 섹터 속성(A존)의 치수 접미. **릴 심볼에는 붙이지 않는다** — 릴은 32 원도를 그대로 쓰되 표시만
+# `KEEP_ASPECT_CENTERED` 2× 정수 배율(64)로 그린다(개선 회차 6 · 2026-09-04 — 사용자 선택 B · 종전
+# D10 §2.2 무배율 계약은 아카이브 참고). 정수 배율이라 믹셀은 없다. A존 속성은 슬롯이 16 이라
 # 32 원도를 넣으면 1/2 축소가 되어 원도의 절반이 버려진다(8차 §5-③ 실측).
 const ATTR_VARIANT := "_16"
 
@@ -145,6 +146,9 @@ var _snapshot_icons: Array[TextureRect] = []   # SH3 이전 후보 줄의 도상
 @onready var _e05_snapshot: Button = %E05Snapshot
 @onready var _e05_snapshot_new: Button = %E05SnapshotNew
 @onready var _reject_notice: Label = %RejectNotice
+@onready var _clone_row: HBoxContainer = %Sc3DirectionRow
+@onready var _clone_left: Button = %Sc3Left
+@onready var _clone_right: Button = %Sc3Right
 @onready var _e08_charge: Button = %E08ChargeIntervene
 @onready var _e08_confirm: Button = %E08Confirm
 @onready var _e10_log: LogFeed = %E10LogFeed
@@ -248,6 +252,9 @@ func _boot() -> void:
 		_skill_buttons[skill_index].pressed.connect(_on_skill_slot.bind(skill_index))
 	_e05_snapshot.pressed.connect(_on_snapshot_revert)
 	_e05_snapshot_new.pressed.connect(_on_snapshot_keep_new)
+	# SC3 방향 버튼 — 세 입력 중 마우스·포커스 경로 (키 1/3 · 패드 커서는 각 입력 층이 같은 함수를 부른다)
+	_clone_left.pressed.connect(func(): _pick_clone_target(0))
+	_clone_right.pressed.connect(func(): _pick_clone_target(2))
 	_collect_consumable_slots()
 	_apply_static_strings()
 	# TUT-01 — 첫 그랑프리 실주행 위 오버레이(§6 "별도 튜토리얼 스테이지 불신설").
@@ -297,6 +304,8 @@ func _open_pause() -> void:
 
 # 씬에는 표시 문자열을 굳히지 않는다 — 전량 런타임 키 참조 (D09 §6.6 · D12 §8.1).
 func _apply_static_strings() -> void:
+	_clone_left.text = data.strings.text("ui.race.sc3ToLeft")
+	_clone_right.text = data.strings.text("ui.race.sc3ToRight")
 	var s := data.strings
 	(%FrontLabel as Label).text = s.text("ui.race.gaugeFront")
 	(%RearLabel as Label).text = s.text("ui.race.gaugeRear")
@@ -445,7 +454,10 @@ func _handle_pad_context(event: InputEvent) -> bool:
 			return true
 		if pad.button_index == PAD_A:
 			get_viewport().set_input_as_handled()
-			_toggle_hold(_hold_cursor)
+			if _clone_pending:
+				_pick_clone_target(_hold_cursor)   # 대기 중엔 커서 릴 = 대상 지정
+			else:
+				_toggle_hold(_hold_cursor)
 			_pad_combo_used[PAD_X] = true
 			return true
 	# ── RB 홀드 + D패드 좌우 → A : 스킬 슬롯 (D09 §1.3 확정 기준값) ──
@@ -552,6 +564,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var hold_index := HOLD_KEYS.find(key.keycode)
 	if hold_index >= 0:
 		get_viewport().set_input_as_handled()
+		if _clone_pending:
+			_pick_clone_target(hold_index)   # 방향 선택 대기 중엔 번호 키 = 대상 지정
+			return
 		_toggle_hold(hold_index)
 
 
@@ -602,6 +617,7 @@ func _next_turn() -> void:
 	# 고지는 **턴 경계에서 걷힌다** — 거부는 그 턴의 사실이고, 넘어간 턴에 남으면
 	# 아직 유효한 규칙처럼 읽힌다(`limit_hold` 는 실제로 새 턴에서 거짓이 된다).
 	_reject_notice.text = ""
+	_clear_clone_pending()
 	_e04_timer_ring.set_active(false)
 	var info := engine.begin_turn()
 	if String(info.get("type", "")) == "finished":
@@ -937,11 +953,7 @@ func _action_label(label: String, cost_text: String, slot: Dictionary) -> String
 # 패드 커서 하나뿐이고(별첨A §A-6 "클릭 = 홀드 토글"), 스킬용 선택 어휘를 새로 만들면
 # 같은 릴에 두 가지 선택 상태가 생긴다.
 #
-# `[가안]` **SC3(심볼 복제)의 target/donor 배정** — 선택 2개 중 **낮은 인덱스 = donor ·
-# 높은 인덱스 = target** 으로 둔다. 엔진은 `provisional[target] = provisional[donor]` 이므로
-# 배정이 뒤집히면 플레이어 의도와 반대로 덮인다. 릴이 좌→우 순차 정지라 좌측이 먼저 확정된
-# 값이라는 것이 유일한 방향 근거인데, **정본이 대상 지정 흐름을 정하지 않았다** —
-# 진짜 답은 대상 지정 UI 이고 그것은 판정 사안이다(회신 판정 요청).
+# SC3(심볼 복제)의 원본·대상 배정은 `_begin_symbol_clone` 이 맡는다(개선 회차 6 — 종전 가안 인덱스 배정 폐문).
 func _skill_args(family: String) -> Dictionary:
 	var picked: Array = []
 	for i in range(REEL_COUNT):
@@ -950,27 +962,11 @@ func _skill_args(family: String) -> Dictionary:
 	match family:
 		"hold":
 			return {"keep": picked}
-		# ── SC3 대상·공여 배정 = **[가안]** (판정 요청 ㉕ · 15차 ⑤ 폐문 조건 부여) ──
-		#
-		# 낮은 인덱스 = 공여(donor) · 높은 인덱스 = 대상(target). **정본이 방향을 말하지
-		# 않는다** — 별첨A §4.2 는 *"인접 릴 심볼 복제"* 까지만이고 어느 쪽이 원본인지는
-		# 비어 있다.
-		#
-		# **이 [가안]은 규칙으로 닫히지 않는다.** 홀드 체크박스는 *"이 릴을 고정한다"* 는
-		# 뜻인데 변환 계열에서 두 개를 켜면 **켠 릴 하나가 덮인다** — 체크박스의 뜻과
-		# 반대로 움직인다. 하나만 켜서 공여로 삼으면 대상이 두 인접 중 어느 쪽인지가 다시
-		# 비고, 순서로 정하려 해도 체크박스는 **순서를 기억하지 않는다.**
-		# 즉 **한 줄의 체크박스로는 방향 있는 짝을 표현할 수 없다** — 표현 수단이 없는 것이지
-		# 규칙이 없는 것이 아니다.
-		#
-		# **폐문 조건 (IMPL-424 원칙):** 대상 지정 UI 가 서는 회차. 그때 이 분기는 통째로
-		# 그 UI 의 산출을 받는 한 줄이 된다. 그때까지 현행 배정을 유지한다 —
-		# 임의로 뒤집으면 이미 익힌 거동만 바뀌고 모호함은 그대로다.
+		# 변환 계열 = 홀드한 릴이 대상. SC3(심볼 복제)는 여기를 타지 않는다 — `_begin_symbol_clone` 이
+		# 원본·대상을 정한다(개선 회차 6 · 종전 가안 인덱스 배정 폐문).
 		"convert":
 			if picked.is_empty():
 				return {}   # 엔진이 "target" 으로 거부한다 — 화면이 대신 판정하지 않는다
-			if picked.size() >= 2:
-				return {"target": int(picked[picked.size() - 1]), "donor": int(picked[0])}
 			return {"target": int(picked[0])}
 		_:
 			return {}
@@ -985,8 +981,20 @@ func _on_skill_slot(index: int) -> void:
 	if index >= slots.size():
 		return
 	var slot: Dictionary = slots[index]
+	if String(slot.get("effect", "")) == "symbol_clone":
+		_begin_symbol_clone(index)   # 대상 지정 흐름 — 홀드 1개 = 원본 (회차 6)
+		return
+	_use_skill(index, _skill_args(String(slot["family"])))
+
+
+# 스킬 발동 공통 경로 — 인자 조립(`_skill_args` · SC3 지정 흐름)과 발동·후처리를 가른다.
+func _use_skill(index: int, args: Dictionary) -> void:
+	var slots: Array = engine.skill_slots()
+	if index >= slots.size():
+		return
+	var slot: Dictionary = slots[index]
 	var family := String(slot["family"])
-	var outcome := engine.use_skill(String(slot["id"]), _skill_args(family))
+	var outcome := engine.use_skill(String(slot["id"]), args)
 	if not bool(outcome.get("ok", false)):
 		_report_outcome(false, String(outcome.get("error", "")))   # 거부 = 비용·횟수 무변경 (계약 §1.1)
 		_refresh_action_enabled()
@@ -1010,6 +1018,63 @@ func _on_skill_slot(index: int) -> void:
 	_refresh_snapshot_row()
 	_refresh_resources()
 	_refresh_action_enabled()
+
+
+# ── SC3 심볼 복제 대상 지정 (개선 회차 6 — 2026-09-04 · 사용자 선택 "홀드 1개 = 원본") ──
+#
+# 종전 가안(낮은 인덱스 = 공여 · 높은 인덱스 = 대상)은 체크박스의 뜻("이 릴을 지킨다")과 반대로
+# 움직였다 — 켠 릴 하나가 덮였다. 이제 **홀드한 릴이 원본(공여)** 이고 대상은 그 이웃이다.
+# 양 끝 릴은 이웃이 하나라 즉시 발동하고, 가운데 릴은 방향(1번/3번)을 한 번 더 고른다.
+# 방향은 고지 아래 두 버튼(마우스·포커스) · 홀드 키 1/3 · 패드 X 홀드 + 커서 → A 로 받는다.
+# 홀드가 0개·2개 이상이면 고지로 거부한다 — 엔진의 "target" 거부(침묵)보다 앞서 화면이 안내한다.
+# 대기는 턴 경계·홀드 변경·발동에서 걷힌다. 대기 중 발동 창이 닫히면 엔진 phase 거부가 받는다.
+const CLONE_DONOR_MIDDLE := 1
+var _clone_pending := false
+var _clone_slot := -1
+
+
+func _begin_symbol_clone(index: int) -> void:
+	var picked := _held_indices()
+	if picked.size() != 1:
+		_reject_notice.text = data.strings.text("ui.race.sc3HoldOne")
+		sfx("input_rejected")   # SE-I14 — 조작 안내도 거부음과 같은 채널
+		return
+	var donor := int(picked[0])
+	if donor != CLONE_DONOR_MIDDLE:
+		_use_skill(index, {"target": CLONE_DONOR_MIDDLE, "donor": donor})
+		return
+	_clone_pending = true
+	_clone_slot = index
+	_reject_notice.text = data.strings.text("ui.race.sc3PickDirection")
+	_clone_row.visible = true
+	_clone_left.grab_focus()
+
+
+func _pick_clone_target(target: int) -> void:
+	if not _clone_pending or absi(target - CLONE_DONOR_MIDDLE) != 1:
+		return
+	var index := _clone_slot
+	_clear_clone_pending()
+	_use_skill(index, {"target": target, "donor": CLONE_DONOR_MIDDLE})
+
+
+func _clear_clone_pending() -> void:
+	if not _clone_pending:
+		return
+	_clone_pending = false
+	_clone_slot = -1
+	_clone_row.visible = false
+	if _reject_notice.text == data.strings.text("ui.race.sc3PickDirection"):
+		_reject_notice.text = ""
+	_ensure_default_focus()   # 방향 버튼이 숨으면 포커스가 사라진다 — 확정으로 되돌린다
+
+
+func _held_indices() -> Array:
+	var picked: Array = []
+	for i in range(REEL_COUNT):
+		if _hold_boxes[i].button_pressed:
+			picked.append(i)
+	return picked
 
 
 # ── 스킬 거부 고지 (26차) ──
@@ -1166,6 +1231,7 @@ func _toggle_hold(index: int) -> void:
 
 
 func _on_hold_toggled(pressed: bool) -> void:
+	_clear_clone_pending()   # 원본이 바뀌면 방향 대기는 무효다
 	# SE-I02/I03 = 토글 쌍 (D11 §2.2 — 온이 상향·오프가 하향 음정). 홀드 '적용'이 아니라
 	# 토글 자체의 피드백이므로 릴을 실제로 돌리는 리스핀(SE-I04)과 별개 지점이다.
 	sfx("hold_on" if pressed else "hold_off")
@@ -1250,7 +1316,7 @@ func _reveal_reels(indices: Array, start_window: bool) -> void:
 # (교체 대상 = 라인·트러블 2종) 부재는 결함이 아니라 미유입이므로 여기서 보고하지 않는다.
 #
 # **치수 축은 소비 지점이 정한다** (IMPL-226 — 이 창구를 릴 심볼과 섹터 속성이 함께 쓴다).
-# 릴은 32 고정(무배율 계약)이고 섹터 속성만 `_16` 이므로, 창구 안에서 치수를 판단하면
+# 릴은 32 원도 고정(표시 2× 정수 배율 — 회차 6)이고 섹터 속성만 `_16` 이므로, 창구 안에서 치수를 판단하면
 # 두 소비부가 서로의 규격을 밟는다. 그래서 `variant` 를 인자로 받고 기본값은 32(빈 접미)다.
 #
 # **두 축의 이름 순서를 고정한다: `<id>[_alt][_16]`.** 색각 대체는 도상 축, 치수는 치수 축이라
@@ -1331,7 +1397,7 @@ func _refresh_strip() -> void:
 		var sector_entry := data.sector_entry(engine.sector)
 		var corner_key := String(sector_entry.get("name_key", ""))
 		_e02_corner.text = s.text(corner_key)
-		# 섹터 속성만 `_16` 이다 — 릴 심볼은 32 무배율 계약(`ATTR_VARIANT` 주석 참조).
+		# 섹터 속성만 `_16` 이다 — 릴 심볼은 32 원도·2× 정수 배율 표시(`ATTR_VARIANT` 주석 참조).
 		_e02_attr.texture = _icon_texture(String(sector_entry.get("main_attr", "")), ATTR_VARIANT)
 	else:
 		_e02_corner.text = ""
@@ -1365,8 +1431,8 @@ func _refresh_resources() -> void:
 	if critical and not _chassis_warned:
 		sfx("chassis_warning")
 		_e10_log.push_line(
-			s.text("ui.race.speakerRelay"), s.text("raceLog.chassisCritical01"),
-			LogFeed.Speaker.RELAY
+			s.text("ui.race.speakerCrew"), s.text("raceLog.chassisCritical01"),
+			LogFeed.Speaker.CREW
 		)
 	_chassis_warned = critical
 	# SE-I13 = ◆ 스택 +1 동기. 획득원(심볼·안정 완주·듀얼 승리 보너스)이 여럿이라
@@ -1958,6 +2024,34 @@ func _log_display_key(key: String) -> String:
 	return String(variants[posmod(basis + key.hash(), variants.size())])
 
 
+# ── 화자 축 (개선 회차 6 — 2026-09-04) ──
+# 사건의 화자(엔진 `_ev` 의 speaker)를 피드 화자로 옮긴다. 라이벌은 참가자 id 로 오고 **필러 여부는
+# 여기서 갈린다** — 엔진은 화자를 '상대 참가자'로만 적고, 배지가 있는지는 표시 층의 사정이다.
+# 표지 문면(도상 부재 시 되돌림)도 화자별 키다.
+const SPEAKER_MARK_KEYS := {
+	LogFeed.Speaker.RELAY: "ui.race.speakerRelay",
+	LogFeed.Speaker.CREW: "ui.race.speakerCrew",
+	LogFeed.Speaker.RIVAL: "ui.race.speakerRival",
+	LogFeed.Speaker.FILLER: "ui.race.speakerRival",
+}
+
+
+func _log_speaker(speaker: String, speaker_id: String) -> int:
+	match speaker:
+		RaceEngine.SPEAKER_CREW:
+			return LogFeed.Speaker.CREW
+		RaceEngine.SPEAKER_RIVAL:
+			if engine != null and engine.entrants.has(speaker_id) and bool(engine.entrants[speaker_id].get("is_filler", false)):
+				return LogFeed.Speaker.FILLER
+			return LogFeed.Speaker.RIVAL
+		_:
+			return LogFeed.Speaker.RELAY
+
+
+func _speaker_mark_text(speaker: int) -> String:
+	return data.strings.text(String(SPEAKER_MARK_KEYS.get(speaker, "ui.race.speakerRelay")))
+
+
 func _push_events(events: Array) -> void:
 	for event in events:
 		var key := String(event.get("key", ""))
@@ -1991,8 +2085,8 @@ func _push_events(events: Array) -> void:
 			# 텍스트 표지는 도상 부재·적재 실패 시의 되돌림 경로로 함께 넘긴다.
 			# **`speaker_filler` 는 여기서 뜨지 않는다** — 필러 드라이버 발화를 코어가
 			# 발행하지 않으므로 결속할 호출 지점이 없다(회신 §2-② 보고분).
-			_e10_log.push_line(
-				data.strings.text("ui.race.speakerRelay"), body, LogFeed.Speaker.RELAY
-			)
+			var speaker_id := String(event.get("speaker_id", ""))
+			var speaker := _log_speaker(String(event.get("speaker", RaceEngine.SPEAKER_RELAY)), speaker_id)
+			_e10_log.push_line(_speaker_mark_text(speaker), body, speaker, speaker_id)
 	_refresh_strip()
 	_refresh_resources()

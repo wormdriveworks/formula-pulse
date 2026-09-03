@@ -51,13 +51,13 @@ ui.race.fillerName,No.{number} 머신,No.{number} Machine,No.{number} マシン
 ui.race.playerName,플레이어,Player,プレイヤー
 raceLog.gpStart01,{circuit} — 그리드 정렬 완료.,{circuit} — grid set.,{circuit} — グリッド整列完了。
 raceLog.sectorStart01,랩 {lap} 섹터 {sector} 진입.,"Lap {lap}, Sector {sector}.",ラップ{lap} セクター{sector}進入。
-raceLog.overtakeSuccess01,{target} 추월. 포지션 {rank}.,Overtook {target}. Position {rank}.,{target}を抜く。ポジション{rank}。
-raceLog.defendSuccess01,{target}의 공세를 막아냈다.,Held off {target}.,{target}の攻勢を防いだ。
-raceLog.defendFail01,{target}에게 자리를 내줬다.,Lost the position to {target}.,{target}にポジションを譲った。
-raceLog.troubleHit01,머신 이상. 섀시 {amount}.,Machine fault. Chassis {amount}.,マシン異常。シャシー{amount}。
-raceLog.stableSector01,안정 주행. 차지 +{amount}.,Clean running. Charge +{amount}.,安定走行。チャージ+{amount}。
-raceLog.duelStartOvertake01,추월 듀얼 — 상대 {target}.,Overtake duel — {target}.,追い抜きデュエル — 相手{target}。
-raceLog.duelStartDefense01,방어 듀얼 — 상대 {target}.,Defense duel — {target}.,防御デュエル — 相手{target}。
+raceLog.overtakeSuccess01,…다음 코너에서 보자.,...See you at the next corner.,…次のコーナーで会おう。
+raceLog.defendSuccess01,…거기서 버틸 줄은.,...Didn't think you'd keep that line.,…そこで耐えるとはな。
+raceLog.defendFail01,먼저 간다. 따라와 봐.,Going ahead. Try to keep up.,先に行く。ついて来い。
+raceLog.troubleHit01,섀시에 충격. {amount} 손실.,Chassis hit. {amount} lost.,シャシーに衝撃。{amount}損失。
+raceLog.stableSector01,"좋아, 안정적이다. 차지 +{amount}.","Good, steady. Charge +{amount}.",いいぞ、安定してる。チャージ+{amount}。
+raceLog.duelStartOvertake01,쉽게 내줄 자리는 아냐.,Not giving this spot up easy.,この位置、簡単には譲らない。
+raceLog.duelStartDefense01,뒤에서 간다. 비켜.,Coming through. Move.,後ろから行く。どけ。
 raceLog.duelWin01,듀얼 승리. 차지 +{amount}.,Duel won. Charge +{amount}.,デュエル勝利。チャージ+{amount}。
 raceLog.duelLoseOvertake01,듀얼 패배. 섀시 {amount}.,Duel lost. Chassis {amount}.,デュエル敗北。シャシー{amount}。
 raceLog.duelLoseDefense01,듀얼 패배. 피추월.,Duel lost. Overtaken.,デュエル敗北。抜かれた。
@@ -66,7 +66,7 @@ raceLog.chanceProc01,결정적 순간이 열린다.,A decisive moment opens.,決
 raceLog.chanceDuel01,찬스 3매치 — 즉시 듀얼.,Chance three-match — duel now.,チャンス3マッチ — 即時デュエル。
 raceLog.momentum01,흐름을 탔다. 전방 +{amount}.,Momentum caught. Front +{amount}.,流れに乗った。前方+{amount}。
 raceLog.aiRetire01,{target} 리타이어.,{target} retires.,{target} リタイア。
-raceLog.playerRetire01,섀시 한계. 리타이어.,Chassis limit. Retired.,シャシー限界。リタイア。
+raceLog.playerRetire01,섀시 한계. 머신 세운다.,Chassis gone. Bringing it in.,シャシー限界。マシンを止める。
 raceLog.gpFinish01,체커. 최종 {rank}위.,Chequered flag. Final P{rank}.,チェッカー。最終{rank}位。
 raceLog.timeout01,머신이 코너에 진입해버렸다.,The machine entered the corner regardless.,マシンはそのままコーナーへ進入した。
 vane.brief.sector01,섹터 {sector}. 변수 감시 중.,Sector {sector}. Variables under watch.,セクター{sector}。変数監視中。
@@ -79,12 +79,12 @@ raceLog.resonanceEnter01,미승인 출력이 감지된다.,Unsanctioned output d
 raceLog.resonanceProc01,레조넌스 — 출력이 넘친다.,Resonance — output overflows.,レゾナンス — 出力があふれる。
 raceLog.timeout02,판단이 늦었다. 머신이 먼저 갔다.,Too slow — the machine went first.,判断が遅れた。マシンが先に行った。
 raceLog.timeout03,개입 없이 코너를 받아냈다.,Took the corner with no input.,介入なしでコーナーを受けた。
-raceLog.troubleHit02,차체가 비명을 지른다. 섀시 {amount}.,The chassis screams. Chassis {amount}.,車体が悲鳴を上げる。シャシー{amount}。
-raceLog.troubleHit03,충격을 못 받아냈다. 섀시 {amount}.,Impact not absorbed. Chassis {amount}.,衝撃を受け切れない。シャシー{amount}。
-raceLog.stableSector02,라인이 깨끗하다. 차지 +{amount}.,Clean line. Charge +{amount}.,ラインがきれいだ。チャージ+{amount}。
-raceLog.stableSector03,리듬을 지켰다. 차지 +{amount}.,Held the rhythm. Charge +{amount}.,リズムを守った。チャージ+{amount}。
+raceLog.troubleHit02,차체 진동 커진다. 섀시 {amount}.,Vibration rising. Chassis {amount}.,車体の振動が増す。シャシー{amount}。
+raceLog.troubleHit03,충격 흡수 실패. 섀시 {amount}.,Failed to absorb. Chassis {amount}.,衝撃を吸収できず。シャシー{amount}。
+raceLog.stableSector02,라인 깨끗해. 차지 +{amount}.,Clean line. Charge +{amount}.,ラインがきれいだ。チャージ+{amount}。
+raceLog.stableSector03,리듬 유지. 차지 +{amount}.,Rhythm kept. Charge +{amount}.,リズム維持。チャージ+{amount}。
 raceLog.momentum02,기세가 붙는다. 전방 +{amount}.,Carrying speed. Front +{amount}.,勢いがつく。前方+{amount}。
-raceLog.chassisCritical01,섀시 임계. 한계가 가깝다.,Chassis critical. The limit is near.,シャシー臨界。限界が近い。
+raceLog.chassisCritical01,섀시 임계다. 무리하지 마.,Chassis critical. Don't push it.,シャシー限界域。無理はするな。
 ui.eventCategory.c1,정비·머신,Service & Machine,整備・マシン
 ui.eventCategory.c2,크레딧·스폰서,Credits & Sponsors,クレジット・スポンサー
 ui.eventCategory.c3,관계·조우,Relations & Encounters,関係・遭遇
@@ -317,7 +317,13 @@ ui.race.skillRejectedAlreadyHold,이미 홀드를 썼다,Hold already used,ホ�
 ui.race.skillRejectedAlreadyMod,이미 적용된 수식,Already applied,既に適用済み
 ui.race.skillRejectedDuelTurn,섹터 턴 전용,Sector turns only,セクターターン専用
 ui.race.skillRejectedSectorTurn,듀얼 턴 전용,Duel turns only,デュエルターン専用
+ui.race.sc3HoldOne,복제할 원본 릴 하나만 홀드하세요.,Hold exactly one reel as the source.,複製元のリールを1つだけホールドしてください。
+ui.race.sc3PickDirection,복제 방향을 고르세요.,Choose the copy direction.,複製方向を選んでください。
+ui.race.sc3ToLeft,← 1번 릴로 복제,← Copy to Reel 1,← リール1へ複製
+ui.race.sc3ToRight,3번 릴로 복제 →,Copy to Reel 3 →,リール3へ複製 →
 ui.race.speakerRelay,중계,Relay,実況
+ui.race.speakerCrew,피트,Pit,ピット
+ui.race.speakerRival,상대,Rival,相手
 ui.race.actionWithCost,{label} {cost},{label} {cost},{label} {cost}
 ui.race.actionWithUses,{label} {cost} {left},{label} {cost} {left},{label} {cost} {left}
 ui.race.holdKeyFormat,홀드 {index},Hold {index},ホールド{index}
@@ -477,6 +483,8 @@ ui.overhaulScreen.confirm,오버홀 확정,Confirm Overhaul,オーバーホー�
 ui.overhaulScreen.installConfirm,{overhaul} 오버홀을 확정합니다.,Confirm the {overhaul} overhaul.,{overhaul} オーバーホールを確定します。
 ui.overhaulScreen.passThrough,오버홀 없이 진행,Continue Without Overhaul,オーバーホールなしで進む
 ui.overhaulScreen.noCandidates,장착할 수 있는 후보가 없습니다.,No candidates available to install.,装着できる候補がありません。
+ui.overhaulScreen.skip,남은 슬롯 포기,Skip Remaining,残りを放棄
+ui.overhaulScreen.skipConfirm,남은 오버홀 슬롯 {slots}개를 포기하고 진행합니다.,Forgo the remaining {slots} overhaul slot(s) and continue.,残りのオーバーホール枠{slots}個を放棄して進みます。
 ui.hub.stationLockedFormat,{station} — {crew} 합류 시,{station} — on {crew} joining,{station} — {crew}加入時
 ui.records.relationFormat,{axis} · {stage},{axis} · {stage},{axis} · {stage}
 ui.duel.playerFormat,No.{number},No.{number},No.{number}
@@ -724,7 +732,7 @@ ui.event.pdMediaDay,미디어 데이,Media Day,メディアデー
 ui.event.pdLeagueGala,리그 갈라,League Gala,リーグガラ
 ui.event.pdCeremonyRehearsal,세리머니 리허설,Ceremony Rehearsal,セレモニーリハーサル
 ui.event.pdPitWalk,피트 워크,Pit Walk,ピットウォーク
-raceLog.consumableUse01,{item} 사용.,{item} used.,{item} 使用。
+raceLog.consumableUse01,{item} 투입 완료.,{item} deployed.,{item}投入完了。
 ui.milestone.firstFinish,첫 완주,First Finish,初完走
 ui.milestone.firstPoint,첫 포인트,First Point,初ポイント
 ui.milestone.firstPodium,첫 포디움,First Podium,初ポディウム

@@ -295,22 +295,36 @@ func _achievement_icons(data: GameData) -> void:
 # Label** 이어야 하고 둘의 표지 폭이 같아야 한다(폭이 갈리면 본문 시작 x 가 어긋난다).
 func _log_feed_speaker_marks(data: GameData) -> void:
 	var feed := LogFeed.new()
-	feed.configure(4, data.param_int("param_font_size_body"))
+	feed.configure(6, data.param_int("param_font_size_body"))
 	feed.push_line("MARK", "body", LogFeed.Speaker.RELAY)
 	feed.push_line("MARK", "body", LogFeed.Speaker.CREW)
 	feed.push_line("MARK", "body")
+	feed.push_line("MARK", "body", LogFeed.Speaker.RIVAL, "ai_maro")
+	feed.push_line("MARK", "body", LogFeed.Speaker.RIVAL, "filler_03")
 	var relay_mark := feed.get_child(0).get_node("Mark")
 	var crew_mark := feed.get_child(1).get_node("Mark")
 	var none_mark := feed.get_child(2).get_node("Mark")
+	var rival_mark := feed.get_child(3).get_node("Mark")
+	var filler_mark := feed.get_child(4).get_node("Mark")
 	_ok("중계 화자 = 도상", relay_mark is TextureRect, relay_mark.get_class())
 	_ok("중계 도상 실적재",
 		relay_mark is TextureRect and (relay_mark as TextureRect).texture != null)
-	# 크루는 D09 §3.3 이 '미니 초상'으로 규정한 축이라 아이콘 27종에 없다 — 텍스트로 되돌아간다.
-	_ok("도상 없는 화자 = 텍스트 되돌림", crew_mark is Label, crew_mark.get_class())
-	_ok("화자 미지정도 텍스트 되돌림", none_mark is Label, none_mark.get_class())
+	# 크루 초상·네임드 배지는 에셋 유입으로 실물이 섰다(개선 회차 6 결선) — 도상 경로다.
+	_ok("크루 화자 = 도상 실적재",
+		crew_mark is TextureRect and (crew_mark as TextureRect).texture != null, crew_mark.get_class())
+	_ok("네임드 라이벌 = 개인 배지",
+		rival_mark is TextureRect and (rival_mark as TextureRect).texture != null
+			and (rival_mark as TextureRect).texture.resource_path.ends_with("speaker_rival_ai_maro_16.png"),
+		rival_mark.get_class())
+	# 배지 없는 참가자(필러·미등재 id)는 공용 헬멧 — 빈 표지가 아니다.
+	_ok("배지 없는 참가자 = 공용 헬멧 되돌림",
+		filler_mark is TextureRect and (filler_mark as TextureRect).texture != null
+			and (filler_mark as TextureRect).texture.resource_path.ends_with("speaker_filler_16.png"),
+		filler_mark.get_class())
+	_ok("화자 미지정 = 텍스트 되돌림", none_mark is Label, none_mark.get_class())
 	_ok("표지 폭 = 도상·텍스트 공통",
 		(relay_mark as Control).custom_minimum_size.x
-			== (crew_mark as Control).custom_minimum_size.x)
+			== (none_mark as Control).custom_minimum_size.x)
 	feed.free()
 
 
@@ -828,9 +842,10 @@ func _filler_log_substitution(data: GameData) -> void:
 	_ok("전제: 필러 name_key 에 {number} 자리가 있다",
 		data.strings.text("ui.race.fillerName").contains("{number}"))
 
-	# 듀얼 3분기 — 대상 매개를 싣는 문면 전부. 승패는 `judgment >= threshold` 이고
-	# 레조넌스 보너스가 판정에 직접 가산되는 외부 레버라 그것으로 가른다
-	# (릴 결과를 흉내 내지 않는다 — 규칙은 코어 검사 몫이다).
+	# 듀얼 3분기 — 듀얼 결과 로그는 **상대의 말**(화자 = rival · 개선 회차 6)이라 이름을 문면에
+	# 싣지 않는다. 정체는 화자 배지가 진다 — 필러는 개인 배지가 없어 공용 헬멧이다. 승패는
+	# `judgment >= threshold` 이고 레조넌스 보너스가 판정에 직접 가산되는 외부 레버라 그것으로
+	# 가른다(릴 결과를 흉내 내지 않는다 — 규칙은 코어 검사 몫이다).
 	var cases := [
 		{"type": RaceTypes.DuelType.OVERTAKE, "win": true, "label": "추월 성공"},
 		{"type": RaceTypes.DuelType.DEFENSE, "win": true, "label": "방어 성공"},
@@ -838,11 +853,41 @@ func _filler_log_substitution(data: GameData) -> void:
 	]
 	for duel_case in cases:
 		var events := _force_filler_duel(engine, filler_id, int(duel_case["type"]), bool(duel_case["win"]))
-		_assert_filler_line(screen, events, String(duel_case["label"]), number)
+		_assert_rival_duel_line(screen, events, String(duel_case["label"]), filler_id)
 
-	# AI 리타이어 — 주력이 실기에서 실제로 본 문면이 이 경로다.
+	# AI 리타이어 — 중계가 이름을 부르는 문면(화자 = relay). **카 넘버 치환 기제의 유일한 산지**이므로
+	# 이 축이 `_entrant_params` 의 중첩 키 선해결(IMPL-210·211)을 계속 지킨다.
 	_assert_filler_line(screen, _force_filler_retire(engine, filler_id), "AI 리타이어", number)
 	_unmount(screen)
+
+
+# 듀얼 결과 = 상대의 말 (개선 회차 6). 화자 태그(rival)·화자 id·필러 표지(공용 헬멧)를 한 줄로 본다.
+# 이름 문면이 아니라 **배지**가 정체를 지므로 카 넘버 치환이 아니라 표지 도상을 검사한다.
+func _assert_rival_duel_line(screen: Control, events: Array, label: String, opponent_id: String) -> void:
+	var rival_events: Array = []
+	for event in events:
+		if String(event.get("speaker", "")) == RaceEngine.SPEAKER_RIVAL:
+			rival_events.append(event)
+	_ok("%s — 라이벌 화자 발행 1건" % label, rival_events.size() == 1, "발행 %d건" % rival_events.size())
+	if rival_events.is_empty():
+		return
+	_ok("%s — 화자 id = 상대" % label,
+		String(rival_events[0].get("speaker_id", "")) == opponent_id,
+		String(rival_events[0].get("speaker_id", "")))
+	screen._e10_log.clear_feed()
+	screen._push_events(rival_events)
+	var slots: Array = screen._e10_log.get_children()
+	_ok("%s — 로그 줄 1개 렌더" % label, slots.size() == 1, "줄 %d개" % slots.size())
+	if slots.is_empty():
+		return
+	var mark := (slots[0] as Control).get_child(0)
+	_ok("%s — 필러 표지 = 공용 헬멧 도상" % label,
+		mark is TextureRect and (mark as TextureRect).texture != null
+			and (mark as TextureRect).texture.resource_path.ends_with("speaker_filler_16.png"),
+		mark.get_class())
+	var body := (slots[0] as Control).get_child(1) as Label
+	_ok("%s — 미치환 자리 잔존 0" % label, body != null and not body.text.contains("{"),
+		body.text if body != null else "")
 
 
 # 듀얼 성립 조건(인접·미소멸)을 세우고 승패를 강제해 대상 문면을 뽑는다.
@@ -1086,7 +1131,7 @@ func _icon_size_regimes(data: GameData) -> void:
 	_ok("섹터 속성 6종 _16 적재", attr_missing == 0, "missing=%d" % attr_missing)
 	_ok("섹터 속성 = _16 파일 · 16×16", attr_wrong == 0, "wrong=%d" % attr_wrong)
 
-	# ── 릴 심볼 = 32 무배율 (접미 없음) ──
+	# ── 릴 심볼 = 32 원도 · 접미 없음 (표시는 2× 정수 배율 — 개선 회차 6) ──
 	# **여기가 창구 공유의 위험 지점이다** — 창구가 치수를 스스로 정하면 릴도 16 이 된다.
 	var reel_ids := ["symbol_slipstream", "symbol_braking", "symbol_line",
 		"symbol_trouble", "symbol_chance", "symbol_pulse"]
@@ -1096,7 +1141,7 @@ func _icon_size_regimes(data: GameData) -> void:
 		if tex == null or tex.resource_path.get_file().get_basename() != id \
 			or tex.get_size() != Vector2(32, 32):
 			reel_wrong += 1
-	_ok("릴 심볼 6종 = 32 무배율 유지", reel_wrong == 0, "wrong=%d" % reel_wrong)
+	_ok("릴 심볼 6종 = 32 원도 유지 (표시 2× 정수 배율)", reel_wrong == 0, "wrong=%d" % reel_wrong)
 
 	# ── 실배치 슬롯이 등배인가 ──
 	# 파일이 맞아도 슬롯이 어긋나면 화면에서 다시 축소된다(Zone A 가 그랬다).
@@ -3254,6 +3299,7 @@ const NOTICE_KEYS := [
 	"ui.race.skillRejectedHoldCap", "ui.race.skillRejectedLimitHold",
 	"ui.race.skillRejectedAlreadyHold", "ui.race.skillRejectedAlreadyMod",
 	"ui.race.skillRejectedDuelTurn", "ui.race.skillRejectedSectorTurn",
+	"ui.race.sc3HoldOne", "ui.race.sc3PickDirection",   # SC3 대상 지정 안내 (개선 회차 6) — 같은 슬롯에 선다
 ]
 const BODY_FONT_PATH := "res://assets/fonts/Galmuri9.ttf"
 const STRINGS_TABLE := "res://data/strings/strings.csv"
