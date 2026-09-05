@@ -983,3 +983,43 @@ vnChoice.act4.opt1,[헬멧을 내려놓는다],[Set the helmet down],[ヘルメ�
 vnChoice.act4.opt2,[테오의 어깨를 친다],[Clap Theo on the shoulder],[テオの肩をたたく]
 vnChoice.epilogue.opt1,[테오에게 공구를 건넨다],[Hand Theo a tool],[テオに工具を渡す]
 vnChoice.epilogue.opt2,[벽의 사진을 본다],[Look at the wall photo],[壁の写真を見る]
+raceLog.duelStartOvertake.lorentz,계산에 없는 시도군.,An attempt outside the calculation.,計算にない試みだな。
+raceLog.duelStartDefense.lorentz,지나간다. 라인 유지해라.,Passing. Keep your line.,抜く。ラインを保て。
+raceLog.overtakeSuccess.lorentz,…재현해 봐라. 다음에도.,...Reproduce it. Next time too.,…再現してみろ。次もだ。
+raceLog.defendSuccess.lorentz,오차다. 다음 코너에서 수정한다.,A deviation. Corrected at the next corner.,誤差だ。次のコーナーで修正する。
+raceLog.defendFail.lorentz,예정대로다.,As scheduled.,予定通りだ。
+raceLog.duelStartOvertake.maro,"여기까지야, 13번.","This is as far as you go, 13.",ここまでよ、13番。
+raceLog.duelStartDefense.maro,"그 자리, 네 것이 아냐.",That place isn't yours.,その位置、あなたのものじゃない。
+raceLog.overtakeSuccess.maro,…이런 게 통할 리가 없는데.,...This shouldn't be working.,…こんなのが通るはずない。
+raceLog.defendSuccess.maro,운이야. 이번만.,Luck. Just this once.,運よ。今回だけ。
+raceLog.defendFail.maro,서열은 이렇게 정해지는 거야.,This is how the order is decided.,序列はこうして決まるの。
+raceLog.duelStartOvertake.diaz,"오, 덤비는 거냐? 좋아!","Oh, coming at me? Good!",おっ、来るのか？いいぞ！
+raceLog.duelStartDefense.diaz,옆으로 붙는다. 피하지 마!,Pulling alongside. Don't flinch!,横に並ぶ。逃げるな！
+raceLog.overtakeSuccess.diaz,하! 제대로 붙었잖아.,Ha! Now that was a fight.,ハッ！いい勝負だったな。
+raceLog.defendSuccess.diaz,버텼네. 마음에 들어.,You stood your ground. I like it.,耐えたな。気に入った。
+raceLog.defendFail.diaz,다음엔 피하지 말고 와.,"Next time, don't back off.",次は逃げずに来い。
+raceLog.duelStartOvertake.volkova,"뭐야, 감히 나한테?!",What? You dare?!,何、私に挑むの？！
+raceLog.duelStartDefense.volkova,"느려, 느려! 비켜!","Slow, slow! Move!",遅い、遅い！どけ！
+raceLog.overtakeSuccess.volkova,말도 안 돼… 다시 해!,No way... Again!,ありえない…もう一回！
+raceLog.defendSuccess.volkova,"아, 진짜! 한 번만 더!","Ugh, seriously! One more!",もう、本当に！あと一回！
+raceLog.defendFail.volkova,봤지? 이게 나야.,See that? That's me.,見た？これが私。
+raceLog.duelStartOvertake.holloway,젊군. 받아 주지.,Spirited. I accept.,若いな。受けて立とう。
+raceLog.duelStartDefense.holloway,실례하네. 지나가겠소.,Pardon me. Coming through.,失礼。通らせてもらう。
+raceLog.overtakeSuccess.holloway,훌륭해. 잘 배웠군.,Splendid. Well learned.,見事だ。よく学んだな。
+raceLog.defendSuccess.holloway,좋은 방어였네.,A fine defense.,良い守りだった。
+raceLog.defendFail.holloway,마지막 랩은 길다네.,The last lap is long.,最終ラップは長いぞ。
+raceLog.duelStartOvertake.bianca,…흔들리지 마. 교본대로.,...Don't waver. By the book.,…揺れないで。教本通りに。
+raceLog.duelStartDefense.bianca,이 코너에서. 배운 대로.,This corner. As taught.,このコーナーで。教わった通りに。
+raceLog.overtakeSuccess.bianca,…왜. 왜 이렇게 되는 거지.,...Why. Why does this happen.,…なぜ。なぜこうなるの。
+raceLog.defendSuccess.bianca,아직… 아직 괜찮아.,Still... still fine.,まだ…まだ大丈夫。
+raceLog.defendFail.bianca,이 정도는… 해내야 해.,This much... I have to manage.,これくらいは…やらなきゃ。
+raceLog.duelStartOvertake.sherwood,정면으로? 재미없는데.,Head-on? How dull.,正面から？つまらないな。
+raceLog.duelStartDefense.sherwood,잠깐 눈 감아 봐. 지나갈게.,Close your eyes a moment. Passing.,少し目を閉じてて。抜けるよ。
+raceLog.overtakeSuccess.sherwood,허. 어디서 본 방식인데.,Huh. I've seen that style before.,へえ。どこかで見た走りだ。
+raceLog.defendSuccess.sherwood,…읽혔나. 그럴 리가.,...Read me? No way.,…読まれた？まさか。
+raceLog.defendFail.sherwood,미안. 이런 식이라서.,Sorry. It's just how I am.,悪いね。こういう性分で。
+raceLog.duelStartOvertake.jude,왔구나! 안 질 거야!,You came! I won't lose!,来たな！負けないぞ！
+raceLog.duelStartDefense.jude,"간다, 13번! 정정당당하게!","Here I come, 13! Fair and square!",行くよ、13番！正々堂々！
+raceLog.overtakeSuccess.jude,우와… 다음엔 내 차례야!,Whoa... Next time it's me!,うわ…次は僕の番だ！
+raceLog.defendSuccess.jude,아깝다! 좋은 승부였어!,"So close! Great duel, though!",惜しい！でもいい勝負だった！
+raceLog.defendFail.jude,먼저 갈게! 따라와!,Going first! Follow me!,先に行くよ！ついて来て！

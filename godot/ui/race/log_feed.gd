@@ -13,19 +13,24 @@ extends VBoxContainer
 
 const VISUAL_LINES := 2  # [데스크탑] 물리 고정 — D09 §7.3
 
-# 화자 구분 (D09 §3.3) — 도상 위계: 크루 초상 > 네임드 카 넘버 배지 > 공용 헬멧.
+# 화자 구분 (D09 §3.3) — 도상 위계: 크루 초상 > 네임드 카 넘버 배지 > 필러 카 넘버(텍스트).
+# 필러의 공용 헬멧 도상은 **배지 없는 라이벌 id** 의 되돌림으로만 남는다 (개선 회차 7 — 2026-09-05 · 사용자
+# 선택: 헬멧만으로는 로그 이력에서 상대가 누구였는지 남지 않아, 네임드 배지와 같은 '번호' 축으로 필러도
+# 카 넘버를 표지로 쓴다 — 호출부가 `speaker_mark` 에 넘버를 싣는다).
 enum Speaker { RELAY, CREW, RIVAL, FILLER }
 
 const ICON_DIR := "res://assets/ui/icons/"
 
 # 화자 → 도상. 크루 초상(`speaker_crew_16`)과 네임드 배지(`speaker_rival_<id>_16` 8종)는 에셋 유입으로
 # 실물이 섰다(개선 회차 6 결선). 라이벌은 개인 배지라 표가 아니라 `_speaker_asset()` 이 id 로 고른다.
-# 표에 없는 화자는 텍스트 표지로 되돌아간다.
+# 표에 없는 화자(필러 = 카 넘버 · 미지정)는 텍스트 표지로 간다.
 const ICON_BY_SPEAKER := {
 	Speaker.RELAY: "speaker_relay_16",
 	Speaker.CREW: "speaker_crew_16",
-	Speaker.FILLER: "speaker_filler_16",
 }
+
+# 배지 없는 라이벌 id 의 되돌림 도상 — 빈 표지보다 공용 도상이 열 정렬을 지킨다.
+const FALLBACK_BADGE := "speaker_filler_16"
 
 # 도상 미지정 — 텍스트 표지 경로. 기본값을 특정 화자로 두면 새 호출부가 조용히
 # 남의 도상을 달고 나온다(RELAY 를 기본으로 두면 전 화자가 마이크가 된다).
@@ -93,18 +98,16 @@ func _build_slot(speaker_mark: String, body: String, speaker: int = SPEAKER_NONE
 
 # 화자 표지 1칸 — 도상이 있으면 도상, 없으면 텍스트.
 #
-# **텍스트 경로를 지우지 않는 이유:** 도상이 있는 화자는 2종뿐이고 나머지 2종(크루 초상·
-# 카 넘버 배지)은 아이콘 축이 아니다. 텍스트를 걷어내면 그 두 화자가 표지 없이 나온다.
-# 도상 적재가 실패한 경우도 같은 자리로 떨어진다 — 빈 칸으로 조용히 나가지 않게.
-# 화자 → 도상 id. 라이벌은 **개인 배지**이고, 배지가 없는 참가자(필러·미등재 id)는 공용 헬멧으로
-# 되돌아간다 — 빈 표지보다 공용 도상이 열 정렬을 지킨다.
+# **텍스트 경로는 되돌림이 아니라 정규 경로다:** 필러 화자의 표지가 카 넘버 텍스트다(개선 회차 7).
+# 도상 적재가 실패한 화자도 같은 자리로 떨어진다 — 빈 칸으로 조용히 나가지 않게.
+# 화자 → 도상 id. 라이벌은 **개인 배지**이고, 배지가 없는 라이벌 id 는 공용 헬멧으로 되돌아간다.
 func _speaker_asset(speaker: int, speaker_id: String) -> String:
 	if speaker == Speaker.RIVAL:
 		if not speaker_id.is_empty():
 			var badge := "speaker_rival_%s_16" % speaker_id
 			if ResourceLoader.exists("%s%s.png" % [ICON_DIR, badge]):
 				return badge
-		return String(ICON_BY_SPEAKER[Speaker.FILLER])
+		return FALLBACK_BADGE
 	return String(ICON_BY_SPEAKER.get(speaker, ""))
 
 
@@ -124,6 +127,7 @@ func _build_mark(speaker_mark: String, speaker: int, speaker_id: String = "") ->
 	var mark := Label.new()
 	mark.name = "Mark"
 	mark.text = speaker_mark
+	mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER   # 카 넘버(1~2자리)가 도상 칸 가운데에 선다
 	mark.custom_minimum_size = Vector2(MARK_SLOT, 0)
 	mark.add_theme_font_size_override("font_size", _font_size)
 	mark.add_theme_color_override("font_color", UiPalette.TEXT_DIM)

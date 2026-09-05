@@ -196,6 +196,24 @@ func _on_bound(_payload: Dictionary) -> void:
 func _ready() -> void:
 	if session == null:
 		_boot()
+	# 패드 연결 플랩 방어 (개선 회차 7 — 2026-09-05). 듀얼센스 USB 실기에서 160ms 단절·재연결이 2회
+	# 관측됐다. 단절 중에는 뗌 이벤트가 오지 않아 `_pad_held` 가 '계속 눌림'으로 남고, 그 상태의 다음 A 는
+	# 스핀이 아니라 홀드 토글로 간다. 연결 상태가 바뀌면 장부·조합 흔적·커서 표시를 전부 비운다.
+	Input.joy_connection_changed.connect(_on_joy_connection_changed)
+
+
+func _exit_tree() -> void:
+	if Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
+		Input.joy_connection_changed.disconnect(_on_joy_connection_changed)
+
+
+func _on_joy_connection_changed(_device: int, _connected: bool) -> void:
+	_pad_held.clear()
+	_pad_combo_used.clear()
+	_consumable_combo_used = false
+	if _cursor_active:
+		_cursor_active = false
+		_refresh_reel_frames()
 
 
 func _boot() -> void:
@@ -227,7 +245,11 @@ func _boot() -> void:
 	_pause_overlay.setup(session)
 	_pause_overlay.resumed.connect(func():
 		_paused = false
-		session.audio.set_paused(false))
+		session.audio.set_paused(false)
+		# 재개 뒤 포커스를 기본 자리(확정)로 되돌린다 (개선 회차 7 — 듀얼센스 실기 발견: 오버레이가
+		# 닫히면 포커스 주인이 사라져 다음 턴까지 D패드 순회가 죽었다. A 는 액션 경유라 살아 있어
+		# 눈치채기 어렵다).
+		_ensure_default_focus())
 	_pause_overlay.quit_to_title.connect(func(): go("SYS-01", {}))
 	(%E14Menu as Button).pressed.connect(_open_pause)
 	# ── E08 행동 버튼의 클릭 경로 (IMPL-301 — 사용자 실기 발견) ──
@@ -363,8 +385,16 @@ func _process(delta: float) -> void:
 		_next_turn()
 
 
-# 패드 눌림/뗌 장부. **소비하지 않는다** — `_input` 은 전 입력을 가장 먼저 보므로 여기서만
-# 기록해 두면 이후 어느 층(`_shortcut_input`·`_unhandled_input`)에서 판정하든 상태가 최신이다.
+# 패드 눌림/뗌 장부. `_input` 은 전 입력을 가장 먼저 보므로 여기서 기록해 두면 이후 어느 층
+# (`_shortcut_input`·`_unhandled_input`)에서 판정하든 상태가 최신이다.
+#
+# **모디파이어 홀드 중의 A·D패드 좌우는 여기서 조합으로 판정한다 (개선 회차 7 — 듀얼센스 실기 발견).**
+# 엔진 순서는 `_input` → **GUI 포커스 층** → `_shortcut_input` → `_unhandled_input` 이다. 조합 판정을
+# `_unhandled_input` 에만 두면 GUI 층이 먼저 먹는다 — D패드 좌우는 `ui_left/right` 로 포커스를 옮기고
+# (실기: X 홀드 + → 에서 커서는 2로 갔는데 포커스가 Skill5 로 새어 나가, X 를 놓은 뒤의 A 가 확정이 아니라
+# 스킬로 갔다), A 는 `ui_accept` 로 포커스 버튼을 눌러 버린다(확정 + 홀드 토글 이중 발화). 검사 하네스는
+# 세 훅을 직접 부르므로 이 층을 건너뛰어 잡지 못했다 — UISCR ㉒ 가 뷰포트 경유로 잰다.
+# 조합이 아닌 것(`_handle_pad_context` 가 false)은 손대지 않고 GUI 층으로 내려보낸다.
 func _input(event: InputEvent) -> void:
 	var pad := event as InputEventJoypadButton
 	if pad == null:
@@ -374,6 +404,13 @@ func _input(event: InputEvent) -> void:
 		_pad_combo_used[pad.button_index] = false
 	else:
 		_pad_held.erase(pad.button_index)
+	if _paused or not pad.pressed:
+		return
+	var combo_key := pad.button_index == PAD_A or pad.button_index == PAD_DPAD_LEFT \
+		or pad.button_index == PAD_DPAD_RIGHT
+	var modifier_held := _pad_is_held(PAD_X) or _pad_is_held(PAD_RB) or _pad_is_held(PAD_LB)
+	if combo_key and modifier_held:
+		_handle_pad_context(event)
 
 
 func _pad_is_held(button_index: int) -> bool:
@@ -2011,9 +2048,73 @@ const LOG_VARIANT_KEYS := {
 }
 
 
+# ── 라이벌 대사 개별화 (개선 회차 7 — 2026-09-05 · 사용자 선택 "표시 층 키 대장") ──
+# 엔진은 공용 키 + 화자 id 를 발행하고(소리·연출·듀얼 프레임 대조는 원 키 그대로), 표시 층이 네임드 8인의
+# 개별 문면 키로 바꿔 그린다. LOG_VARIANT_KEYS 와 같은 **열거형 대장**이다 — 접미 조립로 탐침하면 V6 가
+# 고아로 읽고 V2 실재 검사도 비켜 간다. 표에 없는 화자(필러·미등재 id·무화자)는 공용 문면 그대로다.
+# 문면 근거 = D03 §2.4 성격 한 줄·주행 스타일 (정본 = docs/improve 회차 7 문서 §2).
+const RIVAL_LINE_KEYS := {
+	"raceLog.duelStartOvertake01": {
+		"ai_lorentz": "raceLog.duelStartOvertake.lorentz",
+		"ai_maro": "raceLog.duelStartOvertake.maro",
+		"ai_diaz": "raceLog.duelStartOvertake.diaz",
+		"ai_volkova": "raceLog.duelStartOvertake.volkova",
+		"ai_holloway": "raceLog.duelStartOvertake.holloway",
+		"ai_bianca": "raceLog.duelStartOvertake.bianca",
+		"ai_sherwood": "raceLog.duelStartOvertake.sherwood",
+		"ai_jude": "raceLog.duelStartOvertake.jude",
+	},
+	"raceLog.duelStartDefense01": {
+		"ai_lorentz": "raceLog.duelStartDefense.lorentz",
+		"ai_maro": "raceLog.duelStartDefense.maro",
+		"ai_diaz": "raceLog.duelStartDefense.diaz",
+		"ai_volkova": "raceLog.duelStartDefense.volkova",
+		"ai_holloway": "raceLog.duelStartDefense.holloway",
+		"ai_bianca": "raceLog.duelStartDefense.bianca",
+		"ai_sherwood": "raceLog.duelStartDefense.sherwood",
+		"ai_jude": "raceLog.duelStartDefense.jude",
+	},
+	"raceLog.overtakeSuccess01": {
+		"ai_lorentz": "raceLog.overtakeSuccess.lorentz",
+		"ai_maro": "raceLog.overtakeSuccess.maro",
+		"ai_diaz": "raceLog.overtakeSuccess.diaz",
+		"ai_volkova": "raceLog.overtakeSuccess.volkova",
+		"ai_holloway": "raceLog.overtakeSuccess.holloway",
+		"ai_bianca": "raceLog.overtakeSuccess.bianca",
+		"ai_sherwood": "raceLog.overtakeSuccess.sherwood",
+		"ai_jude": "raceLog.overtakeSuccess.jude",
+	},
+	"raceLog.defendSuccess01": {
+		"ai_lorentz": "raceLog.defendSuccess.lorentz",
+		"ai_maro": "raceLog.defendSuccess.maro",
+		"ai_diaz": "raceLog.defendSuccess.diaz",
+		"ai_volkova": "raceLog.defendSuccess.volkova",
+		"ai_holloway": "raceLog.defendSuccess.holloway",
+		"ai_bianca": "raceLog.defendSuccess.bianca",
+		"ai_sherwood": "raceLog.defendSuccess.sherwood",
+		"ai_jude": "raceLog.defendSuccess.jude",
+	},
+	"raceLog.defendFail01": {
+		"ai_lorentz": "raceLog.defendFail.lorentz",
+		"ai_maro": "raceLog.defendFail.maro",
+		"ai_diaz": "raceLog.defendFail.diaz",
+		"ai_volkova": "raceLog.defendFail.volkova",
+		"ai_holloway": "raceLog.defendFail.holloway",
+		"ai_bianca": "raceLog.defendFail.bianca",
+		"ai_sherwood": "raceLog.defendFail.sherwood",
+		"ai_jude": "raceLog.defendFail.jude",
+	},
+}
+
+
 # 선택은 **결정적**이다 — 턴·섹터·랩에서 유도하므로 같은 진행을 다시 밟으면 같은 문면이
 # 나오고(재로드 리롤 무효와 같은 방향), RNG 6스트림(D12 §6 — 게임 로직 전속)을 소비하지 않는다.
-func _log_display_key(key: String) -> String:
+# 화자 id 가 개별화 대장에 있으면 그 문면이 우선이다 — 라이벌 발화 5사건은 변형 대장과 겹치지 않는다.
+func _log_display_key(key: String, speaker_id: String = "") -> String:
+	if RIVAL_LINE_KEYS.has(key):
+		var by_rival: Dictionary = RIVAL_LINE_KEYS[key]
+		if by_rival.has(speaker_id):
+			return String(by_rival[speaker_id])
 	if not LOG_VARIANT_KEYS.has(key):
 		return key
 	var variants: Array = [key]
@@ -2048,7 +2149,12 @@ func _log_speaker(speaker: String, speaker_id: String) -> int:
 			return LogFeed.Speaker.RELAY
 
 
-func _speaker_mark_text(speaker: int) -> String:
+# 필러 표지 = 카 넘버 (개선 회차 7 — 2026-09-05 · 사용자 선택). 공용 헬멧 도상만으로는 로그 이력에서 상대가
+# 누구였는지 남지 않았다. 네임드 배지가 '번호'인 것과 같은 축으로 필러는 넘버 텍스트가 표지다 — 도상 슬롯 폭
+# 안에서 정렬을 지키고 에셋을 늘리지 않는다. 참가자 장부에 없는 id 는 종전 문면 표지로 되돌아간다.
+func _speaker_mark_text(speaker: int, speaker_id: String = "") -> String:
+	if speaker == LogFeed.Speaker.FILLER and engine != null and engine.entrants.has(speaker_id):
+		return str(int(engine.entrants[speaker_id]["number"]))
 	return data.strings.text(String(SPEAKER_MARK_KEYS.get(speaker, "ui.race.speakerRelay")))
 
 
@@ -2073,20 +2179,16 @@ func _push_events(events: Array) -> void:
 			if typeof(value) == TYPE_STRING and data.strings.has_key(String(value)):
 				# 참조 키의 문면에 매개(필러의 {number} 등)가 있으면 같은 params 로 치환한다
 				params[param_name] = data.strings.text(String(value), params)
-		var body := data.strings.text(_log_display_key(key), params)
+		# 화자는 문면보다 먼저 정해진다 — 네임드 라이벌의 개별 문면(RIVAL_LINE_KEYS)이 화자 id 로 갈린다.
+		var speaker_id := String(event.get("speaker_id", ""))
+		var speaker := _log_speaker(String(event.get("speaker", RaceEngine.SPEAKER_RELAY)), speaker_id)
+		var body := data.strings.text(_log_display_key(key, speaker_id), params)
 		if key.begins_with("vane."):
 			_e07_text.text = body  # 릴 존 콜아웃 전속 — 로그 피드로 흘리지 않는다
 		else:
-			# 화자 축이 이벤트에 아직 없다 — 발행 층(코어)이 화자를 구분하지 않으므로
-			# 전량 중계로 표기한다. [가안] 화자 구분(D09 §3.3 4종)은 이벤트 스키마에
-			# 화자 필드가 생긴 뒤 결선한다. — IMPL-071
-			#
-			# 도상 축은 결선했다 (IMPL-207) — 중계 = 마이크 아이콘(D09 §3.3 공용 1종).
-			# 텍스트 표지는 도상 부재·적재 실패 시의 되돌림 경로로 함께 넘긴다.
-			# **`speaker_filler` 는 여기서 뜨지 않는다** — 필러 드라이버 발화를 코어가
-			# 발행하지 않으므로 결속할 호출 지점이 없다(회신 §2-② 보고분).
-			var speaker_id := String(event.get("speaker_id", ""))
-			var speaker := _log_speaker(String(event.get("speaker", RaceEngine.SPEAKER_RELAY)), speaker_id)
-			_e10_log.push_line(_speaker_mark_text(speaker), body, speaker, speaker_id)
+			# 화자 축 결선 이력: 도상 축 IMPL-207(중계 마이크) → 화자 필드 개선 회차 6(`_ev` speaker) →
+			# 필러 넘버 표지·라이벌 개별 문면 개선 회차 7. 텍스트 표지는 도상 부재·적재 실패 시의 되돌림
+			# 경로이자 필러의 정규 표지(카 넘버)로 함께 넘긴다.
+			_e10_log.push_line(_speaker_mark_text(speaker, speaker_id), body, speaker, speaker_id)
 	_refresh_strip()
 	_refresh_resources()

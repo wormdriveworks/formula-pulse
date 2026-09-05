@@ -98,6 +98,10 @@ func _process(_delta: float) -> bool:
 	_detail_info_pin(data)
 	_hold_dim_is_neutral()
 	_race_pad_context()
+	_race_pad_flap_reset()
+	_race_pad_gui_ordering()
+	_race_pause_resume_focus()
+	_rival_line_individualization(data)
 	_race_detail_relocation(data)
 	_palette_sources_exist()
 	_filler_log_substitution(data)
@@ -301,6 +305,7 @@ func _log_feed_speaker_marks(data: GameData) -> void:
 	feed.push_line("MARK", "body")
 	feed.push_line("MARK", "body", LogFeed.Speaker.RIVAL, "ai_maro")
 	feed.push_line("MARK", "body", LogFeed.Speaker.RIVAL, "filler_03")
+	feed.push_line("21", "body", LogFeed.Speaker.FILLER, "filler_01")
 	var relay_mark := feed.get_child(0).get_node("Mark")
 	var crew_mark := feed.get_child(1).get_node("Mark")
 	var none_mark := feed.get_child(2).get_node("Mark")
@@ -322,6 +327,11 @@ func _log_feed_speaker_marks(data: GameData) -> void:
 			and (filler_mark as TextureRect).texture.resource_path.ends_with("speaker_filler_16.png"),
 		filler_mark.get_class())
 	_ok("화자 미지정 = 텍스트 되돌림", none_mark is Label, none_mark.get_class())
+	# 필러 화자의 표지는 카 넘버 텍스트다 (개선 회차 7) — 헬멧 도상이 아니다.
+	var filler_number_mark := feed.get_child(5).get_node("Mark")
+	_ok("필러 화자 = 카 넘버 텍스트 표지",
+		filler_number_mark is Label and (filler_number_mark as Label).text == "21",
+		filler_number_mark.get_class())
 	_ok("표지 폭 = 도상·텍스트 공통",
 		(relay_mark as Control).custom_minimum_size.x
 			== (none_mark as Control).custom_minimum_size.x)
@@ -656,13 +666,23 @@ func _pad_release(button_index: int) -> InputEventJoypadButton:
 	return event
 
 
-# 패드 입력 1건을 화면에 흘린다. **`_input` 먼저** — 모디파이어 장부가 그 층에서 갱신되므로
-# 실제 엔진 순서(`_input` → `_shortcut_input` → `_unhandled_input`)를 그대로 재현해야
-# 조합 판정이 실기와 같은 조건에서 검사된다.
+# 패드 입력 1건을 화면에 흘린다 — **뷰포트 경유** (개선 회차 7 개정). 종전에는 세 훅
+# (`_input` → `_shortcut_input` → `_unhandled_input`)을 직접 불렀는데, 그 사이에 있는 **GUI 포커스 층**
+# (`ui_left/right` 포커스 이동 · `ui_accept` 버튼 눌림)을 건너뛰어 실기 결함을 보지 못했고(㉒), 화면이
+# 소비한 입력이 다음 훅에 또 들어가 이중 판정이 났다. `push_input` 은 엔진이 실기에서 타는 순서 그대로다.
+#
+# **대상 화면만 듣게 한다.** 하네스 트리에는 정렬 대기용 화면(`_settle_*`)이 함께 서 있고 브로드캐스트
+# 입력은 그쪽에도 닿는다 — 실측: 업적 화면이 LB(`tab_prev`)를 먹고 탭 버튼으로 포커스를 끌어가 LB+Y
+# 상세 정보가 빈손이 됐다. 실기는 라우터가 화면 1장만 세우므로 그 조건을 재현한다(입력 동안 처리 정지).
 func _feed_pad(screen: Control, event: InputEventJoypadButton) -> void:
-	screen._input(event)
-	screen._shortcut_input(event)
-	screen._unhandled_input(event)
+	var muted: Array = []
+	for child in root.get_children():
+		if child != screen and child.process_mode != Node.PROCESS_MODE_DISABLED:
+			child.process_mode = Node.PROCESS_MODE_DISABLED
+			muted.append(child)
+	screen.get_viewport().push_input(event)
+	for child in muted:
+		child.process_mode = Node.PROCESS_MODE_INHERIT
 
 
 func _new_race_screen() -> Control:
@@ -747,6 +767,167 @@ func _race_pad_context() -> void:
 	_feed_pad(screen3, _pad_event(PAD_DPAD_LEFT_INDEX))
 	_ok("X 홀드 + D패드 좌 = 되돌아온다", screen3._hold_cursor == 0)
 	_unmount(screen3)
+
+
+# ── 패드 연결 플랩 방어 (개선 회차 7 — 듀얼센스 USB 실측: 160ms 단절·재연결 2회) ──
+# 단절 중의 뗌은 오지 않는다. 장부가 '계속 눌림'으로 남으면 다음 A 가 스핀이 아니라 홀드 토글로 간다.
+func _race_pad_flap_reset() -> void:
+	var screen := _new_race_screen()
+	if screen == null:
+		return
+	_feed_pad(screen, _pad_event(PAD_X_INDEX))
+	_ok("전제: X 눌림이 장부에 선다", screen._pad_is_held(PAD_X_INDEX))
+	_ok("전제: X 눌림 = 커서 표시", screen._cursor_active)
+	_ok("전제: X 홀드 중 A 는 조합", screen._handle_pad_context(_pad_event(PAD_A_INDEX)))
+	Input.joy_connection_changed.emit(0, false)
+	_ok("연결 플랩 → 눌림 장부 비움", not screen._pad_is_held(PAD_X_INDEX))
+	_ok("연결 플랩 → 커서 표시 해제", not screen._cursor_active)
+	# 뗌 없이 온 다음 A 는 조합으로 읽히지 않는다 — 공통 층(확정·스핀)으로 내려간다.
+	_ok("플랩 뒤의 A 는 조합으로 읽히지 않는다", not screen._handle_pad_context(_pad_event(PAD_A_INDEX)))
+	var handler := Callable(screen, "_on_joy_connection_changed")
+	_ok("화면 생존 중 연결 시그널 결속", Input.joy_connection_changed.is_connected(handler))
+	_unmount(screen)
+	_ok("화면 이탈 뒤 연결 시그널 해제", not Input.joy_connection_changed.is_connected(handler))
+
+
+# ── ㉒ 패드 조합의 GUI 층 선점 (개선 회차 7 — 듀얼센스 실기 발견) ──
+# 엔진 순서 `_input` → GUI → `_unhandled_input` 을 실제로 타야 잡힌다 — 세 훅을 직접 부르는 `_feed_pad` 는
+# GUI 층을 건너뛰어 이 결함을 보지 못했다(X 홀드 + → 에서 포커스가 `ui_right` 로 새고, X 홀드 + A 가
+# `ui_accept` 로 포커스 버튼을 눌렀다). 뷰포트 `push_input` 으로 전 경로를 태운다.
+func _race_pad_gui_ordering() -> void:
+	var screen := _new_race_screen()
+	if screen == null:
+		return
+	screen._timer_active = true
+	var confirm: Button = screen._e08_confirm
+	confirm.grab_focus()
+	var confirm_presses: Array = [0]
+	confirm.pressed.connect(func(): confirm_presses[0] += 1)
+	# X 홀드 + D패드 우 → 커서만 움직이고 포커스는 그대로
+	_feed_pad(screen, _pad_event(PAD_X_INDEX))
+	_feed_pad(screen, _pad_event(PAD_DPAD_RIGHT_INDEX))
+	_feed_pad(screen, _pad_release(PAD_DPAD_RIGHT_INDEX))
+	_ok("㉒ X 홀드 + D패드 우 = 릴 커서 이동 (뷰포트 경유)", screen._hold_cursor == 1, str(screen._hold_cursor))
+	_ok("㉒ X 홀드 + D패드 우 = 포커스 불변 (ui_right 로 새지 않는다)",
+		root.gui_get_focus_owner() == confirm, str(root.gui_get_focus_owner()))
+	# X 홀드 + A → 홀드 토글만. 포커스 버튼(확정)은 눌리지 않는다.
+	var held_before: bool = screen._hold_boxes[1].button_pressed
+	_feed_pad(screen, _pad_event(PAD_A_INDEX))
+	_feed_pad(screen, _pad_release(PAD_A_INDEX))
+	_ok("㉒ X 홀드 + A = 릴 홀드 토글 (뷰포트 경유)", screen._hold_boxes[1].button_pressed != held_before)
+	_ok("㉒ X 홀드 + A 는 포커스 버튼(확정)을 누르지 않는다", confirm_presses[0] == 0, str(confirm_presses[0]))
+	var before_respin: int = _respin_sfx_count(screen)
+	_feed_pad(screen, _pad_release(PAD_X_INDEX))
+	_ok("㉒ 조합으로 쓰인 X 뗌 = 리스핀 아님", _respin_sfx_count(screen) == before_respin)
+	# 검사의 이빨 — 조합이 아닌 단독 A 는 GUI 층이 포커스 버튼을 누른다 (마지막에 둔다: 확정이 턴을 넘긴다).
+	_feed_pad(screen, _pad_event(PAD_A_INDEX))
+	_feed_pad(screen, _pad_release(PAD_A_INDEX))
+	_ok("㉒ 단독 A = 포커스 버튼(확정) 눌림", confirm_presses[0] == 1, str(confirm_presses[0]))
+	_unmount(screen)
+
+
+# ── 일시정지 재개 뒤 포커스 복귀 (개선 회차 7 — 듀얼센스 실기 발견) ──
+# 오버레이가 닫히면 포커스 주인이 사라져 다음 턴까지 D패드 순회가 죽었다. A 는 액션 경유라 살아 있어
+# 눈치채기 어렵다 — 재개 시그널에서 기본 자리(확정)로 되잡는다.
+func _race_pause_resume_focus() -> void:
+	var screen := _new_race_screen()
+	if screen == null:
+		return
+	screen._e08_confirm.grab_focus()
+	screen._open_pause()
+	var paused_owner := root.gui_get_focus_owner()
+	_ok("전제: 정지 중 포커스 = 재개 버튼",
+		paused_owner != null and paused_owner.name == "ResumeButton", str(paused_owner))
+	screen._pause_overlay._begin_countin()
+	screen._pause_overlay._process(9999.0)   # 카운트인 만료 → resumed
+	_ok("재개 = 정지 해제", not screen._paused)
+	_ok("재개 뒤 포커스 = 확정 (허공에 떨어지지 않는다)",
+		root.gui_get_focus_owner() == screen._e08_confirm, str(root.gui_get_focus_owner()))
+	_unmount(screen)
+
+
+# ── 라이벌 대사 개별화 (개선 회차 7 — 2026-09-05) ──
+# 표시 층 대장(RIVAL_LINE_KEYS)이 네임드 8인 × 라이벌 발화 5사건을 전부 덮고, 문면이 실재하며, 화자 id 로
+# 표시 키가 갈리고, 필러·무화자는 공용 문면에 남는지 본다. 실렌더 1건으로 문면·배지가 같은 줄에 서는지 잰다.
+const RIVAL_LINE_BASE_KEYS := [
+	"raceLog.duelStartOvertake01", "raceLog.duelStartDefense01",
+	"raceLog.overtakeSuccess01", "raceLog.defendSuccess01", "raceLog.defendFail01",
+]
+
+
+func _rival_line_individualization(data: GameData) -> void:
+	var screen := _mount(RACE_SCENE, _fresh_session(data))
+	if screen == null:
+		return
+	var table: Dictionary = screen.RIVAL_LINE_KEYS
+	var rival_ids: Array = []
+	for row in data.rivals:
+		rival_ids.append(String(row["id"]))
+	_ok("전제: 네임드 라이벌 8인", rival_ids.size() == 8, str(rival_ids.size()))
+	_ok("개별화 대장 = 라이벌 발화 5사건 전량", table.size() == RIVAL_LINE_BASE_KEYS.size(), str(table.keys()))
+	var seen_keys: Dictionary = {}
+	for base in RIVAL_LINE_BASE_KEYS:
+		_ok("%s — 대장 등재" % base, table.has(base))
+		if not table.has(base):
+			continue
+		var by_rival: Dictionary = table[base]
+		var missing: Array = []
+		var broken: Array = []
+		var texts: Dictionary = {}
+		for rival_id in rival_ids:
+			if not by_rival.has(rival_id):
+				missing.append(rival_id)
+				continue
+			var rival_key := String(by_rival[rival_id])
+			if not data.strings.has_key(rival_key):
+				broken.append(rival_key)
+			elif screen._log_display_key(base, rival_id) != rival_key:
+				broken.append("%s->%s" % [rival_id, screen._log_display_key(base, rival_id)])
+			seen_keys[rival_key] = true
+			texts[data.strings.text(rival_key)] = true
+		_ok("%s — 8인 전원 개별 문면 키" % base, missing.is_empty(), str(missing))
+		_ok("%s — 문면 실재·표시 키 해석" % base, broken.is_empty(), str(broken))
+		_ok("%s — 8인 문면 상호 상이" % base,
+			texts.size() == rival_ids.size() - missing.size(), "%d종" % texts.size())
+		_ok("%s — 필러는 공용 문면" % base, screen._log_display_key(base, "filler_01") == base)
+		_ok("%s — 무화자는 공용 문면" % base, screen._log_display_key(base) == base)
+	_ok("개별 문면 키 40종 전부 상이", seen_keys.size() == 40, str(seen_keys.size()))
+	# 변형 대장의 키만 나와야 한다 — 접두 비교(`raceLog.timeout`)는 V2 가 실재하지 않는 키 발행으로 읽는다.
+	var timeout_key: String = screen._log_display_key("raceLog.timeout01", "ai_maro")
+	var timeout_variants: Array = ["raceLog.timeout01"]
+	timeout_variants.append_array(screen.LOG_VARIANT_KEYS["raceLog.timeout01"])
+	_ok("변형 키(타임아웃)는 개별화 표를 안 탄다", timeout_variants.has(timeout_key), timeout_key)
+	# 실렌더 — 그리드의 첫 네임드 라이벌을 상대로 추월 성공 듀얼을 강제하고 줄 하나를 본다.
+	var engine: RaceEngine = screen.engine
+	var named_id := ""
+	for entrant_id in engine.entrants:
+		var entrant: Dictionary = engine.entrants[entrant_id]
+		if not bool(entrant["is_player"]) and not bool(entrant["is_filler"]):
+			named_id = String(entrant_id)
+			break
+	_ok("전제: 그리드에 네임드 라이벌이 있다", named_id != "")
+	if named_id != "":
+		var events := _force_filler_duel(engine, named_id, RaceTypes.DuelType.OVERTAKE, true)
+		var rival_events: Array = []
+		for event in events:
+			if String(event.get("speaker", "")) == RaceEngine.SPEAKER_RIVAL:
+				rival_events.append(event)
+		_ok("네임드 추월 성공 — 라이벌 화자 발행 1건", rival_events.size() == 1, str(rival_events.size()))
+		if rival_events.size() == 1:
+			screen._e10_log.clear_feed()
+			screen._push_events(rival_events)
+			var slot := screen._e10_log.get_child(0) as Control
+			var mark := slot.get_child(0)
+			var body := slot.get_child(1) as Label
+			var expected_key := String((table["raceLog.overtakeSuccess01"] as Dictionary).get(named_id, ""))
+			_ok("네임드 문면 = 개별 키 문면 (%s)" % named_id,
+				expected_key != "" and body.text == data.strings.text(expected_key), body.text)
+			_ok("네임드 문면 ≠ 공용 문면", body.text != data.strings.text("raceLog.overtakeSuccess01"))
+			_ok("네임드 표지 = 개인 배지",
+				mark is TextureRect and (mark as TextureRect).texture != null
+					and (mark as TextureRect).texture.resource_path.ends_with("speaker_rival_%s_16.png" % named_id),
+				mark.get_class())
+	_unmount(screen)
 
 
 # ── ⑪ Y 단독 대 LB 홀드 + Y (v1.3 재배치 행) ──
@@ -853,7 +1034,7 @@ func _filler_log_substitution(data: GameData) -> void:
 	]
 	for duel_case in cases:
 		var events := _force_filler_duel(engine, filler_id, int(duel_case["type"]), bool(duel_case["win"]))
-		_assert_rival_duel_line(screen, events, String(duel_case["label"]), filler_id)
+		_assert_rival_duel_line(screen, events, String(duel_case["label"]), filler_id, number)
 
 	# AI 리타이어 — 중계가 이름을 부르는 문면(화자 = relay). **카 넘버 치환 기제의 유일한 산지**이므로
 	# 이 축이 `_entrant_params` 의 중첩 키 선해결(IMPL-210·211)을 계속 지킨다.
@@ -861,9 +1042,10 @@ func _filler_log_substitution(data: GameData) -> void:
 	_unmount(screen)
 
 
-# 듀얼 결과 = 상대의 말 (개선 회차 6). 화자 태그(rival)·화자 id·필러 표지(공용 헬멧)를 한 줄로 본다.
-# 이름 문면이 아니라 **배지**가 정체를 지므로 카 넘버 치환이 아니라 표지 도상을 검사한다.
-func _assert_rival_duel_line(screen: Control, events: Array, label: String, opponent_id: String) -> void:
+# 듀얼 결과 = 상대의 말 (개선 회차 6). 화자 태그(rival)·화자 id·필러 표지를 한 줄로 본다.
+# 이름 문면이 아니라 **표지**가 정체를 진다 — 필러는 카 넘버 텍스트(개선 회차 7 · 종전 공용 헬멧).
+func _assert_rival_duel_line(screen: Control, events: Array, label: String, opponent_id: String,
+		number: int) -> void:
 	var rival_events: Array = []
 	for event in events:
 		if String(event.get("speaker", "")) == RaceEngine.SPEAKER_RIVAL:
@@ -881,10 +1063,9 @@ func _assert_rival_duel_line(screen: Control, events: Array, label: String, oppo
 	if slots.is_empty():
 		return
 	var mark := (slots[0] as Control).get_child(0)
-	_ok("%s — 필러 표지 = 공용 헬멧 도상" % label,
-		mark is TextureRect and (mark as TextureRect).texture != null
-			and (mark as TextureRect).texture.resource_path.ends_with("speaker_filler_16.png"),
-		mark.get_class())
+	_ok("%s — 필러 표지 = 카 넘버 텍스트" % label,
+		mark is Label and (mark as Label).text == str(number),
+		"%s '%s'" % [mark.get_class(), (mark as Label).text if mark is Label else ""])
 	var body := (slots[0] as Control).get_child(1) as Label
 	_ok("%s — 미치환 자리 잔존 0" % label, body != null and not body.text.contains("{"),
 		body.text if body != null else "")
