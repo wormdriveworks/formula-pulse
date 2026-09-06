@@ -60,6 +60,7 @@ var _frame := 0
 var _settle_probe: Control
 var _settle_race: Control
 var _settle_choice: Control
+var _settle_next: Array[Control] = []
 
 
 func _process(_delta: float) -> bool:
@@ -83,7 +84,13 @@ func _process(_delta: float) -> bool:
 			if _settle_choice != null:
 				_settle_choice._advance()
 				_settle_choice._advance()
+			# 결산 3화면 — 주 버튼 마우스 히트테스트 축(개선 회차 8)도 정렬이 끝난 버튼 rect 를
+			# 요구한다. 순위표가 서야 재현되므로 GP 를 실제로 끝낸 세션으로 세운다.
+			_settle_next = _mount_settle_next(data)
 		return false
+	# **첫 축이어야 한다** — 결산 3화면의 InputGuard 가 `_input` 층에서 ui_accept·마우스 버튼을 트리
+	# 전역으로 삼키므로, 뒤 축들이 `push_input` 으로 넣는 패드 A(= ui_accept)가 남은 창에 죽는다.
+	_settle_next_button_mouse_hit()
 	_achievement_without_career(data)
 	_achievement_with_career(data)
 	_achievement_icons(data)
@@ -2578,6 +2585,146 @@ func _mouse_click_paths(data: GameData) -> void:
 		race.engine.turn_phase != RaceTypes.TurnPhase.T1_SECTOR_OPEN,
 		"phase=%d" % race.engine.turn_phase)
 	_unmount(race)
+
+
+# ── 결산 화면 주 버튼 — 실 마우스 히트테스트 (개선 회차 8 · 2026-09-07 사용자 보고) ──
+#
+# **`pressed.emit()` 은 클릭의 증거가 아니다.** 위 경로 등가 축은 시그널을 직접 쏘므로, 버튼 위에
+# 다른 Control 이 얹혀 포인터를 가로채는 결함을 원리적으로 못 본다. 실제로 RACE-03·SET-01·SET-02 의
+# 코드 생성 순위표(`StandingsTable` — 우측 45% × 전 높이)가 우하단 주 버튼을 덮어 [다음으로]·
+# [개러지로]·[시즌 오버홀로]의 마우스 클릭이 죽어 있었다: Container 의 기본 mouse_filter 는 PASS 라
+# 히트테스트에 잡히고, 잡힌 Control 이 처리하지 않은 이벤트는 **부모로만** 흐르므로 형제인 버튼에는
+# 영원히 닿지 않는다(부모 pane 의 IGNORE 로는 막지 못한다 — 히트테스트는 자식을 먼저 본다).
+# 그래서 이 축은 뷰포트 `push_input` 으로 **버튼 중심 캔버스 좌표에 실 마우스 이벤트**를 넣고,
+# 눌림을 받은 Control 과 `pressed` 발화를 함께 본다. 세 화면은 GP 를 실제로 끝낸 세션으로 프레임 1 에
+# 세운다(순위표가 서야 재현되고, 버튼 rect 는 정렬이 끝나야 값이 있다 — § LAYOUT_SETTLE_FRAMES).
+const SETTLE_NEXT_SCENES := [
+	"res://ui/race/gp_result_screen.tscn",
+	"res://ui/settle/tour_report_screen.tscn",
+	"res://ui/settle/season_result_screen.tscn",
+]
+
+
+# GP 를 타임아웃 경로로 끝까지 돌려 결산 소재(순위표)를 가진 세션을 만든다 —
+# test_core_loop 의 주행 루프와 같은 순서(begin_turn → spin → timeout). 실패하면 null.
+func _finished_gp_session(data: GameData) -> RunSession:
+	var session := _fresh_session(data)
+	if not session.begin_gp():
+		return null
+	var engine := session.engine
+	engine.start_gp()
+	var guard := 200
+	while not engine.finished and guard > 0:
+		guard -= 1
+		var info := engine.begin_turn()
+		if String(info.get("type", "")) == "finished":
+			break
+		engine.spin()
+		engine.timeout()
+	if not engine.finished or engine.result.is_empty():
+		return null
+	session.close_gp()
+	return session
+
+
+# 결산 3화면을 각자의 세션으로 세운다 — SET-01 은 투어 마감 뒤, SET-02 는 시즌 마감 뒤의 소재를 읽는다.
+func _mount_settle_next(data: GameData) -> Array[Control]:
+	var mounted: Array[Control] = []
+	for index in range(SETTLE_NEXT_SCENES.size()):
+		var session := _finished_gp_session(data)
+		if session == null:
+			continue
+		if index >= 1:
+			session.close_tour()
+		if index >= 2:
+			session.close_season()
+		var screen := _mount(String(SETTLE_NEXT_SCENES[index]), session)
+		if screen != null:
+			mounted.append(screen)
+	return mounted
+
+
+# 실 마우스 클릭 — 뷰포트 `push_input` 경유(히트테스트 → mouse_focus → 대상 gui_input). 좌표는
+# 캔버스 좌표(`get_global_rect`)라 `in_local_coords = true` 다 — 창 배율(3×)과 무관하게 잰다.
+func _click_at(viewport: Viewport, point: Vector2) -> void:
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.button_mask = MOUSE_BUTTON_MASK_LEFT
+	press.pressed = true
+	press.position = point
+	press.global_position = point
+	viewport.push_input(press, true)
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	release.position = point
+	release.global_position = point
+	viewport.push_input(release, true)
+
+
+func _settle_next_button_mouse_hit() -> void:
+	_ok("전제: 결산 3화면 마운트 (GP 실주행 소재)",
+		_settle_next.size() == SETTLE_NEXT_SCENES.size(), "mounted=%d" % _settle_next.size())
+	var guards := 0
+	for screen in _settle_next:
+		if screen.get_node_or_null("InputGuard") != null:
+			guards += 1
+	_ok("전제: 결산 3화면 전부 진입 방어 창 무장", guards == _settle_next.size(),
+		"%d/%d" % [guards, _settle_next.size()])
+	# ⓐ 방어 창 동안은 마우스도 삼켜진다 (InputGuard 계약 — 첫 화면으로 대표 관측)
+	if not _settle_next.is_empty() and guards > 0:
+		var probe := _settle_next[0]
+		var probe_button := probe.get_node_or_null("%NextButton") as Button
+		if probe_button != null:
+			root.move_child(probe, root.get_child_count() - 1)
+			var got := [0]
+			var tap := func() -> void: got[0] += 1
+			probe_button.pressed.connect(tap)
+			_click_at(probe.get_viewport(), probe_button.get_global_rect().get_center())
+			_ok("방어 창 동안 마우스 클릭은 주 버튼에 닿지 않는다", got[0] == 0, "presses=%d" % got[0])
+			probe_button.pressed.disconnect(tap)
+	# 창 만료를 앞당긴다 — 실기에서는 0.4s 뒤의 상태. `_input` 은 트리 전역이라 남의 창 하나만 남아도
+	# 전부 삼키므로 세 화면의 창을 함께 걷는다.
+	for screen in _settle_next:
+		var guard := screen.get_node_or_null("InputGuard")
+		if guard != null:
+			guard.free()
+	# ⓑ 창이 걷힌 뒤 — 버튼 중심 클릭은 버튼이 받아야 한다
+	for screen in _settle_next:
+		var label := screen.scene_file_path.get_file()
+		var button := screen.get_node_or_null("%NextButton") as Button
+		var table := screen.find_child("StandingsTable", true, false) as Control
+		_ok("%s — 전제: 순위표 실재 (덮는 쪽)" % label, table != null)
+		_ok("%s — 전제: 주 버튼 실재" % label, button != null)
+		if button == null or table == null:
+			continue
+		# 맨 위로 올린다 — 프레임 1 에 세운 다른 화면들과 겹쳐 있고, 히트테스트는 트리 순서 마지막
+		# 루트부터 본다.
+		root.move_child(screen, root.get_child_count() - 1)
+		var rect := button.get_global_rect()
+		_ok("%s — 전제: 버튼 정렬 완료 (크기 > 0)" % label,
+			rect.size.x > 0.0 and rect.size.y > 0.0, str(rect))
+		var table_rect := table.get_global_rect()
+		_ok("%s — 전제: 순위표 rect 가 버튼 중심을 덮는다 (재현 조건)" % label,
+			table_rect.has_point(rect.get_center()), "table=%s button=%s" % [table_rect, rect])
+		var receivers: Array[String] = []
+		var presses := [0]
+		var on_gui := func(event: InputEvent, who: String) -> void:
+			if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+				receivers.append(who)
+		table.gui_input.connect(on_gui.bind("StandingsTable"))
+		button.gui_input.connect(on_gui.bind("NextButton"))
+		button.pressed.connect(func() -> void: presses[0] += 1)
+		_click_at(screen.get_viewport(), rect.get_center())
+		_ok("%s — 마우스 클릭 → 주 버튼 pressed 1회" % label, presses[0] == 1,
+			"presses=%d 눌림 수신=%s" % [presses[0], str(receivers)])
+		_ok("%s — 눌림을 받은 Control = 주 버튼 (순위표가 가로채지 않는다)" % label,
+			receivers.size() == 1 and receivers[0] == "NextButton", str(receivers))
+		_ok("%s — 순위표 mouse_filter = IGNORE" % label,
+			table.mouse_filter == Control.MOUSE_FILTER_IGNORE, "mouse_filter=%d" % table.mouse_filter)
+	for screen in _settle_next:
+		_unmount(screen)
+	_settle_next.clear()
 
 
 # 바인드가 페이로드를 요구하는 화면만 최소분을 넘긴다 — 요구를 우회하는 것이 아니라

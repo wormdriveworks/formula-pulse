@@ -201,6 +201,12 @@ func _mount_standings(result: Dictionary) -> void:
 	pad.add_child(pane)
 	var table := VBoxContainer.new()
 	table.name = "StandingsTable"
+	# **읽기 전용 표라 포인터를 받지 않는다** (개선 회차 8 · 2026-09-07 사용자 보고). Container 의
+	# 기본 mouse_filter 는 PASS 라 히트테스트에 잡히는데, 이 표는 우측 45% × 전 높이라 **우하단 주 버튼
+	# [다음으로] 를 덮어 마우스 클릭을 가로챘다** — 잡힌 Control 이 쓰지 않은 이벤트는 부모로만 흐르므로
+	# 형제인 버튼에는 닿지 않는다. 부모 pane 의 IGNORE 는 자식을 막지 못한다(히트테스트는 자식 우선).
+	# 패드·키보드는 포커스 경로라 멀쩡했고, 그래서 늦게 드러났다. SET-01·SET-02 순위표도 같은 축이다.
+	table.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# 우측 절반 앵커 — 성장 방향·오프셋을 짝으로 명시한다 (ANCH 규약)
 	table.anchor_left = 0.55
 	table.anchor_right = 1.0

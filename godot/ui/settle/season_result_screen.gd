@@ -93,6 +93,9 @@ func _mount_standings(standings: Array) -> void:
 	pad.add_child(pane)
 	var table := VBoxContainer.new()
 	table.name = "StandingsTable"
+	# 읽기 전용 표 — Container 기본 PASS 가 우하단 [시즌 오버홀로] 의 마우스 클릭을 가로챘다
+	# (개선 회차 8 · 2026-09-07). 사유는 RACE-03 `_mount_standings()` 주석과 같다.
+	table.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	table.anchor_left = 0.55
 	table.anchor_right = 1.0
 	table.anchor_top = 0.0
