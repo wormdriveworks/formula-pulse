@@ -15,6 +15,9 @@
 extends FlowScreen
 
 const REEL_COUNT := 3
+# 듀얼 중 릴 프레임 테두리 두께 — 종전 듀얼 프레임(씬 StyleBoxFlat, 2px)의 두께를 릴 프레임으로 승계했다
+# (개선 회차 9 · 릴 존 합체). 기본 두께는 씬 스타일에서 읽어 둔다(`_reel_frame_border_base`) — 코드에 적지 않는다.
+const DUEL_FRAME_BORDER := 2
 # 라이벌 id — 데이터 행 키 참조이며 표시 문자열이 아니다(불변규칙 6의 테이블 ID 체계).
 # CG-02 판정 상수 — '대면' = 관계 단계 1 (총괄 판정 IMPL-249 Q1 확정)
 const KAI_ID := "ai_sherwood"
@@ -111,6 +114,7 @@ var _charge_shown := 0
 var _reel_icons: Array[TextureRect] = []
 var _reel_panels: Array[PanelContainer] = []
 var _reel_frame_styles: Array[StyleBoxFlat] = []
+var _reel_frame_border_base := 0   # 씬 스타일의 기본 테두리 두께 — 듀얼 이탈 시 되돌릴 값 (`_collect_reels` 에서 읽는다)
 
 # 릴 선택 커서 표시 (IMPL-207 · 원격 7차 §3-라 보고분).
 #
@@ -177,9 +181,6 @@ var _skill_cursor := 0        # RB 조합 중 고른 스킬 슬롯 (포커스로
 # 안 된다(포커스 이동이 곧 상세 패널 해제다). 소모품 조합만 뗌 시점에 확정 버튼으로 되돌린다.
 var _consumable_cursor := 0
 var _consumable_combo_used := false
-
-# 통상 턴의 릴 표시 배열 — 듀얼 중에는 오버레이의 릴로 스왑된다 (아래 _enter_duel 참조)
-var _base_reel_icons: Array[TextureRect] = []
 
 # E13 소모품 2슬롯 (별첨A §A-4). 슬롯 수 = 반입 상한(param_consumable_carry_cap = 2)과
 # 1:1이므로 인벤토리가 슬롯을 넘치지 않는다 — 상한이 바뀌면 슬롯 수는 별첨A 개정 사안이다.
@@ -618,11 +619,15 @@ func _collect_reels() -> void:
 		var style := frame.get_theme_stylebox("panel").duplicate() as StyleBoxFlat
 		frame.add_theme_stylebox_override("panel", style)
 		_reel_frame_styles.append(style)
-		_base_reel_icons.append(column.get_node("Frame/Symbol"))
+		if i == 0:
+			_reel_frame_border_base = style.border_width_left
+		# 듀얼 스핀도 **이 릴에서** 돈다 (개선 회차 9 — 릴 존 합체). 종전에는 듀얼 중 표시 배열을 오버레이의
+		# 전용 릴로 스왑했는데, 그 릴에는 홀드 칸이 없고 기본 홀드는 감광판 뒤에 있어 마우스로는 홀드가 불가능했다.
+		# 배열이 하나이므로 공개·은닉·봉인 검사(SEAL-E)도 한 경로만 본다.
+		_reel_icons.append(column.get_node("Frame/Symbol"))
 		var box: CheckBox = column.get_node("Hold")
 		box.toggled.connect(_on_hold_toggled)
 		_hold_boxes.append(box)
-	_reel_icons = _base_reel_icons
 	for child in _e08_skills.get_children():
 		_skill_buttons.append(child)
 	for child in _e05_snapshot.get_node("SnapshotRow").get_children():
@@ -683,7 +688,9 @@ func _next_turn() -> void:
 # A/Space 는 액션 경로라 스핀은 됐지만 십자키 이동의 출발점이 없었다. 턴 개시마다 **비어 있을 때만** 세운다 —
 # 조합 커서가 잡은 슬롯 포커스나 오버레이(튜토리얼·일시정지)의 포커스는 건드리지 않는다.
 func _ensure_default_focus() -> void:
-	if _paused:
+	# 릴 공개·타이머 코루틴이 화면이 트리를 떠난 뒤 재개될 수 있다(라우터 전이·하네스 언마운트) — 그때 뷰포트는
+	# null 이다. 포커스는 트리 안에서만 의미가 있으므로 조용히 돌아간다 (개선 회차 9 — UISCR 종료 잡음 실측).
+	if _paused or not is_inside_tree():
 		return
 	var owner := get_viewport().gui_get_focus_owner()
 	if owner != null and owner.is_visible_in_tree():
@@ -692,8 +699,9 @@ func _ensure_default_focus() -> void:
 		_e08_confirm.grab_focus()
 
 
-# 릴 표시 배열을 오버레이로 스왑한다 — 공개·은닉·봉인 검사(SEAL-E)가 전부 같은 경로로
-# 오버레이 릴을 보게 하는 장치다. 이중 구현이 없으므로 봉인 규칙이 갈라지지 않는다.
+# 듀얼 삽입 — 표시 층만 바뀐다 (개선 회차 9 · 릴 존 합체): 캡션 띠(대치·부스트)를 씬 패널 하단에 얹고,
+# 릴 프레임 테두리를 듀얼색·2px 로 바꾼다(`_refresh_reel_frames`). 릴·홀드·액션 열은 그 자리 그대로라
+# 마우스 조작이 끊기지 않고, 표시 배열도 하나라 봉인 검사(SEAL-E)가 보는 릴과 실제 릴이 갈라지지 않는다.
 func _enter_duel(info: Dictionary) -> void:
 	var opponent_id := String(info.get("opponent", ""))
 	var opponent: Dictionary = engine.entrants.get(opponent_id, {})
@@ -701,7 +709,9 @@ func _enter_duel(info: Dictionary) -> void:
 		push_error("RaceScreen: duel opponent missing - %s" % opponent_id)
 		return
 	_duel_overlay.show_duel(data.strings, opponent, int(info.get("duel_type", 0)))
-	_reel_icons = _duel_overlay.reel_icons()
+	# 띠의 자리 = 씬 패널 호스트 — 앵커·오프셋이 아니라 **노드의 실 rect** 를 따라간다(릴 존 세로 예산과 무관 ·
+	# 레이아웃 비율에 묶이지 않는다 · 호스트가 재정렬되면 띠도 함께 움직인다).
+	_duel_overlay.place_over(%E15ScenePanel as Control)
 	_hide_reels()
 	_refresh_boost()
 
@@ -710,7 +720,7 @@ func _exit_duel() -> void:
 	if not _duel_overlay.visible:
 		return
 	_duel_overlay.dismiss()
-	_reel_icons = _base_reel_icons
+	_refresh_reel_frames()   # 듀얼 테두리(색·두께) 해제
 
 
 func _refresh_boost() -> void:
@@ -1410,13 +1420,18 @@ func _refresh_reel_frames() -> void:
 	# 커서는 홀드 토글이 실제로 가능한 국면에서만 뜬다 — `_toggle_hold()` 의 가드와 같은 조건이다.
 	# 조건이 갈리면 "커서는 보이는데 A 가 안 먹는" 상태가 생긴다.
 	var cursor_on := _cursor_active and _intervention_open()
+	# 듀얼 스핀 표식 (개선 회차 9 — 릴 존 합체): 테두리 두께 2px + 상대·찬스색. 커서 강조(시안)가 한 릴의
+	# 색 채널을 잠깐 이겨도 두께 채널이 남아 "지금 듀얼"은 사라지지 않는다.
+	var duel := _duel_overlay != null and _duel_overlay.visible
 	for i in range(REEL_COUNT):
 		var held: bool = _hold_boxes[i].button_pressed
 		_reel_panels[i].modulate = Color(1.0, 1.0, 1.0) if held else Color(0.78, 0.78, 0.78)
 		if i < _reel_frame_styles.size():
-			# 감광(modulate)과 테두리 색은 **다른 채널**이다 — 홀드와 커서가 서로를 지우지 않는다.
+			# 감광(modulate)·테두리 색·테두리 두께는 **다른 채널**이다 — 홀드·커서·듀얼이 서로를 지우지 않는다.
+			var line_color := UiPalette.SYMBOL_CHANCE if duel else UiPalette.FRAME_LINE
 			_reel_frame_styles[i].border_color = UiPalette.ACCENT_ACTIVE \
-				if cursor_on and i == _hold_cursor else UiPalette.FRAME_LINE
+				if cursor_on and i == _hold_cursor else line_color
+			_reel_frame_styles[i].set_border_width_all(DUEL_FRAME_BORDER if duel else _reel_frame_border_base)
 
 
 func _refresh_strip() -> void:

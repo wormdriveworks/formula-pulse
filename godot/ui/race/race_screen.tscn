@@ -100,40 +100,13 @@ bg_color = Color(0.141176, 0.164706, 0.2, 1)
 bg_color = Color(0.247059, 0.878431, 0.960784, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1d076"]
-content_margin_left = 10.0
-content_margin_top = 10.0
-content_margin_right = 10.0
-content_margin_bottom = 10.0
-bg_color = Color(0.082353, 0.105882, 0.133333, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.247059, 0.878431, 0.960784, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_xgo42"]
-bg_color = Color(0.031373, 0.043137, 0.066667, 1)
-border_width_left = 1
+content_margin_left = 6.0
+content_margin_top = 1.0
+content_margin_right = 6.0
+content_margin_bottom = 1.0
+bg_color = Color(0.082353, 0.105882, 0.133333, 0.86)
 border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.356863, 0.392157, 0.435294, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jc7tq"]
-bg_color = Color(0.031373, 0.043137, 0.066667, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.356863, 0.392157, 0.435294, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_durlp"]
-bg_color = Color(0.031373, 0.043137, 0.066667, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.356863, 0.392157, 0.435294, 1)
+border_color = Color(1, 0.309804, 0.690196, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_8hr8o"]
 content_margin_left = 10.0
@@ -601,117 +574,66 @@ visible = false
 anchors_preset = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
+mouse_filter = 2
 script = ExtResource("5_5jw0g")
 
-[node name="Dim" type="ColorRect" parent="DuelOverlay" unique_id=1116924477]
+[node name="DuelBar" type="PanelContainer" parent="DuelOverlay" unique_id=1298678862]
+unique_name_in_owner = true
 layout_mode = 0
-anchor_right = 1.0
-anchor_bottom = 1.0
-color = Color(0, 0, 0, 0.45)
-
-[node name="DuelFrame" type="PanelContainer" parent="DuelOverlay" unique_id=1298678862]
-custom_minimum_size = Vector2(300, 0)
-layout_mode = 0
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_1d076")
 
-[node name="Column" type="VBoxContainer" parent="DuelOverlay/DuelFrame" unique_id=1949679607]
+[node name="Row" type="HBoxContainer" parent="DuelOverlay/DuelBar" unique_id=1949679607]
 layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="VersusRow" type="HBoxContainer" parent="DuelOverlay/DuelFrame/Column" unique_id=2041724403]
-layout_mode = 2
-theme_override_constants/separation = 10
+mouse_filter = 2
+theme_override_constants/separation = 8
 alignment = 1
 
-[node name="PlayerLabel" type="Label" parent="DuelOverlay/DuelFrame/Column/VersusRow" unique_id=782642811]
+[node name="PlayerLabel" type="Label" parent="DuelOverlay/DuelBar/Row" unique_id=782642811]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
 theme_override_fonts/font = ExtResource("6_y37x3")
 theme_override_font_sizes/font_size = 14
+vertical_alignment = 1
 
-[node name="KindLabel" type="Label" parent="DuelOverlay/DuelFrame/Column/VersusRow" unique_id=914331291]
+[node name="KindLabel" type="Label" parent="DuelOverlay/DuelBar/Row" unique_id=914331291]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
 theme_override_font_sizes/font_size = 9
+vertical_alignment = 1
 
-[node name="OpponentLabel" type="Label" parent="DuelOverlay/DuelFrame/Column/VersusRow" unique_id=116771687]
+[node name="OpponentLabel" type="Label" parent="DuelOverlay/DuelBar/Row" unique_id=116771687]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.309804, 0.690196, 1)
 theme_override_fonts/font = ExtResource("6_y37x3")
 theme_override_font_sizes/font_size = 14
+vertical_alignment = 1
 
-[node name="DuelReels" type="HBoxContainer" parent="DuelOverlay/DuelFrame/Column" unique_id=1540716051]
-layout_mode = 2
-theme_override_constants/separation = 8
-alignment = 1
-
-[node name="Cell0" type="PanelContainer" parent="DuelOverlay/DuelFrame/Column/DuelReels" unique_id=24947961]
-custom_minimum_size = Vector2(44, 44)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_xgo42")
-
-[node name="DuelReel0" type="TextureRect" parent="DuelOverlay/DuelFrame/Column/DuelReels/Cell0" unique_id=2107313909]
-unique_name_in_owner = true
-texture_filter = 1
-custom_minimum_size = Vector2(32, 32)
-layout_mode = 2
-stretch_mode = 3
-
-[node name="Cell1" type="PanelContainer" parent="DuelOverlay/DuelFrame/Column/DuelReels" unique_id=117433234]
-custom_minimum_size = Vector2(44, 44)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_jc7tq")
-
-[node name="DuelReel1" type="TextureRect" parent="DuelOverlay/DuelFrame/Column/DuelReels/Cell1" unique_id=1303502896]
-unique_name_in_owner = true
-texture_filter = 1
-custom_minimum_size = Vector2(32, 32)
-layout_mode = 2
-stretch_mode = 3
-
-[node name="Cell2" type="PanelContainer" parent="DuelOverlay/DuelFrame/Column/DuelReels" unique_id=373799346]
-custom_minimum_size = Vector2(44, 44)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_durlp")
-
-[node name="DuelReel2" type="TextureRect" parent="DuelOverlay/DuelFrame/Column/DuelReels/Cell2" unique_id=72636633]
-unique_name_in_owner = true
-texture_filter = 1
-custom_minimum_size = Vector2(32, 32)
-layout_mode = 2
-stretch_mode = 3
-
-[node name="BoostRow" type="HBoxContainer" parent="DuelOverlay/DuelFrame/Column" unique_id=381189124]
-layout_mode = 2
-theme_override_constants/separation = 8
-alignment = 1
-
-[node name="BoostStack" type="Label" parent="DuelOverlay/DuelFrame/Column/BoostRow" unique_id=1591703892]
+[node name="BoostStack" type="Label" parent="DuelOverlay/DuelBar/Row" unique_id=1591703892]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.815686, 0.552941, 1, 1)
 theme_override_font_sizes/font_size = 9
+vertical_alignment = 1
 
-[node name="BoostButton" type="Button" parent="DuelOverlay/DuelFrame/Column/BoostRow" unique_id=1229003140]
+[node name="BoostButton" type="Button" parent="DuelOverlay/DuelBar/Row" unique_id=1229003140]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 9
 
-[node name="ResultLabel" type="Label" parent="DuelOverlay/DuelFrame/Column" unique_id=501695119]
+[node name="ResultLabel" type="Label" parent="DuelOverlay/DuelBar/Row" unique_id=501695119]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(1, 0.894118, 0.639216, 1)
 theme_override_fonts/font = ExtResource("6_y37x3")
 theme_override_font_sizes/font_size = 14
 horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="PauseOverlay" type="Control" parent="." unique_id=1891229247]
 unique_name_in_owner = true

@@ -77,6 +77,9 @@ func _process(_delta: float) -> bool:
 			# 튜토리얼 콜아웃 축(⑯)도 정렬이 끝난 부모를 요구한다 — 예약 영역(Zone A)의
 			# 실 rect 를 읽어 배치하므로, 스트립이 0 크기면 "불침범"이 0==0 으로 성립한다.
 			_settle_race = _mount(RACE_SCENE, _fresh_session(data))
+			# 듀얼 표시 축(개선 회차 9)은 정렬이 끝난 캡션 띠·부스트 버튼 rect 를 요구한다 — 여기서 듀얼을
+			# 강제해 두고 주 프레임에서 잰다(축이 끝나며 `_exit_duel` 로 되돌린다).
+			_force_duel(_settle_race)
 			# 선택 오버레이 배치 축(⑰-ⓓ)도 정렬이 끝난 뒤에 재야 한다 — 오버레이는
 			# **내용이 크기를 정하는 PanelContainer** 라 지점을 연 그 프레임에는 크기가 0이고,
 			# 0 크기에서는 "스킵을 안 가린다"가 0==0 으로 성립한다.
@@ -91,6 +94,7 @@ func _process(_delta: float) -> bool:
 	# **첫 축이어야 한다** — 결산 3화면의 InputGuard 가 `_input` 층에서 ui_accept·마우스 버튼을 트리
 	# 전역으로 삼키므로, 뒤 축들이 `push_input` 으로 넣는 패드 A(= ui_accept)가 남은 창에 죽는다.
 	_settle_next_button_mouse_hit()
+	_duel_in_place()
 	_achievement_without_career(data)
 	_achievement_with_career(data)
 	_achievement_icons(data)
@@ -2725,6 +2729,104 @@ func _settle_next_button_mouse_hit() -> void:
 	for screen in _settle_next:
 		_unmount(screen)
 	_settle_next.clear()
+
+
+# ── 듀얼 표시 재배치 — 릴 존 합체 + 씬 패널 캡션 띠 (개선 회차 9 · 2026-09-08 사용자 결정) ──
+#
+# 종전 모달(전면 감광 + 중앙 프레임 + 전용 릴 3기)은 조작 버튼을 전부 감광판 뒤에 남겨 마우스로는 아무것도
+# 할 수 없었고(감광판 STOP), 프레임은 앵커 결함으로 우하단에 걸려 있었다. 이 축은 새 계약을 실 rect·실 클릭으로 본다:
+#   ⓐ 듀얼 스핀 = 기본 릴 (표시 배열 스왑 없음) · 프레임 테두리 = 듀얼색(SYMBOL_CHANCE) 2px
+#   ⓑ 대치·부스트 띠 = 씬 패널 하단 · 폭 전체 · 릴과 겹침 0
+#   ⓒ 감광판 없음 · 오버레이는 포인터를 받지 않는다 — 홀드 1·확정·부스트 3점 실 클릭이 각자에 닿는다
+#   ⓓ 결과 국면(띠가 결과 한 줄로) · 이탈(테두리 원상)
+# 듀얼은 프레임 1 에 강제해 둔다(`_force_duel`) — 띠·버튼 rect 는 정렬이 끝나야 값이 있다.
+func _force_duel(screen: Control) -> String:
+	if screen == null or screen.engine == null:
+		return ""
+	var opponent := ""
+	for id in screen.engine.entrants:
+		var entrant: Dictionary = screen.engine.entrants[id]
+		if String(id) != SeasonState.PLAYER_ID and not bool(entrant.get("is_filler", false)):
+			opponent = String(id)
+			break
+	if opponent.is_empty():
+		return ""
+	screen._enter_duel({"opponent": opponent, "duel_type": 0})
+	return opponent
+
+
+func _duel_in_place() -> void:
+	var screen := _settle_race
+	_ok("전제: 듀얼 측정용 레이스 화면 실재", screen != null)
+	if screen == null:
+		return
+	var overlay := screen.get_node("%DuelOverlay") as Control
+	_ok("전제: 듀얼 강제 표시 성립 (프레임 1)", overlay.visible)
+	if not overlay.visible:
+		return
+	# ⓒ-1 감광판·포인터 정책 — 선언이지만 아래 실 클릭 3점이 결선을 받친다
+	_ok("듀얼 — 감광판(Dim) 없음", overlay.get_node_or_null("Dim") == null)
+	_ok("듀얼 — 오버레이 루트 mouse_filter = IGNORE",
+		overlay.mouse_filter == Control.MOUSE_FILTER_IGNORE, "mouse_filter=%d" % overlay.mouse_filter)
+	var bar := overlay.get_node("%DuelBar") as Control
+	_ok("듀얼 — 캡션 띠 mouse_filter = IGNORE", bar.mouse_filter == Control.MOUSE_FILTER_IGNORE)
+	# ⓐ 릴 = 기본 릴
+	var reels := screen.get_node("%E05Reels") as Control
+	var same: bool = screen._reel_icons.size() == 3
+	for i in range(mini(3, screen._reel_icons.size())):
+		same = same and screen._reel_icons[i] == reels.get_child(i).get_node("Frame/Symbol")
+	_ok("듀얼 릴 = 기본 릴 Symbol 3기 (오버레이 릴 스왑 없음)", same)
+	var style0 := screen._reel_frame_styles[0] as StyleBoxFlat
+	_ok("듀얼 중 릴 프레임 테두리색 = SYMBOL_CHANCE",
+		style0.border_color == UiPalette.SYMBOL_CHANCE, str(style0.border_color))
+	_ok("듀얼 중 릴 프레임 테두리 두께 = DUEL_FRAME_BORDER (> 기본)",
+		style0.border_width_left == screen.DUEL_FRAME_BORDER
+			and style0.border_width_left > screen._reel_frame_border_base,
+		"width=%d base=%d" % [style0.border_width_left, screen._reel_frame_border_base])
+	# ⓑ 띠 배치 — 실 rect
+	var panel_rect := (screen.get_node("%E15ScenePanel") as Control).get_global_rect()
+	var bar_rect := bar.get_global_rect()
+	_ok("대치 띠 — 크기 실재", bar_rect.get_area() > 0.0, str(bar_rect))
+	_ok("대치 띠 — 씬 패널 안 (교집합 = 띠 면적)",
+		absf(panel_rect.intersection(bar_rect).get_area() - bar_rect.get_area()) <= 0.5,
+		"panel=%s bar=%s" % [panel_rect, bar_rect])
+	_ok("대치 띠 — 씬 패널 하단 정렬", absf(bar_rect.end.y - panel_rect.end.y) <= 0.5,
+		"bar.end=%.1f panel.end=%.1f" % [bar_rect.end.y, panel_rect.end.y])
+	_ok("대치 띠 — 패널 폭 전체", absf(bar_rect.size.x - panel_rect.size.x) <= 0.5,
+		"bar=%.1f panel=%.1f" % [bar_rect.size.x, panel_rect.size.x])
+	_ok("대치 띠 — 릴과 겹침 0", bar_rect.intersection(reels.get_global_rect()).get_area() <= 0.0)
+	# ⓒ-2 실 클릭 3점 — 홀드 1 · 확정 · 부스트. 프레임 1 화면들과 겹쳐 있으므로 맨 위로 올린다.
+	root.move_child(screen, root.get_child_count() - 1)
+	var hold := reels.get_child(0).get_node("Hold") as Control
+	var confirm := screen.get_node("%E08Confirm") as Control
+	var boost := overlay.get_node("%BoostButton") as Control
+	for target in [hold, confirm, boost]:
+		var control := target as Control
+		var hits := [0]
+		var on_gui := func(event: InputEvent) -> void:
+			if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+				hits[0] += 1
+		control.gui_input.connect(on_gui)
+		_click_at(screen.get_viewport(), control.get_global_rect().get_center())
+		control.gui_input.disconnect(on_gui)
+		_ok("듀얼 중 마우스 클릭이 %s 에 닿는다" % String(control.name), hits[0] == 1,
+			"hits=%d rect=%s" % [hits[0], control.get_global_rect()])
+	# ⓓ 결과 국면 — 띠가 결과 한 줄로 바뀌고 자리는 그대로
+	overlay.show_result("x")
+	_ok("결과 국면 — 결과 라벨 표시 · 대치 라벨·부스트 은닉",
+		(overlay.get_node("%ResultLabel") as Control).visible
+			and not (overlay.get_node("%PlayerLabel") as Control).visible
+			and not boost.visible)
+	var result_rect := bar.get_global_rect()
+	_ok("결과 국면 — 띠는 여전히 씬 패널 하단",
+		absf(result_rect.end.y - panel_rect.end.y) <= 0.5 and result_rect.get_area() > 0.0, str(result_rect))
+	# 이탈 — 원상 복귀
+	screen._exit_duel()
+	_ok("듀얼 이탈 — 오버레이 은닉", not overlay.visible)
+	_ok("듀얼 이탈 — 릴 프레임 테두리 원상 (색·두께)",
+		style0.border_color == UiPalette.FRAME_LINE
+			and style0.border_width_left == screen._reel_frame_border_base,
+		"color=%s width=%d" % [style0.border_color, style0.border_width_left])
 
 
 # 바인드가 페이로드를 요구하는 화면만 최소분을 넘긴다 — 요구를 우회하는 것이 아니라
