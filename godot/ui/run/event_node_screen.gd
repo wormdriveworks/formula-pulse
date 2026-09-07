@@ -3,7 +3,8 @@
 # 경량 중앙 단일 패널: 이벤트 텍스트 + 선택지 0~2(대괄호·14자) + 결과 피드백 행.
 # 연출 L0~L1 한정 (D08 §7.1) — 셰이크·플래시 채널을 쓰지 않는다.
 # **무발생 시 이 화면 자체가 비표출**이다 — 발생 판정은 RACE-03 이탈 시점에 세션이 하고,
-# 미발생이면 라우터가 RUN-01 로 직행하므로 여기 도달 = 발생 확정.
+# 미발생이면 라우터가 개러지(HUB-01)로 직행하므로 여기 도달 = 발생 확정. 이탈도 개러지다 —
+# GP 사이에 간이 정산 화면은 없다 (개선 회차 10 · 2026-09-08 사용자 결정 — 레이스 ↔ 개러지 반복).
 #
 # 선택지 실문안·분기 데이터는 D04 텍스트 풀 트랙 소관 — 골격은 단일 [계속] 경로다.
 # 이벤트 변형(4축)·보상은 코어가 판정을 끝냈고 화면은 결과만 번역한다.
@@ -22,7 +23,7 @@ func _on_bound(payload: Dictionary) -> void:
 	if occurrence.is_empty():
 		# 방어 — 무발생인데 도달했다면 판정·라우팅 어느 쪽이 깨진 것이다
 		push_error("EventNodeScreen: reached without an occurrence")
-		go("RUN-01", {})
+		go("HUB-01", {})
 		return
 
 	var title_key := String(occurrence.get("name_key", ""))
@@ -82,4 +83,4 @@ func _show_reward(reward: Dictionary) -> void:
 
 func _on_proceed(occurrence: Dictionary) -> void:
 	session.apply_event_reward(occurrence.get("reward", {}))
-	go("RUN-01", {})
+	go("HUB-01", {})

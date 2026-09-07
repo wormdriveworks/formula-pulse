@@ -365,7 +365,7 @@ ui.gpResult.retired,리타이어 — 투어 탈락,Retired — out of the tour,�
 ui.gpResult.pointsFormat,+{points},+{points},+{points}
 ui.gpResult.creditFormat,{amount} Cr,{amount} Cr,{amount} Cr
 ui.gpResult.carryFormat,섀시 {chassis} · 차지 {charge},Chassis {chassis} · Charge {charge},シャシー{chassis} · チャージ{charge}
-ui.gpResult.next,다음으로,Next,次へ
+ui.gpResult.next,개러지로,To Garage,ガレージへ
 ui.gpResult.toTourReport,투어 결산으로,To Tour Results,ツアー決算へ
 ui.gpResult.saved,저장됨,Saved,保存しました
 ui.gpResult.gridDelta,순위 변동,Position Change,順位変動
@@ -378,22 +378,6 @@ ui.gpResult.troubleTurnsFormat,{count}턴,{count} turns,{count}ターン
 ui.gpResult.standingsHeader,최종 순위표,Final Standings,最終順位表
 ui.gpResult.standingRowFormat,P{rank} {name},P{rank} {name},P{rank} {name}
 ui.gpResult.standingRetired,P{rank} {name} — 리타이어,P{rank} {name} — DNF,P{rank} {name} — リタイア
-ui.recap.header,간이 정산,Quick Settlement,簡易精算
-ui.recap.summaryFormat,직전 P{rank} · 투어 포인트 +{points},Last race P{rank} · Tour Points +{points},直前 P{rank} · ツアーポイント +{points}
-ui.recap.creditsFormat,{amount} Cr,{amount} Cr,{amount} Cr
-ui.recap.fieldRepair,필드 정비,Field Service,フィールドサービス
-ui.recap.consumableHeaderFormat,소모품 보충 {held}/{cap},Consumables {held}/{cap},消耗品の補充 {held}/{cap}
-ui.recap.consumableBuyFormat,{item} {amount} Cr,{item} {amount} Cr,{item} {amount} Cr
-ui.recap.consumableBuyOwnedFormat,{item} {amount} Cr · 보유 {held},{item} {amount} Cr · owned {held},{item} {amount} Cr・所持{held}
-ui.recap.deckHeaderFormat,덱 교체 {used}/{slots},Deck Change {used}/{slots},デッキ変更 {used}/{slots}
-ui.recap.deckEntryFormat,{mark} {skill},{mark} {skill},{mark} {skill}
-ui.recap.deckEquipped,●,●,●
-ui.recap.deckUnequipped,○,○,○
-ui.recap.deckNoSkill,해금된 스킬 없음,No skills unlocked,解放済みスキルなし
-ui.recap.next,다음 대회로,To Next Grand Prix,次のグランプリへ
-ui.recap.repairCostFormat,이번 {now} Cr → 다음 {next} Cr,Now {now} Cr → Next {next} Cr,今回 {now} Cr → 次回 {next} Cr
-ui.recap.chassisFormat,섀시 {now}% → {after}%,Chassis {now}% → {after}%,シャシー {now}% → {after}%
-ui.recap.chassisNowFormat,섀시 {now}%,Chassis {now}%,シャシー {now}%
 ui.tourReport.header,투어 결산,Tour Results,ツアー決算
 ui.tourReport.block1,투어 종합 순위,Tour Standing,ツアー総合順位
 ui.tourReport.block2,챔피언십 포인트,Championship Points,チャンピオンシップポイント
@@ -425,7 +409,7 @@ ui.hub.amountFormat,{amount},{amount},{amount}
 ui.hub.progressFormat,시즌 {season} · 투어 {tour} · 제{race}전,Season {season} · Tour {tour} · Race {race},シーズン{season} · ツアー{tour} · 第{race}戦
 ui.hub.progressClosedFormat,시즌 {season} 마감,Season {season} closed,シーズン{season} 終了
 ui.hub.back,개러지로,To Garage,ガレージへ
-ui.hub.depart,다음 투어 출발,Depart for Next Tour,次のツアーへ出発
+ui.hub.depart,다음 대회 출발,Depart for Next Race,次のレースへ出発
 ui.hub.lockedByCrew," — {crew} 합류 시"," — on {crew} joining"," — {crew}加入時"
 ui.hub.stRepair,정비 베이,Service Bay,整備ベイ
 ui.hub.stTuning,튜닝 벤치,Tuning Bench,チューニングベンチ
@@ -443,6 +427,9 @@ ui.repairBay.run,실행,Run,実行
 ui.repairBay.totalCostFormat,총비용 {amount} Cr,Total {amount} Cr,総費用 {amount} Cr
 ui.repairBay.chassisFormat,섀시 {now}% → {after}%,Chassis {now}% → {after}%,シャシー {now}% → {after}%
 ui.repairBay.chassisNowFormat,섀시 {now}%,Chassis {now}%,シャシー {now}%
+ui.repairBay.consumableHeaderFormat,소모품 보충 {held}/{cap},Consumables {held}/{cap},消耗品の補充 {held}/{cap}
+ui.repairBay.consumableBuyFormat,{item} {amount} Cr,{item} {amount} Cr,{item} {amount} Cr
+ui.repairBay.consumableBuyOwnedFormat,{item} {amount} Cr · 보유 {held},{item} {amount} Cr · owned {held},{item} {amount} Cr・所持{held}
 ui.tuningBench.title,튜닝 벤치,Tuning Bench,チューニングベンチ
 ui.tuningBench.buy,강화,Upgrade,強化
 ui.tuningBench.maxed,최대 단계,Max Level,最大段階

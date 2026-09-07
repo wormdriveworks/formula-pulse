@@ -118,7 +118,12 @@ func _run_season(seed_value: int) -> Dictionary:
 	return sample
 
 
-# 투어 1회분 — GP 주행·이벤트·간이 정산·투어 결산. 시즌 루프에서 호출된다.
+# 투어 1회분 — GP 주행·이벤트·개러지·투어 결산. 시즌 루프에서 호출된다.
+#
+# **개러지가 GP 마다 선다** (개선 회차 10 · 2026-09-08 사용자 결정 — 간이 정산 소거 · 필드 정비 폐지 ·
+# 레이스 ↔ 개러지 반복). 러너는 실플레이가 지나는 경로를 그대로 지난다: GP → 이벤트 → 개러지(보충 + 상점)
+# → 다음 GP, 투어 결산 뒤에도 개러지. 종전(GP 사이 필드 서비스 · 투어 끝 상점)과 지표가 달라지는 것은
+# 플로우가 달라진 결과이며 이 회차 문서에 기록한다.
 func _run_tour(session: RunSession, sample: Dictionary) -> void:
 	while session.tour_has_remaining_gp():
 		_gp_counter += 1
@@ -140,19 +145,19 @@ func _run_tour(session: RunSession, sample: Dictionary) -> void:
 			sample["tour_retires"] = int(sample["tour_retires"]) + 1
 			session.season.mark_dropout()
 			break
-		# 이벤트 노드 (D08 §7 — RACE-03 → RUN-01 사이 삽입 지점). 실플레이가 반드시
+		# 이벤트 노드 (D08 §7 — RACE-03 → 개러지 사이 삽입 지점). 실플레이가 반드시
 		# 지나는 경로이므로 러너도 지난다 — 빼면 C1 회복·C2 수입이 통째로 누락된다.
 		var event := session.judge_event()
 		if not event.is_empty():
 			session.apply_event_reward(event.get("reward", {}))
-		# GP 사이 간이 정산 (D07 §1.2 — 필드 정비·소모품 보충). 이 경로가 없으면
-		# 4GP 누적 소모가 복원선을 넘어 매 투어 리타이어한다 (실플레이와 다른 경로).
-		_field_service(session)
+		# GP 사이 개러지 — 보충 + 상점(전면 정비 포함). 이 경로가 없으면 4GP 누적 소모가
+		# 복원선을 넘어 매 투어 리타이어한다 (실플레이와 다른 경로).
+		_garage(session)
 	var remaining_charge := session.engine.charge if session.engine != null else 0
 	session.close_tour()
 	session.settle_tour(remaining_charge)
 	_stamp(sample, "first_tour_win", session.outgame.milestones.has("milestone_first_tour_win"), _gp_counter)
-	_shop(session)
+	_garage(session)
 
 
 func _stamp(sample: Dictionary, key: String, reached: bool, gp_index: int) -> void:
@@ -181,7 +186,8 @@ func _drive_gp(session: RunSession) -> void:
 		engine.confirm(1.0 if momentum_hit else 0.0)
 
 
-# 패닉 선 [러너 정책 — 정본 미규정]: 필드 정비 회당 상한만큼 남았을 때가 마지막 여유다
+# 패닉 선 [러너 정책 — 정본 미규정]: 이벤트 회복 상한(`param_repair_field_cap` — 종전 필드 정비 회당 상한과
+# 같은 값)만큼 남았을 때가 마지막 여유다. 필드 정비는 폐지됐지만(회차 10) 정책 기준값은 그대로 둔다.
 func _panic_line() -> float:
 	return _data.param("param_repair_field_cap")
 
@@ -208,14 +214,16 @@ func _intervene(engine: RaceEngine, info: Dictionary) -> void:
 			engine.hold_respin(keep)
 
 
-# 간이 정산 정책 (GP 사이) — 생존 우선: 복원선까지 필드 정비 + 소모품 상한까지 보충.
-# 판단은 정책이고 절단·상한·체증은 전부 코어가 쥔다.
-func _field_service(session: RunSession) -> void:
+# 개러지 정책 (GP 사이 · 투어 경계 공통) — 생존 우선: 소모품 상한까지 보충 → 그리디 상점(스킬 · 전면 정비 ·
+# 튜닝). 필드 정비는 게임에서 폐지됐으므로(회차 10) 복원선 아래 회복도 전면 정비 한 경로다.
+# 판단은 정책이고 절단·상한은 전부 코어가 쥔다.
+func _garage(session: RunSession) -> void:
+	_restock(session)
+	_shop(session)
+
+
+func _restock(session: RunSession) -> void:
 	var outgame := session.outgame
-	var cap := int(_data.param("param_repair_field_cap"))
-	while outgame.chassis < float(outgame.free_restore_line()):
-		if outgame.field_repair(cap) <= 0:
-			break   # 크레딧 부족 또는 회복 여지 소진
 	var carried := 0
 	for held in outgame.consumables:
 		carried += int(outgame.consumables[held])

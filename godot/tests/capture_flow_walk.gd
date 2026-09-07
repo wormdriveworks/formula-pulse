@@ -2,7 +2,8 @@
 #
 #   <console.exe> --path godot --script tests/capture_flow_walk.gd -- <출력 디렉토리> [최대초]
 #
-# 앱 루트를 그대로 띄워 SYS-01 → SYS-02 → RACE-01 → RACE-03 → RUN-01 → … 를 자동 주파하며
+# 앱 루트를 그대로 띄워 SYS-01 → SYS-02 → RACE-01 → RACE-03 → HUB-01 을 자동 주파하며
+# (GP 뒤 개러지 복귀 — 개선 회차 10 · 2026-09-08 플로우: 간이 정산 화면 없음)
 # **화면이 바뀔 때마다** 한 장씩 남긴다. 무개입 경로(스핀 → 즉시 확정)로 돈다 —
 # 개입 경로는 `test_seal_ui.gd` 가 별도로 본다.
 #
@@ -102,12 +103,10 @@ func _drive(screen: Control) -> void:
 				screen._on_primary_action()
 		"GpResultScreen":
 			(screen.get_node("%NextButton") as Button).pressed.emit()
-		"RunRecapScreen":
-			(screen.get_node("%NextButton") as Button).pressed.emit()
 		"TourReportScreen":
 			(screen.get_node("%NextButton") as Button).pressed.emit()
 		"GarageScreen":
-			print("WALK_OK shots=%d — 개러지 도달 (SET-01 ⑧ 이행)" % _shots)
+			print("WALK_OK shots=%d — 개러지 도달 (GP 뒤 개러지 복귀 — 회차 10 플로우)" % _shots)
 			_finish(0)
 
 

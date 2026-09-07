@@ -88,7 +88,6 @@ theme_override_font_sizes/font_size = 14
 
 [node name="Card" type="VBoxContainer" parent="Pad/Column" unique_id=629341899]
 layout_mode = 2
-size_flags_vertical = 3
 theme_override_constants/separation = 4
 
 [node name="CardLabel" type="Label" parent="Pad/Column/Card" unique_id=458786152]
@@ -131,3 +130,22 @@ theme_override_font_sizes/font_size = 9
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 9
+
+[node name="ConsumableCard" type="VBoxContainer" parent="Pad/Column" unique_id=1207843301]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ConsumableTitle" type="Label" parent="Pad/Column/ConsumableCard" unique_id=1207843302]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
+theme_override_font_sizes/font_size = 9
+
+[node name="ConsumableList" type="HBoxContainer" parent="Pad/Column/ConsumableCard" unique_id=1207843303]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="Spacer" type="Control" parent="Pad/Column" unique_id=1207843304]
+layout_mode = 2
+size_flags_vertical = 3

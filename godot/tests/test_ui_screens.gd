@@ -61,6 +61,7 @@ var _settle_probe: Control
 var _settle_race: Control
 var _settle_choice: Control
 var _settle_next: Array[Control] = []
+var _settle_bay: Control
 
 
 func _process(_delta: float) -> bool:
@@ -90,11 +91,17 @@ func _process(_delta: float) -> bool:
 			# 결산 3화면 — 주 버튼 마우스 히트테스트 축(개선 회차 8)도 정렬이 끝난 버튼 rect 를
 			# 요구한다. 순위표가 서야 재현되므로 GP 를 실제로 끝낸 세션으로 세운다.
 			_settle_next = _mount_settle_next(data)
+			# 개러지 루프 축(개선 회차 10)의 소모품 실 클릭도 정렬이 끝난 버튼 rect 를 요구한다.
+			# 새 커리어 잔액은 0 이라 구매 가능 상태를 만들어 세운다.
+			var bay_session := _fresh_session(data)
+			bay_session.outgame.gain_credits(1000)
+			_settle_bay = _mount(HUB02_SCENE, bay_session)
 		return false
 	# **첫 축이어야 한다** — 결산 3화면의 InputGuard 가 `_input` 층에서 ui_accept·마우스 버튼을 트리
 	# 전역으로 삼키므로, 뒤 축들이 `push_input` 으로 넣는 패드 A(= ui_accept)가 남은 창에 죽는다.
 	_settle_next_button_mouse_hit()
 	_duel_in_place()
+	_garage_loop_flow(data)
 	_achievement_without_career(data)
 	_achievement_with_career(data)
 	_achievement_icons(data)
@@ -2525,7 +2532,8 @@ const CLICK_EXEMPT: Array[String] = []
 
 func _mouse_click_paths(data: GameData) -> void:
 	var routes: Dictionary = load(APP_ROOT_SCENE_SCRIPT).ROUTES
-	_ok("전제: 라우팅 대장 실재", routes.size() >= 19, "routes=%d" % routes.size())
+	# 하한 18 = D09 대장 23종 중 구현 화면 전수 (RUN-01 은 개선 회차 10 에 플로우에서 소거 — 19 → 18).
+	_ok("전제: 라우팅 대장 실재", routes.size() >= 18, "routes=%d" % routes.size())
 	# **화면마다 새 세션을 쓴다.** 하나를 공유하면 앞 화면이 1회성 상태를 소모해 뒤 검사가
 	# 무너진다(실측: HUB-01 을 세우자 온보딩 팁 기록이 소모돼 ⑫ⓔ 축이 FAIL 했다).
 	#
@@ -4669,17 +4677,174 @@ func _danger_frame_colorblind(data: GameData) -> void:
 	_ok("원복 (뒤 축 오염 방지)", UiPalette.colorblind == before)
 
 
+# ── 플로우 단순화: 레이스 ↔ 개러지 반복 (개선 회차 10 · 2026-09-08 사용자 결정) ──
+#
+# 간이 정산 화면(RUN-01)이 사라지고 GP 마다 HUB-01 이 선다. "개러지 = 투어당 1회" 불변식 위에 얹혀 있던
+# 결선(브리핑 사슬 발행 · 재개 착지)이 그 불변식 없이도 서는지, 유일한 소모품 구매 지점이 개러지로 옮겨졌는지 본다.
+#   ⓐ RACE-03 투어 중 이탈 = HUB-01 또는 RUN-02 (간이 정산 아님) · RUN-02 이탈 원본 = HUB-01
+#   ⓑ 브리핑 사슬 = 투어 첫 GP 앞의 출발에만 (race_slot == 1) — 조건 밖에서는 대기열도 남는다
+#   ⓒ 막 VN 대기열의 vn_seen 중복 = 버림 (재개 창 재발화 차단)
+#   ⓓ 재개 착지: 투어 중 = HUB-01 · 투어 마감 = SET-01 · 탈락 = SET-01 · 시즌 마감 = SET-02
+#   ⓔ HUB-02 소모품 카드 — 표 전 품목 버튼 · 폰트 명시 · 실 클릭 1건 구매 · 잔액 갱신 · 포커스 복귀
+#   ⓕ 간이 정산 잔존 0 — 라우팅 대장 · 씬/스크립트 파일 · 전이 화면 원본
+const HUB02_SCENE := "res://ui/hub/repair_bay_screen.tscn"
+const RUN01_TOKEN := "RUN-01"
+const RUN01_SCENE := "res://ui/run/run_recap_screen.tscn"
+const RUN01_SCRIPT := "res://ui/run/run_recap_screen.gd"
+
+
+func _garage_loop_flow(data: GameData) -> void:
+	# ⓐ RACE-03 — GP 를 실제로 끝낸 세션으로 세우고 투어 중 이탈 요청의 목적지를 라우터 자리에서 받는다.
+	var finished := _finished_gp_session(data)
+	_ok("⑩ⓐ 전제: GP 실주행 세션", finished != null)
+	if finished != null:
+		var result_screen := _mount(String(SETTLE_NEXT_SCENES[0]), finished)
+		if result_screen != null:
+			# 진입 방어 창은 `_input` 전역 삼킴이라 뒤 축의 push_input 을 죽인다 — 바로 걷는다 (회차 8 과 같은 이유).
+			var guard := result_screen.get_node_or_null("InputGuard")
+			if guard != null:
+				guard.free()
+			_ok("⑩ⓐ 전제: 투어 잔여 GP 있음 (race_slot %d)" % finished.season.race_slot,
+				finished.tour_has_remaining_gp())
+			var targets: Array[String] = []
+			result_screen.navigate.connect(func(target: String, _payload: Dictionary) -> void:
+				targets.append(target))
+			result_screen._on_next(false)
+			_ok("⑩ⓐ RACE-03 투어 중 이탈 = HUB-01 또는 RUN-02 (이벤트 발생 시)",
+				targets.size() == 1 and (targets[0] == "HUB-01" or targets[0] == "RUN-02"), str(targets))
+			_unmount(result_screen)
+	var event_src := FileAccess.get_file_as_string("res://ui/run/event_node_screen.gd")
+	_ok("⑩ⓐ RUN-02 이탈 2갈래(정상·방어) = HUB-01", event_src.count('go("HUB-01", {})') == 2,
+		"count=%d" % event_src.count('go("HUB-01", {})'))
+
+	# ⓑ 브리핑 게이트 — 커리어 개시 직후는 막 VN(1막)이 대기 중이다.
+	var brief := _fresh_session(data)
+	var pending_before := brief.outgame.act_vn_pending.size()
+	_ok("⑩ⓑ 전제: 커리어 개시 = 막 VN 대기 1건 이상", pending_before >= 1, "pending=%d" % pending_before)
+	brief.season.race_slot = 2
+	var mid_tour := brief.take_brief_payload("RACE-01")
+	_ok("⑩ⓑ 투어 중(race_slot 2) 출발 = 브리핑 없음", mid_tour.is_empty(), str(mid_tour.get("vn_id", "")))
+	_ok("⑩ⓑ 조건 밖에서는 대기열을 소비하지 않는다",
+		brief.outgame.act_vn_pending.size() == pending_before, "pending=%d" % brief.outgame.act_vn_pending.size())
+	brief.season.race_slot = 1
+	var first := brief.take_brief_payload("RACE-01")
+	_ok("⑩ⓑ 투어 첫 GP 앞 출발 = 브리핑 발행 (슬롯 = 투어 브리핑)",
+		String(first.get("slot_id", "")) == "vnslot_tour_brief", str(first.get("slot_id", "")))
+	_ok("⑩ⓑ 발행 뒤 대기열 소비", brief.outgame.act_vn_pending.is_empty())
+	# 재회 브리핑 비트도 같은 게이트를 지난다 — 무대·단계만 보는 비트라 게이트가 없으면 매 GP 다시 선다.
+	var alta_index := brief.season.calendar.find(RunSession.ALTA_RIDGE_ID)
+	_ok("⑩ⓑ 전제: 캘린더에 알타 리지", alta_index >= 0)
+	if alta_index >= 0:
+		brief.season.tour_slot = alta_index + 1
+		brief.season.race_slot = 3
+		_ok("⑩ⓑ 전제: 알타 리지 브리핑 비트 자격 성립", not brief._pending_brief_beats().is_empty())
+		_ok("⑩ⓑ 재회 비트도 투어 중 출발에는 서지 않는다 (매 GP 재발화 · 시즌 상한 소모 차단)",
+			brief.take_brief_payload("RACE-01").is_empty())
+		brief.season.race_slot = 1
+		var alta_brief := brief.take_brief_payload("RACE-01")
+		_ok("⑩ⓑ 투어 첫 GP 앞에는 재회 비트가 선다",
+			String(alta_brief.get("vn_id", "")) == "vnbeat_reunion_alta", str(alta_brief.get("vn_id", "")))
+
+	# ⓒ vn_seen 중복 — 재개 창(발생은 기록됐는데 세이브의 대기열에는 남은 상태)의 재현.
+	var dedup := _fresh_session(data)
+	var first_act := String(dedup.outgame.act_vn_pending[0]) if not dedup.outgame.act_vn_pending.is_empty() else ""
+	_ok("⑩ⓒ 전제: 개시형 막 VN 대기", not first_act.is_empty())
+	dedup.narrative.vn_seen[first_act] = true
+	var replay := dedup.take_brief_payload("RACE-01")
+	_ok("⑩ⓒ 이미 발생한 막 VN 은 다시 서지 않는다", replay.is_empty(), str(replay.get("vn_id", "")))
+	_ok("⑩ⓒ 버린 뒤 대기열도 비운다", dedup.outgame.act_vn_pending.is_empty())
+
+	# ⓓ 재개 착지 — 상태별.
+	var resume := _fresh_session(data)
+	_ok("⑩ⓓ 투어 첫 GP 앞 저장분 재개 = HUB-01", resume.resume_route() == "HUB-01", resume.resume_route())
+	resume.season.race_slot = 2
+	_ok("⑩ⓓ 투어 중 저장분 재개 = HUB-01 (개러지 → 출발이 GP 사이의 정규 경로)",
+		resume.resume_route() == "HUB-01")
+	resume.season.race_slot = resume.season.races_per_tour() + 1
+	_ok("⑩ⓓ 투어 마감 저장분 재개 = SET-01 (L1 유지)", resume.resume_route() == "SET-01")
+	_ok("⑩ⓓ 마감 처리 뒤(다음 투어 첫 GP 앞) = HUB-01",
+		resume.season.race_slot == 1 and resume.resume_route() == "HUB-01")
+	var dropped := _fresh_session(data)
+	dropped.season.race_slot = 2
+	dropped.season.mark_dropout()
+	_ok("⑩ⓓ 탈락 저장분 재개 = SET-01 (L2 유지)", dropped.resume_route() == "SET-01")
+	var closed := _fresh_session(data)
+	closed.season.tour_slot = closed.season.tours_per_season() + 1
+	_ok("⑩ⓓ 시즌 마감 저장분 재개 = SET-02 (유지)", closed.resume_route() == "SET-02")
+
+	# ⓔ HUB-02 소모품 카드 — 프레임 1 에 세운 화면에서 실 클릭으로 구매한다.
+	_ok("⑩ⓔ 전제: 정비 베이 마운트", _settle_bay != null)
+	if _settle_bay != null:
+		var bay := _settle_bay
+		var list := bay.get_node_or_null("%ConsumableList") as Control
+		_ok("⑩ⓔ 소모품 카드 실재 (구매 지점이 간이 정산과 함께 사라지지 않았다)", list != null)
+		if list != null:
+			var buttons: Array[Button] = []
+			for child in list.get_children():
+				if child is Button:
+					buttons.append(child)
+			_ok("⑩ⓔ 품목 버튼 = 표 전 품목", buttons.size() == data.consumables.size(),
+				"%d/%d" % [buttons.size(), data.consumables.size()])
+			var fonted := 0
+			for button in buttons:
+				if button.has_theme_font_size_override("font_size"):
+					fonted += 1
+			_ok("⑩ⓔ 코드 생성 버튼 전부 폰트 크기 명시 (FONT 규약)", fonted == buttons.size(),
+				"%d/%d" % [fonted, buttons.size()])
+			if not buttons.is_empty():
+				var outgame: OutgameState = (bay.session as RunSession).outgame
+				var target := buttons[0]
+				var item_id := String(target.name).trim_prefix("Buy_")
+				var cost := CsvTable.to_int(String(data.consumables[item_id]["cost_cr"]))
+				var credits_before: int = outgame.credits
+				var held_before := int(outgame.consumables.get(item_id, 0))
+				_ok("⑩ⓔ 전제: 첫 품목 구매 가능 (잔액 %d ≥ %d · 활성)" % [credits_before, cost],
+					not target.disabled and credits_before >= cost)
+				root.move_child(bay, root.get_child_count() - 1)
+				var rect := target.get_global_rect()
+				_ok("⑩ⓔ 전제: 버튼 정렬 완료 (크기 > 0)", rect.size.x > 0.0 and rect.size.y > 0.0, str(rect))
+				_click_at(bay.get_viewport(), rect.get_center())
+				_ok("⑩ⓔ 실 클릭 → 구매 1건", int(outgame.consumables.get(item_id, 0)) == held_before + 1,
+					"held=%d" % int(outgame.consumables.get(item_id, 0)))
+				_ok("⑩ⓔ 잔액 차감 = 단가", outgame.credits == credits_before - cost,
+					"credits=%d expected=%d" % [outgame.credits, credits_before - cost])
+				_ok("⑩ⓔ 공통 바 잔액 갱신",
+					(bay.get_node("%CreditValue") as Label).text
+						== data.strings.text("ui.hub.amountFormat", {"amount": outgame.credits}))
+				var focus := bay.get_viewport().gui_get_focus_owner()
+				_ok("⑩ⓔ 재생성 뒤 포커스 = 같은 품목", focus != null and String(focus.name) == "Buy_" + item_id,
+					String(focus.name) if focus != null else "null")
+				var owned_text := data.strings.text("ui.repairBay.consumableBuyOwnedFormat", {
+					"item": data.strings.text(String(data.consumables[item_id]["name_key"])),
+					"amount": cost, "held": held_before + 1,
+				})
+				_ok("⑩ⓔ 재생성 뒤 문면 = 보유 표기", focus is Button and (focus as Button).text == owned_text,
+					(focus as Button).text if focus is Button else "null")
+		_unmount(bay)
+		_settle_bay = null
+
+	# ⓕ 잔존 0.
+	var routes: Dictionary = load(APP_ROOT_SCENE_SCRIPT).ROUTES
+	_ok("⑩ⓕ 라우팅 대장에 간이 정산 경로 없음", not routes.has(RUN01_TOKEN))
+	_ok("⑩ⓕ 간이 정산 씬·스크립트 삭제",
+		not ResourceLoader.exists(RUN01_SCENE) and not FileAccess.file_exists(RUN01_SCRIPT))
+	for path in ["res://ui/race/gp_result_screen.gd", "res://ui/run/event_node_screen.gd",
+			"res://ui/hub/garage_screen.gd", "res://ui/flow/run_session.gd", "res://ui/flow/app_root.gd"]:
+		_ok("⑩ⓕ 간이 정산 참조 0 — %s" % String(path).get_file(),
+			not FileAccess.get_file_as_string(String(path)).contains(RUN01_TOKEN))
+
+
 # ── ㉝ 의미 프레임 소비처 (15차 ① — 정본이 이름 붙인 자리에만 건다) ──
 #
-# **`주 버튼` 은 정본 용어다** (D09 별첨A — RACE-03 `[다음으로]` · RUN-02 E05 · SET-01
-# `[개러지로]` · `[다음 대회로]`). 그 넷에만 `PrimaryButton` 을 건다.
+# **`주 버튼` 은 정본 용어다** (D09 별첨A — RACE-03 `[개러지로]` · RUN-02 E05 · SET-01
+# `[개러지로]`). 그 셋에만 `PrimaryButton` 을 건다 — 간이 정산의 `[다음 대회로]` 는 화면과 함께
+# 사라졌다(개선 회차 10).
 #
 # **위험은 비가역 확인의 수락 하나뿐이다** [가안] — §A-23 이 비가역 항목에 경고행을 필수로
 # 두었고 그 자리에 이미 위험색 문면이 서 있다. **가역 확인에는 붙이지 않는다**(대조군) —
 # 붙이면 '위험'이 '확인'의 동의어가 된다.
 const PRIMARY_SCREENS := [
 	"res://ui/race/gp_result_screen.tscn",
-	"res://ui/run/run_recap_screen.tscn",
 	"res://ui/settle/season_result_screen.tscn",
 	"res://ui/settle/tour_report_screen.tscn",
 ]

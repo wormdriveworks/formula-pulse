@@ -214,10 +214,27 @@ static func split_season_vn_id(vn_id: String) -> Dictionary:
 # 화면이 죽는 게 아니라 tense 3건이 BGM-09(일상)로 떨어지는 것으로만 나타난다(D12 v1.4 §5.4).
 #
 # 2건 이상이면 **사슬로 잇는다** — 앞 VN 의 `next` 가 뒤 VN 이고 마지막의 `next` 가 원래 목적지다.
+#
+# **투어 첫 GP 앞의 출발에만 발행한다** (개선 회차 10 · 2026-09-08 사용자 결정 — 간이 정산 소거 · 레이스 ↔
+# 개러지 반복). 종전에는 "개러지 이탈 = 투어당 1회"라는 플로우의 불변식이 이 함수 밖에서 슬롯 위치를 보증했다.
+# 개러지가 GP 마다 서면서 그 보증이 사라졌고, 재회 브리핑 비트는 무대·관계 단계만 보고 `vn_seen` 을 보지
+# 않으므로 게이트가 없으면 **매 GP 같은 VN 이 다시 서고 시즌 상한 15 와 재회 투어 상한 2 를 소모**한다.
+# `vn_slots.csv` 의 `trigger = tour_start` 를 코드가 문면 그대로 이행한다: `race_slot == 1`. 조건 밖에서는
+# 대기열도 소비하지 않는다 — 다음 투어 첫 출발까지 남는다(대기열이 채워지는 지점은 커리어 개시와
+# `close_tour()` 뿐이라 언제나 race_slot 1 에서 채워진다).
+#
+# **막 VN 은 `vn_seen` 인 id 를 버린다.** 출발은 저장 **뒤에** 대기열을 소비하므로 브리핑 VN 뒤 다음 저장
+# (RACE-03) 전에 종료하면 세이브에는 대기열이, 서사 층에는 발생이 함께 남는다. 재개가 개러지에 착지하는
+# 지금은 그 재발화가 재개 직후에 바로 서고 시즌 상한을 1 더 먹는다 — 막 VN 은 정의상 1회(`act_vn_fired`)라
+# 버려도 잃는 것이 없다. 재회 비트는 손대지 않는다(무대·단계 조건의 재발화는 서사 층 설계다).
 func take_brief_payload(next_route: String, next_payload: Dictionary = {}) -> Dictionary:
+	if season != null and season.race_slot != 1:
+		return {}
 	var queued: Array = []
 	if outgame != null:
 		for vn_id in outgame.act_vn_pending:
+			if narrative != null and narrative.vn_seen.has(String(vn_id)):
+				continue
 			queued.append({"kind": "act", "id": String(vn_id)})
 		outgame.act_vn_pending.clear()
 	for beat in _pending_brief_beats():
@@ -470,7 +487,7 @@ func _archive_source_payload(vn_id: String, next_route: String,
 	return _beat_payload(String(beats[0]["id"]), next_route, next_payload, vn_id)
 
 
-# 이벤트 노드 판정 (D08 §7 — RACE-03 → RUN-01 사이 삽입 지점의 발생 판정)
+# 이벤트 노드 판정 (D08 §7 — RACE-03 → 개러지 사이 삽입 지점의 발생 판정)
 func judge_event() -> Dictionary:
 	var stage_id := season.current_stage_id()
 	# 변형 조건 DSL 의 입력 문맥 — 성적·막 축 (D08 §7.3)
@@ -899,9 +916,13 @@ func restore(payload: Dictionary) -> bool:
 # (close_tour / close_season)를 재개 시점에 그대로 수행한다. 원 흐름과 같은 손이다:
 # RACE-03 → close_tour → SET-01, SET-01 → close_season → SET-02 (tour_report_screen._on_next).
 # RACE-03 재표시는 불가 — last_gp_result 는 직렬화되지 않는다. 투어 결산부터가 최소 충실 재개다.
+#
+# **투어 중 착지 = HUB-01** (개선 회차 10 · 2026-09-08 사용자 결정). 간이 정산이 사라지고 GP 사이의 정규
+# 경로가 개러지 → 출발이 되면서 레이스 직행은 정비·구매 기회를 건너뛰는 착지가 됐다. RACE-03 진입 저장분도
+# 개러지 출발 저장분도 같은 자리로 돌아온다 — 이벤트 노드(RUN-02)를 재개가 건너뛰는 것은 종전과 같다.
 func resume_route() -> String:
 	if season == null:
-		return "RACE-01"
+		return "HUB-01"
 	if season.season_finished():
 		# 시즌 최종 SET-01 진입 저장분 — close_tour 는 이미 저장 전에 끝났고 close_season 만
 		# 남은 상태다 (시즌 경계 저장은 HUB-08 확정 시점이라 그 사이 전 구간이 이 상태를 로드한다)
@@ -910,4 +931,4 @@ func resume_route() -> String:
 	if season.tour_dropped_out or season.race_slot > season.races_per_tour():
 		close_tour()
 		return "SET-01"
-	return "RACE-01"
+	return "HUB-01"

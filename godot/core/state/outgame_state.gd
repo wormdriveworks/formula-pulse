@@ -123,6 +123,11 @@ func exchange_charge(remaining_charge: int, tour_finished: bool) -> int:
 
 # ── 정비 (D06 §3.3 · D13 별첨A §3.4) ──
 # 필드 정비: 회당 상한 30 CH · 회차 체증 1.5^(n−1) · 체증 카운터는 투어 개시에 리셋.
+#
+# **게임에서 도달 불가 (개선 회차 10 · 2026-09-08 사용자 결정 — 필드 정비 폐지).** 유일 소비처였던 간이 정산
+# 화면이 플로우에서 사라지고(레이스 ↔ 개러지 반복) 정비는 개러지의 전면 정비 한 경로다. 함수·파라미터·TC-O
+# 검사는 그대로 두었다 — 걷어내는 일은 정리 회차 이월분이며, `param_repair_field_cap` 은 이벤트 회복 상한
+# (`event_chassis_recover`)이 계속 읽는다.
 func field_repair_cost(season_rank_mod: int = 0) -> int:
 	return _field_repair_cost_at(field_repair_count, season_rank_mod)
 
