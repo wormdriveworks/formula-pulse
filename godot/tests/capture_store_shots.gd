@@ -269,10 +269,11 @@ func _stage_gp_result() -> Control:
 
 
 # TL-5 러너 `_run_tour` 의 전사다 — **경로를 줄이지 않는다.** 초판은 GP 만 이어 붙이고
-# 필드 정비·이벤트 노드·리타이어 표기·투어 정산을 뺐다. 그러자 4판 누적 소모가 복원선을
+# 정비·이벤트 노드·리타이어 표기·투어 정산을 뺐다. 그러자 4판 누적 소모가 복원선을
 # 넘어 **20판 전건 미도달·섀시 0** 이 됐다(실측). 러너가 이미 그 주석을 달아 뒀다 —
 # *"이 경로가 없으면 4GP 누적 소모가 복원선을 넘어 매 투어 리타이어한다(실플레이와 다른 경로)"*.
 # 즉 빠진 것은 정책이 아니라 **실플레이가 반드시 지나는 경로**였다.
+# 개선 회차 10 부터 그 경로는 "GP 마다 개러지"다(간이 정산·필드 정비 소거) — 러너 `_garage` 를 그대로 전사한다.
 func _drive_to_podium(session: RunSession) -> bool:
 	var gp := 0
 	while gp < SETTLE_MAX_GP and not session.season.season_finished():
@@ -297,20 +298,21 @@ func _drive_to_podium(session: RunSession) -> bool:
 			var event := session.judge_event()
 			if not event.is_empty():
 				session.apply_event_reward(event.get("reward", {}))
-			_field_service(session)
+			_garage(session)
 		var remaining_charge: int = session.engine.charge if session.engine != null else 0
 		session.close_tour()
 		session.settle_tour(remaining_charge)
 	return false
 
 
-# GP 사이 간이 정산 (D07 §1.2) — 러너 `_field_service` 의 전사.
-func _field_service(session: RunSession) -> void:
+# GP 사이 개러지 (개선 회차 10 플로우) — 러너 `_garage` 의 전사: 보충 + 상점(스킬·전면 정비·튜닝).
+func _garage(session: RunSession) -> void:
+	_restock(session)
+	_shop(session)
+
+
+func _restock(session: RunSession) -> void:
 	var outgame := session.outgame
-	var cap := _data.param_int("param_repair_field_cap")
-	while outgame.chassis < float(outgame.free_restore_line()):
-		if outgame.field_repair(cap) <= 0:
-			break   # 크레딧 부족 또는 회복 여지 소진
 	var carried := 0
 	for held in outgame.consumables:
 		carried += int(outgame.consumables[held])

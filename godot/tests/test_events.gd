@@ -68,7 +68,8 @@ func _d13_event_values() -> void:
 	_eq_float("D13 §6.5 발생 판정 80%", data.param("param_event_trigger_probability"), 0.80)
 	_eq_float("D13 §6.5 재출현 쿨다운 3회", data.param("param_event_cooldown_judgments"), 3.0)
 	_eq_float("D13 §6.5 주드 인접 판정 ±2", data.param("param_event_rank_adjacency"), 2.0)
-	_eq_float("D13 §3.4 필드 정비 회당 상한 30", data.param("param_repair_field_cap"), 30.0)
+	# 종전 "필드 정비 회당 상한 30" — 필드 정비 폐지(회차 10) 뒤 이벤트 회복 상한으로 승계·개명(회차 11)
+	_eq_float("D13 §3.4 이벤트 회복 상한 30", data.param("param_event_recover_cap"), 30.0)
 	# 카테고리 배분 C1 20% / C2 25% / C3 20% / C4 15% / C5 20%
 	var expected_weights := {
 		"category_c1": 0.20, "category_c2": 0.25, "category_c3": 0.20,
@@ -90,10 +91,10 @@ func _d13_event_values() -> void:
 	_eq_float("D13 §6.5 C2 금액 상한 250", CsvTable.to_float(String(c2["reward_max"])), 250.0)
 	_eq_float("D13 §6.5 C2 희소 확률 10%", CsvTable.to_float(String(c2["rare_probability"])), 0.10)
 	_eq_float("D13 §6.5 C2 희소 DP 12", CsvTable.to_float(String(c2["rare_dp"])), 12.0)
-	# C1 회복 상한이 필드 정비 회당 상한을 넘지 않는다 (D08 §7.2 경제 가드 — 구조 단언)
-	_ok("D08 §7.2 경제 가드: C1 상한 ≤ 필드 정비 상한",
-		CsvTable.to_float(String(c1["reward_max"])) <= data.param("param_repair_field_cap"),
-		"c1_max=%s cap=%f" % [c1["reward_max"], data.param("param_repair_field_cap")])
+	# C1 회복 상한이 이벤트 회복 회당 상한을 넘지 않는다 (D08 §7.2 경제 가드 — 구조 단언)
+	_ok("D08 §7.2 경제 가드: C1 상한 ≤ 이벤트 회복 상한",
+		CsvTable.to_float(String(c1["reward_max"])) <= data.param("param_event_recover_cap"),
+		"c1_max=%s cap=%f" % [c1["reward_max"], data.param("param_event_recover_cap")])
 	# 풀 규모 (D08 별첨A §6 확정): 공통 28 + 무대 전용 20(무대 5 × 4) = 총 48종
 	var common_by_category: Dictionary = {}
 	var stage_count := 0
@@ -320,7 +321,7 @@ func _reward_guards() -> void:
 	if data == null:
 		return
 	var service := _new_service(999, data)
-	var cap := data.param_int("param_repair_field_cap")
+	var cap := data.param_int("param_event_recover_cap")
 	var seen_types: Dictionary = {}
 	var rare_seen := false
 	for i in range(6000):

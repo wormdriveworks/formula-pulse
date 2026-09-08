@@ -44,7 +44,7 @@ param_time_pacing_beat_sec,1.0
 param_event_trigger_probability,0.80
 param_event_cooldown_judgments,3
 param_event_rank_adjacency,2
-param_repair_field_cap,7
+param_event_recover_cap,7
 param_pacing_beat_max_sec,2.5
 param_pacing_beat_probability,0.40
 param_closerace_gauge_threshold,70
@@ -55,9 +55,6 @@ param_prize_per_tour_point_cr,100
 param_finish_bonus_cr,200
 param_tour_finish_bonus_cr,600
 param_tour_finish_bonus_dp,45
-param_repair_base_cr,100
-param_repair_escalation,2.0
-param_repair_season_rank_coef,0.0
 param_repair_full_cr_per_ch,5
 param_repair_free_restore_line,40
 param_tuning_refund_ratio,0.8

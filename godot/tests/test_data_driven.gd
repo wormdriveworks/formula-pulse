@@ -11,7 +11,8 @@
 extends SceneTree
 
 const FIXTURE_DIR := "res://tests/fixtures/tables/"
-const MIN_CHECKS := 69
+# 69 → 65 (개선 회차 11): 필드 정비 폐지·코어 삭제로 상한·체증·다음 회차·복원선 뒤 무동작 검사 4건이 걷혔다.
+const MIN_CHECKS := 65
 
 var _failures := 0
 var _checked := 0
@@ -201,24 +202,26 @@ func _outgame_reads_data() -> void:
 		payout == data.param_int("param_charge_exchange_cap") * data.param_int("param_charge_exchange_cr"),
 		"payout=%d" % payout)
 	_ok("환전이 기본값(5 × 20 = 100)이 아니다", payout != 100, "payout=%d" % payout)
-	# 테오 패시브 (픽스처 −50% · 기본 −10%) — 리터럴 0.9 구현을 판별한다
-	var expected_cost := int(round(data.param("param_repair_base_cr") * 0.5))
-	_ok("정비비에 크루 패시브가 데이터대로 반영", state.field_repair_cost() == expected_cost,
-		"actual=%d expected=%d" % [state.field_repair_cost(), expected_cost])
+	# 테오 패시브 (픽스처 −50% · 기본 −10%) — 리터럴 0.9 구현을 판별한다. 소비처 = **전면 정비 단가**
+	# (필드 정비는 회차 10 폐지 · 회차 11 코어 삭제 — 유상 정비는 전면 정비 한 경로다).
+	var missing := 30.0
+	state.chassis = data.param("param_chassis_max") - missing
+	var per_ch := data.param("param_repair_full_cr_per_ch")   # 픽스처 5 · 기본 20
+	var expected_cost := int(round(missing * per_ch * 0.5))
+	_ok("정비비에 크루 패시브가 데이터대로 반영", state.full_repair_cost() == expected_cost,
+		"actual=%d expected=%d" % [state.full_repair_cost(), expected_cost])
 	_ok("정비비가 리터럴 0.9 계수를 쓰지 않는다",
-		state.field_repair_cost() != int(round(data.param("param_repair_base_cr") * 0.9)),
-		"actual=%d" % state.field_repair_cost())
-	# 필드 정비 회당 상한 (픽스처 7 · 기본 30)
+		state.full_repair_cost() != int(round(missing * per_ch * 0.9)),
+		"actual=%d" % state.full_repair_cost())
+	_ok("정비비가 리터럴 20 Cr/CH 단가를 쓰지 않는다",
+		state.full_repair_cost() != int(round(missing * 20.0 * 0.5)),
+		"actual=%d" % state.full_repair_cost())
+	# 실행 지불액 = 조회값 (조회/실행 분리 구조의 패리티 — IMPL-079)
 	state.gain_credits(100000)
-	state.chassis = 0.0  # 이월 결선(IMPL-090) 후 정비는 실적용이다 — 회복 여지를 만들어야 상한이 보인다
-	_ok("필드 정비 상한 = 데이터 값", state.field_repair(999) == data.param_int("param_repair_field_cap"),
-		"restored=%d" % state.field_repair(0))
-	# 회차 체증 (픽스처 ×2.0 · 기본 ×1.5)
-	var first := state.field_repair_cost()
-	state.field_repair(1)
-	var second := state.field_repair_cost()
-	_eq_float("회차 체증 = 데이터 값", float(second) / float(first),
-		data.param("param_repair_escalation"), 0.05)
+	var credits_before := state.credits
+	var restored := state.full_repair()
+	_ok("전면 정비 지불 = 데이터 단가 × 결손 × 패시브", credits_before - state.credits == expected_cost
+		and restored == int(missing), "paid=%d restored=%d" % [credits_before - state.credits, restored])
 	# 튜닝 단계 상한 (픽스처 2 · 기본 5)
 	var tuning_state := OutgameState.new()
 	tuning_state.setup(data)
@@ -310,31 +313,21 @@ func _new_consumers_read_data() -> void:
 	var data := _fixture_data()
 	if data == null:
 		return
-	# 다음 회차 비용 조회 (IMPL-079): 현재 × 데이터 체증 (픽스처 2.0 · 기본 1.5)
+	# 무상 복원선 (픽스처 40 · 기본 70) — begin_tour 하한이 데이터 값. (다음 회차 비용 조회·필드 정비 절단
+	# 검사는 필드 정비 폐지(회차 10)·코어 삭제(회차 11)로 걷어냈다.)
 	var state := OutgameState.new()
 	state.setup(data)
-	var now := state.field_repair_cost()
-	var next := state.field_repair_cost_next()
-	_eq_float("다음 회차 비용 = 현재 × 데이터 체증", float(next) / float(now),
-		data.param("param_repair_escalation"), 0.05)
-	_ok("다음 회차 비용이 리터럴 1.5 체증이 아니다", next != int(round(float(now) * 1.5)),
-		"next=%d now=%d" % [next, now])
-	_ok("다음 회차 조회는 카운터 무변경", state.field_repair_cost() == now)
-	# 무상 복원선 (픽스처 40 · 기본 70) — begin_tour 하한과 필드 정비 절단이 데이터 값
 	state.chassis = 0.0
 	state.begin_tour()
 	_eq_float("무상 복원선 = 데이터 값", state.chassis, data.param("param_repair_free_restore_line"))
 	_ok("복원선이 리터럴 70이 아니다", absf(state.chassis - 70.0) > 0.0001,
 		"chassis=%f" % state.chassis)
-	state.gain_credits(100000)
-	_ok("복원선 도달 후 필드 정비 무동작 = 데이터 기준", state.field_repair(999) == 0,
-		"chassis=%f" % state.chassis)
-	# 이벤트 회복 상한 = 데이터 필드 정비 상한 (픽스처 7 · 기본 30)
+	# 이벤트 회복 상한 = 데이터 값 (픽스처 7 · 기본 30 — 종전 필드 정비 회당 상한 승계 · 회차 11 개명)
 	var ev := OutgameState.new()
 	ev.setup(data)
 	ev.chassis = 0.0
 	var recovered := ev.event_chassis_recover(50)
-	_ok("이벤트 회복 상한 = 데이터 값", recovered == data.param_int("param_repair_field_cap"),
+	_ok("이벤트 회복 상한 = 데이터 값", recovered == data.param_int("param_event_recover_cap"),
 		"recovered=%d" % recovered)
 	_ok("이벤트 회복 상한이 리터럴 30이 아니다", recovered != 30, "recovered=%d" % recovered)
 	# 이월 절단 = 데이터 최대치 (픽스처 80 · 기본 100)

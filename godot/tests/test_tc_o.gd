@@ -139,16 +139,17 @@ func _d13_outgame_values() -> void:
 	_eq_float("D13 §3.5 T6 단계당 −7%",
 		CsvTable.to_float(String(data.tuning_line("tuning_t6")["effect_per_step"])), -0.07)
 	_eq_float("D13 §3.5 환급률 80%", data.param("param_tuning_refund_ratio"), 0.80)
-	# §3.6 소모품 단가
-	var expected_consumable := {"consumable_p1": 250, "consumable_p2": 320, "consumable_p3": 400}
+	# §3.6 소모품 단가 — P1 은 250 → 375 (개선 회차 11 · 2026-09-09 사용자 결정: R4 를 전면 정비 단가 기준으로
+	# 재정의하며 25 Cr/CH = 전면 정비 1.25배로 조정 · D13 §3.6 대비 변경점).
+	var expected_consumable := {"consumable_p1": 375, "consumable_p2": 320, "consumable_p3": 400}
 	for consumable_id in expected_consumable:
 		_ok("D13 §3.6 %s %d Cr" % [consumable_id, expected_consumable[consumable_id]],
 			CsvTable.to_int(String(data.consumable(consumable_id)["cost_cr"])) == int(expected_consumable[consumable_id]),
 			String(data.consumable(consumable_id)["cost_cr"]))
 	_eq_float("D13 §3.6 휴대 상한 2", data.param("param_consumable_carry_cap"), 2.0)
-	# §3.4 정비
-	_eq_float("D13 §3.4 정비 기준액 200", data.param("param_repair_base_cr"), 200.0)
-	_eq_float("D13 §3.4 회차 체증 1.5", data.param("param_repair_escalation"), 1.5)
+	# §3.4 정비 — 필드 정비 기준액·체증 행은 회차 11 에 삭제됐다(회차 10 폐지의 데이터 층 정합).
+	# 회당 상한 30 은 이벤트 회복 상한으로 승계·개명됐다(`param_event_recover_cap`).
+	_eq_float("D13 §3.4 이벤트 회복 상한 30 (종전 필드 정비 회당 상한 승계)", data.param("param_event_recover_cap"), 30.0)
 	_eq_float("D13 §3.4 전면 정비 20 Cr/CH", data.param("param_repair_full_cr_per_ch"), 20.0)
 	_eq_float("D13 §3.4 무상 복원선 70", data.param("param_repair_free_restore_line"), 70.0)
 	# §5.1 크루 패시브
@@ -573,7 +574,7 @@ func _milestones_and_achievements() -> void:
 	_ok("복원 확인 — 공유 GameData 무오염", probe.data.relation_axes.has("relation_reunion"))
 	# ── SYS-04 조건 진척 조회 (표시 전용) ──
 	# 표시가 판정과 다른 계산을 쓰면 화면이 거짓을 그린다 — 같은 소스를 보는지 전수로 못박는다
-	# (IMPL-100 `field_repair_preview` 패리티 검사와 같은 구조).
+	# (IMPL-100 프리뷰·실행 패리티 검사와 같은 구조).
 	var viewer := _new_state()
 	for i2 in range(4):
 		viewer.record_gp_result({"player_rank": 5, "player_retired": false, "duels": 3, "duel_wins": 2,
@@ -716,11 +717,9 @@ func _tc_o6_exchange_guards() -> void:
 	# 함께 고치지 않는 한 통과하지 못하게 한다 (검사 수 하한과 같은 "의도적 변경만 통과" 구조).
 	var expected_methods := [
 		"setup", "gain_credits", "gain_drive_data", "exchange_charge",
-		# `field_repair_cost_next` 는 D07 §3.3·D09 §4.3이 **사전 표시를 필수**로 요구하는
-		# 다음 회차 비용의 조회 경로다 (표시 전용 · 체증 카운터 무변경 — IMPL-079).
-		# `field_repair_preview` 는 §A-9 E02 회복 고스트 게이지의 도달값 조회 (표시 전용 —
-		# field_repair와 절단 계산 공유, 패리티 검사로 담보).
-		"field_repair_cost", "field_repair_cost_next", "field_repair_preview", "field_repair", "begin_tour",
+		# 필드 정비 4종(`field_repair*`)은 회차 10 폐지 → 회차 11 코어 삭제. 이 집합에서 빠진 것이
+		# 곧 "다시 생기면 붉는다"는 보장이다 — 유상 정비는 전면 정비 한 경로다.
+		"begin_tour",
 		# `full_repair_cost` 는 D09 §4.3 비용 표시의 조회 경로 (IMPL-079와 같은 구조 — 표시 전용).
 		# `event_chassis_recover` 는 D06 §3.4 이벤트 회복의 유일 진입로 (회당 상한 가드 내장).
 		"full_repair", "full_repair_cost", "free_restore_line", "event_chassis_recover",
@@ -913,46 +912,9 @@ func _repair_and_consumables() -> void:
 	# 섀시 이월분의 아웃게임 정본 (D05 §8 이월 결선 — IMPL-078 해소)
 	var maximum := state.data.param("param_chassis_max")
 	_ok("새 커리어 섀시 = 최대치 [가안]", state.chassis == maximum, "chassis=%f" % state.chassis)
-	# 회차 체증: 200 → 300 → 450 (기준액 × 1.5^(n−1)) · 테오 −10% 반영
-	var expected_first := int(round(200.0 * 0.9))
-	_ok("1회차 정비비 = 200 × (테오 −10%)", state.field_repair_cost() == expected_first,
-		"actual=%d expected=%d" % [state.field_repair_cost(), expected_first])
-	state.gain_credits(10000)
-	# 회복 여지 없음 = 무동작 — 지불·체증 카운터 무변경 (헛돈이 나가지 않는다)
-	var credits_before := state.credits
-	_ok("만충 시 필드 정비 무동작", state.field_repair(30) == 0
-		and state.credits == credits_before and state.field_repair_cost() == expected_first)
-	# 프리뷰 = 실행 패리티 (§A-9 E02 고스트 게이지의 정직성 — 절단 계산 공유 검증)
-	_ok("프리뷰: 만충 시 도달값 = 현재", state.field_repair_preview(30) == maximum)
-	# 회복 적용 + 회당 상한 30 CH 절단 (D06 §3.4 경제 가드)
-	state.chassis = 10.0
-	var previewed := state.field_repair_preview(100)
-	_ok("프리뷰는 상태 무변경 (표시 전용)", state.chassis == 10.0
-		and state.field_repair_cost() == expected_first)
-	_ok("회당 상한 절단·적용 (10→40)", state.field_repair(100) == 30 and state.chassis == 40.0,
-		"chassis=%f" % state.chassis)
-	_ok("프리뷰 = 실행 도달값 (10→40)", previewed == state.chassis,
-		"previewed=%f chassis=%f" % [previewed, state.chassis])
-	var expected_second := int(round(200.0 * 1.5 * 0.9))
-	_ok("2회차 정비비 = ×1.5", state.field_repair_cost() == expected_second,
-		"actual=%d expected=%d" % [state.field_repair_cost(), expected_second])
-	# 복원선 절단 — 초과 구간(70~100)의 유일 수단은 전면 정비 (D07 §3.3 명문)
-	previewed = state.field_repair_preview(100)
-	_ok("복원선 절단 (40→70)", state.field_repair(100) == 30 and state.chassis == 70.0,
-		"chassis=%f" % state.chassis)
-	_ok("프리뷰 = 실행 도달값 (40→70 복원선)", previewed == state.chassis,
-		"previewed=%f chassis=%f" % [previewed, state.chassis])
-	_ok("복원선 도달 후 필드 정비 무동작", state.field_repair(100) == 0 and state.chassis == 70.0)
-	# 복원선이 상한보다 먼저 걸리는 지점의 패리티 — 40→70 지점은 두 절단이 동치(40+30=70)라
-	# 프리뷰가 복원선을 무시해도 못 가른다. 여기(55→70)가 실제로 가르는 지점이다.
-	state.chassis = 55.0
-	previewed = state.field_repair_preview(100)
-	_ok("프리뷰 = 실행 도달값 (55→70 복원선 우선)", state.field_repair(100) == 15
-		and previewed == state.chassis, "previewed=%f chassis=%f" % [previewed, state.chassis])
-	# 체증 카운터는 투어 개시에 리셋
-	state.begin_tour()
-	_ok("투어 개시 시 체증 리셋", state.field_repair_cost() == expected_first,
-		"actual=%d" % state.field_repair_cost())
+	# 필드 정비(회차 체증·회당 상한·프리뷰 패리티) 검사 12건은 회차 11 에 걷어냈다 — 기능 자체가 게임에서
+	# 폐지됐고(회차 10) 코어에서 사라졌다. 부재는 위 G1 공개 메서드 집합이 못박는다.
+	# 이벤트 회복 상한(종전 필드 정비 회당 상한 값 승계)은 `_events` 스위트와 데이터 드리븐 검사가 본다.
 	# 투어 개시 무상 복원선 = 하한 (D06 §3.3 결정 #12 — 위면 유지·아래면 끌어올림)
 	state.chassis = 10.0
 	state.begin_tour()
@@ -1001,11 +963,14 @@ func _repair_and_consumables() -> void:
 	_ok("소모품 1개", shop.buy_consumable("consumable_p1"))
 	_ok("소모품 2개", shop.buy_consumable("consumable_p2"))
 	_ok("휴대 상한 초과 거부", not shop.buy_consumable("consumable_p3"))
-	# P1 프리미엄 검증 (D13 §3.6 R4): 소모품 단가/회복량이 필드 정비보다 비싸다
-	var p1_rate := 250.0 / 15.0
-	var field_rate := 200.0 / 30.0
-	_ok("R4 소모품 프리미엄 성립 (P1 > 필드 정비 단가)", p1_rate > field_rate,
-		"p1=%f field=%f" % [p1_rate, field_rate])
+	# P1 프리미엄 검증 (D13 §3.6 R4 — 회차 11 재정의): 필드 정비 폐지로 비교 기준을 **전면 정비 단가**로 교체.
+	# 소모품 CH 단가 ≥ 전면 정비 단가 — 값은 표에서 읽는다(P1 375/15 = 25 ≥ 20).
+	var p1_row: Dictionary = shop.data.consumables["consumable_p1"]
+	var p1_rate := CsvTable.to_float(String(p1_row["cost_cr"])) \
+		/ CsvTable.to_float(String(p1_row["effect_value"]))
+	var full_rate := shop.data.param("param_repair_full_cr_per_ch")
+	_ok("R4' 소모품 프리미엄 성립 (P1 CH 단가 ≥ 전면 정비 단가)", p1_rate >= full_rate,
+		"p1=%f full=%f" % [p1_rate, full_rate])
 	# 베인 단계는 누적 획득 총량 기준 — 소비해도 내려가지 않는다 (D13 §5.4)
 	var vane := _new_state()
 	_ok("초기 베인 1단계", vane.vane_stage() == 1)

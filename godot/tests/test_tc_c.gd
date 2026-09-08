@@ -1676,7 +1676,7 @@ func _consumable_paths() -> void:
 	var data := probe.data
 	# D13 §3.6 전사 대조 — 단가·효과·값 (수치의 유일 창구 = D13)
 	var expected_items := {
-		"consumable_p1": ["chassis_restore", 250.0, 15.0],
+		"consumable_p1": ["chassis_restore", 375.0, 15.0],   # 250 → 375 (회차 11 R4 재정의 — 25 Cr/CH)
 		"consumable_p2": ["chassis_restore_and_shield", 320.0, 8.0],
 		"consumable_p3": ["chassis_wear_ratio", 400.0, -0.20],
 	}
@@ -1688,10 +1688,17 @@ func _consumable_paths() -> void:
 		_eq_float("D13 §3.6 %s 단가" % item_id, CsvTable.to_float(String(row.get("cost_cr", "-1"))), float(spec[1]))
 		_eq_float("D13 §3.6 %s 효과값" % item_id, CsvTable.to_float(String(row.get("effect_value", "0"))), float(spec[2]))
 	_eq_float("D13 §3.6 P2 트러블 반감 계수 0.5", data.param("param_consumable_shield_mult"), 0.5)
-	# R4 프리미엄 검증 (D13 §3.6 문면: P1 16.7 Cr/CH vs 필드 정비 1회차 6.7 Cr/CH = 2.5배)
-	var p1_rate := 250.0 / 15.0
-	var repair_rate := data.param("param_repair_base_cr") / data.param("param_repair_field_cap")
-	_eq_float("D13 §3.6 R4 프리미엄 2.5배", p1_rate / repair_rate, 2.5, 0.01)
+	# R4 프리미엄 재정의 (개선 회차 11 · 2026-09-09 사용자 결정): 종전 문면 "P1 16.7 Cr/CH vs 필드 정비 1회차
+	# 6.7 Cr/CH = 2.5배"는 필드 정비 폐지(회차 10)로 비교 기준이 사라졌다. 남은 유일한 유상 정비 = **전면 정비
+	# 단가**를 기준으로 삼는다 — 섀시 회복 소모품의 CH 단가 ≥ 전면 정비 단가. 소모품은 인레이스 즉시 회복
+	# (패닉 버튼 — D06 §3.5 R4)이라 아웃게임 정비보다 싸지면 정비의 자리가 없어진다. 값은 표에서 읽는다.
+	var full_rate := data.param("param_repair_full_cr_per_ch")
+	for item_id in ["consumable_p1", "consumable_p2"]:
+		var item_row: Dictionary = data.consumables[item_id]
+		var item_rate := CsvTable.to_float(String(item_row["cost_cr"])) \
+			/ CsvTable.to_float(String(item_row["effect_value"]))
+		_ok("D13 §3.6 R4' %s CH 단가 ≥ 전면 정비 단가" % item_id, item_rate >= full_rate,
+			"rate=%.2f full=%.2f" % [item_rate, full_rate])
 	_eq_float("D06 §3.5 휴대 상한 2", data.param("param_consumable_carry_cap"), 2.0)
 	# P1: T1 사용 성공 — 회복·재고 감소·반입분 불변 (held 는 사본이다)
 	probe.consumables_carry_in = {"consumable_p1": 2, "consumable_p2": 2, "consumable_p3": 2}

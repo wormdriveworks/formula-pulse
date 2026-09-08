@@ -28,11 +28,12 @@ fi
 TESTS=(
 	"tests/test_core_loop.gd:0"
 	"tests/test_save_reload.gd:0"
-	"tests/test_tc_c.gd:2259"
+	"tests/test_tc_c.gd:2260"
 	"tests/test_tc_p.gd:153"
 	"tests/test_events.gd:7039"
 	"tests/test_season.gd:497"
-	"tests/test_tc_o.gd:395"
+	# TC-O 395 → 382 (개선 회차 11 — 필드 정비 검사 12건 + D13 §3.4 행 1건 걷힘 · 기능 폐지의 귀결)
+	"tests/test_tc_o.gd:382"
 	"tests/test_narrative.gd:235"
 	# AUDIO — 오디오 디스패처 정책 4종(봉인·게이트·채널 상한·P1 보호) + 표 전수 대조.
 	"tests/test_audio.gd:384"
@@ -43,7 +44,7 @@ TESTS=(
 	# AUDIO-W — 표와 화면 사이의 공백. 부를 곳이 없는 행은 실물이 유입돼도 영원히 울리지
 	# 않는데, 무음 폴백 단계에서는 그 침묵이 정상과 구분되지 않는다.
 	"tests/test_audio_wiring.gd:107"
-	"tests/test_data_driven.gd:69"
+	"tests/test_data_driven.gd:65"
 	# AUDIO-P — 재생기(표현 층). 헤드리스 더미 드라이버에서도 버스·볼륨·재생 상태·`finished`
 	# 통지가 실재하므로 **소리 없이 상태 검증이 성립**한다. 관측은 전부 `AudioServer` 되읽기다 —
 	# 설정 호출의 성공은 증거가 아니다(`.import` 문면 함정의 오디오 서버 층 적용).

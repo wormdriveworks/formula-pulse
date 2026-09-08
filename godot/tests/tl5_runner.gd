@@ -186,10 +186,10 @@ func _drive_gp(session: RunSession) -> void:
 		engine.confirm(1.0 if momentum_hit else 0.0)
 
 
-# 패닉 선 [러너 정책 — 정본 미규정]: 이벤트 회복 상한(`param_repair_field_cap` — 종전 필드 정비 회당 상한과
-# 같은 값)만큼 남았을 때가 마지막 여유다. 필드 정비는 폐지됐지만(회차 10) 정책 기준값은 그대로 둔다.
+# 패닉 선 [러너 정책 — 정본 미규정]: 이벤트 회복 상한(`param_event_recover_cap` — 종전 필드 정비 회당 상한
+# 값을 승계 · 회차 11 개명)만큼 남았을 때가 마지막 여유다. 필드 정비는 폐지됐지만 정책 기준값은 그대로 둔다.
 func _panic_line() -> float:
-	return _data.param("param_repair_field_cap")
+	return _data.param("param_event_recover_cap")
 
 
 func _intervene(engine: RaceEngine, info: Dictionary) -> void:

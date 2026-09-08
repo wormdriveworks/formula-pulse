@@ -39,7 +39,6 @@ var relation_counters: Dictionary = {}   # relation id -> 카운터
 var relation_stages: Dictionary = {}     # relation id -> 공표된 단계 (0~3)
 var _relation_pending: Dictionary = {}   # relation id -> 도달했으나 미공표 단계
 var consumables: Dictionary = {}         # consumable id -> 보유 수
-var field_repair_count: int = 0          # 투어 내 정비 회차 (체증 카운터)
 # 섀시 컨디션 이월분 (D05 §8 — 투어 관통 생존 자원 · GP 간 자동 완전 회복 없음).
 # GP 중에는 엔진이 쥐고, GP 밖에서는 여기가 정본이다 — 세션이 GP 경계에서 양방향 복사한다.
 var chassis: float = 0.0
@@ -122,29 +121,12 @@ func exchange_charge(remaining_charge: int, tour_finished: bool) -> int:
 
 
 # ── 정비 (D06 §3.3 · D13 별첨A §3.4) ──
-# 필드 정비: 회당 상한 30 CH · 회차 체증 1.5^(n−1) · 체증 카운터는 투어 개시에 리셋.
 #
-# **게임에서 도달 불가 (개선 회차 10 · 2026-09-08 사용자 결정 — 필드 정비 폐지).** 유일 소비처였던 간이 정산
-# 화면이 플로우에서 사라지고(레이스 ↔ 개러지 반복) 정비는 개러지의 전면 정비 한 경로다. 함수·파라미터·TC-O
-# 검사는 그대로 두었다 — 걷어내는 일은 정리 회차 이월분이며, `param_repair_field_cap` 은 이벤트 회복 상한
-# (`event_chassis_recover`)이 계속 읽는다.
-func field_repair_cost(season_rank_mod: int = 0) -> int:
-	return _field_repair_cost_at(field_repair_count, season_rank_mod)
-
-
-# 다음 회차 비용 — D07 §3.3·D09 §4.3이 **사전 표시를 필수**로 요구하는 값이다
-# ("지금 정비할 것인가"라는 의사결정의 성립 조건). 표시 전용이며 체증 카운터를 건드리지 않는다.
-func field_repair_cost_next(season_rank_mod: int = 0) -> int:
-	return _field_repair_cost_at(field_repair_count + 1, season_rank_mod)
-
-
-func _field_repair_cost_at(count: int, season_rank_mod: int) -> int:
-	var base := data.param("param_repair_base_cr") \
-		* (1.0 + data.param("param_repair_season_rank_coef") * float(season_rank_mod))
-	var escalated := base * pow(data.param("param_repair_escalation"), float(count))
-	return int(round(escalated * _repair_cost_ratio()))
-
-
+# **유상 정비 = 전면 정비 한 경로다.** 필드 정비(회당 30 CH 상한 · 회차 체증 1.5^(n−1) · 투어 단위 리셋)는
+# 개선 회차 10(2026-09-08 · 사용자 결정)에 게임에서 폐지되고, 회차 11 에 코어에서 걷어냈다 — 함수군
+# (`field_repair*`)·체증 카운터·전용 파라미터 3행(`param_repair_base_cr` · `param_repair_escalation` ·
+# `param_repair_season_rank_coef`)이 함께 사라졌다(D06 §3.3 · D07 §3.3 · D13 별첨A §3.4 R2 대비 변경점 —
+# 회차 11 문서). 남은 것은 무상 복원선(투어 개시) · 전면 정비 · 이벤트 회복 셋이다.
 func _repair_cost_ratio() -> float:
 	# 테오 패시브 −10% (D13 별첨A §5.1)
 	if crew.has("crew_theo"):
@@ -152,41 +134,13 @@ func _repair_cost_ratio() -> float:
 	return 1.0
 
 
-# 반환: 실제 회복량 (0 = 실패 또는 회복 여지 없음 — 이때는 지불·체증 카운터 무변경).
-# 회당 상한(30 CH) 절단 + **무상 복원선 초과 구간 진입 불가** — 그 구간의 유일 수단은
-# 전면 정비다 (D07 §3.3 명문 "투어 개시 무상 복원선 70% 초과 구간의 유일 수단").
-func field_repair(requested_ch: int, season_rank_mod: int = 0) -> int:
-	var recoverable := _field_repair_recoverable(requested_ch)
-	if recoverable <= 0.0:
-		return 0
-	var cost := field_repair_cost(season_rank_mod)
-	if not _spend_credits(cost):
-		return 0
-	field_repair_count += 1
-	chassis += recoverable
-	return int(round(recoverable))
-
-
-# 필드 정비 프리뷰 — 실행 시 도달할 섀시 값 (표시 전용 · §A-9 E02 회복 고스트 게이지의 성립 조건).
-# field_repair()와 절단 계산을 공유하므로 표시와 실행이 갈라질 수 없다. 지불 판정은 비대상 —
-# 지불 가능 여부는 버튼 활성이 별도로 본다 (고스트는 "하면 어디까지 가는가"만 답한다).
-func field_repair_preview(requested_ch: int) -> float:
-	return chassis + _field_repair_recoverable(requested_ch)
-
-
-func _field_repair_recoverable(requested_ch: int) -> float:
-	var capped := minf(float(maxi(requested_ch, 0)), data.param("param_repair_field_cap"))
-	return maxf(minf(capped, float(free_restore_line()) - chassis), 0.0)
-
-
 func begin_tour() -> void:
-	field_repair_count = 0    # 체증 카운터 리셋 = 투어 개시 (D13 별첨A §3.4 R2)
 	skill_uses_this_tour.clear()   # 투어당 횟수 리셋 (D07 §4.2 — SH4 2회 · SI4 1회)
 	# 무상 복원선 — 투어 개시 시 복원선까지 무상 복원, 이미 그 위면 그대로 (D06 §3.3 결정 #12)
 	chassis = maxf(chassis, float(free_restore_line()))
 
 
-# 전면 정비 비용 조회 — 표시 전용 (D09 §4.3 비용 표시 · field_repair_cost_next와 같은 구조)
+# 전면 정비 비용 조회 — 표시 전용 (D09 §4.3 비용 표시 · IMPL-079 조회/실행 분리 구조)
 func full_repair_cost() -> int:
 	var missing := maxf(data.param("param_chassis_max") - chassis, 0.0)
 	var per_ch := data.param("param_repair_full_cr_per_ch") * _repair_cost_ratio()
@@ -207,10 +161,12 @@ func full_repair() -> int:
 
 
 # 이벤트 회복 (D06 §3.4 — 무상·확률적·페이싱, 인스턴스 D08 풀).
-# 경제 가드: 무상 이벤트 회복은 필드 정비의 회당 상한을 초과할 수 없다 (D06 §3.4 명문).
+# 경제 가드: 회당 상한 = `param_event_recover_cap`(30). D06 §3.4 명문은 "필드 정비의 회당 상한을 초과할 수
+# 없다"였고 그 값(30)을 그대로 승계한다 — 필드 정비 폐지 뒤 이 상한의 소비처가 이벤트 회복(+ 이벤트 보상
+# 추첨 절단)만 남아 회차 11 에 `param_repair_field_cap` 에서 개명했다(사용자 결정 · D13 행명 대비 변경점).
 # [가안] 복원선 절단은 걸지 않는다 — 가드 조항이 회당 상한만 명시하므로 최대치 절단만 적용.
 func event_chassis_recover(amount: int) -> int:
-	var capped := minf(float(maxi(amount, 0)), data.param("param_repair_field_cap"))
+	var capped := minf(float(maxi(amount, 0)), data.param("param_event_recover_cap"))
 	var applied := minf(capped, data.param("param_chassis_max") - chassis)
 	if applied <= 0.0:
 		return 0
@@ -715,7 +671,7 @@ func pending_achievements() -> Array:
 
 # 업적 1건의 진척 조회 (표시 전용) — SYS-04 업적 화면의 '조건' 축 (D09 별첨A §A-4).
 # **판정과 같은 계산을 쓴다** — `_achievement_met()` 이 여기 반환값을 그대로 임계와 비교하므로
-# 표시와 판정이 갈라질 수 없다 (IMPL-100 `field_repair_preview` 와 같은 구조).
+# 표시와 판정이 갈라질 수 없다 (IMPL-100 프리뷰·실행 패리티와 같은 구조).
 # 상태 변경 없음 — 조회만 한다.
 func achievement_progress(achievement_id: String) -> Dictionary:
 	if not data.achievements.has(achievement_id):
@@ -828,7 +784,6 @@ func serialize() -> Dictionary:
 		"relation_stages": relation_stages.duplicate(),
 		"relation_pending": _relation_pending.duplicate(),
 		"consumables": consumables.duplicate(),
-		"field_repair_count": field_repair_count,
 		"skill_uses_this_tour": skill_uses_this_tour.duplicate(),
 		"milestones": milestones.duplicate(),
 		"narrative_act": narrative_act,
@@ -868,7 +823,7 @@ func restore(payload: Dictionary) -> bool:
 	relation_stages = payload.get("relation_stages", {})
 	_relation_pending = payload.get("relation_pending", {})
 	consumables = payload.get("consumables", {})
-	field_repair_count = int(payload.get("field_repair_count", 0))
+	# `field_repair_count`(회차 11 삭제)는 구세이브에 남아 있어도 읽지 않는다 — 미지 키는 무시가 규약이다.
 	# 스킬 소비부 도입 전 세이브 = 무사용이 충실값 (구세이브 관용)
 	skill_uses_this_tour = payload.get("skill_uses_this_tour", {})
 	milestones = payload.get("milestones", {})

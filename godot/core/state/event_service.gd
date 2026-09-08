@@ -116,8 +116,9 @@ func _roll_reward(category_id: String) -> Dictionary:
 		return {"type": reward_type, "amount": 0, "rare": false}
 	var amount := rng.stream("event").randi_range(minimum, maximum)
 	if reward_type == "chassis":
-		# 경제 가드: 필드 정비 회당 상한 초과 금지 (D08 §7.2 · D06 §3.4 구속)
-		amount = mini(amount, data.param_int("param_repair_field_cap"))
+		# 경제 가드: 이벤트 회복 회당 상한 (D08 §7.2 · D06 §3.4 구속 — 종전 "필드 정비 회당 상한" 30 의 값을
+		# 승계한 `param_event_recover_cap`. 필드 정비 폐지 뒤 회차 11 개명).
+		amount = mini(amount, data.param_int("param_event_recover_cap"))
 	return {"type": reward_type, "amount": amount, "rare": false}
 
 
