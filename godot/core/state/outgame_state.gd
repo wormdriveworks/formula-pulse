@@ -35,6 +35,9 @@ var skill_uses_this_tour: Dictionary = {}
 var deck_slots: int = 0
 var crew: Dictionary = {}                # crew id -> true
 var sponsor_contracts: Array = []        # sponsor id
+# 이번 투어의 스폰서 조건 소재 (개선 회차 13 · D07 §5.4) — GP 결과가 들어올 때 쌓고 투어 개시에 비운다. 판정은 결산 때.
+#   "finish_ranks": 완주한 GP 의 순위 목록 (SP2 "P3 이내 달성마다" = 임계 이하 개수) · "beat_named_rival": 네임드 선착 1회 이상
+var sponsor_tour_facts: Dictionary = {}
 var relation_counters: Dictionary = {}   # relation id -> 카운터
 var relation_stages: Dictionary = {}     # relation id -> 공표된 단계 (0~3)
 var _relation_pending: Dictionary = {}   # relation id -> 도달했으나 미공표 단계
@@ -136,6 +139,7 @@ func _repair_cost_ratio() -> float:
 
 func begin_tour() -> void:
 	skill_uses_this_tour.clear()   # 투어당 횟수 리셋 (D07 §4.2 — SH4 2회 · SI4 1회)
+	sponsor_tour_facts.clear()     # 투어 단위 계약 — 조건 소재도 투어마다 (회차 13 · D07 §5.4). 계약 자체는 이어진다.
 	# 무상 복원선 — 투어 개시 시 복원선까지 무상 복원, 이미 그 위면 그대로 (D06 §3.3 결정 #12)
 	chassis = maxf(chassis, float(free_restore_line()))
 
@@ -387,7 +391,16 @@ func recruit_crew(crew_id: String) -> bool:
 	return true
 
 
-# ── 스폰서 (D07 §5.4 · D13 별첨A §5.3) ──
+# ── 스폰서 (D07 §5.4 · D13 별첨A §5.3 · 결선 = 개선 회차 13 · 2026-09-09) ──
+#
+# 계약은 **투어 단위**다. 정산은 투어 결산 한 번(`settle_sponsors_for_tour` — 세션 `settle_tour` 전속) · 체결·해지(교체)는
+# 투어 첫 출발 전 개러지에서만(시점 판정은 세션 `sponsor_renewal_open` — 코어는 race_slot 을 모른다) · 해지하지 않은 계약은
+# 다음 투어로 이어진다(자동 갱신 · 중도 파기 없음). **탈락 투어도 정기 수입은 지급**되고 보너스만 조건 판정을 받는다
+# (사용자 결정 — D06 §2.4 "손에 쥔 것은 뺏지 않는다"의 적용). 조건 4종(표 `condition` · 임계는 표 `threshold`):
+#   tour_all_finish = 탈락 없이 마감 · race_top3 = 임계(3) 이하 완주 **횟수**(달성마다 가산 — D13 §5.3 문면) ·
+#   beat_named_rival = 네임드 라이벌 선착 1회 이상 · 투어당 1회 정액([가안] — 표에 지정 라이벌 열이 없다 · 사용자 결정) ·
+#   tour_top5 = 투어 종합 순위 ≤ 임계(5).
+# 후보 3/4종 제시(D07 §5.4)는 두지 않았다 — 데스크는 나디아 합류로만 열리고 그때 후보는 4종 전부다(나디아 패시브).
 func sponsor_slots() -> int:
 	if facilities.has("facility_g4"):
 		return data.param_int("param_sponsor_slots_with_g4")
@@ -410,16 +423,88 @@ func sign_sponsor(sponsor_id: String) -> bool:
 	return true
 
 
-# 투어 단위 갱신 — 정기 수입 + 조건 충족 보너스 (D13 별첨A §5.3)
-func settle_sponsors(conditions_met: Dictionary) -> int:
-	var payout := 0
+# 해지 — 교체의 전반 (D07 §5.4 "결산 시 갱신·교체"). 시점 제한은 세션·화면이 건다.
+func release_sponsor(sponsor_id: String) -> bool:
+	if not sponsor_contracts.has(sponsor_id):
+		return false
+	sponsor_contracts.erase(sponsor_id)
+	return true
+
+
+# 조건 임계 — 표의 `threshold` 열 (race_top3 = 3 · tour_top5 = 5 · 그 외 0). 순위 수치를 코드에 적지 않는다(불변규칙 2).
+func _sponsor_threshold(sponsor_id: String) -> int:
+	return CsvTable.to_int(String(data.sponsors[sponsor_id].get("threshold", "0")))
+
+
+# 계약 1건의 **이번 투어** 조건 값 — int(횟수형 · 임계 이하 완주 수) / bool(사건형) / null(결산 소재가 없어 아직 못 정하는
+# 결산형). HUB-06 진행 표기와 결산 판정이 같은 소재를 본다.
+func sponsor_condition_value(sponsor_id: String, tour_summary: Dictionary = {}) -> Variant:
+	var row: Dictionary = data.sponsors[sponsor_id]
+	match String(row["condition"]):
+		"race_top3":
+			var count := 0
+			for finish_rank in sponsor_tour_facts.get("finish_ranks", []):
+				if int(finish_rank) <= _sponsor_threshold(sponsor_id):
+					count += 1
+			return count
+		"beat_named_rival":
+			return bool(sponsor_tour_facts.get("beat_named_rival", false))
+		"tour_all_finish":
+			if tour_summary.has("dropped_out"):
+				return not bool(tour_summary["dropped_out"])
+			return null
+		"tour_top5":
+			if tour_summary.has("player_position"):
+				return int(tour_summary["player_position"]) <= _sponsor_threshold(sponsor_id)
+			return null
+	return null
+
+
+# 투어 결산 소재 → 조건 사전 (condition id → 값). 계약 중인 것만 — 판정 대상이 그것뿐이다.
+func sponsor_tour_conditions(tour_summary: Dictionary) -> Dictionary:
+	var conditions: Dictionary = {}
+	for sponsor_id in sponsor_contracts:
+		var condition := String(data.sponsors[sponsor_id]["condition"])
+		var value: Variant = sponsor_condition_value(String(sponsor_id), tour_summary)
+		conditions[condition] = value if value != null else false
+	return conditions
+
+
+# 지급 내역 (지불 없음 · 표시·판정 공용). 조건 값이 int 면 그 횟수만큼(SP2 "달성마다"), bool 이면 1회.
+func sponsor_settlement_breakdown(conditions_met: Dictionary) -> Dictionary:
+	var regular := 0
+	var bonus := 0
 	for sponsor_id in sponsor_contracts:
 		var row: Dictionary = data.sponsors[sponsor_id]
-		payout += CsvTable.to_int(String(row["regular_cr"]))
-		if bool(conditions_met.get(String(row["condition"]), false)):
-			payout += CsvTable.to_int(String(row["bonus_cr"]))
+		regular += CsvTable.to_int(String(row["regular_cr"]))
+		bonus += CsvTable.to_int(String(row["bonus_cr"])) \
+			* _condition_multiplier(conditions_met.get(String(row["condition"]), false))
+	return {"regular": regular, "bonus": bonus, "payout": regular + bonus}
+
+
+func _condition_multiplier(value: Variant) -> int:
+	match typeof(value):
+		TYPE_BOOL:
+			return 1 if bool(value) else 0
+		TYPE_INT, TYPE_FLOAT:
+			return maxi(int(value), 0)
+	return 0
+
+
+# 투어 단위 정산 — 정기 수입 + 조건 충족 보너스 (D13 별첨A §5.3). 반환 = 총 지급액.
+func settle_sponsors(conditions_met: Dictionary) -> int:
+	var payout := int(sponsor_settlement_breakdown(conditions_met)["payout"])
 	gain_credits(payout)
 	return payout
+
+
+# 투어 결산 창구 (세션 `settle_tour` 전속) — 소재에서 조건을 만들고 정산한다. 반환 = 내역 + 조건 (표시 층이 그대로 읽는다).
+func settle_sponsors_for_tour(tour_summary: Dictionary) -> Dictionary:
+	var conditions := sponsor_tour_conditions(tour_summary)
+	var breakdown := sponsor_settlement_breakdown(conditions)
+	gain_credits(int(breakdown["payout"]))
+	breakdown["conditions"] = conditions
+	return breakdown
 
 
 # ── 관계 카운터 (D07 §5.5 · D12 §5.2 형식 B · D13 별첨A §5.2) ──
@@ -541,6 +626,13 @@ func record_gp_result(result: Dictionary) -> void:
 		_bump_stat("scripted_loss_p2")
 	# 리타이어한 GP는 순위 기반 마일스톤의 대상이 아니다 — 완주가 성적의 전제다
 	# (D05 §9.2 리타이어 = 1층 포인트 0과 같은 취지). 0 = 판정 불성립 표기.
+	# 스폰서 조건 소재 (회차 13 · D07 §5.4): 완주한 GP 만 — 리타이어는 순위가 성적이 아니다(D05 §9.2).
+	if not retired:
+		var finish_ranks: Array = sponsor_tour_facts.get("finish_ranks", [])
+		finish_ranks.append(rank)
+		sponsor_tour_facts["finish_ranks"] = finish_ranks
+		if not Array(result.get("beaten_rivals", [])).is_empty():
+			sponsor_tour_facts["beat_named_rival"] = true
 	_record_milestones({"gp_rank": 0 if retired else rank, "gp_finish": 0 if retired else 1,
 		"beaten_rivals": result.get("beaten_rivals", [])})
 
@@ -811,6 +903,7 @@ func serialize() -> Dictionary:
 		"overhaul_installs_this_season": overhaul_installs_this_season,
 		"deck": deck.duplicate(), "deck_slots": deck_slots,
 		"crew": crew.duplicate(), "sponsor_contracts": sponsor_contracts.duplicate(),
+		"sponsor_tour_facts": sponsor_tour_facts.duplicate(true),
 		"relation_counters": relation_counters.duplicate(),
 		"relation_stages": relation_stages.duplicate(),
 		"relation_pending": _relation_pending.duplicate(),
@@ -850,6 +943,7 @@ func restore(payload: Dictionary) -> bool:
 	deck_slots = int(payload["deck_slots"])
 	crew = payload["crew"]
 	sponsor_contracts = payload.get("sponsor_contracts", [])
+	sponsor_tour_facts = payload.get("sponsor_tour_facts", {})   # 회차 13 이전 세이브 = 소재 없음이 충실값
 	relation_counters = payload["relation_counters"]
 	relation_stages = payload.get("relation_stages", {})
 	_relation_pending = payload.get("relation_pending", {})

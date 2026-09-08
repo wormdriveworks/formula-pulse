@@ -390,6 +390,8 @@ ui.tourReport.pointsFormat,{points},{points},{points}
 ui.tourReport.creditFormat,{amount} Cr,{amount} Cr,{amount} Cr
 ui.tourReport.dataFormat,{amount} DP,{amount} DP,{amount} DP
 ui.tourReport.dropoutNote,탈락 — 완주 보너스 미지급 · 순위 보상 축소,Out — no finish bonus · reduced position reward,脱落 — 完走ボーナスなし · 順位報酬は縮小
+ui.tourReport.sponsor,스폰서 수입,Sponsor Income,スポンサー収入
+ui.tourReport.sponsorFormat,{payout} Cr · 정기 {regular} + 보너스 {bonus},{payout} Cr · regular {regular} + bonus {bonus},{payout} Cr · 定期 {regular} + ボーナス {bonus}
 ui.tourReport.chargeExpired,잔여 차지는 투어 경계에서 소멸합니다.,Remaining charge expires at the tour boundary.,残りのチャージはツアー境界で消滅します。
 ui.tourReport.toGarage,개러지로,To Garage,ガレージへ
 ui.tourReport.subheaderFormat,시즌 {season} · 투어 {tour},Season {season} · Tour {tour},シーズン{season} · ツアー{tour}
@@ -461,6 +463,19 @@ ui.sponsorDesk.incomeFormat,정기 {regular} Cr · 보너스 {bonus} Cr,Regular 
 ui.sponsorDesk.sign,체결,Sign,締結
 ui.sponsorDesk.signed,계약 중,Under Contract,契約中
 ui.sponsorDesk.signConfirm,{sponsor} 계약을 체결합니다.,Sign the {sponsor} contract.,{sponsor} 契約を締結します。
+ui.sponsorDesk.release,해지,Release,解約
+ui.sponsorDesk.releaseConfirm,{sponsor} 계약을 해지합니다. 이번 투어 정산 대상에서 빠집니다.,Release the {sponsor} contract. It will not be settled this tour.,{sponsor} 契約を解約します。今ツアーの精算対象から外れます。
+ui.sponsorDesk.windowOpen,체결·해지 가능 — 투어 첫 출발 전 · 정산은 투어 결산 시,Sign or release now — before the tour's first race · settled at tour end,締結・解約可能 — ツアー初戦前 · 精算はツアー決算時
+ui.sponsorDesk.windowClosed,투어 중 — 열람 전용 · 체결·해지는 투어 첫 출발 전 개러지에서,Mid-tour — view only · sign or release before the tour's first race,ツアー中 — 閲覧のみ · 締結・解約はツアー初戦前のガレージで
+ui.sponsorDesk.conditionFormat,조건: {condition} · {progress},Condition: {condition} · {progress},条件: {condition} · {progress}
+ui.sponsorDesk.progressCountFormat,이번 투어 {count}회,{count} this tour,今ツアー{count}回
+ui.sponsorDesk.progressDone,이번 투어 달성,Achieved this tour,今ツアー達成
+ui.sponsorDesk.progressPending,이번 투어 미달성,Not yet this tour,今ツアー未達成
+ui.sponsorDesk.progressAtSettle,결산 시 판정,Judged at settlement,決算時に判定
+ui.sponsorCondition.tourAllFinish,투어 전 대회 완주,Finish every race of the tour,ツアー全戦完走
+ui.sponsorCondition.raceTop3,대회 P3 이내 (달성마다),Race top 3 (each time),レースP3以内(達成ごと)
+ui.sponsorCondition.beatNamedRival,네임드 라이벌 선착,Finish ahead of a named rival,ネームドライバルに先着
+ui.sponsorCondition.tourTop5,투어 종합 P5 이내,Tour standing top 5,ツアー総合P5以内
 ui.facilityPanel.title,시설 확장,Facility Expansion,施設拡張
 ui.facilityPanel.buy,구매,Purchase,購入
 ui.facilityPanel.owned,보유,Owned,保有

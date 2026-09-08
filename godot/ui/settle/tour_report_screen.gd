@@ -65,6 +65,18 @@ func _on_bound(_payload: Dictionary) -> void:
 	(%Block6Value as Label).text = data_text
 	(%Block3Note as Label).visible = dropped
 	(%Block3Note as Label).text = s.text("ui.tourReport.dropoutNote")
+	# 스폰서 수입 S8 (개선 회차 13 결선 — D07 §5.4 투어 단위 정산 · D13 §5.3) — 계약이 있을 때만 행이 선다.
+	# 지급은 `settle_tour` 안에서 세션이 끝냈고(정기 = 탈락 투어에도 · 보너스 = 조건 판정) 여기서는 내역만 읽는다.
+	var sponsor: Dictionary = settled.get("sponsor", {})
+	var has_contract := not session.outgame.sponsor_contracts.is_empty()
+	(%SponsorRow as Control).visible = has_contract
+	if has_contract:
+		(%SponsorLabel as Label).text = s.text("ui.tourReport.sponsor")
+		var sponsor_text := s.text("ui.tourReport.sponsorFormat", {
+			"payout": int(sponsor.get("payout", 0)), "regular": int(sponsor.get("regular", 0)),
+			"bonus": int(sponsor.get("bonus", 0)),
+		})
+		(%SponsorValue as Label).text = sponsor_text
 
 	# 블록 4 — 완주 시에만 표출 (탈락 시 환전 자체가 성립하지 않는다)
 	_block4.visible = not dropped

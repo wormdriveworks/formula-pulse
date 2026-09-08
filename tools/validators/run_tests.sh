@@ -33,8 +33,8 @@ TESTS=(
 	"tests/test_events.gd:7039"
 	"tests/test_season.gd:497"
 	# TC-O 395 → 382 (개선 회차 11 — 필드 정비 검사 12건 + D13 §3.4 행 1건 걷힘 · 기능 폐지의 귀결)
-	# → 387 (개선 회차 12 — 부분 정비 5건)
-	"tests/test_tc_o.gd:387"
+	# → 387 (개선 회차 12 — 부분 정비 5건) → 400 (개선 회차 13 — 스폰서 결산 13건)
+	"tests/test_tc_o.gd:400"
 	"tests/test_narrative.gd:235"
 	# AUDIO — 오디오 디스패처 정책 4종(봉인·게이트·채널 상한·P1 보호) + 표 전수 대조.
 	"tests/test_audio.gd:384"

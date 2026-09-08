@@ -264,7 +264,8 @@
     "kind": "enum:stable,aggressive,rivalry,prestige",
     "regular_cr": "int",
     "bonus_cr": "int",
-    "condition": "string"
+    "condition": "string",
+    "threshold": "int"
    }
   },
   "relation_axes.csv": {

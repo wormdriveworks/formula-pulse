@@ -102,6 +102,7 @@ func _process(_delta: float) -> bool:
 	_settle_next_button_mouse_hit()
 	_duel_in_place()
 	_garage_loop_flow(data)
+	_sponsor_settlement_flow(data)
 	_achievement_without_career(data)
 	_achievement_with_career(data)
 	_achievement_icons(data)
@@ -4862,6 +4863,102 @@ func _garage_loop_flow(data: GameData) -> void:
 			"res://ui/hub/garage_screen.gd", "res://ui/flow/run_session.gd", "res://ui/flow/app_root.gd"]:
 		_ok("⑩ⓕ 간이 정산 참조 0 — %s" % String(path).get_file(),
 			not FileAccess.get_file_as_string(String(path)).contains(RUN01_TOKEN))
+
+
+# ── 스폰서 정기 수입 결선 (개선 회차 13 · 2026-09-09 사용자 결정) ──
+#
+# 종전에는 계약을 맺어도 게임 어디서도 `settle_sponsors` 를 부르지 않아 한 푼도 들어오지 않았다. 결선 뒤의 계약:
+#   ⓐ SET-01 — 계약이 있으면 스폰서 행이 서고 내역이 세션 정산과 일치 · 계약이 없으면 행이 없다
+#   ⓑ HUB-06 — 투어 첫 출발 전(race_slot 1)에는 체결·해지가 살고, 투어 중에는 열람 전용(전부 소등 · 안내 문면)
+#   ⓒ 세션 창 판정 `sponsor_renewal_open` = race_slot == 1
+const SET01_SCENE := "res://ui/settle/tour_report_screen.tscn"
+const HUB06_SCENE := "res://ui/hub/sponsor_desk_screen.tscn"
+
+
+func _sponsor_settlement_flow(data: GameData) -> void:
+	# ⓐ 계약 있음 — SP1(전 대회 완주 +200): 1 GP 완주 뒤 close_tour 는 탈락 아님 → 500 + 200 = 700
+	var contracted := _finished_gp_session(data)
+	_ok("⑬ⓐ 전제: GP 실주행 세션", contracted != null)
+	if contracted != null:
+		contracted.outgame.sign_sponsor("sponsor_sp1")
+		contracted.close_tour()
+		var screen := _mount(SET01_SCENE, contracted)
+		if screen != null:
+			var guard := screen.get_node_or_null("InputGuard")
+			if guard != null:
+				guard.free()
+			var row := screen.get_node("%SponsorRow") as Control
+			_ok("⑬ⓐ 계약 있음 → 스폰서 행 표출", row.visible)
+			_ok("⑬ⓐ 스폰서 행 문면 = 정기 500 + 보너스 200 (SP1 완주)",
+				(screen.get_node("%SponsorValue") as Label).text == data.strings.text("ui.tourReport.sponsorFormat",
+					{"payout": 700, "regular": 500, "bonus": 200}),
+				(screen.get_node("%SponsorValue") as Label).text)
+			_ok("⑬ⓐ 스폰서 행 표제", (screen.get_node("%SponsorLabel") as Label).text
+				== data.strings.text("ui.tourReport.sponsor"))
+			_unmount(screen)
+	var plain := _finished_gp_session(data)
+	if plain != null:
+		plain.close_tour()
+		var screen := _mount(SET01_SCENE, plain)
+		if screen != null:
+			var guard := screen.get_node_or_null("InputGuard")
+			if guard != null:
+				guard.free()
+			_ok("⑬ⓐ 계약 없음 → 스폰서 행 비표출", not (screen.get_node("%SponsorRow") as Control).visible)
+			_unmount(screen)
+
+	# ⓑⓒ HUB-06 창 — 새 커리어 = race_slot 1 (투어 첫 출발 전)
+	var desk_session := _fresh_session(data)
+	_ok("⑬ⓒ race_slot 1 = 창 열림", desk_session.sponsor_renewal_open())
+	var desk := _mount(HUB06_SCENE, desk_session)
+	if desk != null:
+		var list := desk.get_node("%CardList") as Control
+		var signs: Array[Button] = []
+		for card in list.get_children():
+			var sign := (card as Control).find_child("Sign", true, false) as Button
+			if sign != null:
+				signs.append(sign)
+		_ok("⑬ⓑ 카드 = 표 전 계약 (4)", signs.size() == data.sponsors.size(), "%d/%d" % [signs.size(), data.sponsors.size()])
+		var enabled := 0
+		for sign in signs:
+			if not sign.disabled:
+				enabled += 1
+		_ok("⑬ⓑ 창 열림 → 체결 버튼 전부 활성 (슬롯 1 여유)", enabled == signs.size(), "%d/%d" % [enabled, signs.size()])
+		_ok("⑬ⓑ 안내 = 체결·해지 가능 문면", (desk.get_node("%WindowNote") as Label).text
+			== data.strings.text("ui.sponsorDesk.windowOpen"))
+		var condition := (list.get_child(0) as Control).find_child("Condition", true, false) as Label
+		_ok("⑬ⓑ 카드에 조건 문면 실재", condition != null and not condition.text.is_empty(),
+			condition.text if condition != null else "null")
+		# 체결(코어) 뒤 갱신 → 그 카드는 [해지] · 다른 카드는 슬롯 소진으로 소등
+		desk_session.outgame.sign_sponsor("sponsor_sp2")
+		desk._refresh_all()
+		var signed := (list.get_child(1) as Control).find_child("Sign", true, false) as Button
+		_ok("⑬ⓑ 계약 카드 = [해지] 활성", signed != null and not signed.disabled
+			and signed.text == data.strings.text("ui.sponsorDesk.release"), signed.text if signed != null else "null")
+		var other := (list.get_child(0) as Control).find_child("Sign", true, false) as Button
+		_ok("⑬ⓑ 슬롯 소진 → 타 카드 체결 소등 · 포커스 불가", other.disabled and other.focus_mode == Control.FOCUS_NONE)
+		# 투어 중(race_slot 2) → 열람 전용
+		desk_session.season.race_slot = 2
+		_ok("⑬ⓒ race_slot 2 = 창 닫힘", not desk_session.sponsor_renewal_open())
+		desk._refresh_all()
+		var all_disabled := true
+		for sign in signs:
+			if not sign.disabled:
+				all_disabled = false
+		_ok("⑬ⓑ 투어 중 → 전 버튼 소등 (열람 전용)", all_disabled)
+		_ok("⑬ⓑ 계약 카드 문면 = 계약 중", signed.text == data.strings.text("ui.sponsorDesk.signed"))
+		_ok("⑬ⓑ 안내 = 투어 중 열람 전용 문면", (desk.get_node("%WindowNote") as Label).text
+			== data.strings.text("ui.sponsorDesk.windowClosed"))
+		# 조건 진행 — SP2 는 횟수형: GP 결과가 들어오면 문면이 따라간다
+		desk_session.outgame.record_gp_result({"player_rank": 2, "player_retired": false, "beaten_rivals": []})
+		desk._refresh_all()
+		var sp2_condition := (list.get_child(1) as Control).find_child("Condition", true, false) as Label
+		_ok("⑬ⓑ SP2 진행 = 이번 투어 1회", sp2_condition != null and sp2_condition.text
+			== data.strings.text("ui.sponsorDesk.conditionFormat", {
+				"condition": data.strings.text("ui.sponsorCondition.raceTop3"),
+				"progress": data.strings.text("ui.sponsorDesk.progressCountFormat", {"count": 1}),
+			}), sp2_condition.text if sp2_condition != null else "null")
+		_unmount(desk)
 
 
 # ── ㉝ 의미 프레임 소비처 (15차 ① — 정본이 이름 붙인 자리에만 건다) ──

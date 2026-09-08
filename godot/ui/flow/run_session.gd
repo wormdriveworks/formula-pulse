@@ -790,7 +790,24 @@ func settle_tour(remaining_charge: int) -> Dictionary:
 	outgame.gain_drive_data(drive_points)
 	# 탈락 시 환전 미성립 (D06 §4.1 G4) — 코어가 조건을 쥐지만 호출 자체를 걸지 않는다
 	var exchanged := outgame.exchange_charge(remaining_charge, not dropped)
-	return {"credits": credits, "dp": drive_points, "exchanged": exchanged, "dropped": dropped}
+	# 스폰서 정산 S8 (개선 회차 13 · 2026-09-09 결선 — 종전에는 게임 어디서도 `settle_sponsors` 를 부르지 않아
+	# 계약이 한 푼도 내지 않았다). 정기 수입은 탈락 투어에도 지급, 보너스는 조건 판정(사용자 결정 — D06 §2.4
+	# "손에 쥔 것은 뺏지 않는다"). 조건은 `close_tour()` 가 리포트에 스냅숏한 것을 쓴다 — 그 사이 `begin_tour()` 가
+	# 이번 투어 소재를 비웠기 때문이다. 스냅숏이 없으면(구 경로) 소재에서 다시 만든다.
+	var conditions: Dictionary = last_tour_report.get("sponsor_conditions",
+		outgame.sponsor_tour_conditions(last_tour_report))
+	var sponsor := outgame.sponsor_settlement_breakdown(conditions)
+	outgame.gain_credits(int(sponsor["payout"]))
+	sponsor["conditions"] = conditions
+	return {"credits": credits, "dp": drive_points, "exchanged": exchanged, "dropped": dropped,
+		"sponsor": sponsor}
+
+
+# 스폰서 체결·해지(교체) 창 — **투어 첫 출발 전의 개러지 방문**에만 열린다 (D07 §5.4 "투어 단위 계약 · 결산 시
+# 갱신·교체 · 중도 파기 없음" · D09 §A-16 "갱신 시점 외 열람 전용"). 개러지가 GP 마다 서므로(회차 10) race_slot 이
+# 창을 가른다 — 코어(OutgameState)는 시즌 층을 모르니 세션이 답한다.
+func sponsor_renewal_open() -> bool:
+	return season != null and season.race_slot == 1
 
 
 # 시즌 결산 지급 (D06 §2.1 S6 — 챔피언십 순위 비례). 선재 공백이었다:
@@ -818,6 +835,9 @@ func close_tour() -> Dictionary:
 	outgame.latch_narrative_act()
 	committed_relations = outgame.commit_relation_transitions()
 	_reunion_beats_this_tour = 0
+	# 스폰서 조건 스냅숏 (회차 13) — 바로 아래 `outgame.begin_tour()` 가 투어 소재(`sponsor_tour_facts`)를 비우므로,
+	# SET-01 이 `settle_tour()` 에서 판정할 조건을 마감 리포트에 함께 싣는다(순위표 스냅숏과 같은 사유).
+	last_tour_report["sponsor_conditions"] = outgame.sponsor_tour_conditions(last_tour_report)
 	if not season.season_finished():
 		# 다음 투어 개시 — 체증 카운터 리셋 + 무상 복원선 (D06 §3.3 · D13 별첨A §3.4 R2).
 		# 시즌 마지막 투어면 다음 투어가 없다 — 개시 처리는 begin_next_season()이 한다.

@@ -687,6 +687,60 @@ func _tc_o3_sponsors() -> void:
 	_ok("슬롯 2에서 2번째 계약 성립", state.sign_sponsor("sponsor_sp2"))
 	# 보상은 Source 범위 안 — 이벤트처럼 신설 Source를 만들지 않는다 (D06 §2.1)
 	_ok("계약 수입은 크레딧 축 전속", state.credits > 0)
+	# ── 결선 (개선 회차 13 · 2026-09-09): 투어 소재 → 조건 → 결산 · 탈락 · 해지 · 투어 리셋 · 직렬화 ──
+	# SP2 "P3 이내 달성마다 +300": 완주한 GP 의 순위만 센다 — 리타이어 GP 는 순위가 성적이 아니다.
+	var tour := _new_state()
+	tour.sign_sponsor("sponsor_sp2")
+	tour.record_gp_result({"player_rank": 2, "player_retired": false, "beaten_rivals": ["ai_maro"]})
+	tour.record_gp_result({"player_rank": 5, "player_retired": false, "beaten_rivals": []})
+	tour.record_gp_result({"player_rank": 1, "player_retired": true, "beaten_rivals": []})
+	tour.record_gp_result({"player_rank": 3, "player_retired": false, "beaten_rivals": []})
+	_ok("SP2 이번 투어 P3 이내 = 2회 (리타이어 GP 제외 · 임계는 표 threshold)",
+		tour.sponsor_condition_value("sponsor_sp2") == 2, str(tour.sponsor_condition_value("sponsor_sp2")))
+	var conditions := tour.sponsor_tour_conditions({"player_position": 4, "dropped_out": false})
+	_ok("결산 조건 = 계약 중 조건만 · race_top3 = 2", conditions.size() == 1 and int(conditions.get("race_top3", -1)) == 2,
+		str(conditions))
+	var breakdown := tour.sponsor_settlement_breakdown(conditions)
+	_ok("SP2 내역 = 정기 250 + 보너스 300 × 2 = 850", int(breakdown["regular"]) == 250
+		and int(breakdown["bonus"]) == 600 and int(breakdown["payout"]) == 850, str(breakdown))
+	var credits_before_settle := tour.credits
+	var settled := tour.settle_sponsors_for_tour({"player_position": 4, "dropped_out": false})
+	_ok("투어 결산 창구 = 850 지급 · 내역 + 조건 반환", tour.credits == credits_before_settle + 850
+		and int(settled["payout"]) == 850 and settled.has("conditions"), str(settled))
+	# 탈락 투어 = 정기 지급 · 보너스는 조건대로 (SP1 전 대회 완주 불성립 — 사용자 결정 2026-09-09)
+	var dropped := _new_state()
+	dropped.sign_sponsor("sponsor_sp1")
+	var drop_settled := dropped.settle_sponsors_for_tour({"player_position": 9, "dropped_out": true})
+	_ok("탈락 투어 = 정기 500 만 (SP1 완주 보너스 불성립)", int(drop_settled["payout"]) == 500
+		and int(drop_settled["bonus"]) == 0, str(drop_settled))
+	var finished := _new_state()
+	finished.sign_sponsor("sponsor_sp1")
+	_ok("완주 투어 SP1 = 500 + 200", int(finished.settle_sponsors_for_tour(
+		{"player_position": 9, "dropped_out": false})["payout"]) == 700)
+	# SP4 "투어 종합 P5 이내" — 임계는 표 threshold(5)
+	var prestige := _new_state()
+	prestige.sign_sponsor("sponsor_sp4")
+	_ok("SP4 P5 → 500 + 400", int(prestige.settle_sponsors_for_tour(
+		{"player_position": 5, "dropped_out": false})["payout"]) == 900)
+	_ok("SP4 P6 → 정기만", int(prestige.settle_sponsors_for_tour(
+		{"player_position": 6, "dropped_out": false})["payout"]) == 500)
+	# SP3 "네임드 라이벌 선착" = 투어당 1회 정액 [가안] — 두 GP 에서 선착해도 +350 한 번
+	var rivalry := _new_state()
+	rivalry.sign_sponsor("sponsor_sp3")
+	rivalry.record_gp_result({"player_rank": 8, "player_retired": false, "beaten_rivals": ["ai_maro"]})
+	rivalry.record_gp_result({"player_rank": 6, "player_retired": false, "beaten_rivals": ["ai_maro", "ai_jude"]})
+	_ok("SP3 네임드 선착 = 250 + 350 (1회 정액)", int(rivalry.settle_sponsors_for_tour(
+		{"player_position": 7, "dropped_out": false})["payout"]) == 600)
+	# 투어 개시 = 소재 리셋 · 계약은 이어진다 (자동 갱신) · 해지
+	rivalry.begin_tour()
+	_ok("투어 개시 시 조건 소재 리셋 · 계약 유지", rivalry.sponsor_condition_value("sponsor_sp3") == false
+		and rivalry.sponsor_contracts.has("sponsor_sp3"))
+	_ok("해지 = 계약 목록에서 제거", rivalry.release_sponsor("sponsor_sp3") and rivalry.sponsor_contracts.is_empty())
+	_ok("미계약 해지 거부", not rivalry.release_sponsor("sponsor_sp3"))
+	# 소재가 세이브를 넘는다 — 투어 중 저장·재개 뒤에도 결산 판정이 이어진다
+	var restored := _new_state()
+	_ok("조건 소재 직렬화·복원", restored.restore(tour.serialize())
+		and restored.sponsor_condition_value("sponsor_sp2") == 2)
 
 
 # ── TC-O5 아카이브 (D07 §6.3 · D09 §4.5 — 무상·상시·게이트 표시 부재) ──
@@ -734,7 +788,11 @@ func _tc_o6_exchange_guards() -> void:
 		"record_discovery", "evaluate_achievements", "pending_achievements", "achievement_progress",
 		"skill_tier_open", "unlock_cost", "unlock_skill", "expand_deck", "set_deck",
 		"recruit_crew",
-		"sponsor_slots", "sponsor_candidate_count", "sign_sponsor", "settle_sponsors",
+		# 회차 13 결선 — `release_sponsor`(교체의 전반) · `sponsor_tour_conditions`(결산 소재 → 조건) ·
+		# `sponsor_settlement_breakdown`(표시·판정 공용 내역 · 지불 없음) · `settle_sponsors_for_tour`(투어 결산 창구)
+		"sponsor_slots", "sponsor_candidate_count", "sign_sponsor", "release_sponsor", "settle_sponsors",
+		"sponsor_condition_value", "sponsor_tour_conditions", "sponsor_settlement_breakdown",
+		"settle_sponsors_for_tour",
 		"add_relation", "pending_relation_transitions", "commit_relation_transitions",
 		"latch_narrative_act",
 		"open_narrative_act",
