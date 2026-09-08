@@ -12,7 +12,8 @@ extends SceneTree
 
 const FIXTURE_DIR := "res://tests/fixtures/tables/"
 # 69 → 65 (개선 회차 11): 필드 정비 폐지·코어 삭제로 상한·체증·다음 회차·복원선 뒤 무동작 검사 4건이 걷혔다.
-const MIN_CHECKS := 65
+# → 67 (개선 회차 12): 부분 정비 데이터 판별 2건.
+const MIN_CHECKS := 67
 
 var _failures := 0
 var _checked := 0
@@ -222,6 +223,16 @@ func _outgame_reads_data() -> void:
 	var restored := state.full_repair()
 	_ok("전면 정비 지불 = 데이터 단가 × 결손 × 패시브", credits_before - state.credits == expected_cost
 		and restored == int(missing), "paid=%d restored=%d" % [credits_before - state.credits, restored])
+	# 부분 정비 (회차 12) = 잔액 한도 — 픽스처 단가 5 × 패시브 0.5 = 2.5 Cr/CH · 잔액 7 → 2 CH · 5 Cr
+	var partial := OutgameState.new()
+	partial.setup(data)
+	partial.chassis = data.param("param_chassis_max") - 30.0
+	partial.gain_credits(7)
+	var partial_restored := partial.full_repair()
+	_ok("부분 정비 회복 = floor(잔액 / 데이터 단가)", partial_restored == 2 and partial.credits == 2,
+		"restored=%d credits=%d" % [partial_restored, partial.credits])
+	_ok("부분 정비가 리터럴 20 Cr/CH 를 쓰지 않는다 (7 Cr 이면 0 CH 가 아니다)",
+		partial.chassis == data.param("param_chassis_max") - 28.0, "chassis=%f" % partial.chassis)
 	# 튜닝 단계 상한 (픽스처 2 · 기본 5)
 	var tuning_state := OutgameState.new()
 	tuning_state.setup(data)

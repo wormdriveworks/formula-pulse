@@ -4823,6 +4823,36 @@ func _garage_loop_flow(data: GameData) -> void:
 		_unmount(bay)
 		_settle_bay = null
 
+	# ⓖ 부분 정비 (개선 회차 12 · 2026-09-09 사용자 결정) — 잔액이 총비용에 못 미쳐도 실행 버튼이 살고 "가능 회복"이
+	# 표기되며, 실행은 가능 회복만큼만 회복·지불한다. 종전에는 이 상태에서 실행이 소등이었다(회차 10 캡처: 총비용 972 ·
+	# 잔액 500 · 소등). 새 커리어 = 테오 합류라 단가 18 Cr/CH · 결손 60 · 잔액 500 → 27 CH · 486 Cr.
+	var partial_session := _fresh_session(data)
+	partial_session.outgame.chassis = 40.0
+	partial_session.outgame.gain_credits(500)
+	var bay_partial := _mount(HUB02_SCENE, partial_session)
+	_ok("⑩ⓖ 전제: 정비 베이 마운트 (부분 정비 재현 조건)", bay_partial != null)
+	if bay_partial != null:
+		var og: OutgameState = partial_session.outgame
+		var run := bay_partial.get_node("%RunButton") as Button
+		_ok("⑩ⓖ 전제: 잔액 < 총비용", og.credits < og.full_repair_cost(),
+			"credits=%d total=%d" % [og.credits, og.full_repair_cost()])
+		_ok("⑩ⓖ 잔액 부족에도 실행 버튼 활성 (종전 = 소등)", not run.disabled)
+		var expected_affordable := data.strings.text("ui.repairBay.affordableFormat", {
+			"ch": int(round(og.repair_affordable_ch())), "amount": og.repair_affordable_cost(),
+		})
+		_ok("⑩ⓖ 가능 회복 표기 = 코어 산식", (bay_partial.get_node("%AffordableValue") as Label).text == expected_affordable,
+			(bay_partial.get_node("%AffordableValue") as Label).text)
+		var before_chassis: float = og.chassis
+		var before_credits: int = og.credits
+		bay_partial._on_run_pressed()
+		_ok("⑩ⓖ 실행 = 가능 회복만큼 회복 (27 CH) · 그 비용만 지불 (486 Cr)",
+			og.chassis == before_chassis + 27.0 and og.credits == before_credits - 486,
+			"chassis=%f credits=%d" % [og.chassis, og.credits])
+		_ok("⑩ⓖ 실행 뒤 1 CH 값 미달 → 버튼 소등", run.disabled)
+		_ok("⑩ⓖ 카드 갱신 = 잔여 결손 총비용", (bay_partial.get_node("%TotalCostValue") as Label).text
+			== data.strings.text("ui.repairBay.totalCostFormat", {"amount": og.full_repair_cost()}))
+		_unmount(bay_partial)
+
 	# ⓕ 잔존 0.
 	var routes: Dictionary = load(APP_ROOT_SCENE_SCRIPT).ROUTES
 	_ok("⑩ⓕ 라우팅 대장에 간이 정산 경로 없음", not routes.has(RUN01_TOKEN))

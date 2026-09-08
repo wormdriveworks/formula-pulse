@@ -140,24 +140,55 @@ func begin_tour() -> void:
 	chassis = maxf(chassis, float(free_restore_line()))
 
 
-# 전면 정비 비용 조회 — 표시 전용 (D09 §4.3 비용 표시 · IMPL-079 조회/실행 분리 구조)
+# ── 정비 = **잔액 한도 내 최대 회복** (개선 회차 12 · 2026-09-09 사용자 결정 — 부분 정비 도입) ──
+#
+# 종전 전면 정비는 결손 전량의 비용을 한 번에 내지 못하면 0 이었다("전액 아니면 0"). 필드 정비 폐지(회차 10·11)
+# 뒤 그것이 유일한 유상 정비가 되자 잔액이 총비용에 못 미치는 플레이어는 **정비 자체가 불가**했고, TL-5 2차가 그
+# 귀결(저숙련 투어 리타이어 0.29 → 2.02/시즌 · 표준 0.20 → 0.36)을 드러냈다(`docs/qa/TL5_실행기록_2026-09-09.md`
+# §2). 단가(20 Cr/CH · D13 별첨A §3.4)·상한 없음·완전 회복 가능은 그대로이고 **부분 지불만 허용**한다 — D07 §3.3
+# "전면 정비 = 완전 회복" 문면 대비 변경점(회차 12 문서). 함수명 `full_repair*` 는 호출부(HUB-02·러너·캡처·검사)
+# 안정성을 위해 유지한다. 표시(가능 회복)·버튼 활성·실행이 **같은 산식**(`repair_affordable_ch`)을 쓴다 — 패리티.
+
+# 완전 회복 총비용 — 표시 전용 (D09 §4.3 비용 표시 · IMPL-079 조회/실행 분리 구조)
 func full_repair_cost() -> int:
-	var missing := maxf(data.param("param_chassis_max") - chassis, 0.0)
-	var per_ch := data.param("param_repair_full_cr_per_ch") * _repair_cost_ratio()
-	return int(round(per_ch * missing))
+	return int(round(_repair_per_ch() * _repair_missing()))
 
 
-# 전면 정비: 20 Cr / 1 CH · 상한 없음 — 완전 회복 (D13 별첨A §3.4).
-# 반환: 실제 회복량 (0 = 실패 또는 이미 만충).
+# 지금 잔액으로 회복할 수 있는 CH — 결손과 `잔액 ÷ 단가`(내림) 중 작은 쪽. 결손이 더 작으면 완전 회복이다.
+func repair_affordable_ch() -> float:
+	var per_ch := _repair_per_ch()
+	if per_ch <= 0.0:
+		return 0.0
+	return minf(_repair_missing(), floorf(float(credits) / per_ch))
+
+
+# 가능 회복분의 비용 — 표시 전용 ("가능 회복 N CH · M Cr")
+func repair_affordable_cost() -> int:
+	return int(round(_repair_per_ch() * repair_affordable_ch()))
+
+
+# 정비 실행 시 도달 섀시 — 표시 전용 (고스트 게이지). 실행과 계산을 공유한다.
+func repair_preview() -> float:
+	return chassis + repair_affordable_ch()
+
+
+# 정비 실행 — 잔액 한도 내 최대 회복. 반환: 실제 회복량 (0 = 결손 없음 또는 1 CH 값도 못 냄 — 지불 없음).
 func full_repair() -> int:
-	var maximum := data.param("param_chassis_max")
-	var missing := maxf(maximum - chassis, 0.0)
-	if missing <= 0.0:
+	var amount := repair_affordable_ch()
+	if amount <= 0.0:
 		return 0
-	if not _spend_credits(full_repair_cost()):
+	if not _spend_credits(int(round(_repair_per_ch() * amount))):
 		return 0
-	chassis = maximum
-	return int(round(missing))
+	chassis += amount
+	return int(round(amount))
+
+
+func _repair_per_ch() -> float:
+	return data.param("param_repair_full_cr_per_ch") * _repair_cost_ratio()
+
+
+func _repair_missing() -> float:
+	return maxf(data.param("param_chassis_max") - chassis, 0.0)
 
 
 # 이벤트 회복 (D06 §3.4 — 무상·확률적·페이싱, 인스턴스 D08 풀).

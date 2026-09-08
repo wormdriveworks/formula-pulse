@@ -721,8 +721,11 @@ func _tc_o6_exchange_guards() -> void:
 		# 곧 "다시 생기면 붉는다"는 보장이다 — 유상 정비는 전면 정비 한 경로다.
 		"begin_tour",
 		# `full_repair_cost` 는 D09 §4.3 비용 표시의 조회 경로 (IMPL-079와 같은 구조 — 표시 전용).
+		# `repair_affordable_ch`·`repair_affordable_cost`·`repair_preview` = 부분 정비(회차 12)의 표시·활성 조회 —
+		# 실행 `full_repair` 와 산식을 공유한다(패리티).
 		# `event_chassis_recover` 는 D06 §3.4 이벤트 회복의 유일 진입로 (회당 상한 가드 내장).
-		"full_repair", "full_repair_cost", "free_restore_line", "event_chassis_recover",
+		"full_repair", "full_repair_cost", "repair_affordable_ch", "repair_affordable_cost", "repair_preview",
+		"free_restore_line", "event_chassis_recover",
 		"tuning_step", "tuning_cost", "buy_tuning", "tuning_refund_ratio", "redistribute_tuning",
 		"overhaul_slots", "install_overhaul", "draw_overhaul_candidates", "parts_stat_bonus",
 		"career_stat", "record_gp_result", "record_tour_result", "record_season_result",
@@ -937,6 +940,22 @@ func _repair_and_consumables() -> void:
 		"credits=%d" % full.credits)
 	_ok("만충 시 전면 정비 무동작", full.full_repair() == 0
 		and full.credits == full_credits - expected_full_cost)
+	# 부분 정비 (개선 회차 12 · 2026-09-09 사용자 결정): 잔액이 총비용에 못 미쳐도 잔액 한도 내 최대 회복.
+	# 테오 −10% → 18 Cr/CH · 결손 60(총비용 1,080) · 잔액 500 → 27 CH · 486 Cr. 표시·활성·실행이 같은 산식이다.
+	var partial := _new_state()
+	partial.chassis = 40.0
+	partial.gain_credits(500)
+	_ok("부분 정비: 가능 회복 = floor(잔액/단가) (27 CH)", partial.repair_affordable_ch() == 27.0,
+		"affordable=%f" % partial.repair_affordable_ch())
+	_ok("부분 정비: 가능 회복 비용 = 단가 × 가능 회복 (486)", partial.repair_affordable_cost() == 486,
+		"cost=%d" % partial.repair_affordable_cost())
+	_ok("부분 정비: 프리뷰 = 현재 + 가능 회복 (67)", partial.repair_preview() == 67.0,
+		"preview=%f" % partial.repair_preview())
+	_ok("부분 정비: 실행 = 27 CH 회복 · 486 Cr 지불 (잔액 14)",
+		partial.full_repair() == 27 and partial.chassis == 67.0 and partial.credits == 14,
+		"chassis=%f credits=%d" % [partial.chassis, partial.credits])
+	_ok("1 CH 값도 없으면 무동작·무지불", partial.full_repair() == 0 and partial.credits == 14
+		and partial.repair_affordable_ch() == 0.0)
 	# 이벤트 회복 — 회당 상한 가드 (D06 §3.4 "필드 정비의 회당 상한을 초과할 수 없다")
 	var ev := _new_state()
 	ev.chassis = 20.0

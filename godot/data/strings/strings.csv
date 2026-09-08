@@ -420,11 +420,12 @@ ui.hub.stFacility,시설 확장,Facility Expansion,施設拡張
 ui.hub.stOverhaul,시즌 오버홀,Season Overhaul,シーズンオーバーホール
 ui.hub.stRecruit,크루 영입,Crew Recruitment,クルー登用
 ui.repairBay.title,정비 베이,Service Bay,整備ベイ
-ui.repairBay.fullRepair,전면 정비,Full Service,フルサービス
+ui.repairBay.fullRepair,정비 — 잔액 한도 내 회복,Service — within your balance,整備 — 残高内で回復
 ui.repairBay.perChFormat,섀시 1당 {amount} Cr,{amount} Cr per chassis point,シャシー1あたり {amount} Cr
 ui.repairBay.freeLineNote,투어 개시 시 {line}까지 무상 복원됩니다.,Restored free up to {line} at tour start.,ツアー開始時に {line} まで無償で回復します。
 ui.repairBay.run,실행,Run,実行
 ui.repairBay.totalCostFormat,총비용 {amount} Cr,Total {amount} Cr,総費用 {amount} Cr
+ui.repairBay.affordableFormat,가능 회복 {ch} CH · {amount} Cr,Affordable {ch} CH · {amount} Cr,回復可能 {ch} CH · {amount} Cr
 ui.repairBay.chassisFormat,섀시 {now}% → {after}%,Chassis {now}% → {after}%,シャシー {now}% → {after}%
 ui.repairBay.chassisNowFormat,섀시 {now}%,Chassis {now}%,シャシー {now}%
 ui.repairBay.consumableHeaderFormat,소모품 보충 {held}/{cap},Consumables {held}/{cap},消耗品の補充 {held}/{cap}

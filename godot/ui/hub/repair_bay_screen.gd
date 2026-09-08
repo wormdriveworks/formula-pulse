@@ -1,8 +1,12 @@
 # HUB-02 정비 베이 — D09 §4.3 · 별첨A §A-12.
 #
-# 전면 정비 카드: 비용 · 완전 회복 고스트 게이지 · 실행. 테오 스탠딩 상주(아트 유입 대상).
+# 정비 카드: 총비용 · **가능 회복(잔액 한도)** · 고스트 게이지(현재 → 도달값) · 실행. 테오 스탠딩 상주(아트 유입 대상).
 # 무상 복원선(투어 개시 70)은 자동 처리 고지행으로만 표기한다 (§A-12 확정).
 # 실행은 섀시 이월 결선(IMPL-078 해소)으로 개방 — 비용·회복량 판정은 전부 코어 소관.
+#
+# **부분 정비** (개선 회차 12 · 2026-09-09 사용자 결정): 종전 카드는 총비용을 한 번에 못 내면 실행이 소등이었다 —
+# 필드 정비 폐지 뒤 잔액 부족 = 정비 불가가 되어 TL-5 2차에서 리타이어 급증으로 드러났다. 이제 실행 = 잔액 한도 내
+# 최대 회복이고, 카드는 총비용과 함께 "가능 회복 N CH · M Cr" 을 보인다. 활성 조건도 같은 산식(1 CH 값 이상).
 #
 # **소모품 보충 서브 카드** (§A-12 규격 — 개선 회차 10 · 2026-09-08 결선). 종전에는 간이 정산 화면이 게임의
 # 유일한 구매 지점이었고 이 화면에는 규격만 있었다. 플로우가 레이스 ↔ 개러지 반복으로 바뀌며 간이 정산 화면이
@@ -43,8 +47,8 @@ func _on_run_pressed() -> void:
 	_refresh_consumables()   # 잔액이 줄면 소모품 지불 능력도 바뀐다
 
 
-# §A-12 전면 정비 카드 — 총비용 + 완전 회복 고스트 게이지 (현재 → 최대치).
-# 총비용·최대치는 코어 조회 전속 (full_repair_cost — IMPL-079 구조의 표시 전용 경로).
+# §A-12 정비 카드 — 총비용 + 가능 회복 + 고스트 게이지 (현재 → 실행 시 도달값).
+# 총비용·가능 회복·도달값은 코어 조회 전속 (IMPL-079 구조의 표시 전용 경로 — 실행과 산식 공유).
 # [가안] 백분율 분모 = 섀시 최대치 (종전 간이 정산 E02 와 동일 판단)
 func _refresh_repair_card() -> void:
 	var s := session.data.strings
@@ -52,22 +56,26 @@ func _refresh_repair_card() -> void:
 	var maximum := session.data.param("param_chassis_max")
 	var total_text := s.text("ui.repairBay.totalCostFormat", {"amount": outgame.full_repair_cost()})
 	(%TotalCostValue as Label).text = total_text
+	var affordable_text := s.text("ui.repairBay.affordableFormat", {
+		"ch": int(round(outgame.repair_affordable_ch())), "amount": outgame.repair_affordable_cost(),
+	})
+	(%AffordableValue as Label).text = affordable_text
+	var after := outgame.repair_preview()
 	var now_pct := int(round(outgame.chassis / maximum * 100.0))
+	var after_pct := int(round(after / maximum * 100.0))
 	var chassis_text := s.text("ui.repairBay.chassisNowFormat", {"now": now_pct})
-	if now_pct < 100:
-		chassis_text = s.text("ui.repairBay.chassisFormat", {"now": now_pct, "after": 100})
+	if after_pct > now_pct:
+		chassis_text = s.text("ui.repairBay.chassisFormat", {"now": now_pct, "after": after_pct})
 	(%ChassisValue as Label).text = chassis_text
-	(%ChassisGauge as GhostGauge).set_values(outgame.chassis, maximum, maximum)
+	(%ChassisGauge as GhostGauge).set_values(outgame.chassis, after, maximum)
 
 
-# 손상(최대치 미만)과 지불 능력이 함께 성립할 때만 활성 — 이미 만충이면 소등
+# 1 CH 값 이상 회복할 수 있을 때만 활성 — 만충이거나 1 CH 값도 없으면 소등 (활성 판정 = 실행 산식)
 func _refresh_run_button() -> void:
 	var outgame := session.outgame
-	var damaged := outgame.chassis < session.data.param("param_chassis_max")
-	var affordable := outgame.credits >= outgame.full_repair_cost()
 	var run := %RunButton as Button
 	var had_focus := run.has_focus()
-	run.disabled = not (damaged and affordable)
+	run.disabled = outgame.repair_affordable_ch() < 1.0
 	run.focus_mode = Control.FOCUS_NONE if run.disabled else Control.FOCUS_ALL
 	# 포커스를 가진 채 FOCUS_NONE 이 되면 포커스가 허공에 떨어진다 (개선 2026-09-02 H1 —
 	# 실기: 정비 실행 직후 방향키·Esc 전부 무반응, 패드는 복구 수단이 없다).
@@ -115,7 +123,8 @@ func _on_buy_consumable(consumable_id: String) -> void:
 	sfx("purchase")   # SE-U07 구매 성사
 	refresh_currency()
 	_refresh_consumables()
-	_refresh_run_button()  # 잔액이 줄면 전면 정비 지불 능력도 바뀐다
+	_refresh_repair_card()   # 잔액이 줄면 가능 회복·도달값도 바뀐다
+	_refresh_run_button()
 	# 재생성이 포커스를 가진 버튼을 free 하므로 여기서 되잡는다 — 없으면 패드가 이 화면에서
 	# 갇힌다(ui_focus_next 가 패드에 없다). 같은 품목 → 첫 가용 품목 → 뒤로가기 순.
 	_restore_list_focus("Buy_" + consumable_id)
