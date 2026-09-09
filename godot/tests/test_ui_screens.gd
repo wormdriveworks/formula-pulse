@@ -138,6 +138,7 @@ func _process(_delta: float) -> bool:
 	_skill_session_channel(data)
 	_season_open_wiring(data)
 	_archive_replay_wiring(data)
+	_archive_dedup(data)
 	_tutorial_callout_placement()
 	_skill_slots(data)
 	_skill_snapshot_pairing(data)
@@ -5065,6 +5066,87 @@ const PAYLOAD_MAKERS := [
 	"season_close_payload",
 	"archive_replay_payload",
 ]
+
+
+# ── ㊺ 아카이브 장면 단위 접기 (개선 회차 14 · 2026-09-10) ──
+#
+# 사용자 보고 = 세이브 1번의 기록실에 "시즌 개막"이 넷. 발생 대장은 시즌 경계 VN 을 시즌마다 다른
+# 인스턴스(`vn_season_open_s1..s4`)로 남기고 그것이 시즌당 1회 가드의 열쇠라 **대장은 그대로 두고
+# 목록만 장면으로 접는다.** 축은 세 겹이다: 규칙(열쇠·대표) · 대장 불변(가드가 보는 것) · 실화면 행 수.
+func _archive_dedup(data: GameData) -> void:
+	var open_stem := RunSession.SEASON_OPEN_VN_STEM
+	var close_stem := RunSession.SEASON_CLOSE_VN_STEM
+	var session := _fresh_session(data)
+	session.begin_career(1)
+	# 세이브 1번과 같은 모양 + 엔딩 2시즌. 심는 순서는 결과와 무관해야 한다.
+	var seeded := ["vn_act1", RunSession.season_vn_id(open_stem, 3), RunSession.season_vn_id(open_stem, 1),
+		RunSession.season_vn_id(open_stem, 4), RunSession.season_vn_id(open_stem, 2),
+		"vnbeat_feat_finish", "vnbeat_feat_point", "vnbeat_reunion_alta",
+		RunSession.season_vn_id(close_stem, 2), RunSession.season_vn_id(close_stem, 1)]
+	for vn_id in seeded:
+		session.narrative.vn_seen[String(vn_id)] = true
+	# ⓐ 규칙
+	_ok("㊺ 장면 열쇠: 시즌 인스턴스 → 줄기",
+		RunSession.archive_scene_key(RunSession.season_vn_id(open_stem, 3)) == open_stem,
+		RunSession.archive_scene_key(RunSession.season_vn_id(open_stem, 3)))
+	_ok("㊺ 장면 열쇠: 비트 id 는 그대로 (`_s` 를 품은 이름도)",
+		RunSession.archive_scene_key("vnbeat_clue_silence") == "vnbeat_clue_silence")
+	_ok("㊺ 장면 열쇠: 막 VN 은 그대로", RunSession.archive_scene_key("vn_act1") == "vn_act1")
+	var entries := session.archive_entries()
+	var expected := ["vn_act1", RunSession.season_vn_id(close_stem, 1), RunSession.season_vn_id(open_stem, 1),
+		"vnbeat_feat_finish", "vnbeat_feat_point", "vnbeat_reunion_alta"]
+	expected.sort()
+	_ok("㊺ 표시 항목 = 장면 단위 6 (개막 4·엔딩 2 → 각 1)", entries == expected, str(entries))
+	_ok("㊺ 대표 = 가장 이른 시즌 (s1)", entries.has(RunSession.season_vn_id(open_stem, 1))
+		and not entries.has(RunSession.season_vn_id(open_stem, 2)))
+	# 대표는 숫자 순이다 — 문자열 정렬은 s10 을 s2 앞에 둔다.
+	var late := _fresh_session(data)
+	late.begin_career(1)
+	for season_no in [10, 3, 2]:
+		late.narrative.vn_seen[RunSession.season_vn_id(open_stem, int(season_no))] = true
+	var late_entries := late.archive_entries()
+	_ok("㊺ 대표는 숫자 순 (s2 < s10)",
+		late_entries == [RunSession.season_vn_id(open_stem, 2)], str(late_entries))
+	# ⓑ 발생 대장 불변 — 시즌당 1회 가드가 이것을 본다. 접기가 대장을 건드리면 가드가 풀린다.
+	_ok("㊺ 발생 대장 불변 (인스턴스 %d 전부)" % seeded.size(),
+		session.narrative.archive_entries().size() == seeded.size(),
+		str(session.narrative.archive_entries().size()))
+	_ok("㊺ 접힌 뒤에도 같은 시즌 개막 재발행 0", session.season_open_payload("RACE-01").is_empty())
+	# ⓒ 실화면 — 행 수 · 표제 중복 · 재생 버튼.
+	var packed := load(RECORDS_SCENE) as PackedScene
+	if packed == null:
+		_ok("㊺ 기록실 씬 로드", false)
+		return
+	var records := packed.instantiate() as Control
+	records.session = session
+	root.add_child(records)
+	records.bind(session, {"tab": "archive"})
+	var panel := records.get_node("%PanelArchive") as VBoxContainer
+	var titles: Array = []
+	var live_replays := 0
+	for row in panel.get_children():
+		if row is HBoxContainer and row.get_child_count() >= 2 and row.get_child(0) is Label:
+			titles.append((row.get_child(0) as Label).text)
+			if row.get_child(1) is Button and not (row.get_child(1) as Button).disabled:
+				live_replays += 1
+	var open_title := data.strings.text("ui.vnSlot.seasonOpen")
+	_ok("㊺ 실화면 행 수 = 장면 수 %d" % expected.size(), titles.size() == expected.size(), str(titles.size()))
+	_ok("㊺ 실화면 '시즌 개막' 1행", titles.count(open_title) == 1, str(titles.count(open_title)))
+	var unique := {}
+	for title in titles:
+		unique[title] = true
+	_ok("㊺ 실화면 표제 중복 0", unique.size() == titles.size(), "%d/%d" % [unique.size(), titles.size()])
+	_ok("㊺ 실화면 재생 버튼 전부 활성 (누락 0)",
+		live_replays == titles.size() and records.replay_omissions.is_empty(),
+		"live=%d rows=%d omissions=%s" % [live_replays, titles.size(), str(records.replay_omissions)])
+	_unmount(records)
+	# 대조군 — 접기가 서로 다른 장면을 삼키지 않는다: 인스턴스가 하나씩이면 대장과 같다.
+	var plain := _fresh_session(data)
+	plain.begin_career(1)
+	for vn_id in ["vn_act1", "vnbeat_feat_finish", RunSession.season_vn_id(open_stem, 1)]:
+		plain.narrative.vn_seen[String(vn_id)] = true
+	_ok("㊺ 대조군: 인스턴스 1개씩 = 대장 그대로 3",
+		plain.archive_entries() == plain.narrative.archive_entries(), str(plain.archive_entries()))
 
 
 func _archive_replay_wiring(data: GameData) -> void:

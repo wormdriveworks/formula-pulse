@@ -487,6 +487,39 @@ func _archive_source_payload(vn_id: String, next_route: String,
 	return _beat_payload(String(beats[0]["id"]), next_route, next_payload, vn_id)
 
 
+# ── 아카이브 표시 항목 — 장면 단위 (개선 회차 14 · 2026-09-10 — 사용자 보고: 같은 VN 이 기록실에 겹쳐 선다) ──
+#
+# 발생 대장(`narrative.vn_seen`)은 **인스턴스 단위**다 — 시즌 경계 VN 은 시즌마다 접미가 다른 id 를
+# 남기고(`vn_season_open_s1..sN`), 그 id 가 곧 "시즌당 1회" 가드의 열쇠다(`season_open_payload` ·
+# `season_close_payload`). 대장을 그대로 그리면 장면은 하나인데 "시즌 개막"이 지나온 시즌 수만큼 선다.
+#
+# **대장은 손대지 않고 표시만 접는다.** 가드는 인스턴스를, 목록은 장면을 본다. 접는 열쇠는 인스턴스 id 를
+# 만든 규칙 자신(`split_season_vn_id`)이라 포맷이 바뀌면 여기도 함께 따라간다 — 화면이 `_s` 를 찢어
+# 맞추게 두지 않는다. 대표 = **가장 이른 시즌의 인스턴스**(숫자 순 — 문자열 정렬은 s10 을 s2 앞에 둔다).
+# 어느 인스턴스를 골라도 재열람은 같은 비트로 되돌아간다(`_archive_source_payload` 가 줄기 → 슬롯 → 비트).
+func archive_entries() -> Array:
+	if narrative == null:
+		return []
+	var representative: Dictionary = {}   # 장면 열쇠 -> 대표 인스턴스 id
+	var season_of: Dictionary = {}        # 장면 열쇠 -> 대표의 시즌 번호 (경계 VN 만 · 그 외 0)
+	for vn_id in narrative.archive_entries():
+		var id := String(vn_id)
+		var key := archive_scene_key(id)
+		var season_no := int(split_season_vn_id(id).get("season", 0))
+		if not representative.has(key) or season_no < int(season_of[key]):
+			representative[key] = id
+			season_of[key] = season_no
+	var entries: Array = representative.values()
+	entries.sort()
+	return entries
+
+
+# 장면 열쇠 — 접미가 붙은 시즌 인스턴스는 줄기, 그 외는 id 그대로(막 VN·비트는 이미 장면 단위다).
+static func archive_scene_key(vn_id: String) -> String:
+	var split := split_season_vn_id(vn_id)
+	return String(split["stem"]) if not split.is_empty() else vn_id
+
+
 # 이벤트 노드 판정 (D08 §7 — RACE-03 → 개러지 사이 삽입 지점의 발생 판정)
 func judge_event() -> Dictionary:
 	var stage_id := season.current_stage_id()

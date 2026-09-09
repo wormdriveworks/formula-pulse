@@ -200,7 +200,11 @@ func _fill_archive() -> void:
 	var panel := %PanelArchive as VBoxContainer
 	# 게이트 표시 요소 전무 (무상·상시 — D01 G2 조건 2). 발생분 전량 등재 — 스킵분 동일 취급.
 	# 미발생 이벤트는 목록 비표시 (스포일러 방지).
-	var entries := session.narrative.archive_entries()
+	#
+	# **장면 단위로 접힌 목록이다** (개선 회차 14 · 2026-09-10). 발생 대장은 시즌 경계 VN 을 시즌마다 다른
+	# 인스턴스로 남기므로(시즌당 1회 가드의 열쇠) 대장을 그대로 그리면 "시즌 개막"이 시즌 수만큼 겹쳐 선다.
+	# 접는 규칙은 인스턴스 id 를 만든 세션 층의 것이다 — 화면은 대장을 직접 읽지 않는다.
+	var entries := session.archive_entries()
 	if entries.is_empty():
 		var empty := Label.new()
 		empty.add_theme_font_size_override("font_size", _body_font_size)
