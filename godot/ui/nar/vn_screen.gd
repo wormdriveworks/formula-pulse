@@ -97,6 +97,10 @@ func _on_bound(payload: Dictionary) -> void:
 	# 발생 판정은 서사 층이 한다 — 재생 모드는 상태를 바꾸지 않는다 (재열람 멱등)
 	if _replay:
 		session.narrative.replay_from_archive(vn_id)
+	elif bool(payload.get("committed", false)):
+		# 세션이 이미 등재한 발생 (개선 회차 15 — 시즌 엔딩 `commit_season_close_payload`). 시즌 경계 저장이
+		# 이 화면보다 앞이라 여기서 등재하면 저장분에 빠진다. 재열람과 달리 **스킵 기록은 산다**(`_on_skip`).
+		pass
 	elif not vn_id.is_empty():
 		var outcome: Dictionary = session.narrative.trigger_vn(vn_id, slot_id, false)
 		if bool(outcome.get("occurred", false)) and _is_reunion_chain_beat(vn_id, slot_id):

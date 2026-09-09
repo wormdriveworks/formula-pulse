@@ -175,9 +175,14 @@ func _arm_pass_through() -> void:
 # 23차까지는 여기서 개막을 띄웠고, 엔딩이 붙으면 두 경계 비트가 개러지 완충 없이
 # 연속 6라인으로 읽혀 닫힘과 열림이 같은 호흡에 들어간다(내러티브 6차 §4.2).
 # 개막은 개러지 이탈 지점(`garage_screen._on_depart`)이 맡는다.
+#
+# **엔딩 발생 등재 → 시즌 전환 → 저장 → 재생** (개선 회차 15 · 2026-09-10). 종전에는 페이로드만 받고 등재를
+# 화면에 맡겼는데, 아래 저장이 화면보다 앞이라 시즌 경계 저장분에 엔딩이 없었다 — 엔딩 VN 도중·개러지 체류 중
+# 종료 = 아카이브 영구 소실(실 프로필 4회 전환 0건). 등재가 저장 앞이면 저장분에 남고, 전환 앞이면 계수가
+# 떠나는 시즌에 붙는다. 화면은 페이로드의 `committed` 를 보고 재생만 한다(`RunSession.commit_season_close_payload`).
 func _leave() -> void:
 	if _season_chain:
-		var closing := session.season_close_payload("HUB-01")
+		var closing := session.commit_season_close_payload("HUB-01")
 		session.begin_next_season()
 		session.save_progress()  # 시즌 경계 저장 지점 (D09 §2.4)
 		if not closing.is_empty():

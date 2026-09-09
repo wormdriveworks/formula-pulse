@@ -408,6 +408,32 @@ func season_close_payload(next_route: String, next_payload: Dictionary = {}) -> 
 	return _beat_payload(String(beats[0]["id"]), next_route, next_payload, vn_id)
 
 
+# 시즌 엔딩 VN — **발생을 여기서 등재하고** 페이로드를 낸다 (개선 회차 15 · 2026-09-10).
+#
+# 종전에는 HUB-08 `_leave()` 가 `season_close_payload()` 만 받아 `begin_next_season()` → 저장 → NAR-01 순으로
+# 갔고, 발생 등재는 화면(`VnScreen._on_bound` → `trigger_vn`)이 했다. 그 순서에 구멍이 둘 있었다:
+#  ①**시즌 경계 저장분에 엔딩이 없다.** 저장이 화면보다 앞이라 엔딩 VN 도중·개러지 체류 중에 종료하면 재개는
+#    새 시즌 개러지에 착지하고, 엔딩 id 는 떠난 시즌의 것이라 다시 조립되지 않는다 — 아카이브에서 **영구 소실**.
+#    실 프로필 2벌 · 시즌 전환 4회에 `vn_season_close_*` 가 0건이었다(회차 14 관찰 → 회차 15 실 라우터 재현).
+#  ②**계수가 새 시즌에 붙는다.** 화면의 `trigger_vn` 은 `begin_next_season()` 뒤라 엔딩이 떠나는 시즌이 아니라
+#    새 시즌의 상한 15 를 1 소모했다(슬롯 `trigger = season_end` — 아래 주석의 의도와 반대로 돌고 있었다).
+#
+# 그래서 **세션이 등재를 먼저 한다**: 발생 = 도달(D07 §5.5 형식 A · `trigger_vn` 계약)이므로 시즌 마감에 닿은
+# 것 자체가 발생이고, 열람 여부는 화면이 `vn_skipped` 에 기록한다. 페이로드에 `committed` 를 얹어 화면이 다시
+# 등재하지 않게 한다(재열람의 `replay` 와 다르다 — 스킵 기록은 산다). 상한에 걸려 발생하지 못하면 **빈 사전**이다 —
+# 화면이 세워졌다 곧장 넘어가던 종전 거동과 결과가 같고, 호출부는 빈 사전만 본다.
+# 호출 순서 = 이 함수 → `begin_next_season()` → 저장 → NAR-01. 계수는 떠나는 시즌에 붙고 저장분에 엔딩이 있다.
+func commit_season_close_payload(next_route: String, next_payload: Dictionary = {}) -> Dictionary:
+	var payload := season_close_payload(next_route, next_payload)
+	if payload.is_empty() or narrative == null:
+		return {}
+	var outcome := narrative.trigger_vn(String(payload["vn_id"]), String(payload["slot_id"]), false)
+	if not bool(outcome.get("occurred", false)):
+		return {}
+	payload["committed"] = true
+	return payload
+
+
 # 경계 비트 조회 — 축도 무대도 갖지 않는 비트이므로 **무대에 빈 문자열**을 넘긴다.
 # 현재 무대를 넘기면 영구 미조회가 되고, 그 미조회는 화면에서 "문안이 없다"와 구분되지 않는다.
 func _boundary_beats(slot_id: String) -> Array:

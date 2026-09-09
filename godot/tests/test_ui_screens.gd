@@ -139,6 +139,7 @@ func _process(_delta: float) -> bool:
 	_season_open_wiring(data)
 	_archive_replay_wiring(data)
 	_archive_dedup(data)
+	_season_close_persistence(data)
 	_tutorial_callout_placement()
 	_skill_slots(data)
 	_skill_snapshot_pairing(data)
@@ -3132,14 +3133,16 @@ func _season_open_wiring(data: GameData) -> void:
 	# 두 경계 비트가 연속 발화하면 닫힘과 열림이 같은 호흡에 들어가므로(내러티브 6차 §4.2)
 	# "엔딩이 있다"만으로는 부족하다 — **개막이 그 자리에 없어야** 순서가 성립한다.
 	var overhaul := FileAccess.get_file_as_string("res://ui/hub/overhaul_screen.gd")
-	_ok("⑳ 오버홀이 엔딩 창구를 부른다", overhaul.contains("session.season_close_payload("))
+	# 창구 = **등재 창구**다 (개선 회차 15) — 미등재 창구(`season_close_payload`)를 화면이 직접 부르면 시즌 경계
+	# 저장분에 엔딩이 빠진다(㊻).
+	_ok("⑳ 오버홀이 엔딩 창구를 부른다", overhaul.contains("session.commit_season_close_payload("))
 	_ok("⑳ 오버홀에서 개막 발화 제거", not overhaul.contains("season_open_payload("),
 		"개막이 여기 남으면 엔딩과 연속 6라인이 된다")
 	# 엔딩은 `begin_next_season()` **앞**이어야 한다 — 슬롯 trigger 가 season_end 이고
 	# 전환 뒤면 새 시즌의 상한을 잡아먹는다. 소스 위치로 순서를 본다.
 	# 호출 순서는 **호출 형태로** 찾는다 — 주석 산문에도 같은 이름이 나오므로
 	# 이름만 찾으면 주석 위치를 재게 된다(초판이 그랬다: close=4718 vs advance=4276).
-	var close_at := overhaul.find("session.season_close_payload(")
+	var close_at := overhaul.find("session.commit_season_close_payload(")
 	var advance_at := overhaul.find("session.begin_next_season()")
 	_ok("⑳ 엔딩 조립이 시즌 전환보다 앞", close_at > 0 and advance_at > 0 and close_at < advance_at,
 		"close=%d advance=%d" % [close_at, advance_at])
@@ -5064,6 +5067,7 @@ const PAYLOAD_MAKERS := [
 	"season_open_payload",
 	"milestone_payload",
 	"season_close_payload",
+	"commit_season_close_payload",   # 엔딩 = 등재 창구 (개선 회차 15) — 화면은 이것만 부른다
 	"archive_replay_payload",
 ]
 
@@ -5147,6 +5151,94 @@ func _archive_dedup(data: GameData) -> void:
 		plain.narrative.vn_seen[String(vn_id)] = true
 	_ok("㊺ 대조군: 인스턴스 1개씩 = 대장 그대로 3",
 		plain.archive_entries() == plain.narrative.archive_entries(), str(plain.archive_entries()))
+
+
+# ── ㊻ 시즌 엔딩 VN 발생 등재 = 시즌 경계 저장 앞 (개선 회차 15 · 2026-09-10) ──
+#
+# 실 프로필 2벌 · 시즌 전환 4회에 엔딩 발생 기록이 0건이었다. 재현(실 라우터 워크): 엔딩은 서지만 HUB-08 확정의
+# 경계 저장이 그 앞이라 저장분에 없고, 다음 저장(출발)까지의 종료가 기록을 영구 소실시켰다(엔딩 id 는 떠난 시즌의
+# 것이라 재개가 다시 조립하지 않는다). 계수도 새 시즌에 붙었다. 축은 다섯 겹:
+# 창구(등재·계수·가드·빈 사전) · HUB-08 실화면(경계 저장분에 엔딩) · 화면(committed = 재등재 0 · 스킵 기록) ·
+# 재개(아카이브에 엔딩) · 원본(출구 순서 = 등재 → 전환 → 저장).
+func _season_close_persistence(data: GameData) -> void:
+	var close_s1 := RunSession.season_vn_id(RunSession.SEASON_CLOSE_VN_STEM, 1)
+	# ⓐ 창구
+	var session := _fresh_session(data)
+	session.begin_career(1)
+	var count_before := session.narrative.season_vn_count
+	var committed := session.commit_season_close_payload("HUB-01")
+	_ok("㊻ 창구 발행 = 시즌 1 엔딩", String(committed.get("vn_id", "")) == close_s1, str(committed.get("vn_id", "")))
+	_ok("㊻ committed 플래그", bool(committed.get("committed", false)))
+	_ok("㊻ 창구가 발생을 등재한다", session.narrative.vn_seen.has(close_s1))
+	_ok("㊻ 계수 = 떠나는 시즌 +1", session.narrative.season_vn_count == count_before + 1,
+		"%d → %d" % [count_before, session.narrative.season_vn_count])
+	_ok("㊻ 등재 뒤 재발행 0 (시즌당 1회 가드)", session.commit_season_close_payload("HUB-01").is_empty())
+	_ok("㊻ 문면 3라인·정조 동반 (같은 조립기)", Array(committed.get("line_keys", [])).size() == 3
+		and not String(committed.get("tone", "")).is_empty(), str(committed.get("tone", "")))
+	session.begin_next_season()
+	_ok("㊻ 새 시즌 계수 0 (엔딩이 새 시즌 상한을 먹지 않는다)", session.narrative.season_vn_count == 0,
+		str(session.narrative.season_vn_count))
+	var capped := _fresh_session(data)
+	capped.begin_career(1)
+	capped.narrative.season_vn_count = data.param_int("param_vn_season_cap")
+	_ok("㊻ 상한 도달 = 빈 사전 · 미등재", capped.commit_season_close_payload("HUB-01").is_empty()
+		and not capped.narrative.vn_seen.has(close_s1))
+	# ⓑ HUB-08 실화면 — 확정 출구 뒤 **시즌 경계 저장분**에 엔딩이 있다
+	var chain := _fresh_session(data)
+	chain.begin_career(1)
+	chain.season.tour_slot = chain.season.tours_per_season() + 1   # 시즌 최종 SET-01 진입 상태 — resume_route 와 같은 손
+	chain.close_season()
+	var hub8 := (load("res://ui/hub/overhaul_screen.tscn") as PackedScene).instantiate() as Control
+	hub8.session = chain
+	root.add_child(hub8)
+	var routed: Array = []
+	hub8.navigate.connect(func(target: String, p: Dictionary): routed.append([target, p]))
+	hub8.bind(chain, {"championship_rank": 16, "season_chain": true})
+	hub8._leave()
+	var saved := SaveManager.load_progress(1)
+	var saved_seen: Dictionary = Dictionary(Dictionary(saved.get("payload", {})).get("narrative", {})).get("vn_seen", {})
+	_ok("㊻ 출구 = NAR-01 · committed 페이로드", routed.size() == 1 and String(routed[0][0]) == "NAR-01"
+		and bool(Dictionary(routed[0][1]).get("committed", false)), str(routed))
+	_ok("㊻ 시즌 전환됨 (2)", chain.season.season == 2, str(chain.season.season))
+	_ok("㊻ 시즌 경계 저장분에 엔딩 (종전: 없었다)", bool(saved.get("ok", false)) and saved_seen.has(close_s1),
+		str(saved_seen.keys()))
+	_unmount(hub8)
+	# ⓒ 화면 — committed 페이로드는 재등재·재계수하지 않고 스킵 기록은 남긴다
+	var closing: Dictionary = routed[0][1] if routed.size() == 1 else chain.season_close_payload("HUB-01")
+	var count_at_mount := chain.narrative.season_vn_count
+	var vn := _mount_payload(data, chain, closing)
+	_ok("㊻ 화면 재계수 0", chain.narrative.season_vn_count == count_at_mount,
+		"%d vs %d" % [chain.narrative.season_vn_count, count_at_mount])
+	var lines: Array = closing.get("line_keys", [])
+	var first_key := String(Dictionary(lines[0]).get("text_key", "")) if not lines.is_empty() else ""
+	_ok("㊻ 화면 1라인 = 엔딩 문면", not first_key.is_empty()
+		and (vn.get_node("%BodyLabel") as Label).text == data.strings.text(first_key),
+		(vn.get_node("%BodyLabel") as Label).text)
+	vn._on_skip(String(closing.get("vn_id", "")), String(closing.get("slot_id", "")))
+	_ok("㊻ 스킵 기록은 산다 (재열람과 다르다)", chain.narrative.vn_skipped.has(close_s1))
+	_unmount(vn)
+	# 대조군 — committed 없는 페이로드는 종전대로 화면이 등재한다
+	var plain := _fresh_session(data)
+	plain.begin_career(1)
+	var pv := _mount_payload(data, plain, plain.season_close_payload("HUB-01"))
+	_ok("㊻ 대조군: 미등재 페이로드는 화면이 등재", plain.narrative.vn_seen.has(close_s1))
+	_unmount(pv)
+	# ⓓ 재개 — 경계 저장분으로 되살린 세션의 아카이브에 엔딩이 있다
+	var resumed := RunSession.new()
+	resumed.setup(data)
+	resumed.profile_index = 1
+	_ok("㊻ 재개 복원", resumed.restore(saved.get("payload", {})))
+	_ok("㊻ 재개 착지 = HUB-01 · 시즌 2", resumed.resume_route() == "HUB-01" and resumed.season.season == 2,
+		"%s s%d" % [resumed.resume_route(), resumed.season.season])
+	_ok("㊻ 재개 아카이브에 엔딩", resumed.archive_entries().has(close_s1), str(resumed.archive_entries()))
+	# ⓔ 원본 — 출구 순서 = 등재 → 전환 → 저장 · 미등재 창구 호출 잔존 0
+	var src := FileAccess.get_file_as_string("res://ui/hub/overhaul_screen.gd")
+	var commit_at := src.find("session.commit_season_close_payload(")
+	var advance_at := src.find("session.begin_next_season()")
+	var save_at := src.find("session.save_progress()")
+	_ok("㊻ 출구 순서 = 등재 → 전환 → 저장", commit_at > 0 and commit_at < advance_at and advance_at < save_at,
+		"commit=%d advance=%d save=%d" % [commit_at, advance_at, save_at])
+	_ok("㊻ 오버홀에 미등재 창구 호출 잔존 0", not src.contains("session.season_close_payload("))
 
 
 func _archive_replay_wiring(data: GameData) -> void:
