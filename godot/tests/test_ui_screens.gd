@@ -62,6 +62,7 @@ var _settle_race: Control
 var _settle_choice: Control
 var _settle_next: Array[Control] = []
 var _settle_bay: Control
+var _focus_garage: Control
 
 
 func _process(_delta: float) -> bool:
@@ -91,6 +92,9 @@ func _process(_delta: float) -> bool:
 			# 결산 3화면 — 주 버튼 마우스 히트테스트 축(개선 회차 8)도 정렬이 끝난 버튼 rect 를
 			# 요구한다. 순위표가 서야 재현되므로 GP 를 실제로 끝낸 세션으로 세운다.
 			_settle_next = _mount_settle_next(data)
+			# 개러지 복귀 포커스 축(개선 회차 16 · ㊼ⓐ)의 스테이션 실 클릭도 정렬이 끝난 버튼 rect 를 요구한다.
+			# 정비대(아래)보다 **앞**에 세운다 — 프레임 1 의 마지막 마운트가 포커스를 쥐는데, 그 자리는 종전대로 둔다.
+			_focus_garage = _mount(GARAGE_SCENE, _fresh_session(data))
 			# 개러지 루프 축(개선 회차 10)의 소모품 실 클릭도 정렬이 끝난 버튼 rect 를 요구한다.
 			# 새 커리어 잔액은 0 이라 구매 가능 상태를 만들어 세운다.
 			var bay_session := _fresh_session(data)
@@ -102,6 +106,7 @@ func _process(_delta: float) -> bool:
 	_settle_next_button_mouse_hit()
 	_duel_in_place()
 	_garage_loop_flow(data)
+	_garage_focus_memory(data)
 	_sponsor_settlement_flow(data)
 	_achievement_without_career(data)
 	_achievement_with_career(data)
@@ -4867,6 +4872,144 @@ func _garage_loop_flow(data: GameData) -> void:
 			"res://ui/hub/garage_screen.gd", "res://ui/flow/run_session.gd", "res://ui/flow/app_root.gd"]:
 		_ok("⑩ⓕ 간이 정산 참조 0 — %s" % String(path).get_file(),
 			not FileAccess.get_file_as_string(String(path)).contains(RUN01_TOKEN))
+
+
+# ── ㊼ 개러지 복귀 포커스 기억 (개선 회차 16 · 2026-09-11 사용자 요청) ──
+#
+# 종전에는 하위 스테이션(HUB-02~07)에서 돌아올 때마다 초기 포커스가 첫 스테이션(정비)으로 돌아갔다 —
+# 라우터가 화면을 매번 새로 세우므로 화면 인스턴스는 직전 위치를 모른다. 기억은 세션이 쥔다
+# (`RunSession.last_hub_station` · 세이브 밖 래치): 개러지가 스테이션을 누를 때 적고, 다시 서면 그 앵커에
+# 포커스를 둔다. 출발(`_on_depart`)이 비운다 — 레이스에서 돌아온 개러지는 종전대로 첫 스테이션이다(H6 기본값).
+#   ⓐ 실 클릭 — 정렬이 끝난 개러지에서 스테이션 중심을 마우스로 눌러 라우트 요청·기억이 서는가 (검사 증거 규칙)
+#   ⓑ 열린 스테이션 전부 — 누른 뒤 다시 세우면 그 앵커가 포커스를 갖는다 · 기억이 비면 첫 스테이션(H6 보존)
+#   ⓒ 실 복귀 경로 — 하위 화면의 뒤로 버튼·Esc 는 기억을 건드리지 않고 HUB-01 로 → 착지 포커스 = 그 스테이션
+#   ⓓ 폴백 — 소등 앵커(미개방 스폰서 · HUB-08) · 모르는 라우트는 첫 스테이션 · 개방되면 기억을 따른다
+#   ⓔ 출발이 비운다 → 다음 개러지는 첫 스테이션
+#   ⓕ 원본·직렬화 — 기억은 세이브에 실리지 않는다 · 하위 베이스는 기억을 쓰지 않는다
+const FOCUS_STATIONS := [["StRepair", "HUB-02"], ["StTuning", "HUB-03"], ["StStrategy", "HUB-04"],
+	["StRecords", "HUB-05"], ["StFacility", "HUB-07"]]
+
+
+func _garage_focus_memory(data: GameData) -> void:
+	# ⓐ 실 클릭 (프레임 1 에 세운 개러지 — 정렬 완료)
+	var clicked := _focus_garage
+	_ok("㊼ⓐ 전제: 정렬된 개러지 마운트", clicked != null)
+	if clicked != null:
+		root.move_child(clicked, root.get_child_count() - 1)
+		var tip := clicked.get_node_or_null("OnboardingTip")
+		if tip != null:
+			tip.free()   # 1회성 팁이 떠 있으면 스테이션을 덮을 수 있다 — 축의 관심사가 아니라 걷는다
+		var target := clicked.get_node("%StTuning") as Button
+		var rect := target.get_global_rect()
+		_ok("㊼ⓐ 전제: 튜닝 앵커 정렬 완료 (크기 > 0)", rect.size.x > 0.0 and rect.size.y > 0.0, str(rect))
+		var routed: Array = []
+		clicked.navigate.connect(func(t: String, _p: Dictionary) -> void: routed.append(t))
+		_click_at(clicked.get_viewport(), rect.get_center())
+		_ok("㊼ⓐ 스테이션 실 클릭 = 그 라우트 요청", routed == ["HUB-03"], str(routed))
+		_ok("㊼ⓐ 실 클릭이 기억을 적는다", clicked.session.last_hub_station == "HUB-03",
+			clicked.session.last_hub_station)
+		_unmount(clicked)
+		_focus_garage = null
+
+	# ⓑ 열린 스테이션 전부 — 누른 뒤 다시 세우면 그 앵커
+	var s := _fresh_session(data)
+	_ok("㊼ⓑ 전제: 새 세션의 기억은 비어 있다", s.last_hub_station.is_empty(), s.last_hub_station)
+	var baseline := _mount(GARAGE_SCENE, s)
+	if baseline == null:
+		return
+	_ok("㊼ⓑ 기억이 비면 첫 스테이션 (H6 기본값 보존)",
+		root.gui_get_focus_owner() == baseline.get_node("%StRepair"), str(root.gui_get_focus_owner()))
+	_unmount(baseline)
+	for entry in FOCUS_STATIONS:
+		var node_name := String(entry[0])
+		var route := String(entry[1])
+		var garage := _mount(GARAGE_SCENE, s)
+		if garage == null:
+			return
+		var routed: Array = []
+		garage.navigate.connect(func(t: String, _p: Dictionary) -> void: routed.append(t))
+		(garage.get_node("%" + node_name) as Button).pressed.emit()
+		_ok("㊼ⓑ %s 진입 = %s 요청 + 기억" % [node_name, route],
+			routed == [route] and s.last_hub_station == route, "%s mem=%s" % [str(routed), s.last_hub_station])
+		_unmount(garage)
+		var again := _mount(GARAGE_SCENE, s)
+		if again == null:
+			return
+		_ok("㊼ⓑ %s 복귀 착지 포커스 = 그 앵커" % node_name,
+			root.gui_get_focus_owner() == again.get_node("%" + node_name), str(root.gui_get_focus_owner()))
+		_unmount(again)
+
+	# ⓒ 실 복귀 경로 — 기록실(HUB-05)에서 뒤로 버튼 · Esc
+	s.last_hub_station = ""
+	var entering := _mount(GARAGE_SCENE, s)
+	if entering == null:
+		return
+	(entering.get_node("%StRecords") as Button).pressed.emit()
+	_unmount(entering)
+	var records := _mount(RECORDS_SCENE, s)
+	if records == null:
+		return
+	var back_routed: Array = []
+	records.navigate.connect(func(t: String, _p: Dictionary) -> void: back_routed.append(t))
+	(records.get_node("%BackButton") as Button).pressed.emit()
+	_ok("㊼ⓒ 하위 화면 뒤로 버튼 = HUB-01", back_routed == ["HUB-01"], str(back_routed))
+	records._unhandled_input(_action_event("ui_cancel"))
+	_ok("㊼ⓒ 하위 화면 Esc·B = HUB-01", back_routed == ["HUB-01", "HUB-01"], str(back_routed))
+	_ok("㊼ⓒ 하위 화면은 기억을 건드리지 않는다", s.last_hub_station == "HUB-05", s.last_hub_station)
+	_unmount(records)
+	var landed := _mount(GARAGE_SCENE, s)
+	if landed == null:
+		return
+	_ok("㊼ⓒ 복귀 착지 포커스 = 기록실 앵커",
+		root.gui_get_focus_owner() == landed.get_node("%StRecords"), str(root.gui_get_focus_owner()))
+	_unmount(landed)
+
+	# ⓓ 폴백 — 소등 앵커 · 모르는 라우트 → 첫 스테이션 · 개방되면 기억을 따른다
+	s.outgame.crew.erase("crew_nadia")
+	for entry in [["HUB-06", "미개방 스폰서 앵커"], ["HUB-08", "상시 소등 오버홀 앵커"], ["HUB-99", "모르는 라우트"]]:
+		s.last_hub_station = String(entry[0])
+		var fallback := _mount(GARAGE_SCENE, s)
+		if fallback == null:
+			return
+		_ok("㊼ⓓ %s → 첫 스테이션 폴백" % String(entry[1]),
+			root.gui_get_focus_owner() == fallback.get_node("%StRepair"), str(root.gui_get_focus_owner()))
+		_unmount(fallback)
+	s.outgame.crew["crew_nadia"] = true
+	s.last_hub_station = "HUB-06"
+	var opened := _mount(GARAGE_SCENE, s)
+	if opened == null:
+		return
+	_ok("㊼ⓓ 개방된 스폰서 앵커는 기억을 따른다",
+		root.gui_get_focus_owner() == opened.get_node("%StSponsor"), str(root.gui_get_focus_owner()))
+	_unmount(opened)
+
+	# ⓔ 출발이 비운다 → 레이스 뒤 개러지는 첫 스테이션
+	SaveManager.configure(data)
+	s.last_hub_station = "HUB-04"
+	var departing := _mount(GARAGE_SCENE, s)
+	if departing == null:
+		return
+	departing.navigate.connect(func(_t: String, _p: Dictionary) -> void: pass)
+	departing._on_depart()
+	_ok("㊼ⓔ 출발이 기억을 비운다", s.last_hub_station.is_empty(), s.last_hub_station)
+	_unmount(departing)
+	var after_race := _mount(GARAGE_SCENE, s)
+	if after_race == null:
+		return
+	_ok("㊼ⓔ 레이스 뒤 개러지 = 첫 스테이션",
+		root.gui_get_focus_owner() == after_race.get_node("%StRepair"), str(root.gui_get_focus_owner()))
+	_unmount(after_race)
+
+	# ⓕ 원본·직렬화
+	_ok("㊼ⓕ 기억은 세이브에 실리지 않는다", not str(s.serialize()).contains("last_hub_station"))
+	var garage_src := FileAccess.get_file_as_string("res://ui/hub/garage_screen.gd")
+	_ok("㊼ⓕ 개러지가 진입 시 적고 출발 시 비운다",
+		garage_src.contains("session.last_hub_station = route")
+		and garage_src.contains('session.last_hub_station = ""'))
+	_ok("㊼ⓕ 초기 포커스가 기억 창구를 지난다", garage_src.contains("_initial_station().grab_focus()"))
+	var hub_src := FileAccess.get_file_as_string("res://ui/hub/hub_screen.gd")
+	_ok("㊼ⓕ 하위 베이스는 기억을 쓰지 않는다 (복귀 경로가 기억을 덮지 않는다)",
+		not hub_src.contains("last_hub_station"))
 
 
 # ── 스폰서 정기 수입 결선 (개선 회차 13 · 2026-09-09 사용자 결정) ──
