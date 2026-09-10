@@ -27,6 +27,12 @@ func _audio_enter_events() -> Array:
 	return ["hub_enter"]
 
 
+# 개러지는 복귀의 **목적지**다 — 자기 자신으로 돌아오는 저장은 없다 (개선 회차 17).
+# 뒤로 버튼도 숨기므로 실기에서 이 경로는 서지 않지만, 버튼 결속 자체는 공통 바가 쥐고 있다.
+func _saves_on_return() -> bool:
+	return false
+
+
 func _on_hub_ready(_payload: Dictionary) -> void:
 	var s := session.data.strings
 	(%HeaderLabel as Label).text = s.text("ui.hub.garageTitle")

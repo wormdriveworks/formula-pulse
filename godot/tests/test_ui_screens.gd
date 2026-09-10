@@ -63,6 +63,7 @@ var _settle_choice: Control
 var _settle_next: Array[Control] = []
 var _settle_bay: Control
 var _focus_garage: Control
+var _return_bay: Control
 
 
 func _process(_delta: float) -> bool:
@@ -100,6 +101,12 @@ func _process(_delta: float) -> bool:
 			var bay_session := _fresh_session(data)
 			bay_session.outgame.gain_credits(1000)
 			_settle_bay = _mount(HUB02_SCENE, bay_session)
+			# 복귀 자동 저장 축(개선 회차 17 · ㊽ⓐ)의 뒤로 버튼 실 클릭도 정렬이 끝난 rect 를 요구한다.
+			# **프로필 1** 로 연다 — 디스크 저장분을 `load_progress(1)` 로 되읽어 대조하기 때문이다.
+			var return_session := _fresh_session(data)
+			return_session.begin_career(1)
+			return_session.outgame.gain_credits(1000)
+			_return_bay = _mount(HUB02_SCENE, return_session)
 		return false
 	# **첫 축이어야 한다** — 결산 3화면의 InputGuard 가 `_input` 층에서 ui_accept·마우스 버튼을 트리
 	# 전역으로 삼키므로, 뒤 축들이 `push_input` 으로 넣는 패드 A(= ui_accept)가 남은 창에 죽는다.
@@ -107,6 +114,7 @@ func _process(_delta: float) -> bool:
 	_duel_in_place()
 	_garage_loop_flow(data)
 	_garage_focus_memory(data)
+	_garage_return_autosave(data)
 	_sponsor_settlement_flow(data)
 	_achievement_without_career(data)
 	_achievement_with_career(data)
@@ -5010,6 +5018,160 @@ func _garage_focus_memory(data: GameData) -> void:
 	var hub_src := FileAccess.get_file_as_string("res://ui/hub/hub_screen.gd")
 	_ok("㊼ⓕ 하위 베이스는 기억을 쓰지 않는다 (복귀 경로가 기억을 덮지 않는다)",
 		not hub_src.contains("last_hub_station"))
+
+
+# ── ㊽ 개러지 복귀 자동 저장 (개선 회차 17 · 2026-09-11 사용자 요청) ──
+#
+# 종전 저장 지점(D09 §2.4)은 RACE-03·투어 경계·시즌 경계·개러지 출발 전이라, **하위 스테이션에서
+# 한 작업은 "다음 대회 출발"까지 디스크에 닿지 않았다** — 스테이션에서 돌아온 개러지는 게임을 끄기
+# 자연스러운 정지점인데 그 자리가 저장 지점이 아니다. 복귀 경로(`HubScreen._return_to_garage`)가
+# 저장을 쥔다: 뒤로 버튼과 Esc·패드 B 가 그 창구 하나로 모인다.
+#   ⓐ 실 클릭 — 정렬된 HUB-02 에서 구매 → **디스크는 아직 종전 잔액**(결함 재현) → 뒤로 버튼 실 클릭 → 반영
+#   ⓑ 스테이션 5종(HUB-03~07) — 상태를 바꾼 뒤 뒤로 = 디스크가 그 상태를 담는다
+#   ⓒ Esc·패드 B 경로도 같은 창구를 지난다
+#   ⓓ 저장 표시 근거 — 복귀 1회당 `progress_saved` 1회 (app_root 표시가 이 신호를 읽는다)
+#   ⓔ 대조군 — 개러지 자신은 저장하지 않는다(뒤로 버튼도 숨김) · 재개 저장분이 복귀분과 어긋나지 않는다
+#   ⓕ 원본 — 두 경로 모두 창구 경유 · 창구가 `save_progress()` 호출 · SET·RACE 는 이 베이스 밖
+const RETURN_STATION_SCENES := [
+	["HUB-03", "res://ui/hub/tuning_bench_screen.tscn"],
+	["HUB-04", "res://ui/hub/strategy_screen.tscn"],
+	["HUB-05", "res://ui/hub/records_screen.tscn"],
+	["HUB-06", "res://ui/hub/sponsor_desk_screen.tscn"],
+	["HUB-07", "res://ui/hub/facility_screen.tscn"],
+]
+
+
+# 디스크 저장분의 잔액 — 인메모리가 아니라 **되읽은 값**이어야 저장이 실제로 일어났음의 증거가 된다.
+func _saved_credits() -> int:
+	var saved := SaveManager.load_progress(1)
+	if not bool(saved.get("ok", false)):
+		return -1
+	return int(Dictionary(Dictionary(saved.get("payload", {})).get("outgame", {})).get("credits", -1))
+
+
+func _garage_return_autosave(data: GameData) -> void:
+	SaveManager.configure(data)
+	# ⓐ 실 클릭 (프레임 1 에 세운 정비 베이 — 정렬 완료 · 프로필 1)
+	var bay := _return_bay
+	_ok("㊽ⓐ 전제: 정렬된 정비 베이 마운트", bay != null)
+	if bay != null:
+		var s := bay.session as RunSession
+		_ok("㊽ⓐ 전제: 프로필 1 세션", s.profile_index == 1, "profile=%d" % s.profile_index)
+		s.save_progress()   # 기준선 — "돌아오기 전" 의 디스크 상태
+		var before := _saved_credits()
+		_ok("㊽ⓐ 전제: 기준선 저장분 = 현 잔액", before == s.outgame.credits,
+			"disk=%d mem=%d" % [before, s.outgame.credits])
+		var list := bay.get_node_or_null("%ConsumableList") as Control
+		var buy: Button = null
+		if list != null:
+			for child in list.get_children():
+				if child is Button and not (child as Button).disabled:
+					buy = child as Button
+					break
+		_ok("㊽ⓐ 전제: 구매 가능한 소모품 버튼", buy != null)
+		if buy != null:
+			var item_id := String(buy.name).trim_prefix("Buy_")
+			var cost := CsvTable.to_int(String(data.consumables[item_id]["cost_cr"]))
+			bay._on_buy_consumable(item_id)
+			_ok("㊽ⓐ 전제: 구매 성립 (잔액 -%d)" % cost, s.outgame.credits == before - cost,
+				"mem=%d" % s.outgame.credits)
+			# **결함 재현** — 작업만으로는 디스크에 닿지 않는다. 종전에는 출발까지 이 상태였다.
+			_ok("㊽ⓐ 구매 직후 디스크는 아직 종전 잔액 (저장 지점 아님)", _saved_credits() == before,
+				"disk=%d" % _saved_credits())
+		root.move_child(bay, root.get_child_count() - 1)
+		var back := bay.get_node("%BackButton") as Button
+		var rect := back.get_global_rect()
+		_ok("㊽ⓐ 전제: 뒤로 버튼 정렬 완료 (크기 > 0)", rect.size.x > 0.0 and rect.size.y > 0.0, str(rect))
+		var routed: Array = []
+		bay.navigate.connect(func(t: String, _p: Dictionary) -> void: routed.append(t))
+		_click_at(bay.get_viewport(), rect.get_center())
+		_ok("㊽ⓐ 뒤로 버튼 실 클릭 = HUB-01 요청", routed == ["HUB-01"], str(routed))
+		_ok("㊽ⓐ 복귀 저장분에 작업 반영 (구매 뒤 잔액)", _saved_credits() == s.outgame.credits,
+			"disk=%d mem=%d" % [_saved_credits(), s.outgame.credits])
+		_unmount(bay)
+		_return_bay = null
+
+	# ⓑ 스테이션 5종 — 상태 변경 뒤 뒤로 (신호 경로 · 실 클릭 증거는 ⓐ)
+	var station := _fresh_session(data)
+	station.begin_career(1)
+	var bump := 11
+	for entry in RETURN_STATION_SCENES:
+		var route := String(entry[0])
+		var screen := _mount(String(entry[1]), station)
+		if screen == null:
+			continue
+		station.outgame.gain_credits(bump)   # 그 화면에서 한 '작업' 의 대역
+		bump += 1
+		var routed: Array = []
+		screen.navigate.connect(func(t: String, _p: Dictionary) -> void: routed.append(t))
+		(screen.get_node("%BackButton") as Button).pressed.emit()
+		_ok("㊽ⓑ %s 뒤로 = HUB-01" % route, routed == ["HUB-01"], str(routed))
+		_ok("㊽ⓑ %s 복귀 저장분 = 현 상태" % route, _saved_credits() == station.outgame.credits,
+			"disk=%d mem=%d" % [_saved_credits(), station.outgame.credits])
+		_unmount(screen)
+
+	# ⓒ Esc·패드 B — 같은 창구
+	var esc_screen := _mount(String(RETURN_STATION_SCENES[2][1]), station)
+	if esc_screen != null:
+		station.outgame.gain_credits(23)
+		var routed: Array = []
+		esc_screen.navigate.connect(func(t: String, _p: Dictionary) -> void: routed.append(t))
+		esc_screen._unhandled_input(_action_event("ui_cancel"))
+		_ok("㊽ⓒ Esc·패드 B = HUB-01", routed == ["HUB-01"], str(routed))
+		_ok("㊽ⓒ Esc 복귀도 저장한다", _saved_credits() == station.outgame.credits,
+			"disk=%d mem=%d" % [_saved_credits(), station.outgame.credits])
+		_unmount(esc_screen)
+
+	# ⓓ 저장 표시 근거 — 복귀 1회당 신호 1회
+	var signal_screen := _mount(String(RETURN_STATION_SCENES[0][1]), station)
+	if signal_screen != null:
+		var fired := [0]
+		var tally := func(_ok_flag: bool) -> void: fired[0] += 1
+		station.progress_saved.connect(tally)
+		signal_screen.navigate.connect(func(_t: String, _p: Dictionary) -> void: pass)
+		(signal_screen.get_node("%BackButton") as Button).pressed.emit()
+		_ok("㊽ⓓ 복귀 1회 = progress_saved 1회 (저장 표시의 근거)", fired[0] == 1, "fired=%d" % fired[0])
+		station.progress_saved.disconnect(tally)
+		_unmount(signal_screen)
+
+	# ⓔ 대조군 — 개러지 자신은 복귀 저장을 하지 않는다
+	var garage := _mount(GARAGE_SCENE, station)
+	if garage != null:
+		var garage_back := garage.get_node("%BackButton") as Button
+		_ok("㊽ⓔ 전제: 개러지 뒤로 버튼은 숨겨져 있다", not garage_back.visible)
+		var fired := [0]
+		var tally := func(_ok_flag: bool) -> void: fired[0] += 1
+		station.progress_saved.connect(tally)
+		var routed: Array = []
+		garage.navigate.connect(func(t: String, _p: Dictionary) -> void: routed.append(t))
+		garage_back.pressed.emit()
+		_ok("㊽ⓔ 개러지 자신은 저장하지 않는다", fired[0] == 0, "fired=%d" % fired[0])
+		_ok("㊽ⓔ 개러지 뒤로는 자기 자신으로만 간다", routed == ["HUB-01"], str(routed))
+		station.progress_saved.disconnect(tally)
+		_unmount(garage)
+		# 저장분으로 재개하면 복귀 시점의 상태가 그대로 선다 — 저장이 형식만 남기지 않았음의 증거.
+		var resumed := RunSession.new()
+		resumed.setup(data)
+		var payload := SaveManager.load_progress(1)
+		_ok("㊽ⓔ 복귀 저장분 로드",
+			bool(payload.get("ok", false)) and resumed.restore(Dictionary(payload.get("payload", {}))))
+		_ok("㊽ⓔ 재개 잔액 = 복귀 시점 잔액", resumed.outgame.credits == station.outgame.credits,
+			"resumed=%d mem=%d" % [resumed.outgame.credits, station.outgame.credits])
+
+	# ⓕ 원본
+	var hub_src := FileAccess.get_file_as_string("res://ui/hub/hub_screen.gd")
+	_ok("㊽ⓕ 뒤로 버튼이 복귀 창구에 결속", hub_src.contains("pressed.connect(_return_to_garage)"))
+	_ok("㊽ⓕ Esc 경로도 같은 창구", hub_src.contains("\t_return_to_garage()"))
+	_ok("㊽ⓕ 창구가 저장을 부른다", hub_src.contains("session.save_progress()"))
+	_ok("㊽ⓕ 개러지 이탈은 창구 1곳뿐 (화면마다 흩어진 go 가 남지 않았다)",
+		hub_src.count('go("HUB-01", {})') == 1, "count=%d" % hub_src.count('go("HUB-01", {})'))
+	var garage_src := FileAccess.get_file_as_string("res://ui/hub/garage_screen.gd")
+	_ok("㊽ⓕ 개러지가 복귀 저장을 끈다", garage_src.contains("func _saves_on_return() -> bool:")
+		and garage_src.contains("return false"))
+	for path in ["res://ui/settle/tour_report_screen.gd", "res://ui/settle/season_result_screen.gd",
+			"res://ui/race/gp_result_screen.gd"]:
+		_ok("㊽ⓕ %s 는 HUB 베이스 밖 (복귀 저장 경로 무관)" % String(path).get_file(),
+			FileAccess.get_file_as_string(String(path)).contains("extends FlowScreen"))
 
 
 # ── 스폰서 정기 수입 결선 (개선 회차 13 · 2026-09-09 사용자 결정) ──

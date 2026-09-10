@@ -57,7 +57,7 @@ func _fill_common_bar() -> void:
 		(back as Button).text = s.text("ui.hub.back")
 		# 뒤로 가기는 결정음이 아니라 취소음이다 (SE-U03). 조작음 자동 결속이 이 메타를 읽는다.
 		(back as Button).set_meta(AUDIO_EVENT_META, "ui_cancel")
-		(back as Button).pressed.connect(func(): go("HUB-01", {}))
+		(back as Button).pressed.connect(_return_to_garage)
 
 
 # 취소 / 뒤로 = Esc · 패드 B (D09 §1.3 공통 층 매핑 — 개선 2026-09-02 H7 결선).
@@ -72,7 +72,33 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	get_viewport().set_input_as_handled()
 	sfx("ui_cancel")   # SE-U03 — 버튼 경로의 취소음 결속과 같은 축
+	_return_to_garage()
+
+
+# ── 개러지 복귀 자동 저장 (개선 회차 17 · 2026-09-11 사용자 요청) ──
+#
+# 하위 스테이션(HUB-02~07)에서 한 작업 — 정비·소모품·튜닝·덱 편성·스폰서 체결·시설 확장 — 은
+# 종전에 **"다음 대회 출발"(개러지 E09)까지 디스크에 닿지 않았다.** 개러지 도착은 저장 지점이
+# 아니고(D09 §2.4 대장 = RACE-03·투어 경계·시즌 경계·출발 전), 스테이션에서 돌아온 자리는
+# 게임을 끄기 자연스러운 정지점이다 — 그 회차의 아웃게임 작업이 통째로 사라진다.
+# 회차 15 의 시즌 엔딩 소실과 같은 형태의 창이다(그때는 VN 발생 기록·여기는 아웃게임 상태).
+#
+# **저장 시점은 나가는 쪽이다.** 개러지 도착(`_on_hub_ready`)에 두면 레이스·이벤트·시즌 체인에서
+# 들어온 도착까지 함께 저장하는데, 그 경로들은 이미 자기 저장 지점을 지나온 뒤라 같은 상태를 두 번
+# 쓴다. 스테이션을 떠나는 자리는 "작업이 끝난 지점"과 정확히 겹친다 — 뒤로 버튼과 Esc·패드 B 가
+# 여기 모인다.
+func _return_to_garage() -> void:
+	if _saves_on_return() and session != null:
+		var saved := session.save_progress()
+		if not bool(saved.get("ok", false)):
+			# 조용한 실패는 "작업이 남았다"는 오인을 낳는다 — 저장 표시(app_root)도 실패에는 뜨지 않는다.
+			push_error("HubScreen: return autosave failed - %s" % String(saved.get("error", "")))
 	go("HUB-01", {})
+
+
+# 복귀 저장 대상인가 — 개러지 자신은 돌아올 자리가 아니므로 재정의로 끈다.
+func _saves_on_return() -> bool:
+	return true
 
 
 # 재화 갱신 — 구매 후 호출 (증감 피드백 규격의 최소형. 플로트·펄스는 아트 유입 시)
