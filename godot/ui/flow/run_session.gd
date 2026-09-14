@@ -643,6 +643,9 @@ func begin_gp() -> bool:
 	# 엔진은 아웃게임을 모른다(혼입 0·계층 방향 유지): 세션이 스냅숏을 넣고 되받는다.
 	engine.deck_carry_in = outgame.deck.duplicate()
 	engine.skill_uses_carry_in = outgame.skill_uses_this_tour.duplicate()
+	# 머신 스탯 반입 (개선 회차 18) — 튜닝 단계가 만든 계수·가산치. 덱과 같은 형태의 스냅숏이다:
+	# 엔진은 튜닝을 모르고 효과 대상 이름만 받는다(혼입 0 · 계층 방향 유지).
+	engine.machine_stats_carry_in = outgame.machine_stats()
 	presentation.reset_gp()  # L2/L3 상한 카운터 = GP 단위 (D08 §8.5)
 	return true
 

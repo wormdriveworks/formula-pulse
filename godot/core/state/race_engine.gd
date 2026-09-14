@@ -96,6 +96,13 @@ var chassis: float = 0.0
 # GP 간 이월 주입분 (D05 §8 — "그랑프리 간 자동 완전 회복은 없다"). 음수 = 미주입(최대치 개시).
 # 이월 값의 소유는 아웃게임 층이고 엔진은 주입된 값을 소비만 한다 — 세션이 start_gp 전에 넣는다.
 var chassis_carry_in: float = -1.0
+# 머신 스탯 주입분 (개선 회차 18) — target -> 값. 세션이 아웃게임 창구(`machine_stats()`)에서
+# 스냅숏을 떠 start_gp 전에 넣는다. 엔진은 튜닝도 오버홀도 모르고 **효과 대상 이름만** 안다.
+# 비어 있으면 전 항목 0 이므로 기저값 그대로 — 단독 인스턴스화 경로가 종전과 같이 선다.
+var machine_stats_carry_in: Dictionary = {}
+# 이 GP 의 섀시 최대치 = 기준값 + 스탯. start_gp 에서 한 번 굳힌다 —
+# 대회 중에 최대치가 흔들리면 같은 회복량이 턴마다 다른 결과를 낸다.
+var chassis_max: float = 0.0
 # 소모품 (D06 §3.5 · D07 §3.1) — 반입분(R5)은 세션이 start_gp 전에 주입하고 종료 시 회수한다.
 # 인벤토리 정본은 아웃게임 층(OutgameState.consumables)이고 엔진은 대회 중 사본만 소비한다.
 var consumables_carry_in: Dictionary = {}
@@ -170,6 +177,13 @@ func _transition(next_state: int) -> void:
 
 
 # ── GP_START: 그리드 정렬·리소스 초기화 (D05 §3) ──
+# 머신 스탯 조회 (개선 회차 18) — 주입되지 않은 대상은 0 이다.
+# **침묵 기본값이 아니라 '보강 없음'이 0 이다**: 계수는 1 + stat, 가산치는 0 + stat 으로 쓰므로
+# 미주입 = 기저값 그대로이며, 값이 없는데 있는 척하는 자리가 생기지 않는다.
+func _stat(target: String) -> float:
+	return float(machine_stats_carry_in.get(target, 0.0))
+
+
 func start_gp() -> Array:
 	var events: Array = []
 	gp_state = RaceTypes.GpState.GP_START
@@ -185,11 +199,12 @@ func start_gp() -> Array:
 	final_lap_entry_rank = 0
 	ai_retire_count = 0
 	_retire_order = 0
+	chassis_max = data.param("param_chassis_max") + _stat("chassis_max")
 	if chassis_carry_in >= 0.0:
 		# 이월 개시 (D05 §8) — 주입 값은 [0, 최대치]로 절단한다 (세이브 조작·상한 초과 방어)
-		chassis = clampf(chassis_carry_in, 0.0, data.param("param_chassis_max"))
+		chassis = clampf(chassis_carry_in, 0.0, chassis_max)
 	else:
-		chassis = data.param("param_chassis_max")
+		chassis = chassis_max
 	charge = 0
 	consumables_held = consumables_carry_in.duplicate()
 	deck = deck_carry_in.duplicate()
@@ -392,9 +407,9 @@ func use_consumable(consumable_id: String) -> Array:
 	var value := CsvTable.to_float(String(row["effect_value"]))
 	match String(row["effect"]):
 		"chassis_restore":
-			chassis = minf(chassis + value, data.param("param_chassis_max"))
+			chassis = minf(chassis + value, chassis_max)
 		"chassis_restore_and_shield":
-			chassis = minf(chassis + value, data.param("param_chassis_max"))
+			chassis = minf(chassis + value, chassis_max)
 			trouble_shield_charges += 1
 		"chassis_wear_ratio":
 			# 고정 계수라 누적하지 않는다 [가안] — 중복 사용은 허용하되 효과 동일 (UI 층이 안내)
@@ -881,6 +896,12 @@ func _settle_sector(momentum: bool) -> Array:
 						chassis_delta *= data.param("param_consumable_shield_mult")
 					if chassis_delta < 0.0:
 						chassis_delta *= (1.0 - wear_reduction)
+					# T6 임팩트 스트럭처 — 트러블 섀시 소모 계수 (D13 별첨A §2.3 "단계당 −7%").
+					# **트러블 소모 전속**이다: 해저드 속성의 턴당 가산 소모(−1.0)와 듀얼 패배
+					# 페널티(−5)는 정본 문면("트러블 소모")의 밖이라 계수를 걸지 않는다.
+					# 다른 감쇄(실드 ×0.5 · P3 ×0.8)와는 곱으로 합류한다 — 기존 구현과 같은 형태다.
+					if chassis_delta < 0.0:
+						chassis_delta *= (1.0 + _stat("trouble_chassis_wear"))
 					chassis += chassis_delta
 					var trouble_rear := CsvTable.to_float(String(effect["rear_gauge"])) * gauge_mult
 					if bool(skill_mods.get(MOD_TROUBLE_REAR_ZERO, false)):
@@ -905,8 +926,11 @@ func _settle_sector(momentum: bool) -> Array:
 				if braking_count > 0:
 					# SA3 하드 브레이킹 — 브레이킹 효과는 후방 게이지 **감산**이므로
 					# 배수를 곱하면 감산이 커진다(방어 강화). 부호를 뒤집지 않는다.
+					# T2 브레이크 — 브레이킹 효과 계수 (D07 §3.2 · D13 별첨A §3.5 단계당 +7%).
+					# 감산에 곱하므로 계수가 오를수록 방어가 세진다(부호 유지 — SA3 와 같은 축).
 					rear_gauge += CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_BRAKING, braking_count)["rear_gauge"])) \
-						* gauge_mult * float(skill_mods.get(MOD_DEFENSE_MULT, 1.0))
+						* gauge_mult * float(skill_mods.get(MOD_DEFENSE_MULT, 1.0)) \
+						* (1.0 + _stat("braking_coef"))
 			RaceTypes.SettleStage.STAGE_4_ADVANCE:
 				# SA1 풀 스로틀 — "이번 턴 전진 효과 ×1.5"(별첨A §4.2).
 				# **[가안] 적용 범위 = 심볼 유래 전진분 전속**이며 모멘텀 보너스는 제외한다.
@@ -915,14 +939,19 @@ func _settle_sector(momentum: bool) -> Array:
 				# "개입 후에도 모멘텀 델타 불변"이라 모멘텀을 곱하면 그 기준 자체가 깨진다.
 				# 정본이 침묵하는 지점이므로 총괄 판정 대상으로 회신에 올린다.
 				var advance_mult := float(skill_mods.get(MOD_ADVANCE_MULT, 1.0))
+				# T1 파워트레인 / T3 라인 컨트롤 — 심볼 효과 계수 (D13 별첨A §3.5).
+				# 릴 확률이 아니라 **매치 효과값(게이지 증감분)**에 곱한다(D07 §3.2 명문 차단).
+				# 라인 계수는 전방·후방 **양쪽**에 건다 — 라인의 효과가 그 쌍 자체이기 때문이다.
+				var slip_coef := 1.0 + _stat("slipstream_coef")
+				var line_coef := 1.0 + _stat("line_coef")
 				var slip_count := _count_symbol(RaceTypes.SYMBOL_SLIPSTREAM)
 				if slip_count > 0:
-					front_gauge += CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_SLIPSTREAM, slip_count)["front_gauge"])) * gauge_mult * advance_mult
+					front_gauge += CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_SLIPSTREAM, slip_count)["front_gauge"])) * gauge_mult * advance_mult * slip_coef
 				var line_count := _count_symbol(RaceTypes.SYMBOL_LINE)
 				if line_count > 0:
 					var line_effect := _match_effect(RaceTypes.SYMBOL_LINE, line_count)
-					front_gauge += CsvTable.to_float(String(line_effect["front_gauge"])) * gauge_mult * advance_mult
-					rear_gauge += CsvTable.to_float(String(line_effect["rear_gauge"])) * gauge_mult * advance_mult
+					front_gauge += CsvTable.to_float(String(line_effect["front_gauge"])) * gauge_mult * advance_mult * line_coef
+					rear_gauge += CsvTable.to_float(String(line_effect["rear_gauge"])) * gauge_mult * advance_mult * line_coef
 				var chance_count := _count_symbol(RaceTypes.SYMBOL_CHANCE)
 				if chance_count >= 3:
 					chance_three_matches += 1
@@ -991,7 +1020,7 @@ func _apply_resonance_bonus(gauge_mult: float) -> Array:
 		"duel_judgment":
 			resonance_duel_bonus += bonus_value
 		"chassis":
-			chassis = minf(chassis + bonus_value, data.param("param_chassis_max"))
+			chassis = minf(chassis + bonus_value, chassis_max)
 		_:
 			push_error("RaceEngine: unknown resonance bonus type '%s'" % bonus_type)
 	return events
@@ -1095,7 +1124,14 @@ func _duel_judgment(duel_type: int) -> float:
 	var primary_symbol := RaceTypes.SYMBOL_SLIPSTREAM if duel_type == RaceTypes.DuelType.OVERTAKE else RaceTypes.SYMBOL_BRAKING
 	var primary_count := _count_symbol(primary_symbol)
 	if primary_count > 0:
-		judgment += CsvTable.to_float(String(data.duel_conversion[primary_symbol]["match%d" % primary_count]))
+		var primary_value := CsvTable.to_float(String(data.duel_conversion[primary_symbol]["match%d" % primary_count]))
+		if duel_type == RaceTypes.DuelType.DEFENSE:
+			# T2 브레이크 — 방어 듀얼 판정에도 계수를 건다 (사용자 결정 2026-09-15).
+			# 근거 = D05 §5.2 가 브레이킹 심볼에 "후방 게이지 감쇄 / **방어 듀얼 판정 보정**"
+			# 두 효과를 부여한다. 슬립스트림은 같은 절에서 전방 게이지 가산 하나뿐이라
+			# T1 은 추월 판정에 걸지 않는다 — 비대칭은 심볼 정의의 비대칭 그대로다.
+			primary_value *= (1.0 + _stat("braking_coef"))
+		judgment += primary_value
 	var line_count := _count_symbol(RaceTypes.SYMBOL_LINE)
 	if line_count > 0:
 		judgment += CsvTable.to_float(String(data.duel_conversion[RaceTypes.SYMBOL_LINE]["match%d" % line_count]))
@@ -1109,6 +1145,9 @@ func _duel_judgment(duel_type: int) -> float:
 	if duel_type == RaceTypes.DuelType.DEFENSE:
 		# SA3 하드 브레이킹의 듀얼 절반 — **방어 듀얼 전속** 가산 (별첨A §4.2 문면)
 		judgment += float(skill_mods.get(MOD_DEFENSE_DUEL_ADD, 0.0))
+	# T5 펄스 드라이브 정밀화 — 판정식의 독립 가산항 (D13 별첨A §2.4 판정식 명문:
+	# `J = 심볼 환산 + 부스트 + T5 튜닝(단계×4) + 오버홀 + 레조넌스 보정`). 추월·방어 공통이다.
+	judgment += _stat("duel_judgment")
 	judgment += resonance_duel_bonus
 	return judgment
 

@@ -192,7 +192,7 @@ func _repair_per_ch() -> float:
 
 
 func _repair_missing() -> float:
-	return maxf(data.param("param_chassis_max") - chassis, 0.0)
+	return maxf(chassis_max() - chassis, 0.0)
 
 
 # 이벤트 회복 (D06 §3.4 — 무상·확률적·페이싱, 인스턴스 D08 풀).
@@ -202,7 +202,7 @@ func _repair_missing() -> float:
 # [가안] 복원선 절단은 걸지 않는다 — 가드 조항이 회당 상한만 명시하므로 최대치 절단만 적용.
 func event_chassis_recover(amount: int) -> int:
 	var capped := minf(float(maxi(amount, 0)), data.param("param_event_recover_cap"))
-	var applied := minf(capped, data.param("param_chassis_max") - chassis)
+	var applied := minf(capped, chassis_max() - chassis)
 	if applied <= 0.0:
 		return 0
 	chassis += applied
@@ -217,6 +217,47 @@ func free_restore_line() -> int:
 		if String(row.get("effect", "")) == "free_restore_line":
 			line = CsvTable.to_int(String(row["effect_value"]))
 	return line
+
+
+# ── 머신 스탯 창구 (개선 회차 18 · 2026-09-15) ──
+#
+# 튜닝 단계가 만드는 **효과 계수·가산치의 유일한 조회 지점**이다. 종전에는 `tuning_steps` 가
+# 구매만 기록하고 어느 계산도 그 값을 읽지 않아 6계통 전부가 성능에 닿지 않았다.
+#
+# 대상 이름은 표의 `target` 열이 정하고 코드는 목록을 갖지 않는다 — 계통이 늘어도 창구는 그대로다
+# (D07 §3.2 "튜닝은 효과 계수·최대치의 수치 상승 전용 · 릴 심볼 출현에는 절대 관여하지 않는다").
+#
+# **단계 간은 선형 가산이다** (계수 = 1 + 0.07 × 단계). 복리가 아닌 근거 = D13 별첨A §7.3 이
+# 같은 것을 "튜닝 5단계 총량 +35%p"로 환산한다 — 5 × 7 = 35 이고 복리면 40.3 이 된다.
+#
+# 오버홀 파츠(`parts_stat_bonus`)는 **같은 축에 얹히지만** 이 회차에서 열지 않는다 — 파츠 캡의
+# 절단 단위와 듀얼 판정 이중 계상이 정본 침묵이라 오버홀 회차에서 판정을 받는다.
+func machine_stat(target: String) -> float:
+	var total := 0.0
+	for tuning_id in data.tuning_lines:
+		var row: Dictionary = data.tuning_lines[tuning_id]
+		if String(row["target"]) != target:
+			continue
+		total += CsvTable.to_float(String(row["effect_per_step"])) * float(tuning_step(String(tuning_id)))
+	return total
+
+
+# 엔진 주입용 스냅숏 — 세션이 GP 개시 때 넘긴다. 엔진은 아웃게임을 모른다(혼입 0).
+func machine_stats() -> Dictionary:
+	var stats: Dictionary = {}
+	for tuning_id in data.tuning_lines:
+		var target := String(data.tuning_lines[tuning_id]["target"])
+		if not stats.has(target):
+			stats[target] = machine_stat(target)
+	return stats
+
+
+# 섀시 최대치 = 기준값 + T4 보강 (D13 별첨A §2.3 "최대치 100 (T4 5단계 시 125)").
+# **최대치만 오르고 현재 섀시는 따라 오르지 않는다** (사용자 결정 2026-09-15) — 늘어난 칸은
+# 비어 있고 정비로 채운다. 구매가 곧 무상 회복이 되면 정비 수요가 그만큼 사라진다.
+# 무상 복원선(70)은 절대값 유지다(같은 결정) — 최대치를 올릴수록 무상분의 비중이 줄어든다.
+func chassis_max() -> float:
+	return data.param("param_chassis_max") + machine_stat("chassis_max")
 
 
 # ── 튜닝 (D06 §3.2 회전형 · D13 별첨A §3.5) ──

@@ -1466,7 +1466,8 @@ func _refresh_strip() -> void:
 
 func _refresh_resources() -> void:
 	var s := data.strings
-	var chassis_max := data.param("param_chassis_max")
+	# 이 GP 의 최대치 = 엔진이 개시 때 굳힌 값 (개선 회차 18 — T4 보강 반영).
+	var chassis_max: float = engine.chassis_max
 	_e11_chassis_bar.max_value = chassis_max
 	_e11_chassis_bar.value = engine.chassis
 	var chassis_text := s.text("ui.race.chassisFormat", {"value": int(engine.chassis)})
@@ -1504,7 +1505,8 @@ func _refresh_resources() -> void:
 func _chassis_critical() -> bool:
 	if engine == null:
 		return false
-	return engine.chassis <= data.param("param_chassis_max") * data.param("param_chassis_warn_ratio")
+	# 위험 임계는 **최대치의 비율**이다 (D13 별첨A §8.1 비율 명문) — 최대치가 오르면 함께 오른다.
+	return engine.chassis <= engine.chassis_max * data.param("param_chassis_warn_ratio")
 
 
 # 재고 → 슬롯. 데이터 정의 순서로 펼치므로 같은 인벤토리는 항상 같은 슬롯에 앉는다

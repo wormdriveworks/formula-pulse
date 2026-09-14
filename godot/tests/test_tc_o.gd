@@ -13,6 +13,7 @@ func _init() -> void:
 	_d13_outgame_values()
 	_tc_o1_facilities()
 	_tc_o2_tuning_and_overhaul()
+	_machine_stat_window()
 	_overhaul_candidate_draw()
 	_milestones_and_achievements()
 	_tc_o3_sponsors()
@@ -248,6 +249,70 @@ func _tc_o1_facilities() -> void:
 
 
 # ── TC-O2 튜닝 곡선·오버홀 12종 (D07 §3.2·§3.4 · D13 별첨A §3.5·§7) ──
+# ── 머신 스탯 창구 (개선 회차 18 · 2026-09-15) ──
+#
+# 튜닝 단계가 성능에 닿는 **유일한 통로**다. 종전에는 이 통로가 없어 6계통이 구매만 됐다.
+# 엔진 쪽 적용은 TC-C 가 재고, 여기서는 창구의 산술과 경계를 본다.
+func _machine_stat_window() -> void:
+	var state := _new_state()
+	if state == null:
+		return
+	_eq_float("새 머신은 전 계수 0 (보강 없음)", state.machine_stat("slipstream_coef"), 0.0)
+	_eq_float("새 머신 최대치 = 기준값", state.chassis_max(), state.data.param("param_chassis_max"))
+	_ok("모르는 대상은 0 (침묵 기본값을 만들지 않는다)", state.machine_stat("no_such_target") == 0.0)
+
+	# 단계 간은 **선형 가산**이다 — 복리면 5단계가 40.3%가 되어 D13 §7.3 의 "+35%p"와 어긋난다.
+	var per_step := CsvTable.to_float(String(state.data.tuning_lines["tuning_t1"]["effect_per_step"]))
+	state.gain_credits(100000)
+	for expected_step in range(1, state.data.param_int("param_tuning_max_step") + 1):
+		_ok("T1 %d단계 구매" % expected_step, state.buy_tuning("tuning_t1"))
+		_eq_float("T1 %d단계 계수 = %d × 단계당" % [expected_step, expected_step],
+			state.machine_stat("slipstream_coef"), per_step * float(expected_step))
+	_eq_float("T1 5단계 총량 = +35%", state.machine_stat("slipstream_coef"), 0.35)
+	_eq_float("다른 계통은 따라 오르지 않는다", state.machine_stat("braking_coef"), 0.0)
+
+	# T4 = 최대치만 오른다 (사용자 결정 2026-09-15) — 현재 섀시는 그대로다.
+	state.chassis = 40.0
+	var missing_before := state.full_repair_cost()
+	for _i in range(state.data.param_int("param_tuning_max_step")):
+		state.buy_tuning("tuning_t4")
+	_eq_float("T4 5단계 최대치 = 125", state.chassis_max(),
+		state.data.param("param_chassis_max") + 25.0)
+	_eq_float("현재 섀시는 구매로 회복되지 않는다", state.chassis, 40.0)
+	_ok("결손이 늘어 정비 총비용이 오른다", state.full_repair_cost() > missing_before,
+		"after=%d before=%d" % [state.full_repair_cost(), missing_before])
+	# 무상 복원선은 절대값 유지 (사용자 결정) — 최대치가 올라도 70 그대로다.
+	_ok("무상 복원선은 최대치를 따라가지 않는다",
+		state.free_restore_line() == int(state.data.param("param_repair_free_restore_line")),
+		"line=%d" % state.free_restore_line())
+
+	# 재배분은 계수도 함께 되돌린다 — 단계가 정본이고 계수는 그 파생이다.
+	state.redistribute_tuning("tuning_t1")
+	_eq_float("재배분 후 계수 0", state.machine_stat("slipstream_coef"), 0.0)
+
+	# 엔진 주입 스냅숏 — 표의 전 대상이 키로 서고 값이 창구와 일치한다.
+	var stats := state.machine_stats()
+	var targets: Dictionary = {}
+	for tuning_id in state.data.tuning_lines:
+		targets[String(state.data.tuning_lines[tuning_id]["target"])] = true
+	_ok("스냅숏 키 = 표의 효과 대상 전량",
+		stats.size() == targets.size(), "stats=%d targets=%d" % [stats.size(), targets.size()])
+	var mismatched := 0
+	for target in stats:
+		if absf(float(stats[target]) - state.machine_stat(String(target))) > 0.0001:
+			mismatched += 1
+	_ok("스냅숏 값 = 창구 값", mismatched == 0, "mismatched=%d" % mismatched)
+	_eq_float("스냅숏에도 T4 가 실린다", float(stats.get("chassis_max", 0.0)), 25.0)
+
+	# 직렬화 왕복 — 계수는 저장 대상이 아니라 단계에서 되살아난다.
+	var restored := _new_state()
+	if restored != null:
+		restored.deserialize(state.serialize())
+		_eq_float("재로드 후 최대치 복원", restored.chassis_max(), state.chassis_max())
+		_ok("계수 자체는 세이브에 실리지 않는다",
+			not str(state.serialize()).contains("slipstream_coef"))
+
+
 func _tc_o2_tuning_and_overhaul() -> void:
 	var state := _new_state()
 	if state == null:
@@ -781,6 +846,10 @@ func _tc_o6_exchange_guards() -> void:
 		"full_repair", "full_repair_cost", "repair_affordable_ch", "repair_affordable_cost", "repair_preview",
 		"free_restore_line", "event_chassis_recover",
 		"tuning_step", "tuning_cost", "buy_tuning", "tuning_refund_ratio", "redistribute_tuning",
+		# 회차 18 결선 — 튜닝 단계가 성능에 닿는 유일한 통로. `machine_stat`(대상 1건) ·
+		# `machine_stats`(엔진 주입 스냅숏) · `chassis_max`(기준값 + T4 보강 — 정비·HUD 공용 창구).
+		# 재화를 만들거나 환전하는 경로가 아니다(G1 무접촉) — 읽기 전용 파생값이다.
+		"machine_stat", "machine_stats", "chassis_max",
 		"overhaul_slots", "install_overhaul", "draw_overhaul_candidates", "parts_stat_bonus",
 		"career_stat", "record_gp_result", "record_tour_result", "record_season_result",
 		# `achievement_progress` 는 SYS-04 업적 화면의 조건 진척 조회 경로다

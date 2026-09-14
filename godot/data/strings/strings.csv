@@ -440,6 +440,10 @@ ui.tuningBench.stepFilled,●,●,●
 ui.tuningBench.stepEmpty,○,○,○
 ui.tuningBench.costFormat,{amount} Cr,{amount} Cr,{amount} Cr
 ui.tuningBench.redistribute,재배분,Redistribute,再配分
+ui.tuningBench.effectRatioFormat,{current}% → {next}%,{current}% → {next}%,{current}% → {next}%
+ui.tuningBench.effectRatioMaxFormat,{current}%,{current}%,{current}%
+ui.tuningBench.effectFlatFormat,{current} → {next},{current} → {next},{current} → {next}
+ui.tuningBench.effectFlatMaxFormat,{current},{current},{current}
 ui.strategy.title,전략실,Strategy Room,戦略室
 ui.strategy.tierFormat,스킬 티어 {tier},Skill Tier {tier},スキルティア {tier}
 ui.strategy.tierLockedFormat,스킬 티어 {tier} — 개방: {condition},Skill Tier {tier} — opens: {condition},スキルティア {tier} — 開放: {condition}

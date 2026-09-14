@@ -23,6 +23,7 @@ func _init() -> void:
 	_tc_c6_duel_thresholds()
 	_tc_c7_gauge_coefficients()
 	_tc_c9_chassis_retire()
+	_tuning_effects_wired()
 	_tc_c11_seal()
 	_tc_c12_scumming()
 	_seal_across_many_spins()
@@ -810,6 +811,201 @@ func _tc_c7_gauge_coefficients() -> void:
 	probe4.confirm(0.0)
 	_ok("TC-C7 찬스 3매치 = 즉시 듀얼", probe4.pending_duel == RaceTypes.DuelType.OVERTAKE,
 		"pending=%d" % probe4.pending_duel)
+
+
+# ── 튜닝 효과 결선 (개선 회차 18 · 2026-09-15) ──
+#
+# 종전에는 `tuning_steps` 를 읽는 레이스 코드가 **하나도 없어** 6계통 전부가 구매만 되고
+# 성능에 닿지 않았다(매뉴얼 9절 1항). 이 축은 "샀는데 아무 일도 안 일어난다"가 다시 생기면
+# 붉어진다 — 기저값과의 **차이**를 재므로 계수 적용이 빠지면 곧바로 잡힌다.
+#
+# 기대값은 D13 문면이 아니라 표(`tuning_lines.csv`)에서 읽어 만든다 — 값이 바뀌면 기대값도
+# 함께 바뀌어야 하고, 이 축이 재는 것은 "그 값이 그 자리에 적용됐는가"다.
+const TUNE_MAX_STEP := 5
+
+
+func _tuning_ratio(data: GameData, target: String) -> float:
+	for tuning_id in data.tuning_lines:
+		var row: Dictionary = data.tuning_lines[tuning_id]
+		if String(row["target"]) == target:
+			return CsvTable.to_float(String(row["effect_per_step"])) * float(TUNE_MAX_STEP)
+	return 0.0
+
+
+func _tuning_effects_wired() -> void:
+	var probe_data := GameData.new()
+	if not probe_data.load_all():
+		_ok("튜닝 — 데이터 적재", false)
+		return
+	var slip_stat := _tuning_ratio(probe_data, "slipstream_coef")
+	var brake_stat := _tuning_ratio(probe_data, "braking_coef")
+	var line_stat := _tuning_ratio(probe_data, "line_coef")
+	var wear_stat := _tuning_ratio(probe_data, "trouble_chassis_wear")
+	var chassis_stat := _tuning_ratio(probe_data, "chassis_max")
+	var judge_stat := _tuning_ratio(probe_data, "duel_judgment")
+	_eq_float("튜닝 T1 5단계 = +35%", slip_stat, 0.35)
+	_eq_float("튜닝 T4 5단계 = +25 CH", chassis_stat, 25.0)
+	_eq_float("튜닝 T5 5단계 = +20 판정", judge_stat, 20.0)
+	_eq_float("튜닝 T6 5단계 = −35%", wear_stat, -0.35)
+
+	# ⓐ 미주입 = 기저값 (대조군) · ⓑ T1 계수 = 심볼 효과값에 곱
+	var base_front := _tuned_front_gauge({})
+	var tuned_front := _tuned_front_gauge({"slipstream_coef": slip_stat})
+	var slip_effect := CsvTable.to_float(String(
+		probe_data.match_effects[RaceTypes.SYMBOL_SLIPSTREAM][1]["front_gauge"]))
+	_ok("T1 미장착은 종전 그대로", base_front > 0.0, "front=%f" % base_front)
+	_eq_float("T1 전방 게이지 = 기저 + 심볼분 × 0.35", tuned_front,
+		base_front + slip_effect * slip_stat, 0.01)
+
+	# ⓒ T2 계수 = 후방 감산에 곱 (감산이 커진다 = 방어가 세진다)
+	var base_rear := _tuned_rear_gauge({})
+	var tuned_rear := _tuned_rear_gauge({"braking_coef": brake_stat})
+	_ok("T2 후방 감산이 커진다", tuned_rear < base_rear,
+		"tuned=%f base=%f" % [tuned_rear, base_rear])
+	var brake_effect := CsvTable.to_float(String(
+		probe_data.match_effects[RaceTypes.SYMBOL_BRAKING][1]["rear_gauge"]))
+	_eq_float("T2 후방 게이지 = 기저 + 심볼분 × 0.35", tuned_rear,
+		base_rear + brake_effect * brake_stat, 0.01)
+
+	# ⓓ T3 라인 계수 = 전방·후방 **양쪽**
+	var base_line := _tuned_line_pair({})
+	var tuned_line := _tuned_line_pair({"line_coef": line_stat})
+	_ok("T3 전방도 커진다", tuned_line[0] > base_line[0],
+		"tuned=%f base=%f" % [tuned_line[0], base_line[0]])
+	_ok("T3 후방도 함께 내려간다", tuned_line[1] < base_line[1],
+		"tuned=%f base=%f" % [tuned_line[1], base_line[1]])
+
+	# ⓔ T6 = 트러블 섀시 소모 전속 · 해저드 턴당 소모에는 무관
+	var base_trouble := _tuned_trouble_loss({})
+	var tuned_trouble := _tuned_trouble_loss({"trouble_chassis_wear": wear_stat})
+	_ok("T6 트러블 피해가 줄어든다", tuned_trouble < base_trouble,
+		"tuned=%f base=%f" % [tuned_trouble, base_trouble])
+	_eq_float("T6 트러블 피해 = 기저 × 0.65", tuned_trouble, base_trouble * (1.0 + wear_stat), 0.01)
+	var hazard_base := _tuned_hazard_loss({})
+	var hazard_tuned := _tuned_hazard_loss({"trouble_chassis_wear": wear_stat})
+	_eq_float("T6 은 해저드 턴당 소모를 건드리지 않는다", hazard_tuned, hazard_base, 0.001)
+	_eq_float("해저드 턴당 소모 = 기준값 그대로", hazard_base,
+		probe_data.param("param_chassis_hazard_per_turn"), 0.001)
+
+	# ⓕ T4 = 최대치만 오른다 (사용자 결정 — 현재 섀시는 따라 오르지 않는다)
+	var tall := _new_engine(77, "circuit_mn1")
+	if tall != null:
+		tall.machine_stats_carry_in = {"chassis_max": chassis_stat}
+		tall.chassis_carry_in = 60.0
+		tall.start_gp()
+		_eq_float("T4 최대치 = 기준 + 25", tall.chassis_max,
+			tall.data.param("param_chassis_max") + chassis_stat)
+		_eq_float("T4 이월 섀시는 그대로 (최대치만 올랐다)", tall.chassis, 60.0)
+		var over := _new_engine(78, "circuit_mn1")
+		over.machine_stats_carry_in = {"chassis_max": chassis_stat}
+		over.chassis_carry_in = 999.0
+		over.start_gp()
+		_eq_float("T4 이월 절단선도 새 최대치", over.chassis, over.chassis_max)
+
+	# ⓖ T5 = 듀얼 판정 독립 가산항 (추월·방어 공통)
+	for duel_type in [RaceTypes.DuelType.OVERTAKE, RaceTypes.DuelType.DEFENSE]:
+		var label := "추월" if duel_type == RaceTypes.DuelType.OVERTAKE else "방어"
+		var plain := _tuned_judgment({}, duel_type, RaceTypes.SYMBOL_LINE)
+		var boosted := _tuned_judgment({"duel_judgment": judge_stat}, duel_type, RaceTypes.SYMBOL_LINE)
+		_eq_float("T5 %s 듀얼 판정 +20" % label, boosted, plain + judge_stat, 0.01)
+
+	# ⓗ T2 는 **방어 듀얼 주력 심볼**에도 곱한다 (사용자 결정) · 추월의 슬립스트림에는 걸지 않는다
+	var def_plain := _tuned_judgment({}, RaceTypes.DuelType.DEFENSE, RaceTypes.SYMBOL_BRAKING)
+	var def_tuned := _tuned_judgment({"braking_coef": brake_stat}, RaceTypes.DuelType.DEFENSE, RaceTypes.SYMBOL_BRAKING)
+	_eq_float("T2 방어 듀얼 주력 환산 × 1.35", def_tuned, def_plain * (1.0 + brake_stat), 0.01)
+	var atk_plain := _tuned_judgment({}, RaceTypes.DuelType.OVERTAKE, RaceTypes.SYMBOL_SLIPSTREAM)
+	var atk_tuned := _tuned_judgment({"slipstream_coef": slip_stat}, RaceTypes.DuelType.OVERTAKE, RaceTypes.SYMBOL_SLIPSTREAM)
+	_eq_float("T1 은 추월 듀얼 판정에 걸리지 않는다 (심볼 정의의 비대칭)", atk_tuned, atk_plain, 0.001)
+
+
+# 측정 프로브 5종 — 전부 같은 시드·같은 섹터에서 **스탯만** 갈아 끼운다.
+func _tuned_front_gauge(stats: Dictionary) -> float:
+	var engine := _new_engine(61, "circuit_mn1")
+	if engine == null:
+		return 0.0
+	engine.machine_stats_carry_in = stats
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	engine.begin_turn()
+	engine.spin()
+	engine.front_gauge = GAUGE_PROBE_BASE
+	engine.provisional = _combo(RaceTypes.SYMBOL_SLIPSTREAM, 1, RaceTypes.SYMBOL_PULSE)
+	engine.confirm(0.0)
+	return engine.front_gauge
+
+
+func _tuned_rear_gauge(stats: Dictionary) -> float:
+	var engine := _new_engine(62, "circuit_mn1")
+	if engine == null:
+		return 0.0
+	engine.machine_stats_carry_in = stats
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	engine.begin_turn()
+	engine.spin()
+	engine.rear_gauge = GAUGE_PROBE_BASE
+	engine.provisional = _combo(RaceTypes.SYMBOL_BRAKING, 1, RaceTypes.SYMBOL_PULSE)
+	engine.confirm(0.0)
+	return engine.rear_gauge
+
+
+func _tuned_line_pair(stats: Dictionary) -> Array:
+	var engine := _new_engine(63, "circuit_mn1")
+	if engine == null:
+		return [0.0, 0.0]
+	engine.machine_stats_carry_in = stats
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	engine.begin_turn()
+	engine.spin()
+	engine.front_gauge = GAUGE_PROBE_BASE
+	engine.rear_gauge = GAUGE_PROBE_BASE
+	engine.provisional = _combo(RaceTypes.SYMBOL_LINE, 1, RaceTypes.SYMBOL_PULSE)
+	engine.confirm(0.0)
+	return [engine.front_gauge, engine.rear_gauge]
+
+
+func _tuned_trouble_loss(stats: Dictionary) -> float:
+	var engine := _new_engine(64, "circuit_mn1")
+	if engine == null:
+		return 0.0
+	engine.machine_stats_carry_in = stats
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	engine.begin_turn()
+	engine.spin()
+	var before := engine.chassis
+	engine.provisional = _combo(RaceTypes.SYMBOL_TROUBLE, 1, RaceTypes.SYMBOL_PULSE)
+	engine.confirm(0.0)
+	return before - engine.chassis
+
+
+# 해저드 주속성 섹터에서 **트러블 없이** 통과 — 잃는 것은 속성 소모뿐이다.
+func _tuned_hazard_loss(stats: Dictionary) -> float:
+	var engine := _new_engine(65, "circuit_mf1")
+	if engine == null:
+		return 0.0
+	engine.machine_stats_carry_in = stats
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	engine.sector = 1          # 다음 begin_turn 에서 S2(해저드) 진입
+	engine.begin_turn()
+	engine.spin()
+	var before := engine.chassis
+	engine.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
+	engine.confirm(0.0)
+	return before - engine.chassis
+
+
+func _tuned_judgment(stats: Dictionary, duel_type: int, symbol_id: String) -> float:
+	var engine := _new_engine(66, "circuit_mn1")
+	if engine == null:
+		return 0.0
+	engine.machine_stats_carry_in = stats
+	engine.start_gp()
+	_force_duel(engine, duel_type)
+	engine.provisional = _combo(symbol_id, 1, RaceTypes.SYMBOL_PULSE)
+	return engine._duel_judgment(duel_type)
 
 
 # ── TC-C9 섀시 컨디션·리타이어 — 0 도달 = 리타이어 · 런 결과 반영 ──

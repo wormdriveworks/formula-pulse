@@ -45,6 +45,16 @@ func _build_row(tuning_id: String, oscar: bool) -> Control:
 	gauge.add_theme_color_override("font_color", UiPalette.TIMER_LEEWAY)
 	row.add_child(gauge)
 
+	# 효과 증분 (D09 §4.3 "단계 게이지 + 다음 단계 비용 + **효과 증분 표시**" — 개선 회차 18).
+	# 종전에는 무엇을 사는지가 화면에 없었다. 효과가 실제로 성능에 닿게 되면서 이 자리가 필요해졌다.
+	# 심볼 확률을 말하지 않는다 (§7.1 R1) — 표기는 계수·최대치·판정치의 크기뿐이다.
+	var effect_label := Label.new()
+	effect_label.add_theme_font_size_override("font_size", _body_font_size)
+	effect_label.name = "Effect"
+	effect_label.custom_minimum_size = Vector2(96, 0)
+	effect_label.add_theme_color_override("font_color", UiPalette.TIMER_LEEWAY)
+	row.add_child(effect_label)
+
 	var cost_label := Label.new()
 	cost_label.add_theme_font_size_override("font_size", _body_font_size)
 	cost_label.name = "Cost"
@@ -87,6 +97,21 @@ func _refresh_row(tuning_id: String) -> void:
 	for i in range(max_step):
 		filled += step_filled if i < step else step_empty
 	(row.get_node("Gauge") as Label).text = filled
+	# 효과 증분 — 비율 계통은 %p, 정액 계통은 그대로. 부호는 값이 지고 문면은 지지 않는다
+	# (T6 은 −7%/단계라 문면에 '+' 를 굳히면 감소 계통이 증가로 읽힌다).
+	var line_row: Dictionary = session.data.tuning_lines[tuning_id]
+	var per_step := CsvTable.to_float(String(line_row["effect_per_step"]))
+	var is_ratio := String(line_row["effect_unit"]) == "ratio"
+	var scale := 100.0 if is_ratio else 1.0
+	var effect_key := ""
+	if step >= max_step:
+		effect_key = "ui.tuningBench.effectRatioMaxFormat" if is_ratio else "ui.tuningBench.effectFlatMaxFormat"
+	else:
+		effect_key = "ui.tuningBench.effectRatioFormat" if is_ratio else "ui.tuningBench.effectFlatFormat"
+	(row.get_node("Effect") as Label).text = s.text(effect_key, {
+		"current": int(round(per_step * scale * float(step))),
+		"next": int(round(per_step * scale * float(step + 1))),
+	})
 	var cost_label := row.get_node("Cost") as Label
 	var buy := row.get_node("Buy") as Button
 	if step >= max_step:

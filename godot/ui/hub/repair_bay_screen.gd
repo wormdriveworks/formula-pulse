@@ -53,7 +53,9 @@ func _on_run_pressed() -> void:
 func _refresh_repair_card() -> void:
 	var s := session.data.strings
 	var outgame := session.outgame
-	var maximum := session.data.param("param_chassis_max")
+	# 최대치는 T4 보강만큼 늘어난다 — 아웃게임 창구가 정본이다 (개선 회차 18).
+	# 기준값을 직접 읽으면 125 짜리 머신의 고스트 게이지가 100 에서 넘친다.
+	var maximum := session.outgame.chassis_max()
 	var total_text := s.text("ui.repairBay.totalCostFormat", {"amount": outgame.full_repair_cost()})
 	(%TotalCostValue as Label).text = total_text
 	var affordable_text := s.text("ui.repairBay.affordableFormat", {
