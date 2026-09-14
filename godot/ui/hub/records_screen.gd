@@ -95,9 +95,101 @@ func _cycle_tab(step: int) -> void:
 	(_tabs[_active_tab]["button"] as Button).grab_focus()
 
 
+# G1 텔레메트리 아카이브 — 라이벌 파일의 **하위 탭**으로 심화 통계 (개선 회차 20 · D07 §2.2·§6.1·§6.2,
+# D09 §4.5 / 별첨A §A-15 "G1 개방 시 심화 통계 하위 탭").
+#
+# **수치는 보이되 임계는 보이지 않는다** (D07 §6.1 명문) — 관계 카운터의 값은 열되 다음 전이까지
+# 얼마가 남았는지는 열지 않는다. 기본 탭의 비노출 규격(단계 명칭만)은 G1 구매와 무관하게 그대로다.
+var _deep_rows: VBoxContainer = null
+var _basic_rows: VBoxContainer = null
+
+
 func _fill_rivals() -> void:
 	var s := session.data.strings
-	var list := %PanelRivals as VBoxContainer
+	var panel := %PanelRivals as VBoxContainer
+	if not session.outgame.facility_effect_open("archive_deep_tab"):
+		_basic_rows = panel
+		_fill_rival_rows()
+		return
+	# 하위 탭 머리 — 기본 / 심화 통계
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 8)
+	panel.add_child(head)
+	_basic_rows = VBoxContainer.new()
+	_deep_rows = VBoxContainer.new()
+	panel.add_child(_basic_rows)
+	panel.add_child(_deep_rows)
+	var basic_button := Button.new()
+	basic_button.name = "SubTabBasic"
+	basic_button.add_theme_font_size_override("font_size", _body_font_size)
+	basic_button.text = s.text("ui.records.subTabBasic")
+	basic_button.set_meta(AUDIO_EVENT_META, "ui_tab")
+	head.add_child(basic_button)
+	var deep_button := Button.new()
+	deep_button.name = "SubTabDeep"
+	deep_button.add_theme_font_size_override("font_size", _body_font_size)
+	deep_button.text = s.text("ui.records.subTabDeep")
+	deep_button.set_meta(AUDIO_EVENT_META, "ui_tab")
+	head.add_child(deep_button)
+	basic_button.pressed.connect(_select_rival_sub_tab.bind(false))
+	deep_button.pressed.connect(_select_rival_sub_tab.bind(true))
+	_fill_rival_rows()
+	_fill_rival_deep_rows()
+	_select_rival_sub_tab(false)
+
+
+func _select_rival_sub_tab(deep: bool) -> void:
+	if _basic_rows == null or _deep_rows == null:
+		return
+	_basic_rows.visible = not deep
+	_deep_rows.visible = deep
+
+
+# 심화 행 — 관계 카운터 수치(축 대상만)와 선착 기록. 임계·잔여는 싣지 않는다.
+func _fill_rival_deep_rows() -> void:
+	var s := session.data.strings
+	for rival_row in session.data.rivals:
+		var rival_id := String(rival_row["id"])
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var name_label := Label.new()
+		name_label.add_theme_font_size_override("font_size", _body_font_size)
+		name_label.custom_minimum_size = Vector2(110, 0)
+		name_label.text = s.text(String(rival_row["name_key"]))
+		row.add_child(name_label)
+		var axis := _relation_axis_for(rival_id)
+		if not axis.is_empty():
+			var axis_row: Dictionary = session.data.relation_axes[axis]
+			var counter_label := Label.new()
+			counter_label.add_theme_font_size_override("font_size", _body_font_size)
+			counter_label.custom_minimum_size = Vector2(120, 0)
+			counter_label.text = s.text("ui.records.counterFormat", {
+				"axis": s.text(String(axis_row["name_key"])),
+				"value": int(session.outgame.relation_counters.get(axis, 0)),
+			})
+			counter_label.add_theme_color_override("font_color", UiPalette.TIMER_LEEWAY)
+			row.add_child(counter_label)
+		var beaten_label := Label.new()
+		beaten_label.add_theme_font_size_override("font_size", _body_font_size)
+		beaten_label.text = s.text("ui.records.beatenYes" if _beaten(rival_id) else "ui.records.beatenNo")
+		beaten_label.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+		row.add_child(beaten_label)
+		_deep_rows.add_child(row)
+
+
+# 선착 기록 — 표의 `beat_rival` 마일스톤이 그 라이벌을 가리키는지로 본다(별도 계수기를 만들지 않는다).
+func _beaten(rival_id: String) -> bool:
+	for milestone_id in session.data.milestones:
+		var row: Dictionary = session.data.milestones[milestone_id]
+		if String(row["source"]) == "beat_rival" and String(row["source_id"]) == rival_id \
+			and session.outgame.milestones.has(String(milestone_id)):
+			return true
+	return false
+
+
+func _fill_rival_rows() -> void:
+	var s := session.data.strings
+	var list := _basic_rows
 	for rival_row in session.data.rivals:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
@@ -205,6 +297,21 @@ func _fill_archive() -> void:
 	# 인스턴스로 남기므로(시즌당 1회 가드의 열쇠) 대장을 그대로 그리면 "시즌 개막"이 시즌 수만큼 겹쳐 선다.
 	# 접는 규칙은 인스턴스 id 를 만든 세션 층의 것이다 — 화면은 대장을 직접 읽지 않는다.
 	var entries := session.archive_entries()
+	# G2 크루 라운지 — 목록 **상단의 부가 모드 버튼**으로 연속 재생 (D09 §4.5 / 별첨A §A-15).
+	# 기본 열람(개별 재생)은 무상·상시이므로 이 버튼은 그 경로와 시각적으로 갈라 위에 둔다.
+	# 미구매면 버튼 자체를 두지 않는다 — 잠긴 기능을 목록에 섞지 않는다 (개선 회차 20).
+	if not entries.is_empty() and session.outgame.facility_effect_open("recall_playback"):
+		var play_all := Button.new()
+		play_all.name = "PlayAllButton"
+		play_all.add_theme_font_size_override("font_size", _body_font_size)
+		play_all.text = s.text("ui.records.playAll")
+		var chain := session.archive_chain_payload("HUB-05", {"tab": "archive"})
+		if chain.is_empty():
+			play_all.disabled = true
+			play_all.focus_mode = Control.FOCUS_NONE
+		else:
+			play_all.pressed.connect(func() -> void: go("NAR-01", chain))
+		panel.add_child(play_all)
 	if entries.is_empty():
 		var empty := Label.new()
 		empty.add_theme_font_size_override("font_size", _body_font_size)

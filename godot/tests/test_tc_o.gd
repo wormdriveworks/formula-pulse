@@ -15,6 +15,7 @@ func _init() -> void:
 	_tc_o2_tuning_and_overhaul()
 	_machine_stat_window()
 	_overhaul_effects_window()
+	_facility_effects_window()
 	_overhaul_candidate_draw()
 	_milestones_and_achievements()
 	_tc_o3_sponsors()
@@ -320,6 +321,53 @@ func _machine_stat_window() -> void:
 		_eq_float("재로드 후 최대치 복원", restored.chassis_max(), state.chassis_max())
 		_ok("계수 자체는 세이브에 실리지 않는다",
 			not str(state.serialize()).contains("slipstream_coef"))
+
+
+# ── 시설 효과 결선 (개선 회차 20 · 2026-09-15) ──
+#
+# 종전에는 4종 중 `sponsor_slot_plus` 하나만 읽히고 나머지 셋의 effect 문자열이 코드 어디에서도
+# 소비되지 않았다(매뉴얼 9절 3항). 시설은 **스탯에 관여하지 않는다**(D07 §2.2) — 여는 것은 선택지뿐이다.
+func _facility_effects_window() -> void:
+	var state := _new_state()
+	if state == null:
+		return
+	# 표의 effect 열이 열쇠다 — 코드가 시설 id 목록을 갖지 않는다
+	for effect in ["archive_deep_tab", "recall_playback", "deck_preset_slot", "sponsor_slot_plus"]:
+		_ok("미구매 시설 %s 는 닫혀 있다" % effect, not state.facility_effect_open(String(effect)))
+	_ok("모르는 효과는 닫힘 (침묵 기본값을 열지 않는다)", not state.facility_effect_open("no_such_effect"))
+	state.facilities["facility_g1"] = true
+	_ok("G1 구매 = 심화 탭 개방", state.facility_effect_open("archive_deep_tab"))
+	_ok("G1 이 다른 시설을 열지 않는다", not state.facility_effect_open("recall_playback"))
+	# 아카이브 기본 열람은 시설과 무관하게 상시다 (D01 G2 조건 2 — 안전망을 자원 게이트 뒤에 두지 않는다)
+	_ok("기본 아카이브는 시설 없이도 열려 있다", _new_state().archive_available())
+
+	# G3 덱 프리셋 2세트 — 미구매면 한 칸뿐이고 전환이 성립하지 않는다
+	var deck_state := _new_state()
+	deck_state.gain_drive_data(1000)
+	deck_state.unlock_skill("skill_sh1")
+	deck_state.unlock_skill("skill_sc1")
+	deck_state.set_deck(["skill_sh1"])
+	_ok("미구매 프리셋 수 = 1", deck_state.deck_preset_count() == 1,
+		"count=%d" % deck_state.deck_preset_count())
+	_ok("미구매 상태에서 B 전환 거부", not deck_state.switch_deck_preset(1))
+	deck_state.facilities["facility_g3"] = true
+	_ok("G3 구매 = 프리셋 2", deck_state.deck_preset_count() == 2)
+	_ok("같은 칸으로의 전환은 거부", not deck_state.switch_deck_preset(0))
+	_ok("B 로 전환", deck_state.switch_deck_preset(1))
+	_ok("B 칸은 비어 있다", deck_state.deck.is_empty(), str(deck_state.deck))
+	deck_state.set_deck(["skill_sc1"])
+	_ok("A 로 되돌아간다", deck_state.switch_deck_preset(0))
+	_ok("A 칸의 덱이 그대로 살아 있다", deck_state.deck == ["skill_sh1"], str(deck_state.deck))
+	_ok("B 로 다시 가면 B 의 덱", deck_state.switch_deck_preset(1) and deck_state.deck == ["skill_sc1"],
+		str(deck_state.deck))
+	# 직렬화 왕복 — 쉬는 칸과 활성 칸이 함께 실린다
+	var reloaded := _new_state()
+	reloaded.deserialize(deck_state.serialize())
+	_ok("재로드 후 활성 칸 보존", reloaded.active_deck_preset == deck_state.active_deck_preset,
+		"active=%d" % reloaded.active_deck_preset)
+	_ok("재로드 후 덱 보존", reloaded.deck == deck_state.deck, str(reloaded.deck))
+	_ok("재로드 후 쉬는 칸 보존", reloaded.switch_deck_preset(0) and reloaded.deck == ["skill_sh1"],
+		str(reloaded.deck))
 
 
 # ── 오버홀 효과 결선 (개선 회차 19 · 2026-09-15) ──
@@ -959,6 +1007,9 @@ func _tc_o6_exchange_guards() -> void:
 		"open_narrative_act",
 		"relation_stage",
 		"unlock_facility", "archive_available", "buy_consumable",
+		# 회차 20 결선 — 시설 효과 개방 조회(표의 `effect` 열이 열쇠)와 G3 덱 프리셋 2세트.
+		# 시설은 스탯에 관여하지 않으므로(D07 §2.2) 이 셋도 재화·수치 창구가 아니다.
+		"facility_effect_open", "deck_preset_count", "switch_deck_preset",
 		"gp_prize", "finish_bonus", "settlement_reward", "vane_stage",
 		"serialize", "restore",
 	]

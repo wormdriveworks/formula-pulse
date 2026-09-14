@@ -13,9 +13,68 @@ var _tier_boxes: Dictionary = {}
 var _skill_rows: Dictionary = {}
 
 
+# G3 세컨드 워크벤치 — 전략실 **상단의 프리셋 A/B 전환** (개선 회차 20 · D07 §2.2·§4.1,
+# D09 §4.4 / 별첨A §A-14 "상단: 프리셋 A/B 전환(시설 G3 개방 시)").
+# 전환은 화면을 갈아타지 않고 그 자리에서 목록을 다시 그린다(§A-14 "HUB-04 비전환").
+func _build_preset_row() -> void:
+	if not session.outgame.facility_effect_open("deck_preset_slot"):
+		return
+	var s := session.data.strings
+	var row := HBoxContainer.new()
+	row.name = "PresetRow"
+	row.add_theme_constant_override("separation", 8)
+	for index in range(session.outgame.deck_preset_count()):
+		var button := Button.new()
+		button.name = "Preset%d" % index
+		button.add_theme_font_size_override("font_size", _body_font_size)
+		button.text = s.text("ui.strategy.presetA" if index == 0 else "ui.strategy.presetB")
+		button.set_meta(AUDIO_EVENT_META, "ui_tab")
+		# 활성 칸은 **색으로** 표시한다 — 소등하면 선택이 아니라 잠긴 것으로 읽힌다.
+		# 기록실 탭과 같은 방식이고, 같은 칸을 다시 눌러도 코어가 조용히 거부한다.
+		if index == session.outgame.active_deck_preset:
+			button.add_theme_color_override("font_color", UiPalette.TIMER_LEEWAY)
+		button.pressed.connect(_on_preset.bind(index))
+		row.add_child(button)
+	var header := %HeaderLabel as Control
+	header.get_parent().add_child(row)
+	header.get_parent().move_child(row, header.get_index() + 1)
+
+
+func _on_preset(index: int) -> void:
+	if not session.outgame.switch_deck_preset(index):
+		return
+	# 목록·덱 표기가 통째로 갈리므로 화면을 다시 세운다 — 행마다 갱신하면 상태가 둘로 갈린다.
+	_rebuild()
+	sfx("ui_tab")
+
+
+# 전환 후 재구성 — **즉시 떼어내고** 다시 짓는다. `queue_free()` 만으로는 이번 프레임에 남아 있어
+# 같은 행이 두 벌 서는 자리가 생긴다.
+func _rebuild() -> void:
+	for container in [get_node_or_null("%SkillList"), _preset_row_parent()]:
+		if container == null:
+			continue
+		for child in container.get_children():
+			if child.name == "PresetRow" or container.name == "SkillList":
+				container.remove_child(child)
+				child.queue_free()
+	_build_preset_row()
+	_build_skill_list()
+	_refresh_deck()
+	var focus_target := get_node_or_null("%DeckExpandButton")
+	if focus_target == null or not (focus_target as Button).visible:
+		focus_target = %BackButton
+	(focus_target as Control).grab_focus()
+
+
+func _preset_row_parent() -> Node:
+	return (%HeaderLabel as Control).get_parent()
+
+
 func _on_hub_ready(_payload: Dictionary) -> void:
 	var s := session.data.strings
 	(%HeaderLabel as Label).text = s.text("ui.strategy.title")
+	_build_preset_row()
 	_build_skill_list()
 	_refresh_deck()
 	(%BackButton as Button).grab_focus()

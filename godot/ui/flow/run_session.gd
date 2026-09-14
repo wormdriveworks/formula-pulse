@@ -481,6 +481,27 @@ func _act_vn_payload(vn_id: String, next_route: String, next_payload: Dictionary
 #
 # **조회 실패는 빈 사전이다** — 골격 폴백으로 흘리면 이번 결함이 그대로 되돌아온다.
 # 호출부가 그 빈 사전을 보고 판단한다(기록실은 버튼을 죽이고 누락을 관측 지점에 남긴다).
+# 아카이브 연속 재생 (G2 크루 라운지 · 개선 회차 20 · D07 §2.2 "이벤트 체인 연속 재생").
+#
+# 목록 순서 그대로 사슬을 엮는다 — 막 VN 사슬과 같은 형태(`next`/`next_payload`)이므로
+# 화면도 라우터도 새 개념을 배우지 않는다. **뒤에서부터** 감는 이유는 각 칸의 `next` 가
+# 다음 칸의 페이로드를 통째로 물어야 하기 때문이다.
+# 되찾지 못한 항목은 사슬에서 빠진다(빈 페이로드를 끼우면 골격 화면이 선다 — 개별 재생과 같은 규칙).
+func archive_chain_payload(next_route: String, next_payload: Dictionary = {}) -> Dictionary:
+	var entries := archive_entries()
+	var chain: Dictionary = {}
+	var tail_route := next_route
+	var tail_payload := next_payload
+	for index in range(entries.size() - 1, -1, -1):
+		var built := archive_replay_payload(String(entries[index]), tail_route, tail_payload)
+		if built.is_empty():
+			continue
+		chain = built
+		tail_route = "NAR-01"
+		tail_payload = built
+	return chain
+
+
 func archive_replay_payload(vn_id: String, next_route: String,
 		next_payload: Dictionary = {}) -> Dictionary:
 	var payload := _archive_source_payload(vn_id, next_route, next_payload)

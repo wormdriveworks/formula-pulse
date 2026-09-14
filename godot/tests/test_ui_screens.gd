@@ -5374,6 +5374,7 @@ const PAYLOAD_MAKERS := [
 	"season_close_payload",
 	"commit_season_close_payload",   # 엔딩 = 등재 창구 (개선 회차 15) — 화면은 이것만 부른다
 	"archive_replay_payload",
+	"archive_chain_payload",   # 연속 재생 = 개별 재생 페이로드를 사슬로 엮는다 (개선 회차 20 · G2)
 ]
 
 

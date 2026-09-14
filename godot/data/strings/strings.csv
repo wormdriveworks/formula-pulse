@@ -446,6 +446,8 @@ ui.tuningBench.effectFlatFormat,{current} → {next},{current} → {next},{curre
 ui.tuningBench.effectFlatMaxFormat,{current},{current},{current}
 ui.strategy.title,전략실,Strategy Room,戦略室
 ui.strategy.tierFormat,스킬 티어 {tier},Skill Tier {tier},スキルティア {tier}
+ui.strategy.presetA,프리셋 A,Preset A,プリセット A
+ui.strategy.presetB,프리셋 B,Preset B,プリセット B
 ui.strategy.tierLockedFormat,스킬 티어 {tier} — 개방: {condition},Skill Tier {tier} — opens: {condition},スキルティア {tier} — 開放: {condition}
 ui.strategy.openFirstPodium,첫 포디움,First Podium,初ポディウム
 ui.strategy.openFirstGpWin,첫 그랑프리 우승,First Grand Prix Win,初グランプリ優勝
@@ -535,6 +537,12 @@ ui.vn.calendarTitle,리그 공식 발표 — 시즌 캘린더,League Announcemen
 ui.vn.calendarRowFormat,투어 {tour} — {stage},Tour {tour} — {stage},ツアー{tour} — {stage}
 ui.vn.calendarAnchorFormat,투어 {tour} — {stage} ★,Tour {tour} — {stage} ★,ツアー{tour} — {stage} ★
 ui.records.replay,재생,Replay,再生
+ui.records.subTabBasic,기본,Basic,基本
+ui.records.subTabDeep,심화 통계,Detailed,詳細統計
+ui.records.counterFormat,{axis} {value},{axis} {value},{axis} {value}
+ui.records.beatenYes,선착 기록 있음,Finished ahead,先着記録あり
+ui.records.beatenNo,선착 기록 없음,Not yet,先着記録なし
+ui.records.playAll,연속 재생,Play all,連続再生
 ui.records.statGps,출전 그랑프리,Grands Prix Entered,出走グランプリ
 ui.records.statFinishes,완주,Finishes,完走
 ui.records.statWins,우승,Wins,優勝

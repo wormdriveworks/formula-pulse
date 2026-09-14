@@ -37,6 +37,9 @@ var skill_uses_this_tour: Dictionary = {}
 # 예산형으로 살린다: 한 턴에 몰아 쓰든 나눠 쓰든 투어당 3회분이다. 스킬 사용 횟수와 같은
 # 투어 스코프이므로 `begin_tour()` 가 비우고 세이브에 실린다.
 var overhaul_hold_uses_this_tour := 0
+# 덱 프리셋 2세트와 지금 쓰는 칸 (G3 · 개선 회차 20). 살아 있는 덱은 `deck` 이고 여기엔 **쉬는 칸**이 담긴다.
+var deck_presets: Array = [[], []]
+var active_deck_preset := 0
 var deck_slots: int = 0
 var crew: Dictionary = {}                # crew id -> true
 var sponsor_contracts: Array = []        # sponsor id
@@ -654,6 +657,40 @@ func relation_stage(relation_id: String) -> int:
 
 
 # ── 시설 (D07 §2.2 — 선택지·편의 전용) ──
+# ── 시설 효과 개방 조회 (개선 회차 20 · 2026-09-15) ──
+#
+# 종전에는 시설을 사도 `sponsor_slot_plus` 하나만 읽혔고 나머지 셋은 effect 문자열이 코드 어디에서도
+# 소비되지 않았다(매뉴얼 9절 3항). 열쇠는 **표의 `effect` 열**이고 코드는 이름 목록을 갖지 않는다.
+# 시설은 스탯에 관여하지 않는다(D07 §2.2) — 여는 것은 선택지·편의뿐이다.
+func facility_effect_open(effect: String) -> bool:
+	for facility_id in data.facilities:
+		if String(data.facilities[facility_id]["effect"]) == effect:
+			return facilities.has(String(facility_id))
+	return false
+
+
+# ── 덱 프리셋 (G3 세컨드 워크벤치 · D07 §2.2·§4.1 "덱 구성 2세트 저장·즉시 전환") ──
+#
+# 정본은 **2세트**다. `deck` 은 그대로 살아 있는 덱이고(전 소비부가 이것을 본다), 프리셋은
+# 전환할 때 현재 덱을 제자리에 넣어 두고 상대 칸을 꺼내오는 방식이다 — 덱의 의미를 바꾸지 않는다.
+func deck_preset_count() -> int:
+	return 2 if facility_effect_open("deck_preset_slot") else 1
+
+
+func switch_deck_preset(index: int) -> bool:
+	if index < 0 or index >= deck_preset_count() or index == active_deck_preset:
+		return false
+	deck_presets[active_deck_preset] = deck.duplicate()
+	active_deck_preset = index
+	# 저장된 칸에 미해금 스킬이 섞일 경로는 없다(해금은 되돌릴 수 없다) — 슬롯 수만 절단한다.
+	var restored: Array = []
+	for skill_id in deck_presets[index]:
+		if restored.size() < deck_slots:
+			restored.append(skill_id)
+	deck = restored
+	return true
+
+
 func unlock_facility(facility_id: String) -> bool:
 	var row := data.facility(facility_id)
 	if row.is_empty() or facilities.has(facility_id):
@@ -1014,6 +1051,8 @@ func serialize() -> Dictionary:
 		"consumables": consumables.duplicate(),
 		"skill_uses_this_tour": skill_uses_this_tour.duplicate(),
 		"overhaul_hold_uses_this_tour": overhaul_hold_uses_this_tour,
+		"deck_presets": deck_presets.duplicate(true),
+		"active_deck_preset": active_deck_preset,
 		"milestones": milestones.duplicate(),
 		"narrative_act": narrative_act,
 		"act_vn_fired": act_vn_fired.duplicate(),
@@ -1058,6 +1097,11 @@ func restore(payload: Dictionary) -> bool:
 	skill_uses_this_tour = payload.get("skill_uses_this_tour", {})
 	# 도입(회차 19) 전 세이브에는 없다 — 그 세계는 예산을 쓴 적이 없으므로 0 이 충실값이다.
 	overhaul_hold_uses_this_tour = int(payload.get("overhaul_hold_uses_this_tour", 0))
+	# 프리셋 도입(회차 20) 전 세이브에는 없다 — 그 세계는 덱이 하나였으므로 빈 칸이 충실값이다.
+	deck_presets = payload.get("deck_presets", [[], []])
+	while deck_presets.size() < 2:
+		deck_presets.append([])
+	active_deck_preset = clampi(int(payload.get("active_deck_preset", 0)), 0, 1)
 	milestones = payload.get("milestones", {})
 	narrative_act = int(payload.get("narrative_act", 1))
 	act_vn_fired = payload.get("act_vn_fired", {})
