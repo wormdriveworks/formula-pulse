@@ -53,9 +53,16 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 			})
 			button.text = locked_text
 		elif route.is_empty():
-			# 크루 영입은 이벤트 발생 시 점등 (별첨A E08) — 영입 이벤트 층 결선 전이라 소등
-			button.disabled = true
-			button.focus_mode = Control.FOCUS_NONE
+			# 크루 영입 = **이벤트 발생 시 점등** (별첨A §A-11 E08 · 개선 회차 23 결선).
+			# 라우트가 없는 것이 규격이다 — 정본이 전용 화면을 두지 않는다(D09 §2.2 주석:
+			# "신규 화면이 아니라 NAR-01 합류 VN + COM-01 지불 확인의 조합으로 성립").
+			# 그래서 이 앵커는 화면을 바꾸지 않고 **영입 실행 카드**를 그 자리에 편다(D09 §4.6).
+			var ready := session.crew_recruit_ready()
+			if ready.is_empty():
+				button.disabled = true
+				button.focus_mode = Control.FOCUS_NONE
+			else:
+				button.pressed.connect(_open_recruit_panel)
 		else:
 			# 진입 직전에 자리를 적는다 — 돌아온 개러지가 이 앵커에 포커스를 둔다 (개선 회차 16).
 			button.pressed.connect(func() -> void:
@@ -138,6 +145,114 @@ func _show_currency_onboarding() -> void:
 		session.options.mark_onboarding("currency")
 		panel.queue_free())
 	column.add_child(confirm)
+
+
+# ── 영입 실행 카드 (개선 회차 23 · D09 §4.6 "영입 실행 카드(비용 표시) + COM-01") ──
+#
+# **새 화면을 세우지 않는다** — 정본이 화면 수 억제를 이유로 그렇게 정했다(D09 §2.2). 개러지 위에
+# 카드 목록을 펴고, 확정만 COM-01 을 탄다. 재화 안내 팁(COM-02)과 같은 형태의 그 자리 패널이다.
+const RECRUIT_PANEL_NAME := "RecruitPanel"
+
+
+func _open_recruit_panel() -> void:
+	if get_node_or_null(RECRUIT_PANEL_NAME) != null:
+		return
+	var s := session.data.strings
+	var panel := PanelContainer.new()
+	panel.name = RECRUIT_PANEL_NAME
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	var style := StyleBoxFlat.new()
+	style.bg_color = UiPalette.BG_PANEL
+	style.border_color = UiPalette.FRAME_LINE
+	style.set_border_width_all(1)
+	style.set_content_margin_all(10)
+	panel.add_theme_stylebox_override("panel", style)
+	add_child(panel)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 6)
+	panel.add_child(column)
+	var title := Label.new()
+	title.add_theme_font_size_override("font_size", _head_font_size)
+	title.text = s.text("ui.recruit.title")
+	column.add_child(title)
+	var ready := session.crew_recruit_ready()
+	if ready.is_empty():
+		var empty := Label.new()
+		empty.add_theme_font_size_override("font_size", _body_font_size)
+		empty.text = s.text("ui.recruit.empty")
+		empty.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+		column.add_child(empty)
+	for crew_id in ready:
+		column.add_child(_build_recruit_row(String(crew_id)))
+	var close := Button.new()
+	close.name = "RecruitClose"
+	close.add_theme_font_size_override("font_size", _body_font_size)
+	close.text = s.text("ui.recruit.close")
+	close.set_meta(AUDIO_EVENT_META, "ui_cancel")
+	close.pressed.connect(_close_recruit_panel)
+	column.add_child(close)
+	audio_bind_controls(panel)   # 동적 생성분도 조작음 결속 대상이다
+	close.grab_focus()
+
+
+func _close_recruit_panel() -> void:
+	var panel := get_node_or_null(RECRUIT_PANEL_NAME)
+	if panel == null:
+		return
+	remove_child(panel)
+	panel.queue_free()
+	(%StRecruit as Button).grab_focus()
+
+
+func _build_recruit_row(crew_id: String) -> Control:
+	var s := session.data.strings
+	var row := HBoxContainer.new()
+	row.name = "Recruit_" + crew_id
+	row.add_theme_constant_override("separation", 8)
+	var crew_row: Dictionary = session.data.crew[crew_id]
+	var name_label := Label.new()
+	name_label.add_theme_font_size_override("font_size", _body_font_size)
+	name_label.custom_minimum_size = Vector2(120, 0)
+	name_label.text = s.text(String(crew_row["name_key"]))
+	row.add_child(name_label)
+	var cost := session.outgame.unlock_cost(CsvTable.to_int(String(crew_row["recruit_dp"])))
+	var cost_label := Label.new()
+	cost_label.add_theme_font_size_override("font_size", _body_font_size)
+	cost_label.custom_minimum_size = Vector2(70, 0)
+	# 표시 가격 = **실제 차감액**(사샤 할인 반영) — 전략실·시설과 같은 규칙이다.
+	cost_label.text = s.text("ui.tourReport.dataFormat", {"amount": cost})
+	cost_label.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
+	row.add_child(cost_label)
+	var action := Button.new()
+	action.name = "RecruitAction"
+	action.add_theme_font_size_override("font_size", _body_font_size)
+	action.text = s.text("ui.recruit.action")
+	action.disabled = session.outgame.drive_data < cost
+	row.add_child(action)
+	if not action.disabled:
+		action.pressed.connect(_on_recruit.bind(crew_id))
+	return row
+
+
+func _on_recruit(crew_id: String) -> void:
+	var s := session.data.strings
+	var crew_name := s.text(String(session.data.crew[crew_id]["name_key"]))
+	var cost := session.outgame.unlock_cost(
+		CsvTable.to_int(String(session.data.crew[crew_id]["recruit_dp"])))
+	# 영입은 되돌릴 수 없다 — COM-01 비가역형 (D09 §4.6)
+	var dialog := ConfirmDialog.ask(self, s, s.text("ui.recruit.confirm", {"crew": crew_name}),
+		s.text("ui.tourReport.dataFormat", {"amount": cost}), true, _body_font_size)
+	dialog.resolved.connect(func(accepted: bool) -> void:
+		if not accepted:
+			return
+		if not session.outgame.recruit_crew(crew_id):
+			return
+		sfx("purchase")
+		# 합류가 스테이션 개방을 바꾼다(나디아 → 스폰서 데스크) — 화면을 다시 세운다.
+		_close_recruit_panel()
+		go("HUB-01", {}))
 
 
 func _on_depart() -> void:

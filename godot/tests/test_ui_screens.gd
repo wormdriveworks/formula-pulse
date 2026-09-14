@@ -115,6 +115,7 @@ func _process(_delta: float) -> bool:
 	_garage_loop_flow(data)
 	_garage_focus_memory(data)
 	_garage_return_autosave(data)
+	_crew_recruit_flow(data)
 	_sponsor_settlement_flow(data)
 	_achievement_without_career(data)
 	_achievement_with_career(data)
@@ -5172,6 +5173,95 @@ func _garage_return_autosave(data: GameData) -> void:
 			"res://ui/race/gp_result_screen.gd"]:
 		_ok("㊽ⓕ %s 는 HUB 베이스 밖 (복귀 저장 경로 무관)" % String(path).get_file(),
 			FileAccess.get_file_as_string(String(path)).contains("extends FlowScreen"))
+
+
+# ── ㊾ 크루 영입 동선 (개선 회차 23 · D07 §5.2 2단 구조 · D09 §2.2 화면 불신설) ──
+#
+# 정본은 **전용 화면을 두지 않는다** — "NAR-01 합류 VN + COM-01 지불 확인의 조합"이다.
+# 그래서 개러지 앵커(E08)는 라우트를 갖지 않고 **그 자리에 영입 실행 카드를 편다**(D09 §4.6).
+# 종전에는 앵커가 상시 소등이라 나디아·오스카·사샤를 아무도 얻을 수 없었고, 그 여파로
+# 스폰서 데스크·튜닝 심화 2계통·스폰서 부스·해금 할인이 전부 도달 불가였다(매뉴얼 9절 표 2).
+#   ⓐ 세션 창구 — 접근이 열려도 **합류 VN 전에는** 실행 자리가 서지 않는다
+#   ⓑ 앵커 — 실행 가능분이 없으면 소등 · 생기면 점등
+#   ⓒ 카드 — 실행 가능분만 행으로 서고 잔액 부족이면 버튼 소등
+#   ⓓ 라우트 불신설 — 앵커가 화면을 바꾸지 않는다(대장에 크루 화면 없음)
+func _crew_recruit_flow(data: GameData) -> void:
+	var s := _fresh_session(data)
+	# 사샤만 게이트가 없다 (사용자 결정 2026-09-15 — 기존 "데드락 부재" 유지). 그래서 초기부터
+	# 실행 자리에 서고, 그 합류 VN 은 접근이 아니라 **막 기준**으로 옮겨 첫 투어에 서지 않는다.
+	_ok("㊾ⓐ 초기: 접근 열린 크루는 사샤뿐", s.outgame.recruitable_crew() == ["crew_sasha"],
+		str(s.outgame.recruitable_crew()))
+	_ok("㊾ⓐ 게이트 없는 크루는 곧바로 실행 자리", s.crew_recruit_ready() == ["crew_sasha"],
+		str(s.crew_recruit_ready()))
+	_ok("㊾ⓐ 사샤는 서사 게이트가 없다", s.crew_join_vn_seen("crew_sasha"))
+	# 접근이 닫힌 크루는 VN 이 서도 실행 자리에 오지 않는다 (1단을 건너뛸 수 없다)
+	s.narrative.trigger_vn("vnbeat_crew_nadia", "vnslot_tour_milestone", false)
+	_ok("㊾ⓐ 접근이 닫혔으면 VN 만으로는 서지 않는다", not s.crew_recruit_ready().has("crew_nadia"),
+		str(s.crew_recruit_ready()))
+	s.outgame.milestones["milestone_first_podium"] = true
+	_ok("㊾ⓐ 두 단이 다 서면 실행 자리", s.crew_recruit_ready().has("crew_nadia"),
+		str(s.crew_recruit_ready()))
+	# 반대로 접근만 열리고 VN 이 아직이면 서지 않는다 — 오스카로 잰다(서사 게이트가 살아 있는 쪽)
+	s.outgame.milestones["milestone_first_gp_win"] = true
+	_ok("㊾ⓐ 접근만으로는 서지 않는다 (VN 대기)", not s.crew_recruit_ready().has("crew_oscar"),
+		str(s.crew_recruit_ready()))
+	s.narrative.trigger_vn("vnbeat_crew_oscar", "vnslot_tour_milestone", false)
+	_ok("㊾ⓐ VN 이 서면 오스카도 실행 자리", s.crew_recruit_ready().has("crew_oscar"),
+		str(s.crew_recruit_ready()))
+
+	# ⓑ 앵커 점등 — 실행 가능분이 없는 세션에서는 소등 (전원 합류 상태로 만든다)
+	var dark := _fresh_session(data)
+	for crew_id in dark.data.crew:
+		dark.outgame.crew[String(crew_id)] = true
+	var dark_garage := _mount(GARAGE_SCENE, dark)
+	if dark_garage != null:
+		var anchor := dark_garage.get_node("%StRecruit") as Button
+		_ok("㊾ⓑ 실행 가능분 0 = 앵커 소등", anchor.disabled)
+		_unmount(dark_garage)
+	s.outgame.gain_drive_data(1000)
+	var lit_garage := _mount(GARAGE_SCENE, s)
+	if lit_garage == null:
+		return
+	var lit_anchor := lit_garage.get_node("%StRecruit") as Button
+	_ok("㊾ⓑ 실행 가능분이 있으면 점등", not lit_anchor.disabled)
+	var routed: Array = []
+	lit_garage.navigate.connect(func(t: String, _p: Dictionary) -> void: routed.append(t))
+	lit_anchor.pressed.emit()
+	_ok("㊾ⓓ 앵커는 화면을 바꾸지 않는다", routed.is_empty(), str(routed))
+	var panel := lit_garage.get_node_or_null("RecruitPanel")
+	_ok("㊾ⓒ 영입 카드가 그 자리에 선다", panel != null)
+	if panel != null:
+		var rows := 0
+		for crew_id in s.crew_recruit_ready():
+			if panel.find_child("Recruit_" + String(crew_id), true, false) != null:
+				rows += 1
+		_ok("㊾ⓒ 실행 가능분마다 행", rows == s.crew_recruit_ready().size(),
+			"rows=%d ready=%d" % [rows, s.crew_recruit_ready().size()])
+		# 실행 자리에 없는 크루는 행도 없다 — 이미 합류한 마르타·테오로 잰다
+		var stale := 0
+		for joined in ["crew_marta", "crew_theo"]:
+			if panel.find_child("Recruit_" + joined, true, false) != null:
+				stale += 1
+		_ok("㊾ⓒ 실행 자리에 없는 크루는 행이 없다", stale == 0, "stale=%d" % stale)
+		_ok("㊾ⓒ 닫기 버튼", panel.find_child("RecruitClose", true, false) != null)
+	# 실행 버튼은 잔액을 본다 — 누르면 코어가 거부하는 죽은 버튼을 남기지 않는다
+	_unmount(lit_garage)
+	var rich := _mount(GARAGE_SCENE, s)
+	if rich != null:
+		(rich.get_node("%StRecruit") as Button).pressed.emit()
+		var rich_panel := rich.get_node_or_null("RecruitPanel")
+		if rich_panel != null:
+			var action := rich_panel.find_child("RecruitAction", true, false) as Button
+			_ok("㊾ⓒ 잔액이 충분하면 실행 버튼 활성", action != null and not action.disabled)
+		_unmount(rich)
+
+	# ⓓ 라우트 대장에 크루 화면이 없다 — 정본의 화면 불신설 조항
+	var routes: Dictionary = load(APP_ROOT_SCENE_SCRIPT).ROUTES
+	var crew_route := false
+	for route_id in routes:
+		if String(routes[route_id]).contains("recruit") or String(routes[route_id]).contains("crew"):
+			crew_route = true
+	_ok("㊾ⓓ 라우팅 대장에 크루 전용 화면 없음", not crew_route, str(routes.keys()))
 
 
 # ── 스폰서 정기 수입 결선 (개선 회차 13 · 2026-09-09 사용자 결정) ──

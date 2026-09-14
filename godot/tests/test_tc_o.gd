@@ -16,6 +16,7 @@ func _init() -> void:
 	_machine_stat_window()
 	_overhaul_effects_window()
 	_facility_effects_window()
+	_crew_recruit_two_stage()
 	_overhaul_candidate_draw()
 	_milestones_and_achievements()
 	_tc_o3_sponsors()
@@ -240,6 +241,9 @@ func _tc_o1_facilities() -> void:
 	# G4는 나디아 합류가 선행 조건 (D07 §2.2)
 	state.gain_drive_data(1000)
 	_ok("나디아 미합류 시 G4 거부", not state.unlock_facility("facility_g4"))
+	# 영입은 **2단 구조**다 (개선 회차 23 · D07 §5.2) — 접근 해금(마일스톤) 없이는 지불이 성립하지 않는다.
+	_ok("접근 해금 전에는 영입 거부", not state.recruit_crew("crew_nadia"))
+	state.milestones["milestone_first_podium"] = true
 	_ok("나디아 영입", state.recruit_crew("crew_nadia"))
 	_ok("나디아 합류 후 G4 해금", state.unlock_facility("facility_g4"))
 	# 시설은 스탯에 관여하지 않는다 (D07 §2.2 · D06 §3.2 비중첩) — 구조 단언
@@ -321,6 +325,55 @@ func _machine_stat_window() -> void:
 		_eq_float("재로드 후 최대치 복원", restored.chassis_max(), state.chassis_max())
 		_ok("계수 자체는 세이브에 실리지 않는다",
 			not str(state.serialize()).contains("slipstream_coef"))
+
+
+# ── 크루 영입 2단 구조 (개선 회차 23 · D07 §5.2·§5.3) ──
+#
+# 종전에는 `recruit_crew()` 가 DP 잔액만 보아 **시즌 1 첫 대회에서도 전원을 살 수 있었고**,
+# 개러지 앵커에 경로가 없어 실제로는 아무도 살 수 없었다(매뉴얼 9절 표 2). 정본의 구조는
+# ①마일스톤 도달(접근 해금) → ②합류 VN → ③지불이며, 여기서는 ①과 ③을 잰다(②는 세션 몫).
+#
+# **사샤는 관계 단계 조건을 두지 않는다** (사용자 결정 2026-09-15 — 기존 "데드락 부재" 결정 유지).
+func _crew_recruit_two_stage() -> void:
+	var state := _new_state()
+	if state == null:
+		return
+	_ok("시작 합류 2인은 접근이 열려 있다",
+		state.crew_access_open("crew_marta") and state.crew_access_open("crew_theo"))
+	_ok("나디아는 첫 포디움 전까지 닫혀 있다", not state.crew_access_open("crew_nadia"))
+	_ok("오스카는 첫 우승 전까지 닫혀 있다", not state.crew_access_open("crew_oscar"))
+	_ok("사샤는 조건 없이 열려 있다", state.crew_access_open("crew_sasha"))
+	_ok("모르는 크루는 닫힘", not state.crew_access_open("crew_nobody"))
+	_ok("초기 영입 가능 목록 = 사샤뿐", state.recruitable_crew() == ["crew_sasha"],
+		str(state.recruitable_crew()))
+
+	# 접근 해금 전에는 **지불 자체가 성립하지 않는다** — 잔액이 넉넉해도 거부된다.
+	state.gain_drive_data(1000)
+	var dp_before := state.drive_data
+	_ok("닫힌 크루는 잔액이 있어도 영입 거부", not state.recruit_crew("crew_nadia"))
+	_ok("거부는 DP 를 먹지 않는다", state.drive_data == dp_before, "dp=%d" % state.drive_data)
+
+	state.milestones["milestone_first_podium"] = true
+	_ok("첫 포디움 → 나디아 접근 해금", state.crew_access_open("crew_nadia"))
+	_ok("해금은 합류가 아니다 (아직 크루 아님)", not state.crew.has("crew_nadia"))
+	_ok("목록에 나디아 등장", state.recruitable_crew().has("crew_nadia"),
+		str(state.recruitable_crew()))
+	var cost := state.unlock_cost(CsvTable.to_int(String(state.data.crew["crew_nadia"]["recruit_dp"])))
+	_ok("나디아 영입 성립", state.recruit_crew("crew_nadia"))
+	_ok("영입이 DP 를 실제로 먹는다", state.drive_data == dp_before - cost,
+		"dp=%d expected=%d" % [state.drive_data, dp_before - cost])
+	_ok("합류 후 목록에서 빠진다", not state.recruitable_crew().has("crew_nadia"),
+		str(state.recruitable_crew()))
+	_ok("중복 영입 거부", not state.recruit_crew("crew_nadia"))
+
+	state.milestones["milestone_first_gp_win"] = true
+	_ok("첫 우승 → 오스카 접근 해금", state.crew_access_open("crew_oscar"))
+	# 직렬화 — 접근 해금의 근거(마일스톤)가 실리므로 게이트가 재로드로 풀리지 않는다
+	var reloaded := _new_state()
+	if reloaded != null:
+		reloaded.deserialize(state.serialize())
+		_ok("재로드 후에도 접근 해금 유지", reloaded.crew_access_open("crew_oscar"))
+		_ok("재로드 후 합류분 보존", reloaded.crew.has("crew_nadia"))
 
 
 # ── 시설 효과 결선 (개선 회차 20 · 2026-09-15) ──
@@ -883,6 +936,7 @@ func _tc_o3_sponsors() -> void:
 	_ok("조건 충족 = 정기 + 보너스 (700 Cr)", with_bonus == 700, "payout=%d" % with_bonus)
 	# 나디아 합류 → 후보 4종 / G4 해금 → 슬롯 2
 	state.gain_drive_data(1000)
+	state.milestones["milestone_first_podium"] = true   # 접근 해금 선행 (회차 23 2단 구조)
 	state.recruit_crew("crew_nadia")
 	_ok("나디아 합류 → 후보 4종", state.sponsor_candidate_count() == 4)
 	state.unlock_facility("facility_g4")
@@ -1010,6 +1064,8 @@ func _tc_o6_exchange_guards() -> void:
 		# 회차 20 결선 — 시설 효과 개방 조회(표의 `effect` 열이 열쇠)와 G3 덱 프리셋 2세트.
 		# 시설은 스탯에 관여하지 않으므로(D07 §2.2) 이 셋도 재화·수치 창구가 아니다.
 		"facility_effect_open", "deck_preset_count", "switch_deck_preset",
+		# 회차 23 결선 — 영입 2단 구조의 1단(접근 해금)과 그 목록. 지불은 종전 `recruit_crew` 가 쥔다.
+		"crew_access_open", "recruitable_crew",
 		"gp_prize", "finish_bonus", "settlement_reward", "vane_stage",
 		"serialize", "restore",
 	]

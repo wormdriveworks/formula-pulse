@@ -425,11 +425,45 @@ func _milestone_trigger_met(row: Dictionary) -> bool:
 		return outgame.milestones.has(milestone)
 	var crew := String(row.get("trigger_crew", "")).strip_edges()
 	if not crew.is_empty():
-		return outgame.crew.has(crew)
+		# **접근이 열린 시점**에 선다 (개선 회차 23 — D07 §5.2 2단 구조: 마일스톤 → VN → 지불).
+		# 종전에는 `crew.has()` 로 판정해 **영입을 마친 뒤에야 합류 VN 이 떴다** — 순서가 뒤집혀
+		# "만나기 전에 계약한" 꼴이었고, 영입 경로가 닫혀 있어 그 VN 은 실제로 선 적이 없다.
+		return outgame.crew_access_open(crew)
 	var act := CsvTable.to_int(String(row.get("trigger_act", "0")))
 	if act > 0:
 		return outgame.narrative_act >= act
 	return false   # 트리거 미선언 = 미발화 (조용한 상시 발화를 막는다)
+
+
+# ── 크루 영입 실행 가능 목록 (개선 회차 23 · D07 §5.2 2단 구조의 3단) ──
+#
+# 접근이 열렸고(마일스톤·관계 — 아웃게임 소관) **합류 VN 이 이미 섰을 때**만 지불 자리가 열린다.
+# 두 조건을 한 곳에서 보는 이유: 발생 대장은 서사 층이고 접근 게이트는 아웃게임 층이라
+# 어느 한쪽도 상대를 읽지 않는다 — 세션이 두 층을 잇는 자리다(계층 방향 유지).
+#
+# 기회는 소멸하지 않는다 — VN 을 본 뒤 보류하면 개러지에서 언제든 실행할 수 있다(D07 §5.2).
+func crew_recruit_ready() -> Array:
+	var ready: Array = []
+	if outgame == null:
+		return ready
+	for crew_id in outgame.recruitable_crew():
+		if crew_join_vn_seen(String(crew_id)):
+			ready.append(String(crew_id))
+	return ready
+
+
+func crew_join_vn_seen(crew_id: String) -> bool:
+	if narrative == null:
+		return false
+	for beat_id in data.vn_beats:
+		var row: Dictionary = data.vn_beats[beat_id]
+		if String(row.get("trigger_crew", "")).strip_edges() == crew_id:
+			return narrative.vn_seen.has(String(beat_id))
+	# 합류 비트가 **그 크루를 트리거로 걸지 않았으면** 서사 게이트가 없다 — 표가 정한다.
+	# 사샤가 그렇다: 영입에 접근 조건을 두지 않기로 한 결정(2026-09-15) 때문에 접근 기준으로는
+	# 첫 투어 결산에 합류 VN 이 서 버린다. 그래서 그 비트만 **막 기준**(기원 단서 2단계 구간)으로
+	# 옮겼고, 지불은 서사를 기다리지 않는다. 나디아·오스카는 종전대로 접근 해금이 열쇠다.
+	return true
 
 
 # 투어 종료 마일스톤 VN 페이로드 — 경계 VN 과 같은 조립기를 탄다.

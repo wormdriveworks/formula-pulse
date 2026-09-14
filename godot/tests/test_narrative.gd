@@ -843,7 +843,8 @@ func _milestone_firing() -> void:
 	# ⓒ **우선순위 4단.** 짝을 **id 순과 어긋나게** 고른다 — 크루(2) vs 단서(3) 는
 	# id 로는 `clue` 가 앞이고 우선순위로는 `crew` 가 앞이다. 같은 순서를 내는 짝으로 재면
 	# 정렬을 통째로 지워도 통과한다(돌연변이 K1 초판 미검출이 정확히 그 형태였다).
-	session.outgame.crew["crew_nadia"] = true
+	# 접근 해금이 자격의 열쇠다 (개선 회차 23 — 종전에는 **영입을 마친 뒤** VN 이 섰다).
+	session.outgame.milestones["milestone_first_podium"] = true
 	session.outgame.narrative_act = 2   # 단서 1 자격 동시 성립
 	var picked := session.pending_milestone_beat()
 	_ok("우선순위: 크루 합류(2) > 기원 단서(3) — id 순과 반대",
@@ -867,7 +868,7 @@ func _milestone_firing() -> void:
 	_ok("발생분 재자격 0",
 		String(session.pending_milestone_beat().get("id", "")) != "vnbeat_clue_locked")
 	# ⓖ 페이로드 — 경계 VN 과 같은 조립기(슬롯·톤·라인이 비트 행에서 온다)
-	session.outgame.crew["crew_oscar"] = true
+	session.outgame.milestones["milestone_first_gp_win"] = true
 	var payload := session.milestone_payload("HUB-01")
 	_ok("마일스톤 페이로드 발행", not payload.is_empty())
 	_ok("슬롯 = 투어 종료", String(payload.get("slot_id", "")) == "vnslot_tour_milestone",

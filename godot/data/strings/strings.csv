@@ -421,6 +421,11 @@ ui.hub.stSponsor,스폰서 데스크,Sponsor Desk,スポンサーデスク
 ui.hub.stFacility,시설 확장,Facility Expansion,施設拡張
 ui.hub.stOverhaul,시즌 오버홀,Season Overhaul,シーズンオーバーホール
 ui.hub.stRecruit,크루 영입,Crew Recruitment,クルー登用
+ui.recruit.title,크루 영입,Recruit Crew,クルー採用
+ui.recruit.action,영입,Recruit,採用
+ui.recruit.confirm,{crew} 영입을 확정합니다.,Recruit {crew}.,{crew} の採用を確定します。
+ui.recruit.close,닫기,Close,閉じる
+ui.recruit.empty,지금 영입할 수 있는 크루가 없습니다.,No crew available to recruit.,今は採用できるクルーがいません。
 ui.repairBay.title,정비 베이,Service Bay,整備ベイ
 ui.repairBay.fullRepair,정비 — 잔액 한도 내 회복,Service — within your balance,整備 — 残高内で回復
 ui.repairBay.perChFormat,섀시 1당 {amount} Cr,{amount} Cr per chassis point,シャシー1あたり {amount} Cr

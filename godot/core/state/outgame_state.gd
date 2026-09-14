@@ -488,9 +488,47 @@ func set_deck(skill_ids: Array) -> bool:
 
 
 # ── 크루 (D07 §5.2 영입 2단 구조) ──
+# ── 크루 접근 해금 (개선 회차 23 · D07 §5.2 영입 2단 구조의 1단) ──
+#
+# 정본의 2단 구조는 **①마일스톤 도달(접근 해금) → ②합류 이벤트(VN) → ③영입 실행(지불)**이다
+# (D07 §5.2·§5.3). "서사(만남)는 무비용, 계약(영입)은 자원 결정"이 요체이므로 마일스톤은
+# **살 수 있게 하는 것**이지 주는 것이 아니다.
+#
+# 조건은 표가 쥔다 — `unlock_milestone`(첫 포디움·첫 그랑프리 우승) · `unlock_relation` +
+# `unlock_relation_stage`(사샤 = 재회 축 '대면' 이상 · D07 §5.3 결정 #4). 종전에는 이 게이트가
+# **아예 없어** DP 만 있으면 시즌 1 첫 대회에서도 전원을 살 수 있었다.
+func crew_access_open(crew_id: String) -> bool:
+	if not data.crew.has(crew_id):
+		return false
+	var row: Dictionary = data.crew[crew_id]
+	if CsvTable.to_int(String(row["recruit_dp"])) == 0:
+		return true   # 시작 합류분 — 조건 없음
+	var milestone := String(row.get("unlock_milestone", "")).strip_edges()
+	if not milestone.is_empty() and not milestones.has(milestone):
+		return false
+	var relation := String(row.get("unlock_relation", "")).strip_edges()
+	if not relation.is_empty():
+		var needed := CsvTable.to_int(String(row.get("unlock_relation_stage", "0")))
+		if relation_stage(relation) < needed:
+			return false
+	return true
+
+
+# 지금 살 수 있는 크루 — 접근이 열렸고 아직 합류하지 않은 목록. 표 순서를 그대로 쓴다.
+# **기회는 소멸하지 않는다** (D07 §5.2 "보류 중에는 개러지에서 언제든 실행 가능").
+func recruitable_crew() -> Array:
+	var open_list: Array = []
+	for crew_id in data.crew:
+		if not crew.has(String(crew_id)) and crew_access_open(String(crew_id)):
+			open_list.append(String(crew_id))
+	return open_list
+
+
 func recruit_crew(crew_id: String) -> bool:
 	if not data.crew.has(crew_id) or crew.has(crew_id):
 		return false
+	if not crew_access_open(crew_id):
+		return false   # 접근 해금 전에는 지불 자체가 성립하지 않는다 (2단 구조의 1단)
 	var cost := CsvTable.to_int(String(data.crew[crew_id]["recruit_dp"]))
 	if not _spend_drive_data(unlock_cost(cost)):
 		return false

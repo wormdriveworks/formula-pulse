@@ -4,7 +4,7 @@ vnbeat_season_open,,vnslot_season_open,,0,0,3,calm,,,,,0
 vnbeat_season_close,,vnslot_season_close,,0,0,3,calm,,,,,0
 vnbeat_crew_nadia,,vnslot_tour_milestone,,0,0,9,calm,ui.vnTitle.crewNadia,mvn_crew_join,,crew_nadia,0
 vnbeat_crew_oscar,,vnslot_tour_milestone,,0,0,9,calm,ui.vnTitle.crewOscar,mvn_crew_join,,crew_oscar,0
-vnbeat_crew_sasha,,vnslot_tour_milestone,,0,0,10,calm,ui.vnTitle.crewSasha,mvn_crew_join,,crew_sasha,0
+vnbeat_crew_sasha,,vnslot_tour_milestone,,0,0,10,calm,ui.vnTitle.crewSasha,mvn_crew_join,,,3
 vnbeat_clue_locked,,vnslot_tour_milestone,,0,0,5,calm,ui.vnTitle.clueLocked,mvn_origin_clue,,,2
 vnbeat_clue_silence,,vnslot_tour_milestone,,0,0,5,calm,ui.vnTitle.clueSilence,mvn_origin_clue,,,3
 vnbeat_feat_finish,,vnslot_tour_milestone,,0,0,9,calm,ui.vnTitle.featFinish,mvn_general_feat,milestone_first_finish,,0
