@@ -14,6 +14,7 @@ func _init() -> void:
 	_tc_o1_facilities()
 	_tc_o2_tuning_and_overhaul()
 	_machine_stat_window()
+	_overhaul_effects_window()
 	_overhaul_candidate_draw()
 	_milestones_and_achievements()
 	_tc_o3_sponsors()
@@ -295,7 +296,15 @@ func _machine_stat_window() -> void:
 	var targets: Dictionary = {}
 	for tuning_id in state.data.tuning_lines:
 		targets[String(state.data.tuning_lines[tuning_id]["target"])] = true
-	_ok("스냅숏 키 = 표의 효과 대상 전량",
+	# 회차 19 — 오버홀의 효과·대가 축도 같은 스냅숏에 실린다. 대체형은 별도 창구라 빠진다.
+	for overhaul_id in state.data.overhauls:
+		var row: Dictionary = state.data.overhauls[overhaul_id]
+		targets[String(row["effect"])] = true
+		if not String(row.get("drawback", "")).is_empty():
+			targets[String(row["drawback"])] = true
+	for override_target in OutgameState.OVERRIDE_STAT_TARGETS:
+		targets.erase(String(override_target))
+	_ok("스냅숏 키 = 표의 효과 대상 전량 (대체형 제외)",
 		stats.size() == targets.size(), "stats=%d targets=%d" % [stats.size(), targets.size()])
 	var mismatched := 0
 	for target in stats:
@@ -311,6 +320,87 @@ func _machine_stat_window() -> void:
 		_eq_float("재로드 후 최대치 복원", restored.chassis_max(), state.chassis_max())
 		_ok("계수 자체는 세이브에 실리지 않는다",
 			not str(state.serialize()).contains("slipstream_coef"))
+
+
+# ── 오버홀 효과 결선 (개선 회차 19 · 2026-09-15) ──
+#
+# 종전에는 12종 중 `free_restore_line` 하나만 소비되고 나머지 11종은 장착만 됐다(매뉴얼 9절 2항).
+# 여기서는 창구의 합산·대체·캡을 재고, 엔진 적용은 TC-C 가 잰다.
+func _overhaul_effects_window() -> void:
+	var state := _new_state()
+	if state == null:
+		return
+	# 대체형 5종 — 미장착이면 기저값, 장착이면 표값 (가산이 아니라 대체다)
+	_eq_float("미장착 안정 완주 차지 = 기저값", state.machine_override("stable_sector_charge",
+		state.data.param("param_charge_stable_sector")), state.data.param("param_charge_stable_sector"))
+	state.overhauls.append("overhaul_ov_t1")
+	_eq_float("OV-T1 안정 완주 차지 = 2 (1 + 2 가 아니다)",
+		state.machine_override("stable_sector_charge", state.data.param("param_charge_stable_sector")), 2.0)
+	state.overhauls.append("overhaul_ov_p3")
+	_eq_float("OV-P3 차지 상한 = 12", state.machine_override("charge_cap",
+		state.data.param("param_charge_cap")), 12.0)
+	state.overhauls.append("overhaul_ov_t4")
+	_eq_float("OV-T4 최종 랩 계수 = 1.35", state.machine_override("final_lap_gauge_mult",
+		state.data.param("param_gauge_final_lap_mult")), 1.35)
+	state.overhauls.append("overhaul_ov_s4")
+	_ok("OV-S4 무상 복원선 = 80", state.free_restore_line() == 80, "line=%d" % state.free_restore_line())
+	_eq_float("OV-S4 대가 = 펄스 생산 −1", state.machine_stat("pulse_charge_yield"), -1.0)
+	var overrides := state.machine_overrides()
+	_ok("대체형 스냅숏은 장착분만 싣는다", overrides.size() == 4, str(overrides.keys()))
+	_ok("대체형은 가산 스냅숏에 섞이지 않는다",
+		not state.machine_stats().has("charge_cap"), str(state.machine_stats().keys()))
+
+	# 사이드그레이드 = 효과와 대가를 **동시에** 산다
+	var side := _new_state()
+	side.overhauls.append("overhaul_ov_s1")
+	_eq_float("OV-S1 전방 게이지 +8%", side.machine_stat("front_gauge_ratio"), 0.08)
+	_eq_float("OV-S1 대가 = 섀시 최대치 −10", side.machine_stat("chassis_max"), -10.0)
+	_eq_float("OV-S1 장착 머신의 최대치 = 90", side.chassis_max(),
+		side.data.param("param_chassis_max") - 10.0)
+	side.overhauls.append("overhaul_ov_s2")
+	_eq_float("OV-S2 대가가 같은 축에서 상쇄", side.machine_stat("front_gauge_ratio"), 0.03)
+	_eq_float("OV-S2 트러블 마모 −20%", side.machine_stat("trouble_chassis_wear"), -0.20)
+	side.overhauls.append("overhaul_ov_s3")
+	_eq_float("OV-S3 듀얼 판정 +8", side.machine_stat("duel_judgment"), 8.0)
+	_eq_float("OV-S3 대가 = 후방 압박 +10%", side.machine_stat("rear_pressure_ratio"), 0.10)
+
+	# 파츠 캡 — 계통당 +10%p · 합산 +20%p (D13 별첨A §7.3). 캡은 **파츠 전속**이고 튜닝은 밖이다.
+	var parts := _new_state()
+	parts.overhauls.append("overhaul_ov_p1")
+	_eq_float("OV-P1 슬립스트림 +10%p", parts.machine_stat("slipstream_coef"), 0.10)
+	parts.overhauls.append("overhaul_ov_p2")
+	_eq_float("OV-P2 도 계통당 상한 안 (+10%p)", parts.machine_stat("braking_coef"), 0.10)
+	_eq_float("두 파츠 합산 = 캡 정확 도달 (0.10 + 0.10 = 0.20)",
+		parts.machine_stat("slipstream_coef") + parts.machine_stat("braking_coef"), 0.20)
+	parts.gain_credits(100000)
+	for _i in range(parts.data.param_int("param_tuning_max_step")):
+		parts.buy_tuning("tuning_t1")
+	_eq_float("튜닝분은 캡 밖 — 파츠 0.10 + 튜닝 0.35", parts.machine_stat("slipstream_coef"), 0.45)
+	# 정액 파츠는 %p 캡의 단위가 아니다 — 절단하면 +15 CH 가 +0.1 로 뭉개진다.
+	parts.overhauls.append("overhaul_ov_p4")
+	_eq_float("OV-P4 섀시 최대치 +15 (캡 단위 밖)", parts.machine_stat("chassis_max"), 15.0)
+
+	# 중복 장착 불가 (사용자 결정 2026-09-15) — 후보 추첨이 장착분을 빼고 뽑는다
+	var dup := _new_state()
+	dup.overhauls.append("overhaul_ov_p1")
+	var rng := RngService.new()
+	rng.setup(9)
+	var drawn := dup.draw_overhaul_candidates(1, rng)
+	_ok("추첨 후보에 장착분이 없다", not drawn.has("overhaul_ov_p1"), str(drawn))
+	_ok("같은 오버홀 재설치 거부", not dup.install_overhaul("overhaul_ov_p1", 1))
+
+	# OV-T2 투어 예산 — 값은 D13 문면("투어당 3회")이 파라미터 창구로 들어왔다
+	_eq_float("OV-T2 투어 예산 = 3", state.data.param("param_overhaul_hold_tour_budget"), 3.0)
+	var budget := _new_state()
+	budget.overhaul_hold_uses_this_tour = 2
+	budget.begin_tour()
+	_ok("투어 개시가 예산을 되돌린다", budget.overhaul_hold_uses_this_tour == 0,
+		"uses=%d" % budget.overhaul_hold_uses_this_tour)
+	budget.overhaul_hold_uses_this_tour = 2
+	var reloaded := _new_state()
+	reloaded.deserialize(budget.serialize())
+	_ok("예산 소진량이 세이브에 실린다", reloaded.overhaul_hold_uses_this_tour == 2,
+		"uses=%d" % reloaded.overhaul_hold_uses_this_tour)
 
 
 func _tc_o2_tuning_and_overhaul() -> void:
@@ -850,6 +940,8 @@ func _tc_o6_exchange_guards() -> void:
 		# `machine_stats`(엔진 주입 스냅숏) · `chassis_max`(기준값 + T4 보강 — 정비·HUD 공용 창구).
 		# 재화를 만들거나 환전하는 경로가 아니다(G1 무접촉) — 읽기 전용 파생값이다.
 		"machine_stat", "machine_stats", "chassis_max",
+		# 회차 19 — 대체형 축(기저 파라미터를 갈아 끼우는 오버홀 5종)의 조회·스냅숏 창구.
+		"machine_override", "machine_overrides",
 		"overhaul_slots", "install_overhaul", "draw_overhaul_candidates", "parts_stat_bonus",
 		"career_stat", "record_gp_result", "record_tour_result", "record_season_result",
 		# `achievement_progress` 는 SYS-04 업적 화면의 조건 진척 조회 경로다

@@ -32,6 +32,11 @@ var deck: Array = []                     # 편성된 skill id
 # 레이스 엔진이 아니라 여기 두는 이유: 상한의 주기가 **투어**라 GP 단위로 생성·폐기되는
 # 엔진 인스턴스에 두면 GP 를 새로 시작하는 것만으로 리셋된다 (D07 §4.2 SH4·SI4 회차 제한).
 var skill_uses_this_tour: Dictionary = {}
+# OV-T2 리버스 텔레메트리 — 투어당 추가 홀드 예산의 소진량 (개선 회차 19 · 사용자 결정).
+# 정본(D13 별첨A §7.2)은 "홀드 턴당 1회 → 투어당 3회 한정 2회"인데 표에 3 이 유실돼 있었다.
+# 예산형으로 살린다: 한 턴에 몰아 쓰든 나눠 쓰든 투어당 3회분이다. 스킬 사용 횟수와 같은
+# 투어 스코프이므로 `begin_tour()` 가 비우고 세이브에 실린다.
+var overhaul_hold_uses_this_tour := 0
 var deck_slots: int = 0
 var crew: Dictionary = {}                # crew id -> true
 var sponsor_contracts: Array = []        # sponsor id
@@ -139,6 +144,7 @@ func _repair_cost_ratio() -> float:
 
 func begin_tour() -> void:
 	skill_uses_this_tour.clear()   # 투어당 횟수 리셋 (D07 §4.2 — SH4 2회 · SI4 1회)
+	overhaul_hold_uses_this_tour = 0   # OV-T2 추가 홀드 예산도 투어 스코프다
 	sponsor_tour_facts.clear()     # 투어 단위 계약 — 조건 소재도 투어마다 (회차 13 · D07 §5.4). 계약 자체는 이어진다.
 	# 무상 복원선 — 투어 개시 시 복원선까지 무상 복원, 이미 그 위면 그대로 (D06 §3.3 결정 #12)
 	chassis = maxf(chassis, float(free_restore_line()))
@@ -210,13 +216,10 @@ func event_chassis_recover(amount: int) -> int:
 
 
 func free_restore_line() -> int:
-	# 투어 개시 무상 복원선 70 CH — OV-S4 장착 시 80 (D13 별첨A §7.2)
-	var line := data.param_int("param_repair_free_restore_line")
-	for overhaul_id in overhauls:
-		var row := data.overhaul(String(overhaul_id))
-		if String(row.get("effect", "")) == "free_restore_line":
-			line = CsvTable.to_int(String(row["effect_value"]))
-	return line
+	# 투어 개시 무상 복원선 70 CH — OV-S4 장착 시 80 (D13 별첨A §7.2 · 대체형 창구 경유).
+	# **절대값이다** — 섀시 최대치가 올라도 따라가지 않는다 (사용자 결정 2026-09-15).
+	return int(machine_override("free_restore_line",
+		data.param("param_repair_free_restore_line")))
 
 
 # ── 머신 스탯 창구 (개선 회차 18 · 2026-09-15) ──
@@ -232,6 +235,18 @@ func free_restore_line() -> int:
 #
 # 오버홀 파츠(`parts_stat_bonus`)는 **같은 축에 얹히지만** 이 회차에서 열지 않는다 — 파츠 캡의
 # 절단 단위와 듀얼 판정 이중 계상이 정본 침묵이라 오버홀 회차에서 판정을 받는다.
+#
+# **결합 방식은 값이 아니라 규칙이므로 코드가 쥔다** (D12 §4 "코드는 타입·규칙만 보유").
+#   · 가산형 — 튜닝 단계분 + 오버홀 효과·대가. 같은 축에 그대로 얹힌다(D13 별첨A §7.2 가
+#     `slipstream_coef` 등 튜닝과 **동일한 이름·단위(%p)** 로 적는다).
+#   · 캡 대상 — §7.2 가 "(G-M2 캡 대상)"이라 부기한 **파츠 2종 전속**이다. 계통당 +10%p ·
+#     합산 +20%p 로 절단하며(§7.3), 튜닝분은 캡 밖이다(§7.3 이 튜닝을 '대조'로만 병기).
+#   · 대체형 — 기저 파라미터를 갈아 끼우는 것들. `machine_override()` 가 따로 본다.
+const CAPPED_STAT_TARGETS := ["slipstream_coef", "braking_coef"]
+const OVERRIDE_STAT_TARGETS := ["stable_sector_charge", "charge_cap",
+	"final_lap_gauge_mult", "free_restore_line", "hold_twice_per_turn"]
+
+
 func machine_stat(target: String) -> float:
 	var total := 0.0
 	for tuning_id in data.tuning_lines:
@@ -239,17 +254,65 @@ func machine_stat(target: String) -> float:
 		if String(row["target"]) != target:
 			continue
 		total += CsvTable.to_float(String(row["effect_per_step"])) * float(tuning_step(String(tuning_id)))
+	if OVERRIDE_STAT_TARGETS.has(target):
+		return total   # 대체형은 가산으로 세지 않는다 — 두 번 읽히면 기저값에 덧붙는다
+	var capped := CAPPED_STAT_TARGETS.has(target)
+	for overhaul_id in overhauls:
+		var row := data.overhaul(String(overhaul_id))
+		if row.is_empty():
+			continue
+		# 파츠의 캡 대상 축은 `parts_stat_bonus()` 가 절단해서 한 번에 넣는다(아래) — 여기서 건너뛴다.
+		var is_part := String(row.get("kind", "")) == "part"
+		if String(row["effect"]) == target and not (capped and is_part):
+			total += CsvTable.to_float(String(row["effect_value"]))
+		# 사이드그레이드의 대가는 효과와 **동시에** 산다 (D13 별첨A §7.2 "양수 효과 + 음수 대가 쌍").
+		if String(row.get("drawback", "")) == target:
+			total += CsvTable.to_float(String(row["drawback_value"]))
+	if capped:
+		total += parts_stat_bonus(target)
 	return total
 
 
+# 대체형 조회 — 오버홀이 그 축을 정의하면 기저값 대신 그 값이다 (D13 별첨A §7.2).
+# 가산이 아니라 대체인 근거는 문면이 전부 "A → B" 꼴이라는 것이다:
+# 안정 완주 차지 1 → 2 · 차지 상한 10 → 12 · 최종 랩 계수 ×1.2 → ×1.35 · 복원선 70 → 80 ·
+# 홀드 턴당 1회 → 2회. 가산으로 읽으면 3·22·2.55·150·3 이 되어 문면과 어긋난다.
+func machine_override(target: String, fallback: float) -> float:
+	for overhaul_id in overhauls:
+		var row := data.overhaul(String(overhaul_id))
+		if not row.is_empty() and String(row["effect"]) == target:
+			return CsvTable.to_float(String(row["effect_value"]))
+	return fallback
+
+
+# 엔진 주입용 대체형 스냅숏 — 기저값은 엔진이 알고 있으므로 **오버홀이 정의한 것만** 싣는다.
+func machine_overrides() -> Dictionary:
+	var overrides: Dictionary = {}
+	for target in OVERRIDE_STAT_TARGETS:
+		var found := machine_override(String(target), NAN)
+		if not is_nan(found):
+			overrides[target] = found
+	return overrides
+
+
 # 엔진 주입용 스냅숏 — 세션이 GP 개시 때 넘긴다. 엔진은 아웃게임을 모른다(혼입 0).
+# 대상 목록은 **표가 정한다** — 튜닝의 `target` 열과 오버홀의 `effect`·`drawback` 열 전량.
+# 대체형은 여기 싣지 않는다(`machine_overrides()` 몫).
 func machine_stats() -> Dictionary:
 	var stats: Dictionary = {}
 	for tuning_id in data.tuning_lines:
-		var target := String(data.tuning_lines[tuning_id]["target"])
-		if not stats.has(target):
-			stats[target] = machine_stat(target)
+		_collect_stat(stats, String(data.tuning_lines[tuning_id]["target"]))
+	for overhaul_id in data.overhauls:
+		var row: Dictionary = data.overhauls[overhaul_id]
+		_collect_stat(stats, String(row["effect"]))
+		_collect_stat(stats, String(row.get("drawback", "")))
 	return stats
+
+
+func _collect_stat(stats: Dictionary, target: String) -> void:
+	if target.is_empty() or stats.has(target) or OVERRIDE_STAT_TARGETS.has(target):
+		return
+	stats[target] = machine_stat(target)
 
 
 # 섀시 최대치 = 기준값 + T4 보강 (D13 별첨A §2.3 "최대치 100 (T4 5단계 시 125)").
@@ -950,6 +1013,7 @@ func serialize() -> Dictionary:
 		"relation_pending": _relation_pending.duplicate(),
 		"consumables": consumables.duplicate(),
 		"skill_uses_this_tour": skill_uses_this_tour.duplicate(),
+		"overhaul_hold_uses_this_tour": overhaul_hold_uses_this_tour,
 		"milestones": milestones.duplicate(),
 		"narrative_act": narrative_act,
 		"act_vn_fired": act_vn_fired.duplicate(),
@@ -992,6 +1056,8 @@ func restore(payload: Dictionary) -> bool:
 	# `field_repair_count`(회차 11 삭제)는 구세이브에 남아 있어도 읽지 않는다 — 미지 키는 무시가 규약이다.
 	# 스킬 소비부 도입 전 세이브 = 무사용이 충실값 (구세이브 관용)
 	skill_uses_this_tour = payload.get("skill_uses_this_tour", {})
+	# 도입(회차 19) 전 세이브에는 없다 — 그 세계는 예산을 쓴 적이 없으므로 0 이 충실값이다.
+	overhaul_hold_uses_this_tour = int(payload.get("overhaul_hold_uses_this_tour", 0))
 	milestones = payload.get("milestones", {})
 	narrative_act = int(payload.get("narrative_act", 1))
 	act_vn_fired = payload.get("act_vn_fired", {})

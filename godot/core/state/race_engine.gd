@@ -100,6 +100,17 @@ var chassis_carry_in: float = -1.0
 # 스냅숏을 떠 start_gp 전에 넣는다. 엔진은 튜닝도 오버홀도 모르고 **효과 대상 이름만** 안다.
 # 비어 있으면 전 항목 0 이므로 기저값 그대로 — 단독 인스턴스화 경로가 종전과 같이 선다.
 var machine_stats_carry_in: Dictionary = {}
+# 대체형 주입분 (개선 회차 19) — 오버홀이 기저 파라미터를 갈아 끼우는 축만 실린다.
+# 비어 있으면 전부 기저값이므로 오버홀 없는 머신은 종전 거동 그대로다.
+var machine_overrides_carry_in: Dictionary = {}
+# OV-T2 추가 홀드 — 투어 예산의 소진량(반입·회수)과 이번 턴에 그 예산을 썼는지.
+# 스킬 투어 횟수와 같은 형태다: 정본은 아웃게임 층이고 엔진은 사본만 움직인다.
+var overhaul_hold_uses_carry_in := 0
+# 장착한 오버홀 수 — 듀얼 판정식의 `오버홀(슬롯×6)` 항 (D13 별첨A §2.4 · 사용자 결정 2026-09-15:
+# 슬롯 항과 인스턴스 효과 OV-S3(+8)를 **함께** 센다). '슬롯 확보'의 실물이 장착분이므로 장착 수로 읽는다.
+var overhaul_count_carry_in := 0
+var overhaul_hold_uses := 0
+var overhaul_hold_used_this_turn := false
 # 이 GP 의 섀시 최대치 = 기준값 + 스탯. start_gp 에서 한 번 굳힌다 —
 # 대회 중에 최대치가 흔들리면 같은 회복량이 턴마다 다른 결과를 낸다.
 var chassis_max: float = 0.0
@@ -184,6 +195,17 @@ func _stat(target: String) -> float:
 	return float(machine_stats_carry_in.get(target, 0.0))
 
 
+# 대체형 조회 (개선 회차 19) — 오버홀이 그 축을 정의했으면 그 값, 아니면 기저값.
+func _override(target: String, fallback: float) -> float:
+	return float(machine_overrides_carry_in.get(target, fallback))
+
+
+# 이번 턴에 기본 홀드를 한 번 더 쓸 수 있는가 (OV-T2 · 투어 예산이 남아 있을 때만).
+func _extra_hold_available() -> bool:
+	return _override("hold_twice_per_turn", 1.0) > 1.0 \
+		and overhaul_hold_uses < data.param_int("param_overhaul_hold_tour_budget")
+
+
 func start_gp() -> Array:
 	var events: Array = []
 	gp_state = RaceTypes.GpState.GP_START
@@ -200,12 +222,16 @@ func start_gp() -> Array:
 	ai_retire_count = 0
 	_retire_order = 0
 	chassis_max = data.param("param_chassis_max") + _stat("chassis_max")
+	overhaul_hold_uses = overhaul_hold_uses_carry_in   # 투어 스코프 — GP 개시가 리셋 지점이 아니다
+	overhaul_hold_used_this_turn = false
 	if chassis_carry_in >= 0.0:
 		# 이월 개시 (D05 §8) — 주입 값은 [0, 최대치]로 절단한다 (세이브 조작·상한 초과 방어)
 		chassis = clampf(chassis_carry_in, 0.0, chassis_max)
 	else:
 		chassis = chassis_max
+	# OV-T3 콜드 스타트 — GP 개시 차지 (D13 별첨A §7.2 "+2"). 없으면 0 에서 시작한다.
 	charge = 0
+	_gain_charge(int(_stat("gp_start_charge")))
 	consumables_held = consumables_carry_in.duplicate()
 	deck = deck_carry_in.duplicate()
 	skill_uses = skill_uses_carry_in.duplicate()   # 투어 스코프 — GP 개시가 리셋 지점이 아니다
@@ -381,6 +407,7 @@ func begin_turn() -> Dictionary:
 	_enter_phase(RaceTypes.TurnPhase.T1_SECTOR_OPEN)
 	provisional = []
 	hold_used = false
+	overhaul_hold_used_this_turn = false   # OV-T2 추가 홀드는 턴 스코프 (예산 자체는 투어 스코프)
 	negated_troubles = 0
 	duel_boost = 0
 	respin_count = 0
@@ -505,7 +532,10 @@ func get_provisional() -> Array:
 func hold_respin(keep_indices: Array) -> Dictionary:
 	if turn_phase != RaceTypes.TurnPhase.T4_INTERVENTION:
 		return {"ok": false, "error": "phase"}
-	if hold_used:
+	# OV-T2 리버스 텔레메트리 — 턴당 1회를 2회로 (D13 별첨A §7.2). 예산이 남아 있을 때만이고,
+	# 그 턴의 두 번째 홀드가 예산 1 을 먹는다(사용자 결정 = 투어당 추가 3회분 · 개선 회차 19).
+	var extra_hold := hold_used and not overhaul_hold_used_this_turn and _extra_hold_available()
+	if hold_used and not extra_hold:
 		# **`limit_boost` 와 갈라 둔다 (26차 재검).** 이쪽은 "홀드는 턴당 1회"(D05 §5.4)이고
 		# 저쪽은 "부스트 상한"이다 — `already` 2분할과 같은 근거: 한 문면으로 둘을 말하면
 		# 한쪽이 거짓이 된다. 같은 함수의 `respin_cap`(합산 상한)과도 다른 사실이다.
@@ -514,7 +544,12 @@ func hold_respin(keep_indices: Array) -> Dictionary:
 	# D05 §5.4 의 "턴당 1회"(기본 액션 자체의 한도)는 무개정이고, 그 취지(무한 리롤 방지)를
 	# 스킬 층까지 넓힌 것이 이 상한이다. 두 카운터를 겹쳐 두는 이유: 스킬이 상한을 먼저
 	# 소진했을 때 기본 홀드도 막혀야 하는데 hold_used 만으로는 그것이 표현되지 않는다.
-	if respin_count >= data.param_int("param_hold_total_cap_per_turn"):
+	# 추가 홀드를 쓰는 턴에는 총량 가드도 그만큼 올린다 (사용자 결정 2026-09-15) — 정본이 총량 2 를
+	# 잡을 때의 전제가 "기본 홀드 턴당 1회"였으므로, 기본이 2 가 되면 스킬 재회전 몫이 사라진다.
+	var respin_cap := data.param_int("param_hold_total_cap_per_turn")
+	if extra_hold:
+		respin_cap += 1
+	if respin_count >= respin_cap:
 		return {"ok": false, "error": "respin_cap"}
 	# SH4 웜업 스핀 — 이번 턴 기본 홀드의 차지 비용 0 (별첨A §4.2 "기본 홀드 비용 1 → 0")
 	var cost := 0 if bool(skill_mods.get(MOD_FREE_HOLD, false)) \
@@ -522,6 +557,9 @@ func hold_respin(keep_indices: Array) -> Dictionary:
 	if charge < cost:
 		return {"ok": false, "error": "charge"}
 	charge -= cost
+	if extra_hold:
+		overhaul_hold_uses += 1
+		overhaul_hold_used_this_turn = true
 	hold_used = true
 	hold_uses += 1
 	respin_count += 1
@@ -915,9 +953,14 @@ func _settle_sector(momentum: bool) -> Array:
 					# 안정 완주 +1·듀얼 승리 보너스는 심볼 생산이 아니므로 곱하지 않는다.
 					var pulse_charge := float(CsvTable.to_int(String(
 						_match_effect(RaceTypes.SYMBOL_PULSE, pulse_count)["charge"])))
+					# OV-S4 롱런 패키지의 대가 — 펄스 심볼 차지 생산 −1, **최저 1** (D13 별첨A §7.2).
+					# 배수(SA2)보다 먼저 깎는다: 생산량 자체가 줄고 그 위에 배수가 붙는 순서다.
+					pulse_charge = maxf(pulse_charge + _stat("pulse_charge_yield"), 1.0)
 					_gain_charge(int(round(pulse_charge * float(skill_mods.get(MOD_PULSE_MULT, 1.0)))))
 				if not trouble_fired:
-					var stable_gain := data.param_int("param_charge_stable_sector")
+					# OV-T1 노스윈드 인테이크 — 안정 완주 차지 1 → 2 (대체 · D13 별첨A §7.2)
+					var stable_gain := int(_override("stable_sector_charge",
+						data.param("param_charge_stable_sector")))
 					_gain_charge(stable_gain)
 					events.append(_ev("T5", "raceLog.stableSector01", {"amount": stable_gain}, SPEAKER_CREW))
 				events.append_array(_apply_resonance_bonus(gauge_mult))
@@ -942,7 +985,10 @@ func _settle_sector(momentum: bool) -> Array:
 				# T1 파워트레인 / T3 라인 컨트롤 — 심볼 효과 계수 (D13 별첨A §3.5).
 				# 릴 확률이 아니라 **매치 효과값(게이지 증감분)**에 곱한다(D07 §3.2 명문 차단).
 				# 라인 계수는 전방·후방 **양쪽**에 건다 — 라인의 효과가 그 쌍 자체이기 때문이다.
-				var slip_coef := 1.0 + _stat("slipstream_coef")
+				# OV-S1 경량 모노코크(+8%) / OV-S2 의 대가(−5%) — 전방 게이지 축 (D13 별첨A §7.2).
+				# 적용 범위는 튜닝 계수와 같은 **심볼 유래 전방 증분**이다(모멘텀·레조넌스 제외).
+				var front_coef := 1.0 + _stat("front_gauge_ratio")
+				var slip_coef := (1.0 + _stat("slipstream_coef")) * front_coef
 				var line_coef := 1.0 + _stat("line_coef")
 				var slip_count := _count_symbol(RaceTypes.SYMBOL_SLIPSTREAM)
 				if slip_count > 0:
@@ -950,7 +996,7 @@ func _settle_sector(momentum: bool) -> Array:
 				var line_count := _count_symbol(RaceTypes.SYMBOL_LINE)
 				if line_count > 0:
 					var line_effect := _match_effect(RaceTypes.SYMBOL_LINE, line_count)
-					front_gauge += CsvTable.to_float(String(line_effect["front_gauge"])) * gauge_mult * advance_mult * line_coef
+					front_gauge += CsvTable.to_float(String(line_effect["front_gauge"])) * gauge_mult * advance_mult * line_coef * front_coef
 					rear_gauge += CsvTable.to_float(String(line_effect["rear_gauge"])) * gauge_mult * advance_mult * line_coef
 				var chance_count := _count_symbol(RaceTypes.SYMBOL_CHANCE)
 				if chance_count >= 3:
@@ -961,7 +1007,7 @@ func _settle_sector(momentum: bool) -> Array:
 						chance_full = true
 						events.append(_ev("T5", "raceLog.chanceDuel01", {}))
 					else:
-						front_gauge += CsvTable.to_float(String(chance_effect["front_gauge"])) * gauge_mult * advance_mult
+						front_gauge += CsvTable.to_float(String(chance_effect["front_gauge"])) * gauge_mult * advance_mult * front_coef
 						events.append(_ev("T5", "raceLog.chanceProc01", {}))
 				if momentum:
 					var bonus := data.param("param_gauge_momentum_bonus")
@@ -1148,6 +1194,9 @@ func _duel_judgment(duel_type: int) -> float:
 	# T5 펄스 드라이브 정밀화 — 판정식의 독립 가산항 (D13 별첨A §2.4 판정식 명문:
 	# `J = 심볼 환산 + 부스트 + T5 튜닝(단계×4) + 오버홀 + 레조넌스 보정`). 추월·방어 공통이다.
 	judgment += _stat("duel_judgment")
+	# 오버홀 슬롯 항 (D13 별첨A §2.4 판정식 · §본문 V-3 "슬롯당 듀얼 판정 +6").
+	# 인스턴스 OV-S3 의 +8 은 위 `duel_judgment` 축에 이미 실려 있고, 둘을 함께 세는 것이 결정이다.
+	judgment += float(overhaul_count_carry_in) * data.param("param_duel_overhaul_per_slot")
 	judgment += resonance_duel_bonus
 	return judgment
 
@@ -1186,7 +1235,10 @@ func _duel_threshold(duel_type: int, opponent_id: String) -> float:
 func _gauge_mult() -> float:
 	var mult := _attr_rule_mult("gauge_mult")
 	if lap >= data.circuit_int("laps"):
-		mult *= data.param("param_gauge_final_lap_mult")
+		# OV-T4 라스트 랩 서지 — 최종 랩 계수 ×1.2 → ×1.35 (대체 · D13 별첨A §7.2).
+		# **상한을 걸지 않는다** (사용자 결정 2026-09-15): 배틀 존 ×1.5 와 겹치면 ×2.025 로
+		# §1.3 의 명문 상한 ×1.8 을 넘지만, 그 상한은 속성 조합에 걸린 것으로 읽는다.
+		mult *= _override("final_lap_gauge_mult", data.param("param_gauge_final_lap_mult"))
 	return mult
 
 
@@ -1206,6 +1258,9 @@ func _apply_neighbor_passives(gauge_mult: float) -> void:
 		var pressure := (data.param("param_gauge_rear_pressure_base") \
 			+ float(rear["seed_aggression"]) * data.param("param_gauge_rear_pressure_aggr_coef")) \
 			* float(rear["pressure_mult"])
+		# OV-S3 하이 레이크 셋업의 대가 — 후방 압박 +10% (D13 별첨A §7.2).
+		# 소속 계수(불카 ×1.3) 뒤에 곱한다: 머신 쪽 사정이라 상대 소속과 독립이다.
+		pressure *= (1.0 + _stat("rear_pressure_ratio"))
 		rear_gauge += pressure * gauge_mult
 
 
@@ -1416,7 +1471,9 @@ func _match_effect(symbol_id: String, match_count: int) -> Dictionary:
 
 
 func _gain_charge(amount: int) -> void:
-	charge = clampi(charge + amount, 0, data.param_int("param_charge_cap"))
+	# 차지 상한 — OV-P3 펄스 코일 확장이 10 → 12 로 갈아 끼운다 (D13 별첨A §7.2 · 회차 19).
+	charge = clampi(charge + amount, 0, int(_override("charge_cap",
+		data.param("param_charge_cap"))))
 
 
 # 화자 축 (개선 회차 6 — 2026-09-04). 표시 층(로그 피드)이 줄마다 화자 도상을 갈라 붙이므로 사건이

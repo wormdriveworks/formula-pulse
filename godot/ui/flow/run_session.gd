@@ -646,6 +646,10 @@ func begin_gp() -> bool:
 	# 머신 스탯 반입 (개선 회차 18) — 튜닝 단계가 만든 계수·가산치. 덱과 같은 형태의 스냅숏이다:
 	# 엔진은 튜닝을 모르고 효과 대상 이름만 받는다(혼입 0 · 계층 방향 유지).
 	engine.machine_stats_carry_in = outgame.machine_stats()
+	# 오버홀 결선분 (개선 회차 19) — 대체형 축 · 장착 수(듀얼 슬롯 항) · OV-T2 투어 예산.
+	engine.machine_overrides_carry_in = outgame.machine_overrides()
+	engine.overhaul_count_carry_in = outgame.overhauls.size()
+	engine.overhaul_hold_uses_carry_in = outgame.overhaul_hold_uses_this_tour
 	presentation.reset_gp()  # L2/L3 상한 카운터 = GP 단위 (D08 §8.5)
 	return true
 
@@ -676,6 +680,8 @@ func close_gp() -> void:
 	# 투어 스코프 사용 횟수 회수 — GP 하나만 돌고 끝나는 값이 아니다.
 	# 회수가 빠지면 SH4·SI4 의 투어 상한이 GP 마다 되살아난다.
 	outgame.skill_uses_this_tour = engine.skill_uses.duplicate()
+	# OV-T2 투어 예산 회수 — 스킬 횟수와 같은 이유다. 빠지면 GP 마다 예산이 되살아난다.
+	outgame.overhaul_hold_uses_this_tour = engine.overhaul_hold_uses
 	_advance_succession_maro(engine)
 	# 카이 벽 조우 = 재회 체인 비트 (D08 §8.7-3 "브리핑·이벤트·벽 조우"의 세 번째 축).
 	if engine.duel_opponents.has(KAI_ID):

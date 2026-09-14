@@ -68,6 +68,7 @@ param_deck_expand_dp1,70
 param_deck_expand_dp2,110
 param_deck_expand_dp3,160
 param_hold_total_cap_per_turn,2
+param_overhaul_hold_tour_budget,3
 param_sponsor_slots_base,1
 param_sponsor_slots_with_g4,2
 param_vane_stage2_dp,290
@@ -101,6 +102,7 @@ param_fx_duel_result_hold_sec,0.6
 param_fx_save_hold_sec,2.0
 param_fx_save_spin_sec,1.0
 param_duel_wall_threshold_add,6
+param_duel_overhaul_per_slot,6
 param_consumable_shield_mult,0.5
 param_jude_adjacent_max,2
 param_audio_default_volume,80

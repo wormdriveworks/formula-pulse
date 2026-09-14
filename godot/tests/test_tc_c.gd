@@ -24,6 +24,7 @@ func _init() -> void:
 	_tc_c7_gauge_coefficients()
 	_tc_c9_chassis_retire()
 	_tuning_effects_wired()
+	_overhaul_effects_wired()
 	_tc_c11_seal()
 	_tc_c12_scumming()
 	_seal_across_many_spins()
@@ -916,6 +917,177 @@ func _tuning_effects_wired() -> void:
 	var atk_plain := _tuned_judgment({}, RaceTypes.DuelType.OVERTAKE, RaceTypes.SYMBOL_SLIPSTREAM)
 	var atk_tuned := _tuned_judgment({"slipstream_coef": slip_stat}, RaceTypes.DuelType.OVERTAKE, RaceTypes.SYMBOL_SLIPSTREAM)
 	_eq_float("T1 은 추월 듀얼 판정에 걸리지 않는다 (심볼 정의의 비대칭)", atk_tuned, atk_plain, 0.001)
+
+
+# ── 오버홀 효과 결선 (개선 회차 19 · 2026-09-15) ──
+#
+# 12종 중 `free_restore_line` 하나만 소비되던 것을 나머지 11종까지 연결했다(매뉴얼 9절 2항).
+# 대체형은 기저 파라미터를 갈아 끼우고, 가산형은 튜닝과 같은 축에 얹힌다.
+func _overhaul_effects_wired() -> void:
+	# OV-T3 콜드 스타트 — GP 개시 차지
+	var cold := _new_engine(81, "circuit_mn1")
+	if cold == null:
+		return
+	cold.machine_stats_carry_in = {"gp_start_charge": 2.0}
+	cold.start_gp()
+	_ok("OV-T3 GP 개시 차지 +2", cold.charge == 2, "charge=%d" % cold.charge)
+	var plain := _new_engine(81, "circuit_mn1")
+	plain.start_gp()
+	_ok("미장착은 0 에서 시작 (종전 그대로)", plain.charge == 0, "charge=%d" % plain.charge)
+
+	# OV-P3 펄스 코일 확장 — 차지 상한 대체
+	var coil := _new_engine(82, "circuit_mn1")
+	coil.machine_overrides_carry_in = {"charge_cap": 12.0}
+	coil.start_gp()
+	coil._gain_charge(99)
+	_ok("OV-P3 차지 상한 12", coil.charge == 12, "charge=%d" % coil.charge)
+	var capped := _new_engine(82, "circuit_mn1")
+	capped.start_gp()
+	capped._gain_charge(99)
+	_ok("미장착 상한 = 기준값", capped.charge == capped.data.param_int("param_charge_cap"),
+		"charge=%d" % capped.charge)
+
+	# OV-T1 노스윈드 인테이크 — 안정 완주 차지 1 → 2 (대체)
+	var intake := _stable_sector_charge({"stable_sector_charge": 2.0})
+	var intake_base := _stable_sector_charge({})
+	_ok("OV-T1 안정 완주 차지 2", intake == 2, "gain=%d" % intake)
+	_ok("미장착 안정 완주 차지 = 기준값 1", intake_base == 1, "gain=%d" % intake_base)
+
+	# OV-S4 대가 — 펄스 생산 −1 · 최저 1
+	var yield_base := _pulse_charge_gain({}, 1)
+	var yield_cut := _pulse_charge_gain({"pulse_charge_yield": -1.0}, 1)
+	_ok("펄스 1매치 기저 = +1", yield_base == 1, "gain=%d" % yield_base)
+	_ok("생산 −1 이어도 최저 1 은 남는다", yield_cut == 1, "gain=%d" % yield_cut)
+	var yield3_base := _pulse_charge_gain({}, 3)
+	var yield3_cut := _pulse_charge_gain({"pulse_charge_yield": -1.0}, 3)
+	_ok("펄스 3매치는 한 칸 줄어든다", yield3_cut == yield3_base - 1,
+		"cut=%d base=%d" % [yield3_cut, yield3_base])
+
+	# OV-T4 라스트 랩 서지 — 최종 랩 계수 대체 · **상한 없음**(사용자 결정)
+	var surge := _new_engine(83, "circuit_mn1")
+	surge.machine_overrides_carry_in = {"final_lap_gauge_mult": 1.35}
+	surge.start_gp()
+	surge.lap = surge.data.circuit_int("laps")
+	surge.sector = 3           # 다음 begin_turn 에서 S4 = 배틀 존
+	surge.begin_turn()
+	var battle_mult := CsvTable.to_float(String(surge.data.sector_attr("attr_battle_zone")["gauge_mult"]), 1.0)
+	_eq_float("OV-T4 최종 랩 × 배틀 존 = 2.025 (상한 미적용)", surge._gauge_mult(),
+		battle_mult * 1.35, 0.001)
+	var surge_plain := _new_engine(83, "circuit_mn1")
+	surge_plain.start_gp()
+	surge_plain.lap = surge_plain.data.circuit_int("laps")
+	surge_plain.sector = 3
+	surge_plain.begin_turn()
+	_eq_float("미장착 최종 랩 × 배틀 존 = 1.8", surge_plain._gauge_mult(),
+		battle_mult * surge_plain.data.param("param_gauge_final_lap_mult"), 0.001)
+
+	# OV-S1 경량 모노코크 — 전방 게이지 축 (심볼 유래 전방 증분 전속)
+	var light_base := _tuned_front_gauge({})
+	var light := _tuned_front_gauge({"front_gauge_ratio": 0.08})
+	_ok("OV-S1 전방 증분이 커진다", light > light_base, "tuned=%f base=%f" % [light, light_base])
+
+	# OV-S3 대가 — 후방 압박 +10%
+	var press_base := _rear_pressure({})
+	var press := _rear_pressure({"rear_pressure_ratio": 0.10})
+	_eq_float("OV-S3 대가 = 압박 ×1.1", press, press_base * 1.10, 0.01)
+
+	# 듀얼 판정 — 슬롯 항(장착 수 × 6)과 인스턴스 효과(+8)를 **함께** 센다 (사용자 결정)
+	var slot_per := _new_engine(84, "circuit_mn1").data.param("param_duel_overhaul_per_slot")
+	_eq_float("슬롯당 판정 = 6 (D13 별첨A §2.4)", slot_per, 6.0)
+	var judge_plain := _tuned_judgment({}, RaceTypes.DuelType.OVERTAKE, RaceTypes.SYMBOL_LINE)
+	var judge_slots := _judgment_with_overhauls({}, 2)
+	_eq_float("오버홀 2슬롯 = 판정 +12", judge_slots, judge_plain + 2.0 * slot_per, 0.01)
+	var judge_both := _judgment_with_overhauls({"duel_judgment": 8.0}, 2)
+	_eq_float("OV-S3 의 +8 은 그 위에 얹힌다", judge_both, judge_plain + 2.0 * slot_per + 8.0, 0.01)
+
+	# OV-T2 리버스 텔레메트리 — 턴당 2회 · 투어 예산 3회분
+	var twice := _hold_probe({"hold_twice_per_turn": 2.0}, 0)
+	_ok("OV-T2 첫 홀드 성립", bool(twice[0].get("ok", false)), str(twice[0]))
+	_ok("OV-T2 같은 턴 두 번째 홀드도 성립", bool(twice[1].get("ok", false)), str(twice[1]))
+	_ok("OV-T2 세 번째는 거부", not bool(twice[2].get("ok", false)), str(twice[2]))
+	_ok("두 번째 홀드가 투어 예산 1 을 먹는다", int(twice[3]) == 1, "uses=%d" % int(twice[3]))
+	var once := _hold_probe({}, 0)
+	_ok("미장착은 종전대로 턴당 1회", not bool(once[1].get("ok", false)), str(once[1]))
+	var spent := _hold_probe({"hold_twice_per_turn": 2.0}, 3)
+	_ok("예산을 다 쓴 투어에서는 두 번째 홀드가 막힌다",
+		not bool(spent[1].get("ok", false)), str(spent[1]))
+
+
+# 안정 완주(트러블 0) 한 턴의 차지 획득량
+func _stable_sector_charge(overrides: Dictionary) -> int:
+	var engine := _new_engine(85, "circuit_mn1")
+	if engine == null:
+		return -1
+	engine.machine_overrides_carry_in = overrides
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = 0
+	engine.provisional = _combo(RaceTypes.SYMBOL_LINE, 3, RaceTypes.SYMBOL_LINE)
+	engine.confirm(0.0)
+	return engine.charge
+
+
+# 펄스 n매치 한 턴의 차지 획득량 (안정 완주 보너스 포함분을 빼고 잰다)
+func _pulse_charge_gain(stats: Dictionary, count: int) -> int:
+	var engine := _new_engine(86, "circuit_mn1")
+	if engine == null:
+		return -1
+	engine.machine_stats_carry_in = stats
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = 0
+	engine.provisional = _combo(RaceTypes.SYMBOL_PULSE, count, RaceTypes.SYMBOL_LINE)
+	engine.confirm(0.0)
+	return engine.charge - engine.data.param_int("param_charge_stable_sector")
+
+
+func _rear_pressure(stats: Dictionary) -> float:
+	var engine := _new_engine(87, "circuit_mn1")
+	if engine == null:
+		return 0.0
+	engine.machine_stats_carry_in = stats
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	_isolate_gauge_side(engine, "rear")
+	engine.begin_turn()
+	engine.spin()
+	engine.rear_gauge = 0.0
+	engine.provisional = _combo(RaceTypes.SYMBOL_LINE, 0, RaceTypes.SYMBOL_PULSE)
+	engine.confirm(0.0)
+	return engine.rear_gauge
+
+
+func _judgment_with_overhauls(stats: Dictionary, count: int) -> float:
+	var engine := _new_engine(66, "circuit_mn1")
+	if engine == null:
+		return 0.0
+	engine.machine_stats_carry_in = stats
+	engine.overhaul_count_carry_in = count
+	engine.start_gp()
+	_force_duel(engine, RaceTypes.DuelType.OVERTAKE)
+	engine.provisional = _combo(RaceTypes.SYMBOL_LINE, 1, RaceTypes.SYMBOL_PULSE)
+	return engine._duel_judgment(RaceTypes.DuelType.OVERTAKE)
+
+
+# 홀드 3연타의 결과와 소진된 투어 예산
+func _hold_probe(overrides: Dictionary, budget_spent: int) -> Array:
+	var engine := _new_engine(88, "circuit_mn1")
+	if engine == null:
+		return [{}, {}, {}, 0]
+	engine.machine_overrides_carry_in = overrides
+	engine.overhaul_hold_uses_carry_in = budget_spent
+	engine.start_gp()
+	engine.begin_turn()
+	engine.spin()
+	engine.charge = 9
+	var first := engine.hold_respin([0])
+	var second := engine.hold_respin([0])
+	var third := engine.hold_respin([0])
+	return [first, second, third, engine.overhaul_hold_uses - budget_spent]
 
 
 # 측정 프로브 5종 — 전부 같은 시드·같은 섹터에서 **스탯만** 갈아 끼운다.
