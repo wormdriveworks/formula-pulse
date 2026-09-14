@@ -126,6 +126,7 @@ func _on_bound(payload: Dictionary) -> void:
 	_mount_cg(vn_id)
 	_lines = _normalize_lines(payload.get("line_keys", ["ui.vn.placeholderLine01"]))
 	_line_index = 0
+	_build_auto_toggle()
 	_show_line()
 	(%AdvanceButton as Button).grab_focus()
 	(%AdvanceButton as Button).pressed.connect(_advance)
@@ -268,7 +269,69 @@ func _normalize_lines(raw: Variant) -> Array:
 	return normalized
 
 
+# ── 자동 진행 (E04 · 개선 회차 22 · D09 §5.3 "자동 진행 모드(속도 3단)") ──
+#
+# 종전에는 옵션 O10 이 저장만 되고 **자동 진행 자체가 없었다** — 속도를 고를 수는 있는데
+# 자동으로 넘어가는 기능이 없으니 그 선택이 닿을 데가 없었다(매뉴얼 9절 5항).
+# 속도는 옵션이 정하고(세션 창구 `vn_auto_advance_sec()`), 켜고 끄는 것은 이 화면의 토글이다.
+#
+# **진입 시에는 꺼진 상태로 선다** — 자동은 그 자리에서 고르는 것이고, 켠 채로 다음 VN 에
+# 들어가면 읽기 전에 넘어간다(D09-2 의 "재개 시 정지 상태로 복귀"와 같은 취지).
+var _auto_button: Button = null
+var _auto_timer: Timer = null
+
+
+func _build_auto_toggle() -> void:
+	_auto_button = Button.new()
+	_auto_button.name = "AutoButton"
+	_auto_button.toggle_mode = true
+	_auto_button.add_theme_font_size_override("font_size", _body_font_size)
+	_auto_button.text = session.data.strings.text("ui.vn.auto")
+	# **스킵의 맞은편(좌상단)에 둔다.** 별첨A §A-19 는 이 토글을 대사창 우하단에 두지만,
+	# 코드 생성 버튼은 씬 버튼보다 최소 높이가 커서 대사창 바닥 행에 넣으면 대사창이 통째로
+	# 높아지고(8 → 18px), 높아진 대사창이 **바닥에서 72px 고정인 선택 지점 오버레이를 밀어
+	# 겹친다**(UISCR 이 그 겹침을 잡았다). 행 하나의 조판 차이가 화면을 건너는 결함이 되는 자리라,
+	# 원도 없이 씬 버튼과 같은 높이를 맞추는 대신 **대사창 밖**으로 옮긴다. 스킵과 같은 층·같은
+	# 여백(8px)의 맞은편이라 조작 묶음으로도 읽힌다. 씬에 노드가 서면 §A-19 자리로 되돌린다.
+	_auto_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_auto_button.offset_left = 8.0
+	_auto_button.offset_top = 8.0
+	add_child(_auto_button)
+	_auto_timer = Timer.new()
+	_auto_timer.name = "AutoTimer"
+	_auto_timer.one_shot = true
+	add_child(_auto_timer)
+	_auto_timer.timeout.connect(_on_auto_timeout)
+	_auto_button.toggled.connect(_on_auto_toggled)
+
+
+func _on_auto_toggled(pressed: bool) -> void:
+	if pressed:
+		_restart_auto_timer()
+	else:
+		_auto_timer.stop()
+
+
+func _on_auto_timeout() -> void:
+	# 선택 지점·캘린더가 떠 있으면 자동이 대신 고르지 않는다 — 진행 입력과 같은 규칙이다.
+	# 멈추지 않고 다시 재는 이유: 지점을 지난 뒤에는 자동이 이어져야 한다.
+	if _choice_visible() or (%CalendarPanel as Control).visible:
+		_restart_auto_timer()
+		return
+	_advance()
+
+
+func _restart_auto_timer() -> void:
+	if _auto_timer == null or _auto_button == null or not _auto_button.button_pressed:
+		return
+	var wait := session.vn_auto_advance_sec()
+	if wait <= 0.0:
+		return
+	_auto_timer.start(wait)
+
+
 func _show_line() -> void:
+	_restart_auto_timer()   # 라인이 바뀔 때마다 다시 잰다 — 남은 시간이 이월되지 않는다
 	var s := session.data.strings
 	var line: Dictionary = _lines[_line_index]
 	var speaker_key := String(line["speaker_key"])

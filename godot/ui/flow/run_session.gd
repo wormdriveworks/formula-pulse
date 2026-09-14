@@ -60,6 +60,8 @@ var _reunion_beats_this_tour := 0
 # 플랫폼 서비스 — **인터페이스 타입으로만 쥔다**(혼입 0). 합성은 `PlatformServices.create()`
 # 단일 지점이며, 미주입(null)도 정상 상태다: 헤드리스 테스트·러너는 플랫폼 없이 돈다.
 var platform: PlatformServices
+# 화면 층 숙주 (라우터) — O8 UI 스케일이 창에 닿는 유일한 통로다 (개선 회차 22).
+var _ui_host: Node = null
 
 # 오디오 디스패처 — **사운드의 유일 발화 경로**. 화면은 게임 이벤트 id 만 던지고 무엇이
 # 울릴지는 `sound_map` 이 정한다. 커리어가 아니라 세션에 매다는 이유: 타이틀·옵션 화면도
@@ -90,9 +92,55 @@ func setup(game_data: GameData, services: PlatformServices = null, audio_host: N
 		var sink := SilentAudioOutput.new()
 		audio.setup(data, sink, haptics_out)
 		sink.bind_dispatcher(audio)
+	_ui_host = audio_host
 	apply_volume_options()
 	apply_haptic_options()
+	apply_display_options()
 	apply_language()
+
+
+# O8 UI 스케일 → 창 (개선 회차 22 · D09 §1.1 "100 / 110 / 125% 확정 기준값").
+#
+# 종전에는 저장만 되고 소비부가 없었다. 값은 표가 대고(`param_opt_ui_scale_1/2`) 코드는 단계와
+# 창구만 쥔다 — 100% 는 문면 그대로의 정의라 1.0 이 값 기입이 아니다(햅틱 3단과 같은 형태).
+#
+# **비정수 표시 확대는 O8 전속의 공인 예외다** (D10 §2.2 — "니어리스트 네이버 허용(확정) ·
+# 표시 스케일 층에 한정"). 제작 층의 믹셀 금지 원칙과 층위가 다르다.
+# 창이 없는 경로(헤드리스 검사·단독 인스턴스화)는 조용히 건너뛴다 — 적용 대상이 없는 것이지
+# 실패가 아니다. 그래서 실효값을 `ui_scale_factor()` 로 따로 열어 검사가 창 없이도 잰다.
+func apply_display_options() -> void:
+	if _ui_host == null or not _ui_host.is_inside_tree():
+		return
+	var window := _ui_host.get_window()
+	if window == null:
+		return
+	window.content_scale_factor = ui_scale_factor()
+
+
+func ui_scale_factor() -> float:
+	if options == null or data == null:
+		return 1.0
+	match options.index_of("o8"):
+		1:
+			return data.param("param_opt_ui_scale_1")
+		2:
+			return data.param("param_opt_ui_scale_2")
+		_:
+			return 1.0
+
+
+# O10 VN 자동 진행 대기 시간(초) — 3단 (개선 회차 22 · D09 §5.3 "자동 진행 모드(속도 3단)").
+# 정본이 문면 3종만 확정하고 초 값을 비워 둔 자리라 **사용자 결정으로 값을 정해 D13 창구에 충전**했다.
+func vn_auto_advance_sec() -> float:
+	if options == null or data == null:
+		return 0.0
+	match options.index_of("o10"):
+		0:
+			return data.param("param_vn_auto_slow_sec")
+		2:
+			return data.param("param_vn_auto_fast_sec")
+		_:
+			return data.param("param_vn_auto_normal_sec")
 
 
 # O11 언어 → 스트링 표. **볼륨·햅틱과 같은 자리다** — 코어는 옵션 저장소(화면 층)를

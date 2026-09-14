@@ -35,6 +35,7 @@ func _init() -> void:
 	_applied_on_screen_bind()
 	_consumers_route()
 	_language_consumption()
+	_scale_and_auto_advance()
 	print("")
 	if _checked < 54:
 		print("UI_OPTIONS_FAIL checks=%d < 하한 54 (스위트 축소 의심)" % _checked)
@@ -186,6 +187,79 @@ func _load_gpl(path: String) -> Dictionary:
 		swatches[String(parts[1]).split(" ")[0]] = Color8(
 			int(channels[0]), int(channels[1]), int(channels[2]))
 	return swatches
+
+
+# ── O8 UI 스케일 · O10 VN 자동 진행 · O7 보류 (개선 회차 22 · 2026-09-15) ──
+#
+# 세 항목 다 종전에는 **저장만 되고 소비부가 0** 이었다(매뉴얼 9절 5항). O8·O10 은 결선했고
+# O7 은 확대 단 폰트 원도가 정본에서 이월된 상태라 목록에서 내렸다 — 고를 수는 있는데 아무 일도
+# 일어나지 않는 항목을 남기지 않는다는 것이 이 축의 요지다.
+func _scale_and_auto_advance() -> void:
+	var data := GameData.new()
+	if not data.load_all():
+		_ok("데이터 적재", false)
+		return
+	var session := RunSession.new()
+	session.setup(data)   # 창 없음 — 실효값 창구가 창 없이도 서는지 함께 본다
+
+	# O8 — 단계 → 배율. 100% 는 문면 그대로라 코드의 1.0 이 값 기입이 아니다.
+	session.options.set_index("o8", 0)
+	_ok("O8 기본 = 100%", is_equal_approx(session.ui_scale_factor(), 1.0),
+		str(session.ui_scale_factor()))
+	session.options.set_index("o8", 1)
+	_ok("O8 2단 = param_opt_ui_scale_1",
+		is_equal_approx(session.ui_scale_factor(), data.param("param_opt_ui_scale_1")),
+		str(session.ui_scale_factor()))
+	session.options.set_index("o8", 2)
+	_ok("O8 3단 = param_opt_ui_scale_2",
+		is_equal_approx(session.ui_scale_factor(), data.param("param_opt_ui_scale_2")),
+		str(session.ui_scale_factor()))
+	_ok("O8 3단이 2단보다 크다",
+		data.param("param_opt_ui_scale_2") > data.param("param_opt_ui_scale_1"))
+	session.options.set_index("o8", 0)
+	_ok("창이 없어도 적용 호출이 죽지 않는다", _apply_display_is_safe(session))
+
+	# O10 — 단계 → 대기 시간(초). 값은 D13 창구 경유이며 느릴수록 길다.
+	var waits: Array = []
+	for step in range(3):
+		session.options.set_index("o10", step)
+		waits.append(session.vn_auto_advance_sec())
+	_ok("O10 느림 = param_vn_auto_slow_sec",
+		is_equal_approx(float(waits[0]), data.param("param_vn_auto_slow_sec")), str(waits))
+	_ok("O10 보통 = param_vn_auto_normal_sec",
+		is_equal_approx(float(waits[1]), data.param("param_vn_auto_normal_sec")), str(waits))
+	_ok("O10 빠름 = param_vn_auto_fast_sec",
+		is_equal_approx(float(waits[2]), data.param("param_vn_auto_fast_sec")), str(waits))
+	_ok("느림 > 보통 > 빠름", float(waits[0]) > float(waits[1]) and float(waits[1]) > float(waits[2]),
+		str(waits))
+
+	# VN 화면이 그 값을 실제로 쓴다 — 창구만 있고 화면이 안 읽으면 종전과 같은 상태다.
+	var vn_src := FileAccess.get_file_as_string("res://ui/nar/vn_screen.gd")
+	_ok("VN 화면이 자동 진행 창구를 읽는다", vn_src.contains("session.vn_auto_advance_sec()"))
+	_ok("VN 화면에 자동 토글이 있다", vn_src.contains("ui.vn.auto"))
+	_ok("라인마다 다시 잰다", vn_src.contains("_restart_auto_timer()"))
+
+	# O7 — 목록에서 내렸으되 정의는 남았다(원도 유입 때 항목만 되올린다)
+	var listed := false
+	for tab in OptionsStore.TABS:
+		if Array(tab["options"]).has("o7"):
+			listed = true
+	_ok("O7 은 옵션 목록에 없다 (확대 단 원도 이월)", not listed)
+	_ok("O7 정의는 남아 있다", OptionsStore.OPTIONS.has("o7"))
+	_ok("O8 은 목록에 있다", _listed("o8"))
+	_ok("O10 도 목록에 있다", _listed("o10"))
+
+
+func _listed(option_id: String) -> bool:
+	for tab in OptionsStore.TABS:
+		if Array(tab["options"]).has(option_id):
+			return true
+	return false
+
+
+func _apply_display_is_safe(session: RunSession) -> bool:
+	session.apply_display_options()
+	return true
 
 
 func _ok(label: String, condition: bool, detail: String = "") -> void:

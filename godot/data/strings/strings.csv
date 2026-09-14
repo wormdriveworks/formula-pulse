@@ -523,6 +523,7 @@ ui.eventNode.rewardFormat,+{amount},+{amount},+{amount}
 ui.eventNode.rewardChassisFormat,섀시 +{amount},Chassis +{amount},シャシー +{amount}
 ui.eventNode.rare,희귀,Rare,レア
 ui.vn.skip,스킵 ▶▶,Skip ▶▶,スキップ ▶▶
+ui.vn.auto,자동,Auto,自動
 ui.vn.speakerVane,베인,VEIN,ヴェイン
 ui.vn.speakerMarta,마르타,Marta,マルタ
 ui.vn.speakerTheo,테오,Theo,テオ

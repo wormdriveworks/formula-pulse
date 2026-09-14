@@ -16,7 +16,13 @@ extends RefCounted
 const TABS := [
 	{"key": "ui.options.tabGameplay", "options": ["o4", "o5", "o6", "o10"]},
 	{"key": "ui.options.tabAccessibility", "options": ["o1", "o2", "o3", "o9", "o12"]},
-	{"key": "ui.options.tabAudioVideo", "options": ["o7", "o8", "o13", "o14", "o15"]},
+	# **O7 텍스트 크기는 목록에서 내려 두었다** (개선 회차 22 · 사용자 결정 2026-09-15).
+	# 소비부가 게을러서가 아니라 **정본이 값을 비워 둔 상태**다 — D10 §5.7 이 "O7 확대 단(115/130%)
+	# 원도 = O7 결선 시 확정 [이월]"이라 명기하고 실효 배율 열도 "실효 100%(확대 단 미확정)"다.
+	# 고를 수는 있는데 아무 일도 일어나지 않는 항목을 남기는 것보다 원도가 설 때까지 감추는 편이
+	# 정직하다. **정의(`OPTIONS["o7"]`)는 남긴다** — 저장된 선택과 기본값이 그대로 살아 있어야
+	# 원도 유입 때 항목만 되올리면 된다.
+	{"key": "ui.options.tabAudioVideo", "options": ["o8", "o13", "o14", "o15"]},
 	{"key": "ui.options.tabControls", "options": []},
 	{"key": "ui.options.tabLanguage", "options": ["o11"]},
 ]
