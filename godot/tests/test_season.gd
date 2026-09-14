@@ -225,6 +225,26 @@ func _season_close_and_grid_level() -> void:
 		str(result3["grid_level_next"]))
 	_ok("챔피언 실패 = 에필로그 아님", not bool(result3["epilogue"]))
 	_ok("연속 기록 초기화", String(result3["champion"]) != SeasonState.PLAYER_ID)
+	# ── 에필로그 이후 레벨 고정 (개선 회차 21 · D08 §5.3 "포스트게임은 자유 주행·기록 경신 국면") ──
+	# 종전에는 이 가드가 없어 챔피언마다 레벨이 계속 올랐다. 래치이므로 실패 시즌을 끼워도 풀리지 않는다.
+	_ok("에필로그 래치는 서 있다", state.epilogue_reached)
+	for extra_season in [4, 5]:
+		state.begin_season(extra_season)
+		for tour in range(5):
+			for race in range(4):
+				state.record_gp(_gp_result(1))
+			state.close_tour()
+		var extra := state.close_season()
+		_ok("시즌 %d 도 챔피언" % extra_season,
+			String(extra["champion"]) == SeasonState.PLAYER_ID, str(extra["champion"]))
+		_ok("에필로그 이후에는 레벨이 오르지 않는다 (시즌 %d)" % extra_season,
+			int(extra["grid_level_next"]) == 2, str(extra["grid_level_next"]))
+	# 래치는 세이브에 실린다 — 재로드로 고정이 풀리면 포스트게임이 다시 가팔라진다
+	var reloaded := _new_state(44)
+	if reloaded != null:
+		_ok("재로드 성립", reloaded.restore(state.serialize()))
+		_ok("재로드 후 래치 보존", reloaded.epilogue_reached)
+		_ok("재로드 후 레벨 보존", reloaded.grid_level == 2, str(reloaded.grid_level))
 	# ── 순위 밖 절상 (총괄 판정 IMPL-141 ① · 집행 IMPL-142) ──
 	# 플레이어가 챔피언십 순위표에 없는 시즌(전 GP 미기록·이상 종료)에도 D06 §5.3 G-M1은
 	# "성적 무관 최소 1슬롯"을 보장한다. 0을 흘리면 등급 표에 걸리는 행이 없어 빈 추첨이 된다.

@@ -19,6 +19,9 @@ var season: int = 1
 var tour_slot: int = 1                 # 1~5 (시즌 내 투어 인덱스)
 var race_slot: int = 1                 # 1~4 (투어 내 그랑프리 인덱스)
 var grid_level: int = 0
+# 에필로그(2연속 챔피언) 도달 래치 — 그리드 레벨 고정의 열쇠 (개선 회차 21 · D08 §5.3).
+# 한 번 서면 내려가지 않는다: 도달 후 실패했다가 다시 2연속을 채워도 포스트게임은 되돌려지지 않는다.
+var epilogue_reached := false
 
 var calendar: Array = []               # tour_slot 순서의 stage id 배열
 var tour_points: Dictionary = {}       # entrant id -> 현 투어 누계 투어 포인트
@@ -168,6 +171,9 @@ func apply_to_engine(engine: RaceEngine) -> void:
 	engine.resonance_circuit_id = resonance_circuit_id
 	engine.resonance_sector_slot = resonance_sector_slot
 	engine.player_start_rank = player_start_rank()
+	# 그리드 레벨 (개선 회차 21) — 합성 5층 중 **4층**이다(D08 §6.1 · D12 §2:
+	# 팀 기본 → 개인 시드 → 무대 보정 → **그리드 레벨** → 슬롯 진행). 엔진은 층을 순서대로 쌓기만 한다.
+	engine.grid_level = grid_level
 
 
 # 플레이어 시작 포지션 (D13 별첨A §6.3 산정식):
@@ -386,9 +392,19 @@ func close_season() -> Dictionary:
 	# **절상은 이 단일 지점 전속** — 하류(HUB-08 진입·결산 화면·통산 기록)는 받은 값을 그대로 쓴다.
 	var player_index := order.find(PLAYER_ID)
 	var player_position := player_index + 1 if player_index >= 0 else _grid_size()
-	# 그리드 레벨: 챔피언 달성 시즌의 **다음 시즌부터** +1, 실패해도 유지 (D13 별첨A §7.4)
-	if champion == PLAYER_ID:
+	# 그리드 레벨: 챔피언 달성 시즌의 **다음 시즌부터** +1, 실패해도 유지 (D13 별첨A §7.4).
+	# **에필로그(2연속 챔피언) 달성 이후에는 고정**한다 (D08 §5.3 확정 — "포스트게임은 자유 주행·
+	# 기록 경신 국면"). 개선 회차 21 · 2026-09-15 — 종전에는 이 가드가 없어 챔피언마다 계속 올랐다.
+	#
+	# **판정은 래치로 본다.** 직전 연속 기록으로 세면 "2연속 → 실패 → 다시 2연속"에서 고정이 풀린다 —
+	# 한 번 도달한 포스트게임이 되돌려지는 셈이다. 래치는 그 시즌의 상승을 살리고(달성 '이후'가 고정이다)
+	# 그다음부터 멈춘다.
+	var frozen := epilogue_reached
+	if champion == PLAYER_ID and not frozen:
 		grid_level += data.param_int("param_grid_level_step")
+	var epilogue_now := _consecutive_player_titles() >= 2
+	if epilogue_now:
+		epilogue_reached = true
 	return {
 		"season": season,
 		"standings": order,
@@ -396,8 +412,10 @@ func close_season() -> Dictionary:
 		"player_position": player_position,
 		"grid_level_next": grid_level,
 		"tour_wins": season_tour_wins,
-		# 에필로그 = 2연속 시즌 챔피언 (D05 §10 · D08 §8.9 — 판정 시점 = 시즌 결산)
-		"epilogue": _consecutive_player_titles() >= 2,
+		# 에필로그 = 2연속 시즌 챔피언 (D05 §10 · D08 §8.9 — 판정 시점 = 시즌 결산).
+		# **이 시즌의 사건**이다 — SET-02 의 개방 고지가 이 값을 읽으므로 래치를 돌려주면
+		# 그 뒤 매 시즌 같은 고지가 다시 선다. 래치(`epilogue_reached`)는 레벨 고정 전용이다.
+		"epilogue": epilogue_now,
 	}
 
 
@@ -414,6 +432,7 @@ func serialize() -> Dictionary:
 	return {
 		"season": season, "tour_slot": tour_slot, "race_slot": race_slot,
 		"grid_level": grid_level,
+		"epilogue_reached": epilogue_reached,
 		"calendar": calendar.duplicate(),
 		"tour_points": tour_points.duplicate(),
 		"championship_points": championship_points.duplicate(),
@@ -436,6 +455,8 @@ func restore(payload: Dictionary) -> bool:
 	tour_slot = int(payload["tour_slot"])
 	race_slot = int(payload["race_slot"])
 	grid_level = int(payload["grid_level"])
+	# 래치 도입(회차 21) 전 세이브에는 없다 — 그 세계는 고정을 몰랐으므로 false 가 충실값이다.
+	epilogue_reached = bool(payload.get("epilogue_reached", false))
 	calendar = payload["calendar"]
 	tour_points = payload["tour_points"]
 	championship_points = payload["championship_points"]

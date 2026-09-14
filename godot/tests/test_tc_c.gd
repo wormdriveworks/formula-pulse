@@ -25,6 +25,7 @@ func _init() -> void:
 	_tc_c9_chassis_retire()
 	_tuning_effects_wired()
 	_overhaul_effects_wired()
+	_grid_level_wired()
 	_tc_c11_seal()
 	_tc_c12_scumming()
 	_seal_across_many_spins()
@@ -917,6 +918,64 @@ func _tuning_effects_wired() -> void:
 	var atk_plain := _tuned_judgment({}, RaceTypes.DuelType.OVERTAKE, RaceTypes.SYMBOL_SLIPSTREAM)
 	var atk_tuned := _tuned_judgment({"slipstream_coef": slip_stat}, RaceTypes.DuelType.OVERTAKE, RaceTypes.SYMBOL_SLIPSTREAM)
 	_eq_float("T1 은 추월 듀얼 판정에 걸리지 않는다 (심볼 정의의 비대칭)", atk_tuned, atk_plain, 0.001)
+
+
+# ── 그리드 레벨 결선 (개선 회차 21 · 2026-09-15) ──
+#
+# 종전에는 `grid_level` 이 시즌 챔피언마다 오르기만 하고 **난이도에 반영되지 않았다**
+# (매뉴얼 9절 4항 · `param_grid_level_pace_add`·`param_duel_grid_level_coef` 소비부 0).
+# 값이 있는 두 축만 연다 — 나머지 3축은 D13 에 수치가 없다(사용자 결정 2026-09-15).
+func _grid_level_wired() -> void:
+	var base := _new_engine(91, "circuit_mn1")
+	if base == null:
+		return
+	base.start_gp()
+	var leveled := _new_engine(91, "circuit_mn1")
+	leveled.grid_level = 2
+	leveled.start_gp()
+	var pace_add := base.data.param("param_grid_level_pace_add")
+	_eq_float("D13 §6.2 레벨당 페이스 +0.4", pace_add, 0.4)
+	_eq_float("D13 §6.2 레벨당 듀얼 임계 +3", base.data.param("param_duel_grid_level_coef"), 3.0)
+
+	# 전 AI 가 대상이고 플레이어는 아니다
+	var lifted := 0
+	var checked := 0
+	for entrant_id in base.entrants:
+		if entrant_id == RaceEngine.PLAYER_ID:
+			continue
+		checked += 1
+		if absf(float(leveled.entrants[entrant_id]["pace"])
+				- float(base.entrants[entrant_id]["pace"]) - 2.0 * pace_add) <= 0.001:
+			lifted += 1
+	_ok("레벨 2 = 전 AI 페이스 +0.8", lifted == checked and checked > 0,
+		"lifted=%d/%d" % [lifted, checked])
+	_eq_float("플레이어 페이스는 그대로",
+		float(leveled.entrants[RaceEngine.PLAYER_ID].get("pace", 0.0)),
+		float(base.entrants[RaceEngine.PLAYER_ID].get("pace", 0.0)))
+
+	# 듀얼 임계 — 추월·방어 공통이고 로렌츠의 방어 override 에도 얹힌다
+	var filler_id := ""
+	for entrant_id in base.entrants:
+		if bool(base.entrants[entrant_id].get("is_filler", false)):
+			filler_id = String(entrant_id)
+			break
+	_ok("전제: 필러 참가자 실재", not filler_id.is_empty())
+	if not filler_id.is_empty():
+		for duel_type in [RaceTypes.DuelType.OVERTAKE, RaceTypes.DuelType.DEFENSE]:
+			var label := "추월" if duel_type == RaceTypes.DuelType.OVERTAKE else "방어"
+			_eq_float("레벨 2 = %s 임계 +6" % label,
+				leveled._duel_threshold(duel_type, filler_id),
+				base._duel_threshold(duel_type, filler_id) + 6.0, 0.01)
+	if base.entrants.has("ai_lorentz"):
+		_eq_float("방어 override 에도 얹힌다 (로렌츠 55 → 61)",
+			leveled._duel_threshold(RaceTypes.DuelType.DEFENSE, "ai_lorentz"),
+			base._duel_threshold(RaceTypes.DuelType.DEFENSE, "ai_lorentz") + 6.0, 0.01)
+	# 레벨 0 은 종전 그대로 — 결선이 기존 밸런스를 밀지 않았다는 대조군
+	var zero := _new_engine(91, "circuit_mn1")
+	zero.start_gp()
+	_eq_float("레벨 0 임계 = 종전값", zero._duel_threshold(RaceTypes.DuelType.OVERTAKE, filler_id),
+		base.data.param("param_duel_overtake_base") + 3.0
+			* base.data.param("param_duel_overtake_stability_coef"), 0.01)
 
 
 # ── 오버홀 효과 결선 (개선 회차 19 · 2026-09-15) ──

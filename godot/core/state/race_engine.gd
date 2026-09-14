@@ -68,6 +68,9 @@ var race_slot: int = 1
 # 플레이어 시작 포지션 (D13 별첨A §6.3) — 투어 층이 산정해 주입한다. 0 = 미주입(고정값 사용).
 # 기준 순위 산정(챔피언십 순위 / 직전 GP 결과)은 시즌 층 소관이며 엔진은 결과만 소비한다.
 var player_start_rank: int = 0
+# 그리드 레벨 (개선 회차 21) — 시즌 챔피언마다 +1(에필로그 이후 고정). 시즌 층이 주입한다.
+# 0 이면 종전 거동 그대로이므로 단독 인스턴스화 경로는 영향을 받지 않는다.
+var grid_level: int = 0
 
 var lap: int = 0
 var sector: int = 0
@@ -319,6 +322,17 @@ func _build_entrants() -> void:
 			"duel_overtake_add": 0.0, "duel_defense_override": -1.0,
 			"retired": false, "retire_order": -1, "number": next_number,
 		}
+	# 그리드 레벨 보정 (개선 회차 21) — 합성 5층의 **4층**이라 슬롯 진행 보정 **앞**에 선다
+	# (D08 §6.1 · D12 §2 의 고정 순서). 대상은 **전 AI**(네임드·필러·벽 라이벌 전부)이고
+	# 플레이어는 아니다 — D08 §5.3 "라이벌 전체 파라미터 1단 상승" · D13 별첨A §6.2 "전 AI 페이스 +0.4".
+	# **값이 있는 두 축만 적용한다** (사용자 결정 2026-09-15): 페이스와 듀얼 임계(`_duel_threshold`).
+	# 나머지 3축(공격성·안정성·러시)과 시작 보정은 D13 에 수치가 없어 열지 않는다(불변규칙 2).
+	if grid_level > 0:
+		var level_pace_add := float(grid_level) * data.param("param_grid_level_pace_add")
+		for entrant_id in entrants:
+			if entrant_id == PLAYER_ID:
+				continue
+			entrants[entrant_id]["pace"] = float(entrants[entrant_id]["pace"]) + level_pace_add
 	# 슬롯 진행 보정: 그리드 전체의 기저 강도에 가산 (D08 §2.4 — 무대 다이얼과 독립된 슬롯 다이얼).
 	# 플레이어는 대상이 아니다 — 보정의 목적어가 "필러·경쟁 풀의 기본 파라미터"다.
 	var slot_pace_add := data.tour_slot_pace_add(race_slot)
@@ -1207,8 +1221,12 @@ func _duel_threshold(duel_type: int, opponent_id: String) -> float:
 	# 벽 라이벌 임계 가산 (D13 별첨A §2.4 "벽 라이벌 (해당 무대) +6" — 추월·방어 공통 행).
 	# [가안] 방어 override(로렌츠 55)에도 가산한다 — §2.4의 벽 행은 필러/네임드/로렌츠 행과
 	# 독립된 조건부 가산 행이고 면제 문면이 없다 (그리드 레벨 +3 행과 동형 구조).
-	var wall_add := data.param("param_duel_wall_threshold_add") \
+	var threshold_add := data.param("param_duel_wall_threshold_add") \
 		if opponent_id == _wall_rival_id() else 0.0
+	# 그리드 레벨 가산 (D13 별첨A §2.4 저항 임계 표의 공통 행 "레벨당 +3" · 개선 회차 21).
+	# 벽 가산과 **같은 층위**이며 추월·방어 공통이다. 로렌츠의 방어 override 에도 얹는다 —
+	# §2.4 에서 벽 행과 그리드 레벨 행이 나란한 조건부 가산 행이고 면제 문면이 없다(벽 가산의 전례).
+	threshold_add += float(grid_level) * data.param("param_duel_grid_level_coef")
 	if duel_type == RaceTypes.DuelType.OVERTAKE:
 		# 압박 훅 (D13 별첨A §6.2 비앙카 "안정성 4.0(압박 시 2.5)" · D08 §6.3 조건 분기 위임).
 		# [가안] '압박 시'의 판정 = **추월 듀얼 상황** — 플레이어가 뒤차로서 앞차를 밀어붙이는
@@ -1220,13 +1238,13 @@ func _duel_threshold(duel_type: int, opponent_id: String) -> float:
 			stability = under_pressure
 		return data.param("param_duel_overtake_base") \
 			+ stability * data.param("param_duel_overtake_stability_coef") \
-			+ float(opponent["duel_overtake_add"]) + wall_add
+			+ float(opponent["duel_overtake_add"]) + threshold_add
 	var override_value := float(opponent["duel_defense_override"])
 	if override_value >= 0.0:
-		return override_value + wall_add
+		return override_value + threshold_add
 	return data.param("param_duel_defense_base") \
 		+ float(opponent["seed_aggression"]) * data.param("param_duel_defense_aggression_coef") \
-		+ wall_add
+		+ threshold_add
 
 
 # ── 게이지 보조 ──
