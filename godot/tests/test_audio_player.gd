@@ -22,7 +22,7 @@
 # **첫 프레임 이후에 돈다** — `_init()` 시점에는 `root` 가 없어 플레이어를 트리에 매달 수 없다.
 extends SceneTree
 
-const MIN_CHECKS := 107
+const MIN_CHECKS := 117
 
 var _checked := 0
 var _failures := 0
@@ -42,6 +42,7 @@ func _process(_delta: float) -> bool:
 	_buses(data)
 	_sfx_pool(data)
 	_voice_release(data)
+	_jingle_release(data)
 	_crossfade(data)
 	_tension_layer(data)
 	_ducking(data)
@@ -149,6 +150,53 @@ func _voice_release(data: GameData) -> void:
 		str(dispatcher.active_voice_count()))
 	_ok("종료 통지 = 재생기 점유 감소", player.active_sfx_count() == 1,
 		str(player.active_sfx_count()))
+
+
+# ── ③-b 징글 보이스 통지 (개선 회차 28 — 사용자 실기 "재개 뒤 효과음 무음" 조사에서 발견) ──
+#
+# 징글은 SFX 풀이 아니라 전용 플레이어를 타는데, 그 플레이어의 `finished` 가 **미결속**이었다.
+# 디스패처는 채널을 가리지 않고 `_voices` 에 넣으므로 징글 1발 = 보이스 1개 영구 점유 — GP 결산
+# 마다 하나씩 쌓여 상한(12)에 닿으면 새 발화는 살아 있는 P3 를 걷어내야만 서고, 걷을 것이 없으면
+# 버려진다(조작음은 전부 P3). ③ 과 같은 방법으로 통지 사슬을 본다: 결속 실재 → 점유 → 통지 →
+# 해제, **겹침**(재생 중 징글 위에 새 징글)이 종전 점유를 푸는가, 상한 이상을 연달아 울려도
+# SFX 가 사는가 — 마지막이 종전 결함의 재현 형태다.
+func _jingle_release(data: GameData) -> void:
+	var player := _player(data)
+	var dispatcher := AudioDispatcher.new()
+	dispatcher.setup(data, player)
+	dispatcher.clock_override_msec = 0
+	player.bind_dispatcher(dispatcher)
+	_ok("③-b 징글 finished 결속 실재",
+		player._jingle_player.finished.is_connected(player._on_jingle_finished))
+	var fired := dispatcher.emit("gp_result_high")
+	_ok("③-b 징글 발화 (JG-01)", fired.has("sound_jg_result_high"), str(fired))
+	_ok("③-b 징글 = 보이스 점유 1", dispatcher.active_voice_count() == 1,
+		str(dispatcher.active_voice_count()))
+	_ok("③-b 재생기 징글 id 기록", player.active_jingle() == "JG-01", player.active_jingle())
+	player._on_jingle_finished()
+	_ok("③-b 종료 통지 = 점유 0", dispatcher.active_voice_count() == 0,
+		str(dispatcher.active_voice_count()))
+	_ok("③-b 종료 통지 = id 비움", player.active_jingle() == "", player.active_jingle())
+	# 겹침 — 두 번째 징글이 첫 징글의 점유를 푼다(첫 스트림은 finished 없이 끊긴다)
+	dispatcher.clock_override_msec = 1000
+	dispatcher.emit("gp_result_high")
+	dispatcher.clock_override_msec = 2000
+	dispatcher.emit("gp_result_low")
+	_ok("③-b 겹침 = 점유 1 (종전 징글 해제)", dispatcher.active_voice_count() == 1,
+		str(dispatcher.active_voice_count()))
+	_ok("③-b 겹침 = 새 징글 id", player.active_jingle() == "JG-02", player.active_jingle())
+	player._on_jingle_finished()
+	# 상한 이상 연타 — 통지가 살아 있으면 점유가 쌓이지 않고, 그 뒤의 조작음(P3)이 산다.
+	var cap := data.param_int("param_audio_virtual_channels")
+	for index in range(cap + 2):
+		dispatcher.clock_override_msec = 10000 + index * 1000
+		dispatcher.emit("gp_result_high")
+		player._on_jingle_finished()
+	_ok("③-b 상한 초과 연타 뒤 점유 0", dispatcher.active_voice_count() == 0,
+		str(dispatcher.active_voice_count()))
+	dispatcher.clock_override_msec = 100000
+	var after := dispatcher.emit("ui_decide")
+	_ok("③-b 연타 뒤 조작음(P3)이 산다", not after.is_empty(), str(after))
 
 
 # ── ④ BGM 크로스페이드 ──

@@ -46,7 +46,7 @@ stretch_mode = 5
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="DataIcon" type="TextureRect" parent="Pad/Column/CommonBar" unique_id=1556426883]
 unique_name_in_owner = true
@@ -59,13 +59,13 @@ stretch_mode = 5
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="ProgressLabel" type="Label" parent="Pad/Column/CommonBar" unique_id=1231470700]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="BarSpacer" type="Control" parent="Pad/Column/CommonBar" unique_id=1026535373]
 layout_mode = 2
@@ -74,7 +74,7 @@ size_flags_horizontal = 3
 [node name="BackButton" type="Button" parent="Pad/Column/CommonBar" unique_id=743678774]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=1172601320]
 unique_name_in_owner = true
@@ -87,13 +87,13 @@ theme_override_font_sizes/font_size = 14
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="WindowNote" type="Label" parent="Pad/Column" unique_id=1207843309]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="CardList" type="VBoxContainer" parent="Pad/Column" unique_id=2095258556]
 unique_name_in_owner = true

@@ -146,6 +146,10 @@ var _snapshot_icons: Array[TextureRect] = []   # SH3 이전 후보 줄의 도상
 @onready var _e07_wave: Control = %E07VaneWave
 @onready var _e07_text: Label = %E07VaneText
 @onready var _e08_respin: Button = %E08Respin
+# 스킬 5칸은 **하단 바(ZoneD/ResourceRow · 소모품 옆)** 에 선다 (개선 회차 28 · 사용자 결정 2026-09-16).
+# 본문 원도가 11px 로 승격되자 한 줄 액션 열(리스핀·S1~S5·차지 개입·확정)이 약 90px 넘쳐 로그 존을
+# 덮었다 — 열을 둘로 가르는 대신 스킬 열을 하단 바의 빈 폭(약 330px)으로 옮겼다. 고유 이름이라
+# 코드 경로는 그대로다(F1~F5 · RB 조합 · 클릭 전부 `_skill_buttons` 경유).
 @onready var _e08_skills: HBoxContainer = %E08Skills
 @onready var _e05_snapshot: Button = %E05Snapshot
 @onready var _e05_snapshot_new: Button = %E05SnapshotNew
@@ -206,6 +210,13 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
 		Input.joy_connection_changed.disconnect(_on_joy_connection_changed)
+	# 일시정지의 SFX 뮤트는 **이 화면의 상태**다 — 화면이 내려가면 함께 내려간다 (개선 회차 28 —
+	# 사용자 실기 "옵션 뒤 재개하면 효과음이 안 난다"). 종전에는 `resumed` 만 뮤트를 풀었으므로
+	# 정지 메뉴에서 **타이틀로** 나가면 디스패처가 정지 상태로 남아 타이틀·개러지·다음 레이스까지
+	# 효과음이 전부 죽었다. BGM 은 버스가 달라 멀쩡해서 "효과음만 안 난다"로 보였고, 다음
+	# 정지·재개까지 복구 수단도 없었다.
+	if session != null and session.audio != null:
+		session.audio.set_paused(false)
 
 
 func _on_joy_connection_changed(_device: int, _connected: bool) -> void:
@@ -946,8 +957,9 @@ func _on_charge_intervene() -> void:
 # 상태가 생기므로 판정은 엔진 한 곳뿐이다.
 #
 # 라벨은 **`S{n}` + 비용 ◆n** 이다 — 별첨A §A-6 의 배치도 자체가 `[리스핀R][S1~S5][차지C]`
-# 로 슬롯을 번호로 적고, 액션 열 실폭이 371px 이라 스킬명 5개(최장 8자)가 물리적으로 들어가지
-# 않는다. 이름·효과·잔여 횟수는 툴팁이 진다(툴팁 고정 = `detail_info` T·Y).
+# 로 슬롯을 번호로 적고, 스킬 열이 서는 하단 바의 빈 폭(약 330px · 개선 회차 28 이동)에도 스킬명
+# 5개(최장 8자)는 물리적으로 들어가지 않는다(UISCR ㉑ⓔ 대조군). 이름·효과·잔여 횟수는 툴팁이
+# 진다(툴팁 고정 = `detail_info` T·Y).
 func _refresh_skill_slots() -> void:
 	var s := data.strings
 	var slots: Array = engine.skill_slots() if engine != null else []

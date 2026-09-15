@@ -52,44 +52,21 @@ func bind(run_session: RunSession, payload: Dictionary) -> void:
 	session = run_session
 	# **`_on_bound()` 보다 먼저 채운다** — 화면 초기화가 이 값으로 Control 을 만든다.
 	if session != null and session.data != null:
-		# O7 확대 단이면 본문 계열만 확대 원도 크기로 선다 (개선 회차 25 · 세션이 창구다).
-		_body_font_size = session.text_body_font_size()
+		# 본문 = Galmuri11 @ 11px (개선 회차 28 — 회차 25 의 확대 단이 기본값으로 승격 · 텍스트
+		# 크기 옵션은 걷었다). 원도는 전역 기본(project.godot)이 그리고 크기는 이 창구가 댄다.
+		_body_font_size = session.data.param_int("param_font_size_body")
 		_head_font_size = session.data.param_int("param_font_size_head")
-		# 원도 자체는 테마의 기본 폰트로 민다 — 코드 생성 라벨은 오버라이드가 없으므로
-		# 이것이 그린다. 씬이 명시한 대형 계열(Galmuri14)은 노드 오버라이드라 덮이지 않는다.
-		UiTheme.apply_text_size(session.text_body_font(), theme)
 	# O9 색각 대체 팔레트 — 폰트 계열과 같은 이유로 `_on_bound()` 보다 먼저다.
 	# 화면 초기화가 이 색으로 컨트롤을 칠하기 때문에 순서가 규격이다.
 	if session != null:
 		UiPalette.apply_options(session.options)
 	_on_bound(payload)
-	# **씬이 구운 본문 크기를 따라잡는다** (O7 확대 단 · 개선 회차 25). `.tscn` 의
-	# `theme_override_font_sizes/font_size = 9` 는 노드 오버라이드라 테마가 덮지 못한다.
-	# 코드 생성 라벨은 위에서 이미 확대 값으로 서므로 여기서 걸리지 않는다(멱등).
-	# `_on_bound()` **뒤**가 자리다 — 화면이 만든 동적 노드까지 한 번에 훑는다.
-	if session != null and session.data != null:
-		_rescale_body_labels(self, session.data.param_int("param_font_size_body"), _body_font_size)
 	# 진입음·조작음은 **`_on_bound()` 뒤**다 — 화면이 계산한 상태(무대 id·VN 정조)를
 	# 진입 이벤트가 근거로 삼고, 초기화가 만든 동적 버튼까지 결속 대상에 들어온다.
 	if _audio_auto_bind():
 		audio_bind_controls()
 	for event_id in _audio_enter_events():
 		sfx(String(event_id))
-
-
-# 본문 크기로 구워진 노드만 확대 크기로 바꾼다. **대형 계열은 건드리지 않는다** —
-# 폰트를 명시한 노드(Galmuri14)는 건너뛰고, 크기가 본문 기준값과 다른 노드도 건너뛴다.
-# 확대 원도가 없는 계열을 함께 키우면 그 순간 격자가 어긋난다(D10 §5.7 이월 잔여).
-func _rescale_body_labels(node: Node, base_size: int, scaled_size: int) -> void:
-	if base_size == scaled_size:
-		return
-	var control := node as Control
-	if control != null and not control.has_theme_font_override("font") \
-		and control.has_theme_font_size_override("font_size") \
-		and control.get_theme_font_size("font_size") == base_size:
-		control.add_theme_font_size_override("font_size", scaled_size)
-	for child in node.get_children():
-		_rescale_body_labels(child, base_size, scaled_size)
 
 
 # 화면별 초기화 지점 — 라우터가 세션을 넣어 준 뒤 불린다.

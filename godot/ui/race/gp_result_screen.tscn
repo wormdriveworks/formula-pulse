@@ -48,7 +48,7 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.290196, 0.239216, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="HeaderSpacer" type="Control" parent="Pad/Column/HeaderRow" unique_id=1892088298]
 layout_mode = 2
@@ -60,7 +60,7 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="RankLabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=91311128]
 layout_mode = 2
@@ -71,13 +71,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="RankValue" type="Label" parent="Pad/Column/RankLabelRow" unique_id=1454783150]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="PointsLabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=1077833307]
 layout_mode = 2
@@ -88,13 +88,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="PointsValue" type="Label" parent="Pad/Column/PointsLabelRow" unique_id=1024759302]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="PrizeLabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=286004679]
 layout_mode = 2
@@ -105,13 +105,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="PrizeValue" type="Label" parent="Pad/Column/PrizeLabelRow" unique_id=324168169]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="BonusLabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=394504688]
 layout_mode = 2
@@ -122,13 +122,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="BonusValue" type="Label" parent="Pad/Column/BonusLabelRow" unique_id=830324863]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="CarryLabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=1282992630]
 layout_mode = 2
@@ -139,13 +139,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="CarryValue" type="Label" parent="Pad/Column/CarryLabelRow" unique_id=1497613978]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="BottomSpacer" type="Control" parent="Pad/Column" unique_id=1651122516]
 layout_mode = 2
@@ -165,4 +165,4 @@ size_flags_vertical = 3
 unique_name_in_owner = true
 theme_type_variation = &"PrimaryButton"
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11

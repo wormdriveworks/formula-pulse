@@ -35,7 +35,7 @@ func _init() -> void:
 	_applied_on_screen_bind()
 	_consumers_route()
 	_language_consumption()
-	_scale_and_auto_advance()
+	_auto_advance_and_removed_scale()
 	print("")
 	if _checked < 54:
 		print("UI_OPTIONS_FAIL checks=%d < 하한 54 (스위트 축소 의심)" % _checked)
@@ -189,35 +189,20 @@ func _load_gpl(path: String) -> Dictionary:
 	return swatches
 
 
-# ── O8 UI 스케일 · O10 VN 자동 진행 · O7 텍스트 크기 (개선 회차 22 → 25) ──
+# ── O10 VN 자동 진행 · 걷어낸 O7·O8 (개선 회차 22 → 25 → 28) ──
 #
 # 세 항목 다 종전에는 **저장만 되고 소비부가 0** 이었다(매뉴얼 9절 5항). 회차 22 가 O8·O10 을
-# 결선하고 O7 은 확대 단 원도 이월을 이유로 목록에서 내렸으며, **회차 25 가 그 이월을 닫았다** —
-# 원도에 맞춰 2단(100% / 122% = Galmuri11@11px · 사용자 결정 2026-09-15).
-func _scale_and_auto_advance() -> void:
+# 결선하고, 회차 25 가 O7 을 원도에 맞춘 2단으로 결선했으며, **회차 28 이 O7 의 확대 단
+# (Galmuri11 @ 11px = 종전 122%)을 기본값으로 승격하고 O7·O8 을 항목·소비부 함께 걷었다**
+# (사용자 결정 2026-09-16). 이 축은 O10 소비부와 함께 **걷어낸 것이 되살아나지 않는가**를 본다 —
+# 항목만 돌아오고 소비부가 없으면 회차 22 이전의 상태(설정은 켜지는데 화면은 그대로)가 재현된다.
+func _auto_advance_and_removed_scale() -> void:
 	var data := GameData.new()
 	if not data.load_all():
 		_ok("데이터 적재", false)
 		return
 	var session := RunSession.new()
-	session.setup(data)   # 창 없음 — 실효값 창구가 창 없이도 서는지 함께 본다
-
-	# O8 — 단계 → 배율. 100% 는 문면 그대로라 코드의 1.0 이 값 기입이 아니다.
-	session.options.set_index("o8", 0)
-	_ok("O8 기본 = 100%", is_equal_approx(session.ui_scale_factor(), 1.0),
-		str(session.ui_scale_factor()))
-	session.options.set_index("o8", 1)
-	_ok("O8 2단 = param_opt_ui_scale_1",
-		is_equal_approx(session.ui_scale_factor(), data.param("param_opt_ui_scale_1")),
-		str(session.ui_scale_factor()))
-	session.options.set_index("o8", 2)
-	_ok("O8 3단 = param_opt_ui_scale_2",
-		is_equal_approx(session.ui_scale_factor(), data.param("param_opt_ui_scale_2")),
-		str(session.ui_scale_factor()))
-	_ok("O8 3단이 2단보다 크다",
-		data.param("param_opt_ui_scale_2") > data.param("param_opt_ui_scale_1"))
-	session.options.set_index("o8", 0)
-	_ok("창이 없어도 적용 호출이 죽지 않는다", _apply_display_is_safe(session))
+	session.setup(data)   # 창 없음
 
 	# O10 — 단계 → 대기 시간(초). 값은 D13 창구 경유이며 느릴수록 길다.
 	var waits: Array = []
@@ -239,32 +224,47 @@ func _scale_and_auto_advance() -> void:
 	_ok("VN 화면에 자동 토글이 있다", vn_src.contains("ui.vn.auto"))
 	_ok("라인마다 다시 잰다", vn_src.contains("_restart_auto_timer()"))
 
-	# O7 — 원도에 맞춘 2단. 단 수가 원도 수와 묶여 있는 것이 이 축의 요지다:
-	# 단이 늘면 그릴 원도가 없는 단이 생기고, 그 순간 도트가 흐려진다.
-	_ok("O7 은 옵션 목록에 있다 (회차 25 결선)", _listed("o7"))
-	_ok("O7 정의는 남아 있다", OptionsStore.OPTIONS.has("o7"))
-	_ok("O7 = 2단 (원도 수와 같다)", Array(OptionsStore.OPTIONS["o7"]["steps"]).size() == 2,
-		str(OptionsStore.OPTIONS["o7"]["steps"]))
-	# 값은 D13 창구에서 온다 — 코드가 11 을 쥐고 있으면 불변규칙 2 위반이다.
-	session.options.set_index("o7", 0)
-	_ok("O7 100% = 기준 본문 크기", session.text_body_font_size()
-		== data.param_int("param_font_size_body"), "size=%d" % session.text_body_font_size())
-	_ok("O7 100% 는 원도를 말하지 않는다 (전역 기본이 그린다)", session.text_body_font() == null)
-	session.options.set_index("o7", 1)
-	_ok("O7 확대 단 = D13 값", session.text_body_font_size()
-		== data.param_int("param_opt_text_size_body_1"), "size=%d" % session.text_body_font_size())
-	var enlarged := session.text_body_font()
-	_ok("O7 확대 단이 확대 원도를 준다", enlarged != null
-		and String(enlarged.resource_path).contains("Galmuri11"),
-		String(enlarged.resource_path) if enlarged != null else "null")
-	# 대형 계열은 이 축의 대상이 아니다 — 확대 원도가 없다(D10 §5.7 이월 잔여).
+	_ok("O10 은 목록에 있다", _listed("o10"))
+
+	# ── 걷어낸 O7·O8 — 항목·소비부·값·문면 네 층이 함께 없어야 한다 (개선 회차 28) ──
+	# 한 층만 남으면 그 층이 다음 회차에 "이미 있는 것"으로 읽혀 되살아난다(회차 22 이전의
+	# O7·O8 이 정확히 그 형태였다 — 항목·문면은 있고 소비부만 0).
+	for option_id in ["o7", "o8"]:
+		_ok("%s 는 옵션 목록에 없다" % option_id, not _listed(String(option_id)))
+		_ok("%s 정의가 없다" % option_id, not OptionsStore.OPTIONS.has(option_id))
+	_ok("세션에 UI 스케일 창구가 없다", not session.has_method("ui_scale_factor")
+		and not session.has_method("apply_display_options"))
+	_ok("세션에 텍스트 크기 창구가 없다", not session.has_method("text_body_font_size")
+		and not session.has_method("text_body_font"))
 	var flow_src := FileAccess.get_file_as_string("res://ui/flow/flow_screen.gd")
-	_ok("본문 계열만 세션 창구를 탄다", flow_src.contains("session.text_body_font_size()"))
+	_ok("화면 베이스가 본문 크기를 D13 창구에서 직접 받는다",
+		flow_src.contains('_body_font_size = session.data.param_int("param_font_size_body")'))
 	_ok("대형 계열은 기준값 그대로", flow_src.contains('_head_font_size = session.data.param_int("param_font_size_head")'))
-	_ok("씬이 구운 본문 크기를 따라잡는 경로가 있다", flow_src.contains("_rescale_body_labels("))
-	session.options.set_index("o7", 0)
-	_ok("O8 은 목록에 있다", _listed("o8"))
-	_ok("O10 도 목록에 있다", _listed("o10"))
+	_ok("씬 크기 따라잡기 경로가 없다 (씬이 곧 기본값이다)", not flow_src.contains("_rescale_body_labels"))
+	var theme_src := FileAccess.get_file_as_string("res://ui/theme/ui_theme.gd")
+	_ok("테마 창구에 원도 교체 경로가 없다", not theme_src.contains("apply_text_size"))
+	var options_src := FileAccess.get_file_as_string("res://ui/sys/options_screen.gd")
+	_ok("옵션 화면이 표시 배율 적용을 부르지 않는다", not options_src.contains("apply_display_options"))
+	for param_id in ["param_opt_ui_scale_1", "param_opt_ui_scale_2", "param_opt_text_size_body_1"]:
+		_ok("걷어낸 값 행이 없다: %s" % param_id, not data.params.has(param_id))
+	# 접두와 항목을 갈라 둔다 — 이어 붙인 전체가 리터럴로 있으면 V2 가 '코드가 발행하는 키'로 보고
+	# 미등재를 차단한다(G4W 대장 `OPTIONS_DOMAIN` 과 같은 회피 · 21차 전례). 여기서 묻는 것은 **부재**라 조립이 맞다.
+	var removed_prefix := "ui.options."
+	for item in ["o7", "o8", "stepScale100", "stepScale110", "stepScale122", "stepScale125"]:
+		var key := removed_prefix + String(item)
+		_ok("걷어낸 문면이 없다: %s" % key, not data.strings.has_key(key))
+
+	# ── 기본값 = 종전 122% — 전역 기본과 D13 창구가 같은 원도·같은 크기를 쥔다 ──
+	# 크기는 표(param_font_size_body)가, 원도는 project.godot 이 댄다. 둘이 갈리면 코드 생성
+	# 라벨(창구)과 씬(전역)이 다른 격자로 그려진다.
+	var body := data.param_int("param_font_size_body")
+	_ok("본문 창구 = 11 (종전 확대 단이 기본값)", body == 11, str(body))
+	var global_size := int(ProjectSettings.get_setting("gui/theme/default_font_size", 0))
+	_ok("전역 기본 크기 = 본문 창구", global_size == body, "global=%d param=%d" % [global_size, body])
+	var global_font := String(ProjectSettings.get_setting("gui/theme/custom_font", ""))
+	_ok("전역 기본 원도 = Galmuri11 (11px 원도)", global_font.ends_with("Galmuri11.ttf"), global_font)
+	var loaded := load(global_font) as FontFile
+	_ok("전역 기본 원도 실물 적재", loaded != null, global_font)
 
 
 func _listed(option_id: String) -> bool:
@@ -272,11 +272,6 @@ func _listed(option_id: String) -> bool:
 		if Array(tab["options"]).has(option_id):
 			return true
 	return false
-
-
-func _apply_display_is_safe(session: RunSession) -> bool:
-	session.apply_display_options()
-	return true
 
 
 func _ok(label: String, condition: bool, detail: String = "") -> void:

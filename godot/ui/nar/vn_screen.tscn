@@ -66,7 +66,7 @@ offset_top = 8.0
 offset_right = -8.0
 offset_bottom = 8.0
 grow_horizontal = 0
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="DialoguePanel" type="PanelContainer" parent="." unique_id=1871334634]
 custom_minimum_size = Vector2(0, 64)
@@ -85,14 +85,14 @@ theme_override_constants/separation = 3
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.247059, 0.878431, 0.960784, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="BodyLabel" type="Label" parent="DialoguePanel/DialogueColumn" unique_id=124783043]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 24)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 autowrap_mode = 3
 
 [node name="DialogueFooter" type="HBoxContainer" parent="DialoguePanel/DialogueColumn" unique_id=956260666]
@@ -106,7 +106,7 @@ size_flags_horizontal = 3
 [node name="AdvanceButton" type="Button" parent="DialoguePanel/DialogueColumn/DialogueFooter" unique_id=1108677850]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="CalendarPanel" type="PanelContainer" parent="." unique_id=463634223]
 unique_name_in_owner = true

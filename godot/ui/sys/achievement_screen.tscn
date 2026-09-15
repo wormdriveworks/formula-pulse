@@ -40,7 +40,7 @@ theme_override_font_sizes/font_size = 14
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="LinkNotice" type="Label" parent="Pad/Column" unique_id=1212933852]
 unique_name_in_owner = true
@@ -68,4 +68,4 @@ size_flags_horizontal = 3
 [node name="CloseButton" type="Button" parent="Pad/Column/Footer" unique_id=612430891]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11

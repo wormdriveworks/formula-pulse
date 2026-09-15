@@ -41,14 +41,14 @@ theme_override_font_sizes/font_size = 14
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="EpilogueLabel" type="Label" parent="Pad/Column" unique_id=1924471526]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.894118, 0.639216, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="RankRow" type="HBoxContainer" parent="Pad/Column" unique_id=1618452818]
 layout_mode = 2
@@ -59,7 +59,7 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 vertical_alignment = 1
 
 [node name="RankValue" type="Label" parent="Pad/Column/RankRow" unique_id=1067716281]
@@ -78,13 +78,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="PointsValue" type="Label" parent="Pad/Column/PointsRow" unique_id=28612858]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="TourWinsRow" type="HBoxContainer" parent="Pad/Column" unique_id=355428451]
 layout_mode = 2
@@ -95,13 +95,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="TourWinsValue" type="Label" parent="Pad/Column/TourWinsRow" unique_id=350891726]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="GridRow" type="HBoxContainer" parent="Pad/Column" unique_id=798727671]
 layout_mode = 2
@@ -112,13 +112,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="GridValue" type="Label" parent="Pad/Column/GridRow" unique_id=1981810943]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="BottomSpacer" type="Control" parent="Pad/Column" unique_id=230296857]
 layout_mode = 2
@@ -136,4 +136,4 @@ size_flags_horizontal = 3
 unique_name_in_owner = true
 theme_type_variation = &"PrimaryButton"
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11

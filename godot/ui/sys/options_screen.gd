@@ -250,7 +250,6 @@ func _shift(option_id: String, direction: int, value: Label, notice: Label) -> v
 	# 볼륨도 같은 성격이다 — 버스는 옵션을 스스로 읽지 못한다(O13~O15).
 	session.apply_volume_options()
 	session.apply_haptic_options()   # O3 진동 감쇠도 같은 자리다
-	session.apply_display_options()  # O8 UI 스케일 — 같은 축 (개선 회차 22)
 	# O11 언어도 같은 성격이다 — 스트링 표는 옵션을 스스로 읽지 못한다.
 	session.apply_language()
 	sfx("ui_toggle")   # SE-U05 토글·슬라이더 — 단계 이동과 볼륨 이동이 같은 축이다
@@ -359,7 +358,6 @@ func _on_reset() -> void:
 	session.options.reset_defaults()
 	session.apply_volume_options()   # 기본값 복귀도 버스에 닿아야 한다
 	session.apply_haptic_options()
-	session.apply_display_options()
 	session.options.reset_onboarding()  # 1회성 툴팁 재표시 초기화 (COM-02 — §A-24)
 	# **초기화도 언어를 되돌린다** (O11 기본값 복귀) — 그러므로 재구축만으로는 부족하고
 	# 표제·닫기·초기화 문면까지 다시 세워야 한다. `_relabel_all()` 이 그 전부를 진다.

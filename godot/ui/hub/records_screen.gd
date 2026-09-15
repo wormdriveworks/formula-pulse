@@ -154,7 +154,10 @@ func _fill_rival_deep_rows() -> void:
 		row.add_theme_constant_override("separation", 8)
 		var name_label := Label.new()
 		name_label.add_theme_font_size_override("font_size", _body_font_size)
-		name_label.custom_minimum_size = Vector2(110, 0)
+		# 135 = 본문 11px 에서 8인 이름의 최장(ja 121px)을 덮는 열 폭 — 110 은 9px 기준이었다
+		# (개선 회차 28). 최소폭이라 넘어도 잘리지는 않지만, 한 행만 넘으면 그 행의 다음 열이
+		# 밀려 열이 어긋난다. G4W 가 대장(135)과 이 선언을 묶는다.
+		name_label.custom_minimum_size = Vector2(135, 0)
 		name_label.text = s.text(String(rival_row["name_key"]))
 		row.add_child(name_label)
 		var axis := _relation_axis_for(rival_id)
@@ -195,7 +198,7 @@ func _fill_rival_rows() -> void:
 		row.add_theme_constant_override("separation", 8)
 		var name_label := Label.new()
 		name_label.add_theme_font_size_override("font_size", _body_font_size)
-		name_label.custom_minimum_size = Vector2(110, 0)
+		name_label.custom_minimum_size = Vector2(135, 0)   # 위 라이벌 행과 같은 열 폭 (개선 회차 28)
 		name_label.text = s.text(String(rival_row["name_key"]))
 		row.add_child(name_label)
 		# 관계 상태 — 축 대상 라이벌만. 상태 명칭만 표시하고 전이 조건·게이지는 절대 금지.

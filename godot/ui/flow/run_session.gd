@@ -95,66 +95,18 @@ func setup(game_data: GameData, services: PlatformServices = null, audio_host: N
 	_ui_host = audio_host
 	apply_volume_options()
 	apply_haptic_options()
-	apply_display_options()
 	apply_language()
 
 
-# O8 UI 스케일 → 창 (개선 회차 22 · D09 §1.1 "100 / 110 / 125% 확정 기준값").
+# ── 표시 배율·텍스트 크기 옵션은 없다 (개선 회차 28 · 사용자 결정 2026-09-16) ──
 #
-# 종전에는 저장만 되고 소비부가 없었다. 값은 표가 대고(`param_opt_ui_scale_1/2`) 코드는 단계와
-# 창구만 쥔다 — 100% 는 문면 그대로의 정의라 1.0 이 값 기입이 아니다(햅틱 3단과 같은 형태).
-#
-# **비정수 표시 확대는 O8 전속의 공인 예외다** (D10 §2.2 — "니어리스트 네이버 허용(확정) ·
-# 표시 스케일 층에 한정"). 제작 층의 믹셀 금지 원칙과 층위가 다르다.
-# 창이 없는 경로(헤드리스 검사·단독 인스턴스화)는 조용히 건너뛴다 — 적용 대상이 없는 것이지
-# 실패가 아니다. 그래서 실효값을 `ui_scale_factor()` 로 따로 열어 검사가 창 없이도 잰다.
-func apply_display_options() -> void:
-	if _ui_host == null or not _ui_host.is_inside_tree():
-		return
-	var window := _ui_host.get_window()
-	if window == null:
-		return
-	window.content_scale_factor = ui_scale_factor()
-
-
-func ui_scale_factor() -> float:
-	if options == null or data == null:
-		return 1.0
-	match options.index_of("o8"):
-		1:
-			return data.param("param_opt_ui_scale_1")
-		2:
-			return data.param("param_opt_ui_scale_2")
-		_:
-			return 1.0
-
-
-# ── O7 텍스트 크기 (개선 회차 25 · 사용자 결정 2026-09-15 "원도에 맞춰 2단") ──
-#
-# **원도를 갈아 끼우는 방식**이다. 캔버스가 정수 배율로 확대되므로(640×360 ·
-# `scale_mode="integer"`) 도트 폰트는 자기 원도 크기에서만 또렷하고, 그 사이 크기로 그리면
-# 픽셀 격자가 어긋난다. 그래서 크기만 올리지 않고 **그 크기의 원도로 바꾼다** —
-# D10 §5.7 이 확대 단 후보로 지목한 Galmuri11 이 그것이다("실물 후보 = Galmuri11 등").
-#
-# 대형·VN 계열(14 · Galmuri14)은 위 원도가 없어 이 축의 대상이 아니다. 접근성 수요가
-# 큰 쪽이 9px 본문이므로 확대 대상으로도 본문이 맞다.
-const TEXT_SIZE_FONT_1 := "res://assets/fonts/Galmuri11.ttf"
-
-
-func text_body_font_size() -> int:
-	if options == null or data == null:
-		return 9
-	if options.index_of("o7") == 1:
-		return data.param_int("param_opt_text_size_body_1")
-	return data.param_int("param_font_size_body")
-
-
-# 확대 단의 원도. 100% 는 `null` 이고, 그것이 곧 "전역 기본(Galmuri9)을 쓴다"는 뜻이다 —
-# 기본값을 여기서 다시 적으면 project.godot 과 두 곳이 된다.
-func text_body_font() -> Font:
-	if options == null or options.index_of("o7") != 1:
-		return null
-	return load(TEXT_SIZE_FONT_1) as Font
+# O8 UI 스케일(회차 22 결선)과 O7 텍스트 크기(회차 25 결선)를 **항목·소비부 함께 걷었다.**
+# 본문 원도는 회차 25 의 확대 단(Galmuri11 @ 11px = 종전 122%)이 **기본값으로 승격**돼
+# 전역 기본(project.godot `gui/theme`)과 D13 창구 `param_font_size_body` 가 그것을 쥔다 —
+# 세션이 폰트를 갈아 끼우던 경로(`text_body_font*` · `apply_display_options`)는 남기지 않는다.
+# 창 배율은 엔진 기본(정수 배율 · `scale_mode="integer"`) 그대로다.
+# **D09 §6.1 O7·O8 행 · D10 §5.7 본문 100%=9px 와 갈린다 — 불변규칙 9 대상이며 회차 문서·
+# impl_log 로 보고한다(정본 무수정).**
 
 
 # O10 VN 자동 진행 대기 시간(초) — 3단 (개선 회차 22 · D09 §5.3 "자동 진행 모드(속도 3단)").

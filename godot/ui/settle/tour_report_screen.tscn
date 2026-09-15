@@ -48,7 +48,7 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.290196, 0.239216, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="HeaderSpacer" type="Control" parent="Pad/Column/HeaderRow" unique_id=1892088299]
 layout_mode = 2
@@ -60,13 +60,13 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="SubHeaderLabel" type="Label" parent="Pad/Column" unique_id=1418232901]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="Block1LabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=1618452817]
 layout_mode = 2
@@ -77,7 +77,7 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 vertical_alignment = 1
 
 [node name="Block1Value" type="Label" parent="Pad/Column/Block1LabelRow" unique_id=1067716280]
@@ -96,13 +96,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="Block2Value" type="Label" parent="Pad/Column/Block2LabelRow" unique_id=28612857]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="Block3LabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=355428450]
 layout_mode = 2
@@ -113,20 +113,20 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="Block3Value" type="Label" parent="Pad/Column/Block3LabelRow" unique_id=350891725]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="Block3Note" type="Label" parent="Pad/Column" unique_id=1705480958]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="SponsorRow" type="HBoxContainer" parent="Pad/Column" unique_id=1207843306]
 unique_name_in_owner = true
@@ -139,13 +139,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="SponsorValue" type="Label" parent="Pad/Column/SponsorRow" unique_id=1207843308]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="Block4" type="VBoxContainer" parent="Pad/Column" unique_id=442188609]
 unique_name_in_owner = true
@@ -161,13 +161,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="Block4Value" type="Label" parent="Pad/Column/Block4/Block4LabelRow" unique_id=711232958]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="Block5LabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=798727670]
 layout_mode = 2
@@ -178,13 +178,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="Block5Value" type="Label" parent="Pad/Column/Block5LabelRow" unique_id=1981810942]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="Block6LabelRow" type="HBoxContainer" parent="Pad/Column" unique_id=734084634]
 layout_mode = 2
@@ -195,13 +195,13 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(110, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="Block6Value" type="Label" parent="Pad/Column/Block6LabelRow" unique_id=1284981981]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="BottomSpacer" type="Control" parent="Pad/Column" unique_id=230296856]
 layout_mode = 2
@@ -221,4 +221,4 @@ size_flags_vertical = 3
 unique_name_in_owner = true
 theme_type_variation = &"PrimaryButton"
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11

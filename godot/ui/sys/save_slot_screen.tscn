@@ -43,7 +43,7 @@ theme_override_font_sizes/font_size = 14
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="TopSpacer" type="Control" parent="Pad/Column" unique_id=1461980217]
 layout_mode = 2
@@ -68,4 +68,4 @@ theme_override_constants/separation = 6
 [node name="BackButton" type="Button" parent="Pad/Column/Footer" unique_id=1000578309]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11

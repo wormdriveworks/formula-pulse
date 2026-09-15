@@ -46,7 +46,7 @@ stretch_mode = 5
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="DataIcon" type="TextureRect" parent="Pad/Column/CommonBar" unique_id=1317328950]
 unique_name_in_owner = true
@@ -59,13 +59,13 @@ stretch_mode = 5
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="ProgressLabel" type="Label" parent="Pad/Column/CommonBar" unique_id=1196963589]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="BarSpacer" type="Control" parent="Pad/Column/CommonBar" unique_id=2145323504]
 layout_mode = 2
@@ -74,7 +74,7 @@ size_flags_horizontal = 3
 [node name="BackButton" type="Button" parent="Pad/Column/CommonBar" unique_id=1066829970]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=1345306668]
 unique_name_in_owner = true
@@ -90,17 +90,17 @@ theme_override_constants/separation = 4
 [node name="TabRivals" type="Button" parent="Pad/Column/Tabs" unique_id=1354405483]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="TabCareer" type="Button" parent="Pad/Column/Tabs" unique_id=95665399]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="TabArchive" type="Button" parent="Pad/Column/Tabs" unique_id=772979980]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="PanelRivals" type="VBoxContainer" parent="Pad/Column" unique_id=343382738]
 unique_name_in_owner = true

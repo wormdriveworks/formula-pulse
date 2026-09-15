@@ -103,8 +103,8 @@ detail_info={
 [gui]
 
 timers/tooltip_delay_sec=0.3
-theme/custom_font="res://assets/fonts/Galmuri9.ttf"
-theme/default_font_size=9
+theme/custom_font="res://assets/fonts/Galmuri11.ttf"
+theme/default_font_size=11
 
 [rendering]
 

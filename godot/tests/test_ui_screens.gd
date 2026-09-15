@@ -144,6 +144,8 @@ func _process(_delta: float) -> bool:
 	_race_pad_flap_reset()
 	_race_pad_gui_ordering()
 	_race_pause_resume_focus()
+	_race_pause_exit_unmutes()
+	_scene_font_sizes(data)
 	_rival_line_individualization(data)
 	_race_detail_relocation(data)
 	_palette_sources_exist()
@@ -889,6 +891,88 @@ func _race_pause_resume_focus() -> void:
 	_ok("재개 뒤 포커스 = 확정 (허공에 떨어지지 않는다)",
 		root.gui_get_focus_owner() == screen._e08_confirm, str(root.gui_get_focus_owner()))
 	_unmount(screen)
+
+
+# ── 일시정지 중 화면 이탈 = 정지 해제 (개선 회차 28 — 사용자 실기 "옵션 뒤 재개하면 효과음 무음") ──
+# 정지 메뉴의 **타이틀로**는 `resumed` 를 거치지 않는다. 뮤트를 재개 시그널만 풀면 그 경로에서
+# 디스패처가 정지 상태로 남아 타이틀·개러지·다음 레이스의 효과음이 전부 죽는다(BGM 은 버스가 달라
+# 산다). 라우터가 화면을 내리는 순서(`remove_child`) 그대로 재현해 트리 이탈이 정지를 푸는지 본다.
+func _race_pause_exit_unmutes() -> void:
+	var screen := _new_race_screen()
+	if screen == null:
+		return
+	var session: RunSession = screen.session
+	screen._open_pause()
+	_ok("전제: 정지 = 디스패처 정지 기록", session.audio.paused())
+	# 타이틀로 — 라우터 부재라 전이는 일어나지 않지만, 재개 시그널을 거치지 않는 경로라는 점은 같다
+	screen._pause_overlay.quit_to_title.emit()
+	_ok("타이틀로 요청만으로는 아직 정지", session.audio.paused())
+	_unmount(screen)
+	_ok("화면 이탈 = 정지 해제 (다음 화면의 효과음이 산다)", not session.audio.paused())
+	# 정상 재개 경로는 종전과 같다 — 이탈 해제가 재개 해제를 대체하지 않는다
+	var again := _new_race_screen()
+	if again == null:
+		return
+	again._open_pause()
+	again._pause_overlay._begin_countin()
+	again._pause_overlay._process(9999.0)
+	_ok("재개 경로도 정지 해제", not again.session.audio.paused())
+	_unmount(again)
+
+
+# ── 씬이 구운 폰트 크기 = D13 창구 (개선 회차 28 — 본문 원도 9 → 11 승격) ──
+# `.tscn` 의 `theme_override_font_sizes/font_size` 는 노드 오버라이드라 테마도 파라미터도 덮지
+# 못한다 — 표가 11 인데 씬이 9 를 쥐고 있으면 그 라벨은 Galmuri11 원도를 9px 로 그려 격자가
+# 어긋난다(회차 25 는 이것을 런타임 따라잡기로 풀었고, 회차 28 은 씬 자체를 바꿨다). 전 씬의 크기
+# 오버라이드가 본문·대형 창구 둘 중 하나임을 못박는다. 예외 = 28(대형 14 의 정수 2배 — 타이틀
+# 로고 · 차지 수치)이고 대장에 적는다. 전역 기본은 UIOPT 가 같은 창구와 묶는다.
+const SCENE_SIZE_ALLOW := {28: "Galmuri14 정수 2배 — title_screen 로고 · race_screen 차지 수치"}
+
+
+func _scene_font_sizes(data: GameData) -> void:
+	var body := data.param_int("param_font_size_body")
+	var head := data.param_int("param_font_size_head")
+	var scenes: Array[String] = []
+	_collect_ext("res://ui", ".tscn", scenes)
+	_ok("전제: 씬 파일 실재", scenes.size() >= 18, str(scenes.size()))
+	var regex := RegEx.create_from_string("theme_override_font_sizes/font_size = (\\d+)")
+	var counted := 0
+	var off: Array = []
+	for path in scenes:
+		var src := FileAccess.get_file_as_string(path)
+		for found in regex.search_all(src):
+			counted += 1
+			var size := int(found.get_string(1))
+			_checked += 1
+			if size != body and size != head and not SCENE_SIZE_ALLOW.has(size):
+				_failures += 1
+				off.append("%s=%d" % [path.get_file(), size])
+	_ok("씬 크기 오버라이드 = 창구(본문·대형) 또는 대장", off.is_empty(), str(off))
+	_ok("씬 크기 오버라이드 표본 실재", counted > 150, str(counted))
+	_ok("씬에 종전 본문 9 가 남지 않았다", not _scenes_contain(scenes, "font_size = 9\n"))
+
+
+func _scenes_contain(scenes: Array[String], needle: String) -> bool:
+	for path in scenes:
+		if FileAccess.get_file_as_string(path).contains(needle):
+			return true
+	return false
+
+
+func _collect_ext(dir_path: String, ext: String, out: Array[String]) -> void:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var entry := dir.get_next()
+	while entry != "":
+		var full := "%s/%s" % [dir_path, entry]
+		if dir.current_is_dir():
+			_collect_ext(full, ext, out)
+		elif entry.ends_with(ext):
+			out.append(full)
+		entry = dir.get_next()
+	dir.list_dir_end()
 
 
 # ── 라이벌 대사 개별화 (개선 회차 7 — 2026-09-05) ──
@@ -2926,16 +3010,27 @@ func _skill_slots(data: GameData) -> void:
 		wide.engine.deck = _widest_deck(data, 5)
 		wide.engine.charge = 10
 		wide._refresh_skill_slots()
-		# 산정은 `_action_row_metrics()` 하나가 진다 — 14차 ㉚(3언어 축)과 **같은 유도**를
-		# 쓴다. 두 축이 각자 계산하면 언젠가 갈리고, 갈린 뒤에는 어느 예산이 참인지 알 수 없다.
+		# 산정은 `_action_row_metrics()`·`_skill_row_metrics()` 둘이 진다 — 14차 ㉚(3언어 축)과
+		# **같은 유도**를 쓴다. 두 축이 각자 계산하면 언젠가 갈리고, 갈린 뒤에는 어느 예산이 참인지 알 수 없다.
+		# **스킬 5칸은 하단 바(Zone D · 소모품 옆)에 선다** (개선 회차 28 · 사용자 결정 2026-09-16 —
+		# 본문 11px 승격으로 한 줄 액션 열이 약 90px 넘쳐 로그 존을 덮었다). 액션 열 = 리스핀·차지 개입·확정.
 		var actions := wide.find_child("E08Actions", true, false) as Control
+		var skills := wide.find_child("E08Skills", true, false) as Control
 		var metrics := _action_row_metrics(wide)
-		_ok("전제: 폭 산정 노드 전건 실재", not metrics.is_empty())
-		if not metrics.is_empty() and actions != null:
+		var skill_metrics := _skill_row_metrics(wide)
+		_ok("전제: 폭 산정 노드 전건 실재", not metrics.is_empty() and not skill_metrics.is_empty())
+		_ok("스킬 5칸 = 하단 바 소모품 옆 (회차 28)", skills != null and actions != null
+			and skills.get_parent().name == "ResourceRow" and not actions.is_ancestor_of(skills))
+		if not metrics.is_empty() and not skill_metrics.is_empty() and actions != null:
 			var budget: float = float(metrics["budget"])
 			var needed: float = float(metrics["needed"])
+			var skill_budget: float = float(skill_metrics["budget"])
+			var skill_needed: float = float(skill_metrics["needed"])
 			_ok("전제: 폭 예산이 릴 열보다 넓다 (산정 실패 오탐 방지)", budget > 208.0,
 				"budget=%.1f" % budget)
+			_ok("전제: 하단 바 스킬 예산 실재", skill_budget > 0.0, "budget=%.1f" % skill_budget)
+			_ok("5슬롯 만재 스킬 열이 하단 바 예산 안 (초과 0)", skill_needed - skill_budget <= 0.0,
+				"needed=%.1f budget=%.1f 초과=%.1f" % [skill_needed, skill_budget, skill_needed - skill_budget])
 			# **언어 권한은 ㉚ 이 진다.** 이 축은 저장된 o11 이 정하는 언어로 재므로 어느
 			# 언어를 재는지 스스로 정하지 못한다 — 그 상태로 `<= budget` 을 단언하면
 			# 프로필에 남은 선택지가 검사의 판정을 바꾼다(실측으로 그렇게 붉어졌다).
@@ -2948,12 +3043,13 @@ func _skill_slots(data: GameData) -> void:
 				_badged_count(wide.engine.skill_slots()) > 0,
 				str(_badged_count(wide.engine.skill_slots())))
 			# 라벨을 스킬명으로 바꾸면 넘친다 — `S{n}` 판단의 근거를 대조군으로 못박는다.
+			# 예산은 이제 하단 바의 빈 폭이다(회차 28) — 넓어졌지만 스킬명 5개는 여전히 넘는다.
 			var slots5: Array = wide.engine.skill_slots()
 			for i in range(mini(slots5.size(), wide._skill_buttons.size())):
 				wide._skill_buttons[i].text = data.strings.text(String(slots5[i]["name_key"]))
-			var named: float = actions.get_combined_minimum_size().x
-			_ok("스킬명 라벨은 같은 예산을 넘는다 (S{n} 채택 근거)", named > budget,
-				"named=%.1f budget=%.1f" % [named, budget])
+			var named: float = float(_skill_row_metrics(wide)["needed"])
+			_ok("스킬명 라벨은 같은 예산을 넘는다 (S{n} 채택 근거)", named > skill_budget,
+				"named=%.1f budget=%.1f" % [named, skill_budget])
 		_unmount(wide)
 
 	# ⓓ 활성화 — **클릭 경로**(pressed) 와 **키보드 경로**(F1) 를 각자 본다.
@@ -3672,6 +3768,34 @@ func _action_row_metrics(screen: Control) -> Dictionary:
 	return {"budget": budget, "needed": actions.get_combined_minimum_size().x, "column": column}
 
 
+# 스킬 열(하단 바) 폭 예산 — 개선 회차 28. 하단 바 행(`ResourceRow`)에서 스킬 열이 쓸 수 있는 폭 =
+# 캔버스 폭 − 패널 여백 − **다른 고정 자식들의 최소폭** − 간격. 신축 스페이서는 0 이라 빼지 않는다.
+# 실 rect 대신 최소폭으로 유도하는 이유는 `_action_row_metrics()` 와 같다(마운트 직후 정렬 지연).
+func _skill_row_metrics(screen: Control) -> Dictionary:
+	var skills := screen.find_child("E08Skills", true, false) as Control
+	var zone := screen.find_child("ZoneD", true, false) as PanelContainer
+	if skills == null or zone == null:
+		return {}
+	var row := skills.get_parent() as BoxContainer
+	if row == null:
+		return {}
+	var style := zone.get_theme_stylebox("panel")
+	var row_width: float = CANVAS.x - (style.get_minimum_size().x if style != null else 0.0)
+	var others := 0.0
+	var visible_count := 0
+	for child in row.get_children():
+		var control := child as Control
+		if control == null or not control.visible:
+			continue
+		visible_count += 1
+		if control == skills or (control.size_flags_horizontal & Control.SIZE_EXPAND) != 0:
+			continue
+		others += control.get_combined_minimum_size().x
+	var separation := float(row.get_theme_constant("separation"))
+	var budget: float = row_width - others - separation * maxf(float(visible_count - 1), 0.0)
+	return {"budget": budget, "needed": skills.get_combined_minimum_size().x, "row": row_width}
+
+
 # ── ㉕ 개입 창 관문 단일화 (14차 ⑦ — 원격 27차 ③ 액션 경로 전수) ──
 #
 # 27차가 `_on_respin` 하나에서 본 형태 — 키·패드 액션이 버튼 `disabled` 를 우회한다 —
@@ -3768,7 +3892,7 @@ const NOTICE_KEYS := [
 	"ui.race.skillRejectedDuelTurn", "ui.race.skillRejectedSectorTurn",
 	"ui.race.sc3HoldOne", "ui.race.sc3PickDirection",   # SC3 대상 지정 안내 (개선 회차 6) — 같은 슬롯에 선다
 ]
-const BODY_FONT_PATH := "res://assets/fonts/Galmuri9.ttf"
+const BODY_FONT_PATH := "res://assets/fonts/Galmuri11.ttf"   # 본문 원도 = Galmuri11 @ 11px (개선 회차 28)
 const STRINGS_TABLE := "res://data/strings/strings.csv"
 
 
@@ -4145,11 +4269,17 @@ func _action_row_budget(data: GameData) -> void:
 		screen._refresh_skill_slots()
 		screen._apply_static_strings()
 		var metrics := _action_row_metrics(screen)
-		_ok("[%s] 전제: 폭 산정 성립" % code, not metrics.is_empty())
-		if not metrics.is_empty():
+		var skill_metrics := _skill_row_metrics(screen)
+		_ok("[%s] 전제: 폭 산정 성립" % code, not metrics.is_empty() and not skill_metrics.is_empty())
+		if not metrics.is_empty() and not skill_metrics.is_empty():
 			var budget: float = float(metrics["budget"])
 			var needed: float = float(metrics["needed"])
 			var over: float = needed - budget
+			# 스킬 열은 하단 바에 선다(회차 28) — 3언어 실측도 두 열을 각각 본다.
+			var skill_over: float = float(skill_metrics["needed"]) - float(skill_metrics["budget"])
+			_ok("[%s] 스킬 열이 하단 바 예산 안 (초과 0)" % code, skill_over <= 0.0,
+				"needed=%.1f budget=%.1f 초과=%.1f"
+					% [float(skill_metrics["needed"]), float(skill_metrics["budget"]), skill_over])
 			# ── ⚠ 덱 구성 전수 관측 (30차 신설 — 내러티브 11차 인계 관측의 실측) ──
 			#
 			# **판정은 만재 5기가 하고, 관측은 전 구성이 한다.** 잠금 슬롯 문면
@@ -4167,7 +4297,7 @@ func _action_row_budget(data: GameData) -> void:
 			for deck_size in range(1, 6):
 				screen.engine.deck = _widest_deck(data, deck_size)
 				screen._refresh_skill_slots()
-				var m := _action_row_metrics(screen)
+				var m := _skill_row_metrics(screen)   # 덱 구성이 움직이는 것은 스킬 열이다(회차 28)
 				if m.is_empty():
 					continue
 				swept += 1
@@ -4175,7 +4305,7 @@ func _action_row_budget(data: GameData) -> void:
 					deck_worst = float(m["needed"]) - float(m["budget"])
 					deck_worst_size = deck_size
 			_ok("[%s] 전제: 덱 구성 전수 훑기 5회" % code, swept == 5, str(swept))
-			print("  [관측] [%s] 덱 전수 최악 = %d슬롯 · 초과 %+.1fpx"
+			print("  [관측] [%s] 스킬 열 덱 전수 최악 = %d슬롯 · 초과 %+.1fpx"
 				% [code, deck_worst_size, deck_worst])
 			screen.engine.deck = _widest_deck(data, 5)
 			screen._refresh_skill_slots()

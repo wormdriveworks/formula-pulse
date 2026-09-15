@@ -601,8 +601,6 @@ ui.options.o4,릴 정지 속도,Reel Stop Speed,リール停止速度
 ui.options.o5,개입 창 타이머,Intervention Window Timer,介入ウィンドウのタイマー
 ui.options.o5Notice,시간 제한이 없어지며 빠른 결정 보너스는 발생하지 않게 됩니다.,The time limit is removed and the quick-decision bonus no longer occurs.,制限時間がなくなり、迅速な判断ボーナスは発生しなくなります。
 ui.options.o6,타이머 수치 표시,Show Timer Value,タイマー数値の表示
-ui.options.o7,텍스트 크기,Text Size,文字サイズ
-ui.options.o8,UI 스케일,UI Scale,UIスケール
 ui.options.o9,색각 대응,Color Vision Support,色覚サポート
 ui.options.o10,VN 자동 진행 속도,VN Auto-Advance Speed,VN自動進行の速度
 ui.options.o11,언어,Language,言語
@@ -620,10 +618,6 @@ ui.options.stepTimerBase,기본,Default,標準
 ui.options.stepTimer15,×1.5,×1.5,×1.5
 ui.options.stepTimer20,×2,×2,×2
 ui.options.stepTimerOff,비활성,Disabled,無効
-ui.options.stepScale100,100%,100%,100%
-ui.options.stepScale110,110%,110%,110%
-ui.options.stepScale122,122%,122%,122%
-ui.options.stepScale125,125%,125%,125%
 ui.options.stepPaletteBase,기본,Default,標準
 ui.options.stepPaletteAlt,대체 팔레트,Alternate Palette,代替パレット
 ui.options.stepSlow,느림,Slow,遅い

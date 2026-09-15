@@ -43,7 +43,7 @@ theme_override_font_sizes/font_size = 28
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.247059, 0.878431, 0.960784, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="TopSpacer" type="Control" parent="Pad/Column" unique_id=1440292631]
 layout_mode = 2
@@ -59,37 +59,37 @@ theme_override_constants/separation = 3
 [node name="ContinueButton" type="Button" parent="Pad/Column/Menu" unique_id=1913246707]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 alignment = 0
 
 [node name="NewCareerButton" type="Button" parent="Pad/Column/Menu" unique_id=1763026168]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 alignment = 0
 
 [node name="ArchiveButton" type="Button" parent="Pad/Column/Menu" unique_id=29305663]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 alignment = 0
 
 [node name="AchievementsButton" type="Button" parent="Pad/Column/Menu" unique_id=612430892]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 alignment = 0
 
 [node name="OptionsButton" type="Button" parent="Pad/Column/Menu" unique_id=893364423]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 alignment = 0
 
 [node name="QuitButton" type="Button" parent="Pad/Column/Menu" unique_id=464010268]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 alignment = 0
 
 [node name="BottomSpacer" type="Control" parent="Pad/Column" unique_id=727596724]
@@ -110,4 +110,4 @@ size_flags_vertical = 3
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11

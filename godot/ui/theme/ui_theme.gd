@@ -33,18 +33,9 @@ static func main() -> Theme:
 	return load(MAIN_THEME) as Theme
 
 
-# O7 텍스트 크기 — 확대 단 원도를 테마의 기본 폰트로 민다 (개선 회차 25).
-#
-# **`null` 이 곧 100%** 다: 테마가 기본 폰트를 말하지 않으면 project.godot 의 전역
-# 기본(Galmuri9)이 그린다. 기본값을 여기 다시 적으면 원도의 출처가 두 곳이 된다.
-# 씬이 명시한 폰트(대형 계열 Galmuri14)는 노드 오버라이드라 이것에 덮이지 않는다 —
-# 확대 대상이 본문 계열뿐이라는 계약이 그대로 지켜진다.
-static func apply_text_size(font: Font, theme: Theme = null) -> void:
-	var target := theme if theme != null else main()
-	if target == null:
-		return
-	target.default_font = font
-
+# 본문 원도는 테마가 말하지 않는다 — project.godot 의 전역 기본(Galmuri11 @ 11px · 개선 회차 28)이
+# 그린다. 여기 다시 적으면 원도의 출처가 두 곳이 된다. 씬이 명시한 폰트(대형 계열 Galmuri14)는
+# 노드 오버라이드다.
 
 # 팔레트·옵션에 갈리는 부분을 테마에 민다. **멱등**이며, 테마 자원이 공유 캐시라
 # 한 번 부르면 이미 세워진 화면까지 함께 따라온다(O9 를 화면 안에서 바꿔도 반영된다).

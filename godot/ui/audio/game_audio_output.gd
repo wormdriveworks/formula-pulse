@@ -41,6 +41,12 @@ var _dispatcher_ref: WeakRef
 var _sfx_pool: Array = []
 var _sfx_ids: Array = []          # 풀 인덱스 → 지금 물려 있는 sfx_id ("" = 유휴)
 var _jingle_player: AudioStreamPlayer
+# 지금 울리는 징글 id ("" = 유휴). **징글도 보이스다** — 디스패처는 채널이 sfx 든 jingle 이든
+# `_voices` 에 넣으므로, 표현 층이 종료를 통지하지 않으면 그 점유가 영원히 남는다.
+# 실측(개선 회차 28): 징글 플레이어의 `finished` 가 미결속이라 GP 결산마다 보이스 1개가 죽지
+# 않고 쌓였다. 상한(D13 12)에 닿으면 새 발화는 살아 있는 P3 를 걷어내야만 서고(끊김), 걷을
+# 것이 없으면 버려진다(무음) — 조작음이 전부 P3 라 그 자리가 먼저 조용해진다.
+var _jingle_id := ""
 
 # BGM 데크 2벌 — 크로스페이드는 **트랙 교체**이고 A/B 레이어는 **동시 재생 + B 볼륨**이다
 # (D11 §4.4 · D12 §10.3). 그래서 데크마다 base·tension 두 플레이어를 갖는다.
@@ -86,6 +92,7 @@ func setup(game_data: GameData, host: Node) -> void:
 	_jingle_player = AudioStreamPlayer.new()
 	_jingle_player.bus = BUS_SFX   # 징글 = SFX 버스 (D11 §4.1 — 트랙 계상 외·볼륨 계층 불증가)
 	_host.add_child(_jingle_player)
+	_jingle_player.finished.connect(_on_jingle_finished)   # SFX 풀과 같은 통지 사슬 (개선 회차 28)
 	for deck in range(2):
 		var base := AudioStreamPlayer.new()
 		base.bus = BUS_BGM
@@ -135,8 +142,19 @@ func play_jingle(jingle_id: String) -> void:
 	if stream == null:
 		_release(jingle_id)
 		return
+	# 재생 중 징글 위에 새 징글이 오면 종전 스트림은 `finished` 없이 끊긴다 — 그 점유를 먼저 푼다.
+	if _jingle_id != "":
+		_release(_jingle_id)
+	_jingle_id = jingle_id
 	_jingle_player.stream = stream
 	_jingle_player.play()
+
+
+func _on_jingle_finished() -> void:
+	var jingle_id := _jingle_id
+	_jingle_id = ""
+	if jingle_id != "":
+		_release(jingle_id)
 
 
 # 컬링 = 즉시 정지 (D11 §6.3 — 걷어낸 발음은 페이드하지 않는다. 페이드는 그 자체로 소리다).
@@ -396,6 +414,10 @@ func _release(sfx_id: String) -> void:
 # 것은 서버가 갖지 않는 것(풀 점유·데크 게인)뿐이다.
 func sfx_pool_size() -> int:
 	return _sfx_pool.size()
+
+
+func active_jingle() -> String:
+	return _jingle_id
 
 
 func active_sfx_count() -> int:

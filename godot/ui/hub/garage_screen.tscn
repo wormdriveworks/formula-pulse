@@ -46,7 +46,7 @@ stretch_mode = 5
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="DataIcon" type="TextureRect" parent="Pad/Column/CommonBar" unique_id=260269897]
 unique_name_in_owner = true
@@ -59,13 +59,13 @@ stretch_mode = 5
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.780392, 0.815686, 0.847059, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="ProgressLabel" type="Label" parent="Pad/Column/CommonBar" unique_id=2004064298]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="BarSpacer" type="Control" parent="Pad/Column/CommonBar" unique_id=343106653]
 layout_mode = 2
@@ -74,7 +74,7 @@ size_flags_horizontal = 3
 [node name="BackButton" type="Button" parent="Pad/Column/CommonBar" unique_id=1032542392]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="HeaderLabel" type="Label" parent="Pad/Column" unique_id=119423556]
 unique_name_in_owner = true
@@ -94,49 +94,49 @@ columns = 3
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="StTuning" type="Button" parent="Pad/Column/StationGrid" unique_id=779215929]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="StStrategy" type="Button" parent="Pad/Column/StationGrid" unique_id=1662214338]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="StRecords" type="Button" parent="Pad/Column/StationGrid" unique_id=1884889338]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="StSponsor" type="Button" parent="Pad/Column/StationGrid" unique_id=1525910732]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="StFacility" type="Button" parent="Pad/Column/StationGrid" unique_id=1254166494]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="StOverhaul" type="Button" parent="Pad/Column/StationGrid" unique_id=1627078357]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="StRecruit" type="Button" parent="Pad/Column/StationGrid" unique_id=1823678110]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(150, 40)
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 
 [node name="Footer" type="HBoxContainer" parent="Pad/Column" unique_id=1041393212]
 layout_mode = 2
@@ -150,4 +150,4 @@ size_flags_horizontal = 3
 unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11

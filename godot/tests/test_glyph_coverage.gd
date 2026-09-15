@@ -19,18 +19,22 @@ const KEY_COLUMN := "key"
 # 렌더 경로 원도 — 전역 기본 + 씬 override. 이 둘 중 어느 쪽이 그릴지 키 단위로는
 # 기계적으로 알 수 없으므로 **양쪽 다 요구**하고, 갈리는 자리는 아래 면제 대장이 받는다.
 const RENDER_FONTS := {
-	"Galmuri9": "res://assets/fonts/Galmuri9.ttf",
-	"Galmuri14": "res://assets/fonts/Galmuri14.ttf",
-	# 개선 회차 25 — **O7 확대 단이 렌더 경로로 데려왔다**(D10 §5.7 이 지목한 후보 원도).
-	# 격리 대장이 이 이동을 강제했다: 회차 25 가 `run_session.gd` 에 경로를 적자
-	# "렌더 경로 참조 0" 이 거짓이 되어 검사가 붉었고, 그래서 커버리지 요구로 옮긴다.
+	# 본문 = Galmuri11 (개선 회차 25 가 O7 확대 단으로 데려왔고, 회차 28 이 **전역 기본으로
+	# 승격**했다 — project.godot `gui/theme/custom_font`). 종전 본문 원도 Galmuri9 는 그 승격으로
+	# 렌더 경로에서 빠져 아래 격리 대장으로 내려갔다.
 	"Galmuri11": "res://assets/fonts/Galmuri11.ttf",
+	"Galmuri14": "res://assets/fonts/Galmuri14.ttf",
 }
 
 # 렌더 경로 **밖** 원도. 커버리지를 요구하지 않는 대신 **렌더 경로에 나타나지 않음**을 요구한다.
 # `cjk_expected` 는 두 방향 대장이다 — 실측이 이 값과 달라지면(원도가 교체·증보되면)
 # 격리 사유 자체가 낡은 것이므로 검사가 실패해 재검토를 강제한다.
 const LATENT_FONTS := {
+	# 개선 회차 28 — 본문 원도가 Galmuri11 로 승격되며 렌더 경로 참조 0 이 됐다. 되살리려면
+	# (본문을 9px 로 되돌리려면) 여기서 빼고 `RENDER_FONTS` 로 올려야 하고, 그러면 커버리지가
+	# 다시 요구된다 — 격리 대장이 이동을 강제하는 방향은 양쪽 다 같다.
+	"Galmuri9": {"path": "res://assets/fonts/Galmuri9.ttf", "cjk_expected": 6375,
+		"reason": "종전 본문 원도 — 회차 28 승격 뒤 렌더 경로 참조 0 (측정 도구·이 검사기만 참조)"},
 	"Galmuri11-Bold": {"path": "res://assets/fonts/Galmuri11-Bold.ttf", "cjk_expected": 0,
 		"reason": "CJK·가나 0자 — 일문에 굵은 글씨를 도입하면 그 순간 전부 두부가 된다"},
 	"GalmuriMono11": {"path": "res://assets/fonts/GalmuriMono11.ttf", "cjk_expected": 6477,
@@ -50,7 +54,7 @@ const COVERAGE_EXEMPT := [
 	{
 		"char": "≡", "font": "Galmuri14", "keys": ["ui.race.menu"],
 		"reason": "소비 노드 %E14Menu (ui/race/race_screen.tscn) 에 theme_override_fonts/font"
-			+ " 가 없다 — 전역 기본 Galmuri9 렌더이고 그 원도는 탑재한다 (실독 확인).",
+			+ " 가 없다 — 전역 기본(Galmuri11 · 회차 28 승격) 렌더이고 그 원도는 탑재한다 (실독 확인).",
 	},
 ]
 
