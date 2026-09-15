@@ -64,6 +64,7 @@ var _settle_next: Array[Control] = []
 var _settle_bay: Control
 var _focus_garage: Control
 var _return_bay: Control
+var _settle_tuning: Control
 
 
 func _process(_delta: float) -> bool:
@@ -107,6 +108,12 @@ func _process(_delta: float) -> bool:
 			return_session.begin_career(1)
 			return_session.outgame.gain_credits(1000)
 			_return_bay = _mount(HUB02_SCENE, return_session)
+			# 재배분 모드 축(개선 회차 24 · 51ⓐ)의 토글·행 버튼 실 클릭도 정렬이 끝난 rect 를 요구한다.
+			# 되돌릴 것이 있어야 축이 성립하므로 T1 을 1단 사 둔 세션으로 세운다.
+			var tuning_session := _fresh_session(data)
+			tuning_session.outgame.gain_credits(6000)
+			tuning_session.outgame.buy_tuning("tuning_t1")
+			_settle_tuning = _mount(TUNING_SCENE, tuning_session)
 		return false
 	# **첫 축이어야 한다** — 결산 3화면의 InputGuard 가 `_input` 층에서 ui_accept·마우스 버튼을 트리
 	# 전역으로 삼키므로, 뒤 축들이 `push_input` 으로 넣는 패드 A(= ui_accept)가 남은 창에 죽는다.
@@ -116,6 +123,7 @@ func _process(_delta: float) -> bool:
 	_garage_focus_memory(data)
 	_garage_return_autosave(data)
 	_crew_recruit_flow(data)
+	_tuning_redistribute_mode(data)
 	_sponsor_settlement_flow(data)
 	_achievement_without_career(data)
 	_achievement_with_career(data)
@@ -5262,6 +5270,110 @@ func _crew_recruit_flow(data: GameData) -> void:
 		if String(routes[route_id]).contains("recruit") or String(routes[route_id]).contains("crew"):
 			crew_route = true
 	_ok("㊾ⓓ 라우팅 대장에 크루 전용 화면 없음", not crew_route, str(routes.keys()))
+
+
+# ── 51 튜닝 재배분 모드 (개선 회차 24 · 매뉴얼 9절 ①) ──
+#
+# 종전에는 `RedistributeButton` 이 상시 소등이라 코어의 `redistribute_tuning` 에 도달할 경로가
+# 없었다(마르타의 환급 90% 패시브도 함께 죽어 있었다). 결선 뒤의 계약:
+#   ⓐ 토글 실 클릭이 같은 행을 '강화' → '재배분' 으로 바꾸고, 표시액 = 코어 미리보기다
+#   ⓑ 단계 0 행은 되돌릴 것이 없으므로 소등 (누르면 거부되는 죽은 버튼을 남기지 않는다)
+#   ⓒ 실행은 COM-01 을 경유하고, 수락하면 단계 0 · 크레딧이 표시액만큼 는다
+#   ⓓ 최대 단계를 되돌린 뒤 구매 모드로 오면 강화 버튼이 되살아난다 (disabled 잔류 방지)
+#   ⓔ 심화 잠금 행은 모드와 무관하게 잠긴 채다 — 버튼이 개방 조건을 이고 있다
+#   ⓕ 활성 모드는 색으로 선다 (전략실 프리셋·기록실 탭과 같은 방식)
+const TUNING_SCENE := "res://ui/hub/tuning_bench_screen.tscn"
+
+
+func _tuning_redistribute_mode(data: GameData) -> void:
+	# ⓐ 실 클릭 (프레임 1 에 세운 튜닝 벤치 — 정렬 완료)
+	var bench := _settle_tuning
+	_ok("51ⓐ 전제: 정렬된 튜닝 벤치 마운트", bench != null)
+	if bench != null:
+		root.move_child(bench, root.get_child_count() - 1)
+		var toggle := bench.get_node("%RedistributeButton") as Button
+		var rect := toggle.get_global_rect()
+		_ok("51ⓐ 전제: 재배분 토글 정렬 완료 (크기 > 0)",
+			rect.size.x > 0.0 and rect.size.y > 0.0, str(rect))
+		_ok("51ⓐ 전제: 토글이 눌린다 (종전 = 상시 소등)", not toggle.disabled)
+		var row: Control = bench._rows["tuning_t1"]
+		var buy := row.get_node("Buy") as Button
+		var cost_label := row.get_node("Cost") as Label
+		var s: StringTable = bench.session.data.strings
+		_ok("51ⓐ 구매 모드 = 강화 문면", buy.text == s.text("ui.tuningBench.buy"), buy.text)
+		_click_at(bench.get_viewport(), rect.get_center())
+		_ok("51ⓐ 토글 실 클릭이 모드를 바꾼다", bench._redistribute_mode)
+		# 활성 모드는 색으로 선다 — 눌림 상태만으로는 어느 모드인지 읽히지 않는다(회차 20 전례)
+		_ok("51ⓐ 활성 모드는 색으로 표시 (눌린 토글은 font_pressed_color 를 쓴다)",
+			toggle.has_theme_color_override("font_color")
+				and toggle.has_theme_color_override("font_pressed_color"))
+		_ok("51ⓐ 재배분 모드 = 재배분 문면",
+			buy.text == s.text("ui.tuningBench.redistribute"), buy.text)
+		var preview: int = bench.session.outgame.redistribute_refund("tuning_t1")
+		_ok("51ⓐ 전제: 되돌릴 단계가 있다", preview > 0, "preview=%d" % preview)
+		_ok("51ⓐ 표시액 = 코어 미리보기", cost_label.text == s.text("ui.tuningBench.refundFormat", {
+				"ratio": int(round(bench.session.outgame.tuning_refund_ratio() * 100.0)),
+				"amount": preview,
+			}), cost_label.text)
+		# ⓑ 단계 0 행 — 되돌릴 것이 없으면 소등
+		var idle_row: Control = bench._rows["tuning_t2"]
+		var idle_buy := idle_row.get_node("Buy") as Button
+		_ok("51ⓑ 단계 0 행은 소등", idle_buy.disabled)
+		_ok("51ⓑ 단계 0 행 문면 = 되돌릴 단계 없음",
+			(idle_row.get_node("Cost") as Label).text == s.text("ui.tuningBench.refundNone"),
+			(idle_row.get_node("Cost") as Label).text)
+		# ⓔ 심화 잠금 행은 모드를 타지 않는다
+		var deep_row: Control = bench._rows["tuning_t5"]
+		var deep_buy := deep_row.get_node("Buy") as Button
+		var oscar_name: String = s.text(String(bench.session.data.crew["crew_oscar"]["name_key"]))
+		_ok("51ⓔ 잠금 행은 재배분 모드에서도 잠긴 채",
+			deep_buy.disabled and deep_buy.text == s.text("ui.hub.lockedByCrew", {"crew": oscar_name}),
+			deep_buy.text)
+		# ⓒ 실행 = COM-01 경유. 행 버튼은 실 클릭으로 누르고, 모달의 수락만 신호로 민다 —
+		# 다이얼로그는 생성 직후 프레임이라 rect 가 아직 0 이고 히트테스트가 성립하지 않는다.
+		var before: int = bench.session.outgame.credits
+		var buy_rect := buy.get_global_rect()
+		_ok("51ⓒ 전제: 행 버튼 정렬 완료", buy_rect.size.x > 0.0 and buy_rect.size.y > 0.0, str(buy_rect))
+		_click_at(bench.get_viewport(), buy_rect.get_center())
+		var dialog := bench.find_child("ConfirmDialog", true, false)
+		if dialog == null:
+			for child in bench.get_children():
+				if child is ConfirmDialog:
+					dialog = child
+		_ok("51ⓒ 행 실 클릭이 COM-01 을 띄운다", dialog != null)
+		_ok("51ⓒ 확인 전에는 단계가 그대로", bench.session.outgame.tuning_step("tuning_t1") == 1,
+			"step=%d" % bench.session.outgame.tuning_step("tuning_t1"))
+		if dialog != null:
+			var ok_button := dialog.find_child("OkButton", true, false) as Button
+			_ok("51ⓒ 전제: 수락 버튼 실재", ok_button != null)
+			if ok_button != null:
+				ok_button.pressed.emit()
+			_ok("51ⓒ 수락하면 단계 0", bench.session.outgame.tuning_step("tuning_t1") == 0,
+				"step=%d" % bench.session.outgame.tuning_step("tuning_t1"))
+			_ok("51ⓒ 크레딧이 표시액만큼 는다",
+				bench.session.outgame.credits == before + preview,
+				"before=%d after=%d preview=%d"
+					% [before, bench.session.outgame.credits, preview])
+		_unmount(bench)
+		_settle_tuning = null
+
+	# ⓓ 최대 단계를 되돌린 뒤 구매 모드로 돌아오면 강화 버튼이 되살아난다.
+	# 종전 `_refresh_row` 는 `if not buy.disabled` 로만 갱신해 한 번 켜진 소등을 끄지 못했다.
+	var revive := _fresh_session(data)
+	revive.outgame.gain_credits(20000)
+	for _index in range(int(data.param("param_tuning_max_step"))):
+		revive.outgame.buy_tuning("tuning_t1")
+	var revive_bench := _mount(TUNING_SCENE, revive)
+	if revive_bench != null:
+		var row2: Control = revive_bench._rows["tuning_t1"]
+		var buy2 := row2.get_node("Buy") as Button
+		_ok("51ⓓ 전제: 최대 단계에서 강화 소등", buy2.disabled)
+		(revive_bench.get_node("%RedistributeButton") as Button).button_pressed = true
+		revive_bench.session.outgame.redistribute_tuning("tuning_t1")
+		(revive_bench.get_node("%RedistributeButton") as Button).button_pressed = false
+		_ok("51ⓓ 되돌린 뒤 강화 버튼이 되살아난다", not buy2.disabled,
+			"step=%d credits=%d" % [revive.outgame.tuning_step("tuning_t1"), revive.outgame.credits])
+		_unmount(revive_bench)
 
 
 # ── 스폰서 정기 수입 결선 (개선 회차 13 · 2026-09-09 사용자 결정) ──

@@ -354,15 +354,23 @@ func tuning_refund_ratio() -> float:
 	return data.param("param_tuning_refund_ratio")
 
 
-func redistribute_tuning(tuning_id: String) -> int:
+# 환급액 **사전 표시**용 미리보기 (D09 §4.3 · 별첨A §A-13 "환급률·환급액 사전 표시" · 개선 회차 24).
+# 실행과 같은 식을 쓴다 — 화면이 자기 식으로 다시 세면 표시액과 실지급액이 갈라진다.
+func redistribute_refund(tuning_id: String) -> int:
 	var step := tuning_step(tuning_id)
 	if step <= 0:
 		return 0
 	var spent := 0
 	for index in range(1, step + 1):
 		spent += tuning_cost(tuning_id, index)
+	return int(round(float(spent) * tuning_refund_ratio()))
+
+
+func redistribute_tuning(tuning_id: String) -> int:
+	if tuning_step(tuning_id) <= 0:
+		return 0
+	var refund := redistribute_refund(tuning_id)
 	tuning_steps[tuning_id] = 0
-	var refund := int(round(float(spent) * tuning_refund_ratio()))
 	gain_credits(refund)
 	return refund
 

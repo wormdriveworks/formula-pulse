@@ -449,6 +449,9 @@ ui.tuningBench.effectRatioFormat,{current}% → {next}%,{current}% → {next}%,{
 ui.tuningBench.effectRatioMaxFormat,{current}%,{current}%,{current}%
 ui.tuningBench.effectFlatFormat,{current} → {next},{current} → {next},{current} → {next}
 ui.tuningBench.effectFlatMaxFormat,{current},{current},{current}
+ui.tuningBench.refundFormat,{ratio}% · {amount} Cr,{ratio}% · {amount} Cr,{ratio}% · {amount} Cr
+ui.tuningBench.refundNone,되돌릴 단계 없음,Nothing to redistribute,再配分できません
+ui.tuningBench.redistributeConfirm,{line} 단계를 모두 재배분합니다.,Redistribute all {line} levels.,{line} の段階をすべて再配分します。
 ui.strategy.title,전략실,Strategy Room,戦略室
 ui.strategy.tierFormat,스킬 티어 {tier},Skill Tier {tier},スキルティア {tier}
 ui.strategy.presetA,프리셋 A,Preset A,プリセット A

@@ -249,7 +249,7 @@ func _on_recruit(crew_id: String) -> void:
 			return
 		if not session.outgame.recruit_crew(crew_id):
 			return
-		sfx("purchase")
+		sfx("crew_join")   # SE-U11 크루 영입 성사 — 전용음이 있다(회차 23 은 범용 구매음을 냈다)
 		# 합류가 스테이션 개방을 바꾼다(나디아 → 스폰서 데스크) — 화면을 다시 세운다.
 		_close_recruit_panel()
 		go("HUB-01", {}))

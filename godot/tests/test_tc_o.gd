@@ -321,7 +321,7 @@ func _machine_stat_window() -> void:
 	# 직렬화 왕복 — 계수는 저장 대상이 아니라 단계에서 되살아난다.
 	var restored := _new_state()
 	if restored != null:
-		restored.deserialize(state.serialize())
+		_ok("전제: 재로드 성공", restored.restore(state.serialize()))
 		_eq_float("재로드 후 최대치 복원", restored.chassis_max(), state.chassis_max())
 		_ok("계수 자체는 세이브에 실리지 않는다",
 			not str(state.serialize()).contains("slipstream_coef"))
@@ -371,7 +371,7 @@ func _crew_recruit_two_stage() -> void:
 	# 직렬화 — 접근 해금의 근거(마일스톤)가 실리므로 게이트가 재로드로 풀리지 않는다
 	var reloaded := _new_state()
 	if reloaded != null:
-		reloaded.deserialize(state.serialize())
+		_ok("전제: 재로드 성공", reloaded.restore(state.serialize()))
 		_ok("재로드 후에도 접근 해금 유지", reloaded.crew_access_open("crew_oscar"))
 		_ok("재로드 후 합류분 보존", reloaded.crew.has("crew_nadia"))
 
@@ -415,7 +415,7 @@ func _facility_effects_window() -> void:
 		str(deck_state.deck))
 	# 직렬화 왕복 — 쉬는 칸과 활성 칸이 함께 실린다
 	var reloaded := _new_state()
-	reloaded.deserialize(deck_state.serialize())
+	_ok("전제: 재로드 성공", reloaded.restore(deck_state.serialize()))
 	_ok("재로드 후 활성 칸 보존", reloaded.active_deck_preset == deck_state.active_deck_preset,
 		"active=%d" % reloaded.active_deck_preset)
 	_ok("재로드 후 덱 보존", reloaded.deck == deck_state.deck, str(reloaded.deck))
@@ -499,7 +499,7 @@ func _overhaul_effects_window() -> void:
 		"uses=%d" % budget.overhaul_hold_uses_this_tour)
 	budget.overhaul_hold_uses_this_tour = 2
 	var reloaded := _new_state()
-	reloaded.deserialize(budget.serialize())
+	_ok("전제: 재로드 성공", reloaded.restore(budget.serialize()))
 	_ok("예산 소진량이 세이브에 실린다", reloaded.overhaul_hold_uses_this_tour == 2,
 		"uses=%d" % reloaded.overhaul_hold_uses_this_tour)
 
@@ -524,10 +524,16 @@ func _tc_o2_tuning_and_overhaul() -> void:
 	# 재배분 환급 — 마르타 합류 상태이므로 90%
 	var spent := 400 + 700 + 1100 + 1700 + 2600
 	var before := state.credits
+	# 사전 표시액 = 실지급액 (회차 24 · D09 §4.3). 화면이 이 값을 COM-01 에 싣는다 —
+	# 갈리면 "쓰여 있는 것과 다른 금액이 들어오는" 자리가 된다.
+	var preview := state.redistribute_refund("tuning_t1")
 	var refund := state.redistribute_tuning("tuning_t1")
+	_ok("환급액 사전 표시 = 실지급액", preview == refund, "preview=%d refund=%d" % [preview, refund])
 	_eq_float("마르타 패시브 환급 90%", float(refund), float(spent) * 0.90, 1.0)
 	_ok("환급 후 단계 0", state.tuning_step("tuning_t1") == 0)
 	_ok("환급이 크레딧에 반영", state.credits == before + refund)
+	_ok("단계 0 에서 미리보기 0", state.redistribute_refund("tuning_t1") == 0)
+	_ok("단계 0 재배분은 거부", state.redistribute_tuning("tuning_t1") == 0)
 	# 오버홀 슬롯 구조 (D13 별첨A §7.1)
 	var top := state.overhaul_slots(1)
 	_ok("1~3위 = 2슬롯 5후보", int(top["slots"]) == 2 and int(top["candidates"]) == 5, str(top))
@@ -1037,7 +1043,10 @@ func _tc_o6_exchange_guards() -> void:
 		# `event_chassis_recover` 는 D06 §3.4 이벤트 회복의 유일 진입로 (회당 상한 가드 내장).
 		"full_repair", "full_repair_cost", "repair_affordable_ch", "repair_affordable_cost", "repair_preview",
 		"free_restore_line", "event_chassis_recover",
+		# 회차 24 — `redistribute_refund` 는 D09 §4.3 "환급액 사전 표시"의 조회 경로다
+		# (표시 전용 · 실행 `redistribute_tuning` 과 산식을 공유한다 — 정비 미리보기와 같은 구조).
 		"tuning_step", "tuning_cost", "buy_tuning", "tuning_refund_ratio", "redistribute_tuning",
+		"redistribute_refund",
 		# 회차 18 결선 — 튜닝 단계가 성능에 닿는 유일한 통로. `machine_stat`(대상 1건) ·
 		# `machine_stats`(엔진 주입 스냅숏) · `chassis_max`(기준값 + T4 보강 — 정비·HUD 공용 창구).
 		# 재화를 만들거나 환전하는 경로가 아니다(G1 무접촉) — 읽기 전용 파생값이다.
