@@ -215,7 +215,11 @@
     "effect": "enum:stable_sector_charge,hold_twice_per_turn,gp_start_charge,final_lap_gauge_mult,front_gauge_ratio,trouble_chassis_wear,duel_judgment,free_restore_line,slipstream_coef,braking_coef,charge_cap,chassis_max",
     "effect_value": "float",
     "drawback": "enum_optional:chassis_max,front_gauge_ratio,rear_pressure_ratio,pulse_charge_yield",
-    "drawback_value": "float"
+    "drawback_value": "float",
+    "effect_name_key": "string_key",
+    "effect_unit": "enum:ratio,flat,replace,mult",
+    "drawback_name_key": "string_key_optional",
+    "drawback_unit": "enum_optional:ratio,flat,replace,mult"
    }
   },
   "overhaul_slots.csv": {

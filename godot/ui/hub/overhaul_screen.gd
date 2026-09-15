@@ -88,6 +88,15 @@ func _candidate(overhaul_id: String) -> Control:
 	pick.custom_minimum_size = Vector2(150, 0)
 	pick.toggled.connect(_on_pick.bind(overhaul_id))
 	row.add_child(pick)
+	# 후보 효과 열람 (D09 §4.6 "후보 일람 → **전 후보 효과 열람** → 선택") — 종전에는 이름뿐이라
+	# 무엇을 고르는지가 화면에 없었다. **오스카 합류가 수치를 연다** (D07 §3.4 · §5.1 ·
+	# D13 별첨A §5.1 "오버홀 후보 상세 공개 — 정보"): 미합류는 축 이름까지, 합류는 수치까지.
+	var effect := Label.new()
+	effect.name = "Effect"
+	effect.add_theme_font_size_override("font_size", _body_font_size)
+	effect.add_theme_color_override("font_color", UiPalette.TIMER_LEEWAY)
+	effect.text = _effect_text(overhaul_id)
+	row.add_child(effect)
 	if session.outgame.overhauls.has(overhaul_id):
 		pick.disabled = true
 		var owned := Label.new()
@@ -96,6 +105,53 @@ func _candidate(overhaul_id: String) -> Control:
 		owned.add_theme_color_override("font_color", UiPalette.TEXT_DIM)
 		row.add_child(owned)
 	return row
+
+
+# 후보 한 줄의 효과 문면. **수치의 공개 여부가 오스카에 달렸다** — 미합류 시 요약(축 이름과
+# 대가 유무)만, 합류 시 수치 전문(D07 §3.4 "미합류 시 요약 설명만 표시 — 확정").
+#
+# 축 이름과 단위는 **표가 쥔다**(`effect_name_key`·`effect_unit`) — 코드는 형식만 고른다.
+# 계통이 늘어도 이 함수는 그대로다(머신 스탯 창구와 같은 규율).
+func _effect_text(overhaul_id: String) -> String:
+	var s := session.data.strings
+	var row: Dictionary = session.data.overhauls[overhaul_id]
+	var effect_name := s.text(String(row["effect_name_key"]))
+	var drawback_key := String(row.get("drawback_name_key", "")).strip_edges()
+	if not session.outgame.crew.has("crew_oscar"):
+		if drawback_key.is_empty():
+			return s.text("ui.overhaulScreen.summaryFormat", {"effect": effect_name})
+		return s.text("ui.overhaulScreen.summaryCostFormat", {"effect": effect_name})
+	var effect_text := _value_text(effect_name, String(row["effect_unit"]),
+		CsvTable.to_float(String(row["effect_value"])))
+	if drawback_key.is_empty():
+		return s.text("ui.overhaulScreen.detailFormat", {"effect": effect_text})
+	return s.text("ui.overhaulScreen.detailCostFormat", {
+		"effect": effect_text,
+		"drawback": _value_text(s.text(drawback_key), String(row["drawback_unit"]),
+			CsvTable.to_float(String(row["drawback_value"]))),
+	})
+
+
+# 수치 한 조각 — 부호는 값이 지고 문면은 지지 않는다(튜닝 벤치와 같은 규율: '+' 를 굳히면
+# 감소 축이 증가로 읽힌다). 대체형은 "→ 값" 으로 적는다 — 가산이 아니라 갈아 끼우는 축이다.
+func _value_text(name: String, unit: String, value: float) -> String:
+	var s := session.data.strings
+	match unit:
+		"ratio":
+			return s.text("ui.overhaulScreen.valueRatioFormat", {
+				"name": name, "value": _signed(int(round(value * 100.0)))})
+		"replace":
+			return s.text("ui.overhaulScreen.valueReplaceFormat", {
+				"name": name, "value": int(round(value))})
+		"mult":
+			return s.text("ui.overhaulScreen.valueMultFormat", {"name": name, "value": value})
+		_:
+			return s.text("ui.overhaulScreen.valueFlatFormat", {
+				"name": name, "value": _signed(int(round(value)))})
+
+
+func _signed(value: int) -> String:
+	return "+%d" % value if value > 0 else str(value)
 
 
 func _on_pick(pressed: bool, overhaul_id: String) -> void:

@@ -503,6 +503,28 @@ ui.overhaulScreen.passThrough,오버홀 없이 진행,Continue Without Overhaul,
 ui.overhaulScreen.noCandidates,장착할 수 있는 후보가 없습니다.,No candidates available to install.,装着できる候補がありません。
 ui.overhaulScreen.skip,남은 슬롯 포기,Skip Remaining,残りを放棄
 ui.overhaulScreen.skipConfirm,남은 오버홀 슬롯 {slots}개를 포기하고 진행합니다.,Forgo the remaining {slots} overhaul slot(s) and continue.,残りのオーバーホール枠{slots}個を放棄して進みます。
+ui.overhaulScreen.summaryFormat,{effect},{effect},{effect}
+ui.overhaulScreen.summaryCostFormat,{effect} · 대가 있음,{effect} · has a cost,{effect} · 代償あり
+ui.overhaulScreen.detailFormat,{effect},{effect},{effect}
+ui.overhaulScreen.detailCostFormat,{effect} · {drawback},{effect} · {drawback},{effect} · {drawback}
+ui.overhaulScreen.valueRatioFormat,{name} {value}%,{name} {value}%,{name} {value}%
+ui.overhaulScreen.valueFlatFormat,{name} {value},{name} {value},{name} {value}
+ui.overhaulScreen.valueReplaceFormat,{name} → {value},{name} → {value},{name} → {value}
+ui.overhaulScreen.valueMultFormat,{name} → ×{value},{name} → ×{value},{name} → ×{value}
+ui.stat.stableSectorCharge,무사고 섹터 차지,Clean Sector Charge,無事故セクター チャージ
+ui.stat.holdPerTurn,턴당 홀드,Holds per Turn,ターン毎ホールド
+ui.stat.gpStartCharge,경기 시작 차지,Starting Charge,開始時チャージ
+ui.stat.finalLapGauge,최종 랩 게이지,Final Lap Gauge,最終ラップ ゲージ
+ui.stat.frontGauge,전방 게이지,Front Gauge,前方ゲージ
+ui.stat.troubleChassisWear,트러블 섀시 소모,Trouble Chassis Loss,トラブル シャシー消耗
+ui.stat.duelJudgment,듀얼 판정,Duel Judgment,デュエル判定
+ui.stat.freeRestoreLine,무상 복원선,Free Restore Line,無償回復ライン
+ui.stat.slipstreamCoef,슬립스트림 효과,Slipstream Effect,スリップストリーム効果
+ui.stat.brakingCoef,브레이킹 효과,Braking Effect,ブレーキング効果
+ui.stat.chargeCap,차지 상한,Charge Cap,チャージ上限
+ui.stat.chassisMax,섀시 최대치,Max Chassis,シャシー最大値
+ui.stat.rearPressure,후방 압박,Rear Pressure,後方プレッシャー
+ui.stat.pulseChargeYield,펄스 차지,Pulse Charge,パルス チャージ
 ui.hub.stationLockedFormat,{station} — {crew} 합류 시,{station} — on {crew} joining,{station} — {crew}加入時
 ui.records.relationFormat,{axis} · {stage},{axis} · {stage},{axis} · {stage}
 ui.duel.playerFormat,No.{number},No.{number},No.{number}

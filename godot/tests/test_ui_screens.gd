@@ -125,6 +125,7 @@ func _process(_delta: float) -> bool:
 	_crew_recruit_flow(data)
 	_tuning_redistribute_mode(data)
 	_title_archive_flow(data)
+	_overhaul_detail_reveal(data)
 	_sponsor_settlement_flow(data)
 	_achievement_without_career(data)
 	_achievement_with_career(data)
@@ -5279,6 +5280,86 @@ func _crew_recruit_flow(data: GameData) -> void:
 		if String(routes[route_id]).contains("recruit") or String(routes[route_id]).contains("crew"):
 			crew_route = true
 	_ok("㊾ⓓ 라우팅 대장에 크루 전용 화면 없음", not crew_route, str(routes.keys()))
+
+
+# ── 53 오버홀 후보 효과 열람 · 오스카 상세 공개 (개선 회차 27 · 매뉴얼 9절 ⑥) ──
+#
+# 종전에는 후보 행이 **이름만** 그렸다 — D09 §4.6 이 요구한 "후보 일람 → **전 후보 효과 열람**"
+# 자체가 없었고, 그래서 오스카의 패시브("오버홀 후보 상세 공개" · D07 §3.4 · §5.1)도 가릴 것이
+# 없었다. 결선 뒤의 계약:
+#   ⓐ 문면의 축과 단위는 **표가 쥔다** — 코드는 형식만 고른다
+#   ⓑ 미합류 = 요약(축 이름 · 대가 유무)이고 **수치가 없다**
+#   ⓒ 합류 = 수치 전문(효과·대가 양쪽)
+const OVERHAUL_SCENE := "res://ui/hub/overhaul_screen.tscn"
+
+
+func _overhaul_detail_reveal(data: GameData) -> void:
+	# ⓐ 표가 문면을 쥔다 — 전 행이 축 이름 키와 단위를 들고 있고, 대가가 있으면 그쪽도 짝이 맞다
+	var missing: Array = []
+	for overhaul_id in data.overhauls:
+		var row: Dictionary = data.overhauls[overhaul_id]
+		if String(row.get("effect_name_key", "")).strip_edges().is_empty() \
+			or String(row.get("effect_unit", "")).strip_edges().is_empty():
+			missing.append(String(overhaul_id))
+		var has_drawback := not String(row.get("drawback", "")).strip_edges().is_empty()
+		var has_drawback_key := not String(row.get("drawback_name_key", "")).strip_edges().is_empty()
+		if has_drawback != has_drawback_key:
+			missing.append("%s(대가 짝 불일치)" % String(overhaul_id))
+	_ok("53ⓐ 전 후보가 축 이름·단위를 들고 있다", missing.is_empty(), str(missing))
+
+	# ⓑ 미합류 — 요약이고 수치가 없다
+	var plain := _fresh_session(data)
+	var sidegrade := "overhaul_ov_s1"   # 효과 + 대가 쌍 (전방 게이지 +8% / 섀시 최대 −10)
+	var plain_screen := _mount_payload_scene(OVERHAUL_SCENE, plain,
+		{"championship_rank": 1, "season_chain": false})
+	_ok("53ⓑ 전제: 오버홀 화면 마운트", plain_screen != null)
+	if plain_screen != null:
+		var s := data.strings
+		var effect_name := s.text(String(data.overhauls[sidegrade]["effect_name_key"]))
+		var summary := _overhaul_effect_text(plain_screen, sidegrade)
+		_ok("53ⓑ 전제: 후보 행이 목록에 있다", summary != "", summary)
+		if summary != "":
+			_ok("53ⓑ 미합류 = 요약 (축 이름)", summary.contains(effect_name), summary)
+			_ok("53ⓑ 미합류에는 수치가 없다", not _has_digit(summary), summary)
+			_ok("53ⓑ 대가가 있으면 요약에도 선다",
+				summary == s.text("ui.overhaulScreen.summaryCostFormat", {"effect": effect_name}),
+				summary)
+		_unmount(plain_screen)
+
+	# ⓒ 오스카 합류 — 수치 전문
+	var expert := _fresh_session(data)
+	expert.outgame.crew["crew_oscar"] = true
+	var expert_screen := _mount_payload_scene(OVERHAUL_SCENE, expert,
+		{"championship_rank": 1, "season_chain": false})
+	if expert_screen != null:
+		var detail := _overhaul_effect_text(expert_screen, sidegrade)
+		_ok("53ⓒ 전제: 후보 행이 목록에 있다", detail != "", detail)
+		if detail != "":
+			_ok("53ⓒ 합류 = 수치 전문", _has_digit(detail), detail)
+			_ok("53ⓒ 효과 수치", detail.contains("+8%"), detail)
+			_ok("53ⓒ 대가 수치도 함께", detail.contains("−10") or detail.contains("-10"), detail)
+		# 대가 없는 후보는 효과만 — 쌍이 없는데 구분자가 서지 않는다
+		var single := _overhaul_effect_text(expert_screen, "overhaul_ov_p4")
+		if single != "":
+			_ok("53ⓒ 대가 없는 후보는 효과만", single.contains("+15") and not single.contains(" · "),
+				single)
+		_unmount(expert_screen)
+
+
+# 후보 행의 효과 라벨 문면 — 추첨 결과에 그 후보가 없으면 빈 문자열이다.
+func _overhaul_effect_text(screen: Control, overhaul_id: String) -> String:
+	var row := screen.find_child(overhaul_id.to_pascal_case(), true, false)
+	if row == null:
+		return ""
+	var label := row.get_node_or_null("Effect") as Label
+	return label.text if label != null else ""
+
+
+func _has_digit(text: String) -> bool:
+	for index in range(text.length()):
+		if text[index] >= "0" and text[index] <= "9":
+			return true
+	return false
 
 
 # ── 52 타이틀 → 기록실 열람 모드 (개선 회차 26 · 매뉴얼 9절 ④) ──
