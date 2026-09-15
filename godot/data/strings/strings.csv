@@ -346,6 +346,7 @@ ui.save.empty,빈 슬롯,Empty Slot,空きスロット
 ui.save.progressFormat,시즌 {season} · 투어 {tour} · 제{race}전,Season {season} · Tour {tour} · Race {race},シーズン{season} · ツアー{tour} · 第{race}戦
 ui.save.hintNew,새 커리어를 시작할 슬롯을 고르세요.,Choose a slot to start a new career.,新しいキャリアを始めるスロットを選んでください。
 ui.save.hintContinue,이어할 커리어를 고르세요.,Choose a career to continue.,続けるキャリアを選んでください。
+ui.save.hintArchive,기록을 볼 커리어를 고르세요.,Choose a career to review.,記録を見るキャリアを選んでください。
 ui.save.cardBodyFormat,"{progress}
 {detail}","{progress}
 {detail}","{progress}

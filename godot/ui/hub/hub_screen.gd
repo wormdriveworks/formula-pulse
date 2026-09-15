@@ -4,14 +4,19 @@
 # **B-1 (절대 규격):** UI 약칭 '데이터'는 반드시 재화 아이콘을 동반한다 (D09 §5.2) —
 # 그래서 공통 바의 재화는 라벨이 아니라 아이콘+수치다.
 #
-# 개별 HUB 화면은 `_on_hub_ready()` 를 구현하고, 뒤로 가기는 공통으로 HUB-01로 돌린다.
+# 개별 HUB 화면은 `_on_hub_ready()` 를 구현하고, 뒤로 가기는 기본적으로 HUB-01로 돌린다.
+# **페이로드가 `return` 을 실어 오면 그쪽이다** (개선 회차 26) — 타이틀에서 세이브를 골라 연
+# 기록실 열람 모드(§A-1 E02)가 그 경로이며, 돌아갈 자리가 개러지가 아니면 복귀 저장도 없다.
 class_name HubScreen
 extends FlowScreen
 
 const ICON_DIR := "res://assets/ui/icons/"
 
+var _return_route := "HUB-01"
+
 
 func _on_bound(payload: Dictionary) -> void:
+	_return_route = String(payload.get("return", "HUB-01"))
 	_fill_common_bar()
 	_on_hub_ready(payload)
 
@@ -93,12 +98,17 @@ func _return_to_garage() -> void:
 		if not bool(saved.get("ok", false)):
 			# 조용한 실패는 "작업이 남았다"는 오인을 낳는다 — 저장 표시(app_root)도 실패에는 뜨지 않는다.
 			push_error("HubScreen: return autosave failed - %s" % String(saved.get("error", "")))
-	go("HUB-01", {})
+	go(_return_route, {})
 
 
 # 복귀 저장 대상인가 — 개러지 자신은 돌아올 자리가 아니므로 재정의로 끈다.
+#
+# **개러지로 돌아가는 자리에만 붙는다** (개선 회차 26). 타이틀에서 세이브를 골라 연 기록실
+# 열람 모드(§A-1 E02)는 진행을 바꾸지 않고 돌아가는 곳도 개러지가 아니다 — 거기서 디스크를
+# 쓰면 "읽기만 했는데 저장된" 자리가 생긴다. 판정을 돌아갈 경로에 묶어 두면 경로가 늘어도
+# 규칙이 따라온다.
 func _saves_on_return() -> bool:
-	return true
+	return _return_route == "HUB-01"
 
 
 # 재화 갱신 — 구매 후 호출 (증감 피드백 규격의 최소형. 플로트·펄스는 아트 유입 시)

@@ -124,6 +124,7 @@ func _process(_delta: float) -> bool:
 	_garage_return_autosave(data)
 	_crew_recruit_flow(data)
 	_tuning_redistribute_mode(data)
+	_title_archive_flow(data)
 	_sponsor_settlement_flow(data)
 	_achievement_without_career(data)
 	_achievement_with_career(data)
@@ -5172,8 +5173,16 @@ func _garage_return_autosave(data: GameData) -> void:
 	_ok("㊽ⓕ 뒤로 버튼이 복귀 창구에 결속", hub_src.contains("pressed.connect(_return_to_garage)"))
 	_ok("㊽ⓕ Esc 경로도 같은 창구", hub_src.contains("\t_return_to_garage()"))
 	_ok("㊽ⓕ 창구가 저장을 부른다", hub_src.contains("session.save_progress()"))
-	_ok("㊽ⓕ 개러지 이탈은 창구 1곳뿐 (화면마다 흩어진 go 가 남지 않았다)",
-		hub_src.count('go("HUB-01", {})') == 1, "count=%d" % hub_src.count('go("HUB-01", {})'))
+	# 창구 1곳 규칙은 그대로다 — 회차 26 이 리터럴을 **기본값을 가진 변수**로 바꿨을 뿐이다.
+	# 리터럴이 남아 있으면 경로가 둘이 된다는 사실을 함께 못박는다.
+	_ok("㊽ⓕ 이탈은 창구 1곳뿐 (화면마다 흩어진 go 가 남지 않았다)",
+		hub_src.count("go(_return_route, {})") == 1 and hub_src.count('go("HUB-01"') == 0,
+		"funnel=%d literal=%d"
+			% [hub_src.count("go(_return_route, {})"), hub_src.count('go("HUB-01"')])
+	_ok("㊽ⓕ 복귀 경로 기본값 = 개러지",
+		hub_src.contains('_return_route = String(payload.get("return", "HUB-01"))'))
+	_ok("㊽ⓕ 복귀 저장은 개러지로 갈 때만 (회차 26)",
+		hub_src.contains('return _return_route == "HUB-01"'))
 	var garage_src := FileAccess.get_file_as_string("res://ui/hub/garage_screen.gd")
 	_ok("㊽ⓕ 개러지가 복귀 저장을 끈다", garage_src.contains("func _saves_on_return() -> bool:")
 		and garage_src.contains("return false"))
@@ -5270,6 +5279,147 @@ func _crew_recruit_flow(data: GameData) -> void:
 		if String(routes[route_id]).contains("recruit") or String(routes[route_id]).contains("crew"):
 			crew_route = true
 	_ok("㊾ⓓ 라우팅 대장에 크루 전용 화면 없음", not crew_route, str(routes.keys()))
+
+
+# ── 52 타이틀 → 기록실 열람 모드 (개선 회차 26 · 매뉴얼 9절 ④) ──
+#
+# 종전에는 타이틀의 기록실 앵커가 **상시 소등**이었다. 정본은 진작 허용해 두었고
+# (§A-1 E02 "확정(결정 #8): 허용 — 무상·상시 정신의 확장. 커리어 세이브 문맥 필요 시
+# **세이브 선택 경유**") 그 경유 경로만 결선되지 않은 상태였다. 결선 뒤의 계약:
+#   ⓐ 읽을 커리어가 없으면 소등 · 있으면 점등하고 SYS-02 를 열람 모드로 연다
+#   ⓑ 열람 모드의 SYS-02 = 전용 문면 · 빈 슬롯 소등 · **삭제 버튼 없음**
+#   ⓒ 슬롯을 고르면 그 커리어를 세워 HUB-05 아카이브 탭으로 간다 (돌아갈 자리 = 타이틀)
+#   ⓓ 열람 모드의 뒤로는 타이틀이고 **디스크를 쓰지 않는다** — 복귀 저장은 개러지 몫이다
+const TITLE_SCENE := "res://ui/sys/title_screen.tscn"
+const SAVE_SLOT_SCENE := "res://ui/sys/save_slot_screen.tscn"
+
+
+func _title_archive_flow(data: GameData) -> void:
+	SaveManager.configure(data)
+	# ⓐ 세이브 없음 — 프로필 전량을 걷고 연다
+	var count := int(data.param("param_save_profile_count"))
+	for profile in range(1, count + 1):
+		SaveManager.delete_progress(profile)
+	var dark := _fresh_session(data)
+	var dark_title := _mount(TITLE_SCENE, dark)
+	if dark_title != null:
+		var dark_anchor := dark_title.get_node("%ArchiveButton") as Button
+		_ok("52ⓐ 읽을 커리어가 없으면 기록실 소등", dark_anchor.disabled)
+		_unmount(dark_title)
+
+	# 세이브를 하나 만든다 — 프로필 2 (ⓑ 의 빈 슬롯 축을 위해 1·3 은 비워 둔다)
+	var owner := _fresh_session(data)
+	owner.begin_career(2)
+	owner.outgame.gain_credits(777)
+	_ok("52ⓐ 전제: 프로필 2 저장", bool(owner.save_progress().get("ok", false)))
+
+	var lit := _fresh_session(data)
+	var title := _mount(TITLE_SCENE, lit)
+	_ok("52ⓐ 전제: 타이틀 마운트", title != null)
+	if title != null:
+		var anchor := title.get_node("%ArchiveButton") as Button
+		_ok("52ⓐ 커리어가 있으면 기록실 점등", not anchor.disabled)
+		var routed: Array = []
+		var payloads: Array = []
+		title.navigate.connect(func(t: String, p: Dictionary) -> void:
+			routed.append(t)
+			payloads.append(p))
+		anchor.pressed.emit()
+		_ok("52ⓐ 기록실 = 세이브 선택 경유", routed == ["SYS-02"], str(routed))
+		_ok("52ⓐ 열람 모드로 연다",
+			not payloads.is_empty() and String(Dictionary(payloads[0]).get("mode", "")) == "archive",
+			str(payloads))
+		_unmount(title)
+
+	# ⓑ·ⓒ 열람 모드의 세이브 슬롯
+	var picker := _fresh_session(data)
+	var slots := _mount_payload_scene(SAVE_SLOT_SCENE, picker, {"mode": "archive"})
+	_ok("52ⓑ 전제: 세이브 슬롯 마운트", slots != null)
+	if slots != null:
+		var s := data.strings
+		_ok("52ⓑ 열람 모드 전용 문면",
+			(slots.get_node("%HintLabel") as Label).text == s.text("ui.save.hintArchive"),
+			(slots.get_node("%HintLabel") as Label).text)
+		_ok("52ⓑ 빈 슬롯 소등", (slots.find_child("Slot1", true, false) as Button).disabled)
+		_ok("52ⓑ 기록 있는 슬롯은 점등",
+			not (slots.find_child("Slot2", true, false) as Button).disabled)
+		var deletes := 0
+		for profile in range(1, count + 1):
+			if slots.find_child("Delete%d" % profile, true, false) != null:
+				deletes += 1
+		_ok("52ⓑ 열람 모드에는 삭제가 없다", deletes == 0, "deletes=%d" % deletes)
+		var routed: Array = []
+		var payloads: Array = []
+		slots.navigate.connect(func(t: String, p: Dictionary) -> void:
+			routed.append(t)
+			payloads.append(p))
+		(slots.find_child("Slot2", true, false) as Button).pressed.emit()
+		_ok("52ⓒ 슬롯 선택 = HUB-05", routed == ["HUB-05"], str(routed))
+		if not payloads.is_empty():
+			var payload: Dictionary = payloads[0]
+			_ok("52ⓒ 아카이브 탭으로 착지", String(payload.get("tab", "")) == "archive", str(payload))
+			_ok("52ⓒ 돌아갈 자리는 타이틀", String(payload.get("return", "")) == "SYS-01", str(payload))
+		_ok("52ⓒ 고른 커리어가 세워진다", picker.outgame.credits == 777,
+			"credits=%d" % picker.outgame.credits)
+		_ok("52ⓒ 프로필도 그 슬롯", picker.profile_index == 2, "profile=%d" % picker.profile_index)
+		_unmount(slots)
+
+	# ⓓ 열람 모드의 기록실 — 뒤로는 타이틀이고 디스크를 쓰지 않는다
+	var viewer := _fresh_session(data)
+	viewer.profile_index = 2
+	var loaded := SaveManager.load_progress(2)
+	_ok("52ⓓ 전제: 저장분 로드", bool(loaded.get("ok", false))
+		and viewer.restore(Dictionary(loaded.get("payload", {}))))
+	viewer.outgame.gain_credits(5000)   # 메모리만 흔든다 — 디스크에 닿으면 축이 잡는다
+	var before := _saved_credits_of(2)
+	var records := _mount_payload_scene(RECORDS_SCENE, viewer, {"tab": "archive", "return": "SYS-01"})
+	if records != null:
+		var routed: Array = []
+		records.navigate.connect(func(t: String, _p: Dictionary) -> void: routed.append(t))
+		(records.get_node("%BackButton") as Button).pressed.emit()
+		_ok("52ⓓ 열람 모드의 뒤로 = 타이틀", routed == ["SYS-01"], str(routed))
+		_ok("52ⓓ 열람은 디스크를 쓰지 않는다", _saved_credits_of(2) == before,
+			"before=%d after=%d mem=%d" % [before, _saved_credits_of(2), viewer.outgame.credits])
+		_unmount(records)
+	# 개러지 복귀는 종전대로 저장한다 — 같은 화면이 경로에 따라 갈린다는 것이 이 축의 요지다
+	var keeper := _fresh_session(data)
+	keeper.profile_index = 2
+	keeper.restore(Dictionary(SaveManager.load_progress(2).get("payload", {})))
+	keeper.outgame.gain_credits(1234)
+	var garage_records := _mount(RECORDS_SCENE, keeper)
+	if garage_records != null:
+		var routed: Array = []
+		garage_records.navigate.connect(func(t: String, _p: Dictionary) -> void: routed.append(t))
+		(garage_records.get_node("%BackButton") as Button).pressed.emit()
+		_ok("52ⓓ 개러지 복귀는 종전대로 저장", routed == ["HUB-01"]
+			and _saved_credits_of(2) == keeper.outgame.credits,
+			"routed=%s disk=%d mem=%d"
+				% [str(routed), _saved_credits_of(2), keeper.outgame.credits])
+		_unmount(garage_records)
+	for profile in range(1, count + 1):
+		SaveManager.delete_progress(profile)
+
+
+# 페이로드를 실어 세우는 마운트 — `_mount` 는 빈 페이로드 전속이다.
+func _mount_payload_scene(scene_path: String, session: RunSession,
+		payload: Dictionary) -> Control:
+	var packed := load(scene_path) as PackedScene
+	if packed == null:
+		_ok("씬 로드: %s" % scene_path, false)
+		return null
+	var screen := packed.instantiate() as Control
+	screen.session = session
+	root.add_child(screen)
+	screen.bind(session, payload)
+	return screen
+
+
+func _saved_credits_of(profile: int) -> int:
+	var loaded := SaveManager.load_progress(profile)
+	if not bool(loaded.get("ok", false)):
+		return -1
+	var payload: Dictionary = loaded.get("payload", {})
+	return int(Dictionary(payload.get("outgame", {})).get("credits", -1))
 
 
 # ── 51 튜닝 재배분 모드 (개선 회차 24 · 매뉴얼 9절 ①) ──

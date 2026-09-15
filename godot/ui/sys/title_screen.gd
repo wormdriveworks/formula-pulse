@@ -4,8 +4,11 @@
 # **세이브 부재 시 '계속하기' 비표출 · '새 커리어' 승격** (§A-1 E01).
 #
 # 업적(SYS-04)은 MS-3 에서 서면서 항목이 들어왔다 (§A-1 이탈 대상 = SYS-02·SYS-03·SYS-04).
-# 기록실(HUB-05)은 커리어 세이브 문맥이 필요해 아직 잠금 표기로 자리만 잡는다 —
-# 도달 불가 요소를 남기면 패드 순회 폐쇄 루프(D09 §1.3)가 깨지므로 비활성으로 순회에서 뺀다.
+#
+# 기록실(HUB-05)은 **세이브 선택을 거쳐 연다** (§A-1 E02 "확정(결정 #8): 허용 — 무상·상시
+# 정신의 확장. 커리어 세이브 문맥 필요 시 **세이브 선택 경유**" · 개선 회차 26 결선).
+# 읽을 커리어가 하나도 없으면 열 것이 없으므로 '계속하기'와 같은 규칙으로 소등한다 —
+# 도달 불가 요소를 남기면 패드 순회 폐쇄 루프(D09 §1.3)가 깨지므로 순회에서도 뺀다.
 extends FlowScreen
 
 # ── 타이틀 키 비주얼 (개선 2026-09-01) ──
@@ -55,11 +58,13 @@ func _on_bound(_payload: Dictionary) -> void:
 	_quit_button.pressed.connect(_on_quit)
 	_achievements_button.pressed.connect(func(): go("SYS-04", {"return": "SYS-01"}))
 	_options_button.pressed.connect(func(): go("SYS-03", {"return": "SYS-01"}))
-	# 기록실 열람 모드(커리어 세이브 문맥)는 세이브 선택 경유가 규격(§A-1 E02) — 미결선 잠금
-	_archive_button.disabled = true
-	_archive_button.focus_mode = Control.FOCUS_NONE
-
 	var has_save := _any_profile_has_save()
+	# 기록실 = 세이브 선택 경유 열람 모드 (§A-1 E02). 읽을 커리어가 없으면 소등이다.
+	if has_save:
+		_archive_button.pressed.connect(func(): go("SYS-02", {"mode": "archive"}))
+	else:
+		_archive_button.disabled = true
+		_archive_button.focus_mode = Control.FOCUS_NONE
 	_continue_button.visible = has_save
 	# 초기 포커스: 계속하기 (부재 시 새 커리어) — §A-1
 	if has_save:

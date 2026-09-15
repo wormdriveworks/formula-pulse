@@ -46,7 +46,9 @@ func _build_slots() -> void:
 		var card := _card_for(profile, loaded, has_save)
 		column.add_child(card)
 		_slot_buttons.append(card)
-		if has_save:
+		# **열람 모드에는 삭제를 두지 않는다** (개선 회차 26) — 기록을 보러 들어온 자리에
+		# 파괴 조작을 세우지 않는다. 슬롯 관리는 새 커리어·이어하기 경로의 일이다.
+		if has_save and _mode != "archive":
 			column.add_child(_delete_button_for(profile))
 		row.add_child(column)
 	if not _slot_buttons.is_empty():
@@ -54,9 +56,12 @@ func _build_slots() -> void:
 	# 슬롯이 데이터 값보다 적게 서면 조용히 넘어가지 않는다
 	if _slot_buttons.size() != count:
 		push_error("SaveSlotScreen: built %d slots but data says %d" % [_slot_buttons.size(), count])
-	(%HintLabel as Label).text = s.text(
-		"ui.save.hintNew" if _mode == "new" else "ui.save.hintContinue"
-	)
+	var hint_key := "ui.save.hintNew"
+	if _mode == "archive":
+		hint_key = "ui.save.hintArchive"
+	elif _mode == "continue":
+		hint_key = "ui.save.hintContinue"
+	(%HintLabel as Label).text = s.text(hint_key)
 
 
 func _card_for(profile: int, loaded: Dictionary, has_save: bool) -> Button:
@@ -100,6 +105,11 @@ func _card_for(profile: int, loaded: Dictionary, has_save: bool) -> Button:
 		body = s.text("ui.save.empty")
 	var card_text := s.text("ui.save.cardFormat", {"label": label, "body": body})
 	button.text = card_text
+	# 열람 모드의 빈 슬롯은 소등이다 — 다른 모드에서는 빈 슬롯이 '여기서 새로 시작'의 자리지만
+	# 기록실에는 읽을 것이 없다. 누르면 새 커리어가 시작되는 경로를 남기지 않는다.
+	if _mode == "archive" and not has_save:
+		button.disabled = true
+		button.focus_mode = Control.FOCUS_NONE
 	button.pressed.connect(_on_slot_pressed.bind(profile, has_save))
 	return button
 
@@ -143,6 +153,21 @@ func _on_delete_disarmed(profile: int, button: Button) -> void:
 
 
 func _on_slot_pressed(profile: int, has_save: bool) -> void:
+	# ── 기록실 열람 모드 (§A-1 E02 · 개선 회차 26) ──
+	#
+	# 커리어를 **읽어서 세우되 진행하지 않는다**. 착지는 HUB-05 아카이브 탭이고 돌아갈 자리는
+	# 타이틀이다 — 그 경로가 `return` 으로 실려 간다(개러지가 아닌 곳에서 열린 기록실이므로).
+	# 저장은 일어나지 않는다: 복귀 저장은 **개러지로 돌아가는 자리**에만 붙어 있다(회차 17).
+	if _mode == "archive":
+		if not has_save:
+			return
+		var archive_load := SaveManager.load_progress(profile)
+		session.profile_index = profile
+		if not session.restore(archive_load.get("payload", {})):
+			push_error("SaveSlotScreen: archive restore failed for profile %d" % profile)
+			return
+		go("HUB-05", {"tab": "archive", "return": "SYS-01"})
+		return
 	if _mode == "continue" and has_save:
 		var loaded := SaveManager.load_progress(profile)
 		session.profile_index = profile
