@@ -21,14 +21,16 @@ const KEY_COLUMN := "key"
 const RENDER_FONTS := {
 	"Galmuri9": "res://assets/fonts/Galmuri9.ttf",
 	"Galmuri14": "res://assets/fonts/Galmuri14.ttf",
+	# 개선 회차 25 — **O7 확대 단이 렌더 경로로 데려왔다**(D10 §5.7 이 지목한 후보 원도).
+	# 격리 대장이 이 이동을 강제했다: 회차 25 가 `run_session.gd` 에 경로를 적자
+	# "렌더 경로 참조 0" 이 거짓이 되어 검사가 붉었고, 그래서 커버리지 요구로 옮긴다.
+	"Galmuri11": "res://assets/fonts/Galmuri11.ttf",
 }
 
 # 렌더 경로 **밖** 원도. 커버리지를 요구하지 않는 대신 **렌더 경로에 나타나지 않음**을 요구한다.
 # `cjk_expected` 는 두 방향 대장이다 — 실측이 이 값과 달라지면(원도가 교체·증보되면)
 # 격리 사유 자체가 낡은 것이므로 검사가 실패해 재검토를 강제한다.
 const LATENT_FONTS := {
-	"Galmuri11": {"path": "res://assets/fonts/Galmuri11.ttf", "cjk_expected": 6477,
-		"reason": "측정 도구 전속 — 렌더 경로 참조 0"},
 	"Galmuri11-Bold": {"path": "res://assets/fonts/Galmuri11-Bold.ttf", "cjk_expected": 0,
 		"reason": "CJK·가나 0자 — 일문에 굵은 글씨를 도입하면 그 순간 전부 두부가 된다"},
 	"GalmuriMono11": {"path": "res://assets/fonts/GalmuriMono11.ttf", "cjk_expected": 6477,

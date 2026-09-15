@@ -16,13 +16,11 @@ extends RefCounted
 const TABS := [
 	{"key": "ui.options.tabGameplay", "options": ["o4", "o5", "o6", "o10"]},
 	{"key": "ui.options.tabAccessibility", "options": ["o1", "o2", "o3", "o9", "o12"]},
-	# **O7 텍스트 크기는 목록에서 내려 두었다** (개선 회차 22 · 사용자 결정 2026-09-15).
-	# 소비부가 게을러서가 아니라 **정본이 값을 비워 둔 상태**다 — D10 §5.7 이 "O7 확대 단(115/130%)
-	# 원도 = O7 결선 시 확정 [이월]"이라 명기하고 실효 배율 열도 "실효 100%(확대 단 미확정)"다.
-	# 고를 수는 있는데 아무 일도 일어나지 않는 항목을 남기는 것보다 원도가 설 때까지 감추는 편이
-	# 정직하다. **정의(`OPTIONS["o7"]`)는 남긴다** — 저장된 선택과 기본값이 그대로 살아 있어야
-	# 원도 유입 때 항목만 되올리면 된다.
-	{"key": "ui.options.tabAudioVideo", "options": ["o8", "o13", "o14", "o15"]},
+	# **O7 텍스트 크기가 목록으로 돌아왔다** (개선 회차 25 · 사용자 결정 2026-09-15 —
+	# "원도에 맞춰 2단"). 회차 22 가 내렸던 이유는 정본이 확대 단 원도를 비워 뒀다는 것이고
+	# (D10 §5.7 "O7 확대 단(115/130%) 원도 = O7 결선 시 확정 [이월]"), 그 이월이 이 회차에서
+	# 닫혔다 — 같은 절이 지목한 후보 원도 **Galmuri11** 을 확대 단으로 채택한다.
+	{"key": "ui.options.tabAudioVideo", "options": ["o7", "o8", "o13", "o14", "o15"]},
 	{"key": "ui.options.tabControls", "options": []},
 	{"key": "ui.options.tabLanguage", "options": ["o11"]},
 ]
@@ -38,7 +36,13 @@ const OPTIONS := {
 	# 기본 끔을 전제했으나, 실기에서 개입 창의 잔량 판독이 링 소진만으로는 약해 기본을 뒤집는다.
 	# 원문 지향 플레이어는 옵션에서 끌 수 있다 — 항목 자체는 유지.
 	"o6": {"label": "ui.options.o6", "steps": ["ui.options.stepOff", "ui.options.stepOn"], "default": 1},
-	"o7": {"label": "ui.options.o7", "steps": ["ui.options.stepScale100", "ui.options.stepScale115", "ui.options.stepScale130"], "default": 0},
+	# O7 = **2단**이다. 캔버스가 정수 배율로 커지므로(`scale_mode="integer"`) 도트 원도는
+	# 자기 크기에서만 또렷하고, 가진 원도는 본문 9(Galmuri9) · 확대 11(Galmuri11) 둘뿐이다.
+	# 115/130 을 흉내 내려면 원도 밖 크기로 그려야 하는데 그러면 격자가 어긋나 흐려진다 —
+	# **단을 원도에 맞춘다**(사용자 결정 2026-09-15). 실효 배율 11/9 = 122%.
+	# 대형·VN 계열(14 · Galmuri14)은 위 원도가 없어 확대 대상이 아니다(D10 §5.7 이월 잔여).
+	# **D10 §5.7 의 115/130 매핑과 갈린다 — 불변규칙 9 대상이며 회차 문서·impl_log 로 보고한다.**
+	"o7": {"label": "ui.options.o7", "steps": ["ui.options.stepScale100", "ui.options.stepScale122"], "default": 0},
 	"o8": {"label": "ui.options.o8", "steps": ["ui.options.stepScale100", "ui.options.stepScale110", "ui.options.stepScale125"], "default": 0},
 	"o9": {"label": "ui.options.o9", "steps": ["ui.options.stepPaletteBase", "ui.options.stepPaletteAlt"], "default": 0},
 	"o10": {"label": "ui.options.o10", "steps": ["ui.options.stepSlow", "ui.options.stepNormal", "ui.options.stepFastText"], "default": 1},

@@ -129,6 +129,34 @@ func ui_scale_factor() -> float:
 			return 1.0
 
 
+# ── O7 텍스트 크기 (개선 회차 25 · 사용자 결정 2026-09-15 "원도에 맞춰 2단") ──
+#
+# **원도를 갈아 끼우는 방식**이다. 캔버스가 정수 배율로 확대되므로(640×360 ·
+# `scale_mode="integer"`) 도트 폰트는 자기 원도 크기에서만 또렷하고, 그 사이 크기로 그리면
+# 픽셀 격자가 어긋난다. 그래서 크기만 올리지 않고 **그 크기의 원도로 바꾼다** —
+# D10 §5.7 이 확대 단 후보로 지목한 Galmuri11 이 그것이다("실물 후보 = Galmuri11 등").
+#
+# 대형·VN 계열(14 · Galmuri14)은 위 원도가 없어 이 축의 대상이 아니다. 접근성 수요가
+# 큰 쪽이 9px 본문이므로 확대 대상으로도 본문이 맞다.
+const TEXT_SIZE_FONT_1 := "res://assets/fonts/Galmuri11.ttf"
+
+
+func text_body_font_size() -> int:
+	if options == null or data == null:
+		return 9
+	if options.index_of("o7") == 1:
+		return data.param_int("param_opt_text_size_body_1")
+	return data.param_int("param_font_size_body")
+
+
+# 확대 단의 원도. 100% 는 `null` 이고, 그것이 곧 "전역 기본(Galmuri9)을 쓴다"는 뜻이다 —
+# 기본값을 여기서 다시 적으면 project.godot 과 두 곳이 된다.
+func text_body_font() -> Font:
+	if options == null or options.index_of("o7") != 1:
+		return null
+	return load(TEXT_SIZE_FONT_1) as Font
+
+
 # O10 VN 자동 진행 대기 시간(초) — 3단 (개선 회차 22 · D09 §5.3 "자동 진행 모드(속도 3단)").
 # 정본이 문면 3종만 확정하고 초 값을 비워 둔 자리라 **사용자 결정으로 값을 정해 D13 창구에 충전**했다.
 func vn_auto_advance_sec() -> float:

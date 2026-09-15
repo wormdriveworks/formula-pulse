@@ -22,6 +22,9 @@ const LAYOUT_SETTLE_FRAMES := 4
 
 const BODY_FONT := "res://assets/fonts/Galmuri9.ttf"
 const HEAD_FONT := "res://assets/fonts/Galmuri14.ttf"
+# O7 확대 단 원도 (개선 회차 25). 옵션이 본문 계열을 이 원도로 갈아 끼우므로 **폭 판정도
+# 그 상태에서 한 번 더 서야 한다** — 100% 에서만 재고 확대 단을 팔면 절단을 옵션으로 파는 것이다.
+const ENLARGED_FONT := "res://assets/fonts/Galmuri11.ttf"
 
 # 뷰포트 폭(D12 §9.1 기준 캔버스 640×360) − 표준 패널 여백. 슬롯이 특정되지 않은
 # 도메인의 **무조건 상한**이다: 이보다 넓은 한 줄 라벨은 어느 자리에서도 잘린다.
@@ -101,6 +104,7 @@ var _strings: Array = []
 var _body: FontFile
 var _head: FontFile
 var _body_size := 9
+var _enlarged_size := 11
 var _slots: Dictionary = {}      # 슬롯 이름 → {"width": px, "max_lines": n, "source": ..}
 var _race: Control
 var _options: Control
@@ -127,6 +131,7 @@ func _process(_delta: float) -> bool:
 	_coverage_accounting()
 	_longest_per_language()
 	_narrow_slot_inventory()
+	_enlarged_step()
 	_report()
 	return true
 
@@ -162,6 +167,7 @@ func _boot() -> bool:
 		_ok("데이터 적재", false)
 		return false
 	_body_size = data.param_int("param_font_size_body")
+	_enlarged_size = data.param_int("param_opt_text_size_body_1")
 	_strings = CsvTable.load_rows(STRINGS_PATH)
 	_ok("스트링 표 적재", not _strings.is_empty())
 	_body = load(BODY_FONT) as FontFile
@@ -541,6 +547,104 @@ func _default_ceiling() -> void:
 	_ok("③ 기본 상한 초과 0", over.is_empty(), _head_of(over))
 	_report_lines.append("[③] 기본 상한 %.0fpx · 대상 %d키 · 초과 %d"
 		% [DEFAULT_CEILING, counted, over.size()])
+
+
+# 확대 단 여유 대장 (사용자 결정 2026-09-15) — **자라는 자리만** 적는다.
+#
+# 선언된 여유(110px · 3줄)는 100% 에서 잰 것이고, 확대 단에서는 같은 물리 공간이 더 적은
+# 글자를 담는다. 두 자리 다 **절단이 아니라 성장**이다 — 라벨의 최소폭은 넘으면 행이 넓어지고,
+# 이벤트 본문 패널은 세로로 자란다(WRAP_DOMAIN_LEDGER 원주석 "패널이 세로로 자란다 — 기능 정상").
+# 값은 원도 비율(11/9 ≈ 1.222)을 그 여유에 곱한 것이다.
+#
+# **자라지 않는 자리는 적지 않는다** — 실 rect 슬롯(로그 존·VN 대사창)과 뷰포트 상한은
+# 화면이 커지지 않으므로 100% 여유 그대로 판정한다. 대장이 쓰이지 않으면 검사가 실패한다
+# (면제 대장과 같은 규율 — 낡은 항이 조용히 남지 않는다).
+const ENLARGED_ALLOWANCE := [
+	{"match": "slot:rivalName", "width": 135.0, "max_lines": 0,
+		"why": "기록실 이름 라벨 최소폭 110 × 11/9 ≈ 134 — 초과분은 행을 넓힌다(절단 아님)"},
+	{"match": "wrap:280/3", "width": 0.0, "max_lines": 4,
+		"why": "이벤트 본문 3줄 × 11/9 ≈ 3.7 → 4 — 패널이 세로로 자란다"},
+]
+
+
+# ── ⑤ O7 확대 단 재판정 (개선 회차 25) ──
+#
+# 같은 슬롯·같은 문면을 **확대 원도(Galmuri11@11px)** 로 다시 잰다. 슬롯 폭은 100% 에서
+# 읽은 값을 그대로 쓴다 — 컨테이너가 자라는 자리도 있지만, 자라지 않는 자리(고정 최소폭 ·
+# 뷰포트 상한 · 고정 rect)가 절단의 실제 후보이므로 **보수적인 쪽**으로 판정한다.
+#
+# `choiceRow`·`minWidth` 는 본 검사에서도 판정이 아니라 관측 축이라 여기서도 제외한다.
+func _enlarged_step() -> void:
+	var enlarged := load(ENLARGED_FONT) as FontFile
+	_ok("⑤ 확대 단 원도 적재", enlarged != null)
+	if enlarged == null:
+		return
+	var base_font := _body
+	var base_size := _body_size
+	_body = enlarged
+	_body_size = _enlarged_size
+	_ok("⑤ 확대 단 크기 = D13 값", _body_size > base_size,
+		"base=%d enlarged=%d" % [base_size, _body_size])
+	var over: Array = []
+	var counted := 0
+	var allowance_hits: Dictionary = {}
+	for row in _strings:
+		var key := String(Dictionary(row)["key"])
+		var mark := String(_assigned.get(key, "ceiling"))
+		var kind := mark.split(":")[0]
+		if kind == "choiceRow" or kind == "minWidth":
+			continue
+		var width := DEFAULT_CEILING
+		var max_lines := 0
+		if kind == "slot":
+			# **판정 종류를 함께 들고 와야 한다** — `_assigned` 의 `slot:` 표지는 슬롯만 적고
+			# `kind`(single/wrap)를 버린다. 그것을 잃으면 2줄 예산을 가진 로그 존이
+			# 한 줄 폭으로 판정돼 거짓 초과가 난다(첫 주행에서 실제로 2건 나왔다).
+			var slot_name := mark.substr(5)
+			if _slots.has(slot_name):
+				width = float(_slots[slot_name]["width"])
+				for entry in SLOT_ASSIGNMENT:
+					if String(entry["slot"]) == slot_name and key.begins_with(String(entry["prefix"])):
+						if String(entry["kind"]) != "single":
+							max_lines = int(_slots[slot_name]["max_lines"])
+						break
+		elif kind == "wrap":
+			var parts := mark.substr(5).split("/")
+			width = float(parts[0])
+			max_lines = int(parts[1])
+		# 확대 단 여유 — 자라는 자리만 다시 선언한다(위 대장).
+		for index in range(ENLARGED_ALLOWANCE.size()):
+			var allowance: Dictionary = ENLARGED_ALLOWANCE[index]
+			if String(allowance["match"]) != mark:
+				continue
+			if float(allowance["width"]) > 0.0:
+				width = float(allowance["width"])
+			if int(allowance["max_lines"]) > 0:
+				max_lines = int(allowance["max_lines"])
+			allowance_hits[index] = int(allowance_hits.get(index, 0)) + 1
+		counted += 1
+		for language in _languages():
+			_checked += 1
+			var value := String(Dictionary(row).get(language, ""))
+			if value == "":
+				continue
+			if max_lines > 0:
+				var lines := _wrapped_lines(value, width)
+				if lines > max_lines:
+					over.append("%s(%s) %d줄 > %d @%s" % [key, language, lines, max_lines, mark])
+			elif _line_width(value) > width:
+				over.append("%s(%s) %.1f > %.1f @%s"
+					% [key, language, _line_width(value), width, mark])
+	_body = base_font
+	_body_size = base_size
+	_ok("⑤ 확대 단 초과 0", over.is_empty(), _head_of(over))
+	# 대장의 각 항이 실제로 쓰였는가 — 안 쓰이면 낡은 것이므로 재검토를 강제한다.
+	for index in range(ENLARGED_ALLOWANCE.size()):
+		var allowance: Dictionary = ENLARGED_ALLOWANCE[index]
+		_ok("⑤ 확대 단 여유가 쓰인다: %s" % allowance["match"],
+			int(allowance_hits.get(index, 0)) > 0, String(allowance["why"]))
+	_report_lines.append("[⑤] 확대 단 %dpx · 대상 %d키 · 초과 %d · 여유 대장 %d항"
+		% [_enlarged_size, counted, over.size(), ENLARGED_ALLOWANCE.size()])
 
 
 # ── ④ 커버리지 회계 — 판정 밖 키 0 ──

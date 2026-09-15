@@ -91,6 +91,7 @@ param_opt_timer_mult_1,1.5
 param_opt_timer_mult_2,2.0
 param_opt_ui_scale_1,1.1
 param_opt_ui_scale_2,1.25
+param_opt_text_size_body_1,11
 param_vn_auto_slow_sec,3.0
 param_vn_auto_normal_sec,2.0
 param_vn_auto_fast_sec,1.2

@@ -189,11 +189,11 @@ func _load_gpl(path: String) -> Dictionary:
 	return swatches
 
 
-# ── O8 UI 스케일 · O10 VN 자동 진행 · O7 보류 (개선 회차 22 · 2026-09-15) ──
+# ── O8 UI 스케일 · O10 VN 자동 진행 · O7 텍스트 크기 (개선 회차 22 → 25) ──
 #
-# 세 항목 다 종전에는 **저장만 되고 소비부가 0** 이었다(매뉴얼 9절 5항). O8·O10 은 결선했고
-# O7 은 확대 단 폰트 원도가 정본에서 이월된 상태라 목록에서 내렸다 — 고를 수는 있는데 아무 일도
-# 일어나지 않는 항목을 남기지 않는다는 것이 이 축의 요지다.
+# 세 항목 다 종전에는 **저장만 되고 소비부가 0** 이었다(매뉴얼 9절 5항). 회차 22 가 O8·O10 을
+# 결선하고 O7 은 확대 단 원도 이월을 이유로 목록에서 내렸으며, **회차 25 가 그 이월을 닫았다** —
+# 원도에 맞춰 2단(100% / 122% = Galmuri11@11px · 사용자 결정 2026-09-15).
 func _scale_and_auto_advance() -> void:
 	var data := GameData.new()
 	if not data.load_all():
@@ -239,13 +239,30 @@ func _scale_and_auto_advance() -> void:
 	_ok("VN 화면에 자동 토글이 있다", vn_src.contains("ui.vn.auto"))
 	_ok("라인마다 다시 잰다", vn_src.contains("_restart_auto_timer()"))
 
-	# O7 — 목록에서 내렸으되 정의는 남았다(원도 유입 때 항목만 되올린다)
-	var listed := false
-	for tab in OptionsStore.TABS:
-		if Array(tab["options"]).has("o7"):
-			listed = true
-	_ok("O7 은 옵션 목록에 없다 (확대 단 원도 이월)", not listed)
+	# O7 — 원도에 맞춘 2단. 단 수가 원도 수와 묶여 있는 것이 이 축의 요지다:
+	# 단이 늘면 그릴 원도가 없는 단이 생기고, 그 순간 도트가 흐려진다.
+	_ok("O7 은 옵션 목록에 있다 (회차 25 결선)", _listed("o7"))
 	_ok("O7 정의는 남아 있다", OptionsStore.OPTIONS.has("o7"))
+	_ok("O7 = 2단 (원도 수와 같다)", Array(OptionsStore.OPTIONS["o7"]["steps"]).size() == 2,
+		str(OptionsStore.OPTIONS["o7"]["steps"]))
+	# 값은 D13 창구에서 온다 — 코드가 11 을 쥐고 있으면 불변규칙 2 위반이다.
+	session.options.set_index("o7", 0)
+	_ok("O7 100% = 기준 본문 크기", session.text_body_font_size()
+		== data.param_int("param_font_size_body"), "size=%d" % session.text_body_font_size())
+	_ok("O7 100% 는 원도를 말하지 않는다 (전역 기본이 그린다)", session.text_body_font() == null)
+	session.options.set_index("o7", 1)
+	_ok("O7 확대 단 = D13 값", session.text_body_font_size()
+		== data.param_int("param_opt_text_size_body_1"), "size=%d" % session.text_body_font_size())
+	var enlarged := session.text_body_font()
+	_ok("O7 확대 단이 확대 원도를 준다", enlarged != null
+		and String(enlarged.resource_path).contains("Galmuri11"),
+		String(enlarged.resource_path) if enlarged != null else "null")
+	# 대형 계열은 이 축의 대상이 아니다 — 확대 원도가 없다(D10 §5.7 이월 잔여).
+	var flow_src := FileAccess.get_file_as_string("res://ui/flow/flow_screen.gd")
+	_ok("본문 계열만 세션 창구를 탄다", flow_src.contains("session.text_body_font_size()"))
+	_ok("대형 계열은 기준값 그대로", flow_src.contains('_head_font_size = session.data.param_int("param_font_size_head")'))
+	_ok("씬이 구운 본문 크기를 따라잡는 경로가 있다", flow_src.contains("_rescale_body_labels("))
+	session.options.set_index("o7", 0)
 	_ok("O8 은 목록에 있다", _listed("o8"))
 	_ok("O10 도 목록에 있다", _listed("o10"))
 

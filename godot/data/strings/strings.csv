@@ -599,9 +599,8 @@ ui.options.stepTimer20,×2,×2,×2
 ui.options.stepTimerOff,비활성,Disabled,無効
 ui.options.stepScale100,100%,100%,100%
 ui.options.stepScale110,110%,110%,110%
-ui.options.stepScale115,115%,115%,115%
+ui.options.stepScale122,122%,122%,122%
 ui.options.stepScale125,125%,125%,125%
-ui.options.stepScale130,130%,130%,130%
 ui.options.stepPaletteBase,기본,Default,標準
 ui.options.stepPaletteAlt,대체 팔레트,Alternate Palette,代替パレット
 ui.options.stepSlow,느림,Slow,遅い
