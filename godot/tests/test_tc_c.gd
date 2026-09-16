@@ -31,6 +31,8 @@ func _init() -> void:
 	_seal_across_many_spins()
 	_neighbor_passive_runtime()
 	_rear_gauge_needs_target()
+	_front_gauge_needs_target()
+	_neighbor_passive_log()
 	_slot_progression_wired()
 	_negative_guards()
 	_result_and_ranking()
@@ -76,20 +78,37 @@ func _eq_float(label: String, actual: float, expected: float, tolerance: float =
 const GAUGE_PROBE_BASE := 50.0
 
 
-# 게이지 측정면의 인접 상대를 **없앤다** (선두 = 앞차 없음 / 최하위 = 뒤차 없음).
+# 게이지 측정면의 인접 상대 패시브를 **0 으로 눕힌다 — 상대는 남긴다** (개선 회차 31 개정).
 #
-# 상대를 남겨 두면 두 가지가 측정을 먹는다: ⓐ앞차 저항·뒤차 압박이 심볼 기여에 섞이고
-# ⓑ정산 ⑧ 백그라운드 AI 가 **플레이어의 이웃을 바꾸면** `_retarget_if_changed` 가
-# 해당 게이지를 0 으로 되돌린다(초판이 그랬다 — 값이 아니라 측정 자체가 사라졌고,
-# 그 스왑은 시드마다 갈려서 "어떤 시드에서는 통과하는 검사"가 됐다).
-# 상대가 없으면 `new_front`/`new_rear` 가 항상 ""이므로 되돌림이 성립하지 않는다.
+# 종전에는 상대 자체를 없앴다(선두 = 앞차 없음 / 최하위 = 뒤차 없음): 그러면 ⓐ앞차 저항·뒤차 압박이
+# 심볼 기여에 섞이지 않고 ⓑ정산 ⑧ 백그라운드 AI 가 이웃을 바꿔 `_retarget_if_changed` 가 게이지를
+# 0 으로 되돌리는 일(시드마다 갈리는 검사)이 없었다. 그런데 회차 30·31 규칙 — **상대가 없으면 그 게이지는
+# 오르지 않는다** — 에서는 상대가 없는 자리의 측정이 곧 0 이다. 그래서 상대를 두고 패시브만 0 으로 만든다:
+#   front: 플레이어 P2, 앞차 = 선두. 저항 = 3.0 + 페이스 × 1.5 → 페이스를 −(3.0/1.5) 로 눕혀 0.
+#   rear:  플레이어 P15, 뒤차 = 최후미. 압박 = (2.0 + 시드 공격성 × 2.2) × 소속 → 시드 공격성을 −(2.0/2.2) 로 눕혀 0.
+# 두 자리 모두 정산 ⑧ 의 스왑 쌍(플레이어 포함 쌍 제외) 밖이라 이웃이 스왑으로 바뀌지 않는다 — 남는 것은
+# 리타이어뿐이고 시드가 고정이다. `_flatten_neighbors` 뒤에 부른다(눕힘이 이 값을 덮지 않게).
 func _isolate_gauge_side(engine: RaceEngine, side: String) -> void:
 	engine.positions.erase(RaceEngine.PLAYER_ID)
 	if side == "front":
-		engine.positions.insert(0, RaceEngine.PLAYER_ID)
+		engine.positions.insert(1, RaceEngine.PLAYER_ID)
 	else:
-		engine.positions.append(RaceEngine.PLAYER_ID)
+		engine.positions.insert(engine.positions.size() - 1, RaceEngine.PLAYER_ID)
 	engine._retarget(true, true)
+	var data := engine.data
+	if side == "front":
+		var front: Dictionary = engine.entrants[engine.front_target]
+		front["pace"] = -data.param("param_gauge_front_resist_base") \
+			/ data.param("param_gauge_front_resist_pace_coef")
+		front["form"] = 0.0
+		front["rush_roll"] = 0.0
+		front["rush_lap1"] = 0.0
+		front["rush_lap_final"] = 0.0
+	else:
+		var rear: Dictionary = engine.entrants[engine.rear_target]
+		rear["seed_aggression"] = -data.param("param_gauge_rear_pressure_base") \
+			/ data.param("param_gauge_rear_pressure_aggr_coef")
+		rear["pressure_mult"] = 1.0
 
 var _engines: Array = []
 
@@ -2432,7 +2451,7 @@ func _rear_gauge_needs_target() -> void:
 		return
 	last.start_gp()
 	_flatten_neighbors(last)
-	_isolate_gauge_side(last, "rear")
+	_place_player(last, last.positions.size() - 1)   # 진짜 최후미 — 격리 헬퍼는 회차 31부터 상대를 남긴다
 	var trouble3 := CsvTable.to_float(String(
 		last.data.match_effects[RaceTypes.SYMBOL_TROUBLE][3]["rear_gauge"]))
 	_ok("후방무주 ⓐ 전제: 뒤차 없음", last.rear_target == "", last.rear_target)
@@ -2484,7 +2503,7 @@ func _rear_gauge_needs_target() -> void:
 	var brake := _new_engine(61, "circuit_mn1")
 	brake.start_gp()
 	_flatten_neighbors(brake)
-	_isolate_gauge_side(brake, "rear")
+	_place_player(brake, brake.positions.size() - 1)   # 진짜 최후미
 	brake.begin_turn()
 	brake.spin()
 	brake.rear_gauge = GAUGE_PROBE_BASE
@@ -2506,6 +2525,206 @@ func _place_player(engine: RaceEngine, index: int) -> void:
 	engine.positions.erase(RaceEngine.PLAYER_ID)
 	engine.positions.insert(index, RaceEngine.PLAYER_ID)
 	engine._retarget(true, true)
+
+
+# ── 전방 게이지는 앞차가 있을 때만 오른다 (개선 회차 31 · 사용자 객관식 2026-09-17 "같은 규칙 적용") ──
+#
+# 후방(회차 30)의 대칭이다. 선두에서 슬립스트림·라인·찬스·모멘텀이 상대 없이 쌓이면 만충 판정이 터지지 않고
+# 리셋도 없어 꽉 찬 채 굳는다. 축은 다섯 자리를 잰다:
+#   ⓐ 선두(앞차 없음) — 슬립스트림 3매치도 전방 0
+#   ⓑ 선두 — 여유 확정(모멘텀)이어도 전방 0 이고 **"전방 +5" 문면도 나가지 않는다** (거짓 문면 차단)
+#   ⓒ 선두 — 찬스 3매치는 만충도 듀얼 예약도 "즉시 듀얼" 문면도 없다
+#   ⓓ 대조군(앞차 있음 · 저항 0 으로 눕힘) — 같은 슬립스트림 1 이 표값만큼 오른다
+#   ⓔ 원본 — 전방 가산 5경로가 창구를 지나고(정의 1 + 호출 5 · `+=` 는 창구 안 1건) 만충 채움 2곳은 `_fill_front_gauge`(정의 1 + 호출 2 · 임계 대입은 창구 안 1건)
+func _front_gauge_needs_target() -> void:
+	# ⓐ 선두 — 슬립스트림 3매치
+	var lead := _new_engine(71, "circuit_mn1")
+	if lead == null:
+		return
+	lead.start_gp()
+	_flatten_neighbors(lead)
+	_place_player(lead, 0)
+	_ok("전방무주 ⓐ 전제: 앞차 없음", lead.front_target == "", lead.front_target)
+	lead.begin_turn()
+	lead.spin()
+	lead.provisional = _combo(RaceTypes.SYMBOL_SLIPSTREAM, 3, RaceTypes.SYMBOL_SLIPSTREAM)
+	lead.confirm(0.0)
+	_eq_float("전방무주 ⓐ 선두에서 슬립스트림 3매치도 전방 0", lead.front_gauge, 0.0)
+	# ⓑ 선두 — 모멘텀 (여유 확정) : 게이지 0 · 문면 없음
+	var brisk := _new_engine(71, "circuit_mn1")
+	brisk.start_gp()
+	_flatten_neighbors(brisk)
+	_place_player(brisk, 0)
+	brisk.begin_turn()
+	brisk.spin()
+	brisk.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
+	var brisk_events := brisk.confirm(1.0)
+	_eq_float("전방무주 ⓑ 선두에서 모멘텀도 전방 0", brisk.front_gauge, 0.0)
+	_ok("전방무주 ⓑ 선두에서는 '전방 +5' 문면이 나가지 않는다",
+		not _has_key(brisk_events, "raceLog.momentum01"), _keys_of(brisk_events))
+	# 대조: 앞차가 있으면(P16) 여유 확정이 모멘텀 문면을 낸다 — ⓑ 가 문면 자체를 지운 것이 아님을 못박는다
+	var brisk_ctrl := _new_engine(71, "circuit_mn1")
+	brisk_ctrl.start_gp()
+	_flatten_neighbors(brisk_ctrl)
+	brisk_ctrl.begin_turn()
+	brisk_ctrl.spin()
+	brisk_ctrl.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
+	_ok("전방무주 ⓑ 대조: 앞차가 있으면 모멘텀 문면이 난다",
+		_has_key(brisk_ctrl.confirm(1.0), "raceLog.momentum01"))
+	# ⓒ 선두 — 찬스 3매치
+	var chance := _new_engine(71, "circuit_mn1")
+	chance.start_gp()
+	_flatten_neighbors(chance)
+	_place_player(chance, 0)
+	chance.begin_turn()
+	chance.spin()
+	chance.provisional = _combo(RaceTypes.SYMBOL_CHANCE, 3, RaceTypes.SYMBOL_CHANCE)
+	var chance_events := chance.confirm(0.0)
+	_ok("전방무주 ⓒ 선두의 찬스 3매치 = 만충 없음 · 듀얼 예약 없음 · '즉시 듀얼' 문면 없음",
+		chance.front_gauge == 0.0 and chance.pending_duel == RaceTypes.DuelType.NONE
+		and not _has_key(chance_events, "raceLog.chanceDuel01"),
+		"front=%.1f pending=%d keys=%s" % [chance.front_gauge, chance.pending_duel, _keys_of(chance_events)])
+	_ok("전방무주 ⓒ 찬스 3매치 계수는 그대로 센다 (기록 축은 발동과 별개)", chance.chance_three_matches == 1)
+	# ⓓ 대조군 — 앞차 있음(저항 0)
+	var ctrl := _new_engine(71, "circuit_mn1")
+	ctrl.start_gp()
+	_flatten_neighbors(ctrl)
+	_isolate_gauge_side(ctrl, "front")
+	_ok("전방무주 ⓓ 전제: 앞차 있음 (P2)", ctrl.front_target != "" and ctrl.positions.find(RaceEngine.PLAYER_ID) == 1)
+	ctrl.begin_turn()
+	ctrl.spin()
+	ctrl.provisional = _combo(RaceTypes.SYMBOL_SLIPSTREAM, 1, RaceTypes.SYMBOL_PULSE)
+	ctrl.confirm(0.0)
+	var slip1 := CsvTable.to_float(String(
+		ctrl.data.match_effects[RaceTypes.SYMBOL_SLIPSTREAM][1]["front_gauge"]))
+	_eq_float("전방무주 ⓓ 앞차 있으면 표값만큼 오른다 (눕힌 저항 = 0)", ctrl.front_gauge,
+		slip1 * ctrl._gauge_mult(), 0.01)
+	# ⓔ 원본
+	var src := FileAccess.get_file_as_string("res://core/state/race_engine.gd")
+	_ok("전방무주 ⓔ 전방 가산은 창구만 (정의 1 + 호출 5) · `front_gauge +=` 는 창구 안 1건",
+		src.count("_add_front_gauge(") == 6 and src.count("front_gauge +=") == 1,
+		"funnel=%d direct=%d" % [src.count("_add_front_gauge("), src.count("front_gauge +=")])
+	_ok("전방무주 ⓔ 만충 채움도 창구만 (정의 1 + 호출 2) · 임계 대입은 창구 안 1건",
+		src.count("_fill_front_gauge(") == 3
+		and src.count('front_gauge = data.param("param_gauge_full_threshold")') == 1,
+		"fill=%d set=%d" % [src.count("_fill_front_gauge("),
+			src.count('front_gauge = data.param("param_gauge_full_threshold")')])
+
+
+func _has_key(events: Array, key: String) -> bool:
+	for event in events:
+		if String(Dictionary(event).get("key", "")) == key:
+			return true
+	return false
+
+
+func _keys_of(events: Array) -> String:
+	var keys: Array = []
+	for event in events:
+		keys.append(String(Dictionary(event).get("key", "")))
+	return str(keys)
+
+
+func _event_params(events: Array, key: String) -> Dictionary:
+	for event in events:
+		if String(Dictionary(event).get("key", "")) == key:
+			return Dictionary(event).get("params", {})
+	return {}
+
+
+# ── 앞차 저항·뒤차 압박 로그 1줄 (개선 회차 31 · 사용자 객관식 2026-09-17 "매 턴 로그 1줄") ──
+#
+# 사용자 실기 "로그는 전방 + 인데 수치 불변" 의 답이다 — 두 패시브가 로그 없이 움직였다. 문면의 수치는
+# **실제로 움직인 양**(절단 뒤)이어야 같은 거짓이 방향만 바꿔 남지 않는다. 축은 다섯 자리를 잰다:
+#   ⓐ 뒤차 디아스 · 전방 0 — 압박만: `neighborRear01` {pressure: 13} (시드 5.0 → 2.0 + 11.0 · 소속 계수는 눕힘) · 저항 문면 없음(0 에서 깎을 것이 없다)
+#   ⓑ P16(앞차만 · 눕힘) · 전방 50 — 저항만: `neighborFront01` {resist: 3}
+#   ⓒ 뒤차 디아스 + 앞차 눕힘 · 전방 50 — 둘: `neighborBoth01` {resist: 3, pressure: 13}
+#   ⓓ 상한 절단 — 후방 95 에서 디아스 압박은 5 만 실제로 오른다: {pressure: 5}
+#   ⓔ 문면 3종이 표에 있고 매개가 전부 치환된다 · 한 턴에 이 계열 문면은 최대 1줄
+func _neighbor_passive_log() -> void:
+	var probe := _new_engine(1313, "circuit_mn1")
+	if probe == null:
+		return
+	var s := probe.data.strings
+	# ⓐ 압박만 — `_neighbor_passive_runtime` 과 같은 배치(디아스 뒤차)
+	var rear_only := _diaz_behind(1313)
+	# 기대 압박은 표에서 — 디아스 시드 공격성 5.0 → 2.0 + 5.0 × 2.2 = 13.0 (소속 계수 1.3 은 `_flatten_neighbors` 가 눕힘)
+	var diaz_pressure := int(round(_expected_rear_pressure(rear_only) * rear_only._gauge_mult()))
+	_ok("패시브 로그 ⓐ 전제: 눕힌 디아스 압박 = 13", diaz_pressure == 13, str(diaz_pressure))
+	var events_a := _settle_pulse(rear_only, 0.0, 0.0)
+	var params_a := _event_params(events_a, "raceLog.neighborRear01")
+	_ok("패시브 로그 ⓐ 압박만 — 뒤차 문면 1건 · {pressure} = 실제 오른 양",
+		int(params_a.get("pressure", -1)) == diaz_pressure and not _has_key(events_a, "raceLog.neighborBoth01")
+		and not _has_key(events_a, "raceLog.neighborFront01"),
+		"params=%s keys=%s" % [str(params_a), _keys_of(events_a)])
+	# ⓑ 저항만 — P16 (뒤차 없음 · 앞차 눕힘 = 기저 3.0) · 전방 50
+	var front_only := _new_engine(1313, "circuit_mn1")
+	front_only.start_gp()
+	_flatten_neighbors(front_only)
+	_ok("패시브 로그 ⓑ 전제: P16 = 앞차만", front_only.front_target != "" and front_only.rear_target == "")
+	var events_b := _settle_pulse(front_only, GAUGE_PROBE_BASE, 0.0)
+	var params_b := _event_params(events_b, "raceLog.neighborFront01")
+	_ok("패시브 로그 ⓑ 저항만 — 앞차 문면 1건 · {resist} = 3",
+		int(params_b.get("resist", -1)) == 3 and not _has_key(events_b, "raceLog.neighborBoth01")
+		and not _has_key(events_b, "raceLog.neighborRear01"),
+		"params=%s keys=%s" % [str(params_b), _keys_of(events_b)])
+	_eq_float("패시브 로그 ⓑ 게이지도 문면만큼 움직였다 (50 → 47)", front_only.front_gauge,
+		GAUGE_PROBE_BASE - _expected_front_resist(front_only), 0.01)
+	# ⓒ 둘 — 디아스 뒤차 + 앞차 눕힘 · 전방 50
+	var both := _diaz_behind(1313)
+	var events_c := _settle_pulse(both, GAUGE_PROBE_BASE, 0.0)
+	var params_c := _event_params(events_c, "raceLog.neighborBoth01")
+	_ok("패시브 로그 ⓒ 둘 — 한 줄에 {resist}=3 · {pressure}=13",
+		int(params_c.get("resist", -1)) == 3 and int(params_c.get("pressure", -1)) == diaz_pressure,
+		"params=%s keys=%s" % [str(params_c), _keys_of(events_c)])
+	# ⓓ 상한 절단 — 후방 95 → 실제 +5
+	var capped := _diaz_behind(1313)
+	var full := capped.data.param("param_gauge_full_threshold")
+	var events_d := _settle_pulse(capped, 0.0, full - 5.0)
+	var params_d := _event_params(events_d, "raceLog.neighborRear01")
+	_ok("패시브 로그 ⓓ 상한 절단 — 후방 95 에서 압박 문면은 실제 오른 5",
+		int(params_d.get("pressure", -1)) == 5, "params=%s" % str(params_d))
+	_eq_float("패시브 로그 ⓓ 게이지 = 만충", capped.rear_gauge, full)
+	# ⓔ 문면 3종 실재 · 매개 치환 · 한 턴 최대 1줄
+	for key in ["raceLog.neighborBoth01", "raceLog.neighborFront01", "raceLog.neighborRear01"]:
+		_ok("패시브 로그 ⓔ 문면 실재 — %s" % key, s.has_key(String(key)))
+		var rendered := s.text(String(key), {"resist": 3, "pressure": 13})
+		_ok("패시브 로그 ⓔ 매개 전부 치환 — %s" % key, not rendered.contains("{") and not rendered.is_empty(), rendered)
+	# V2 는 조립되지 않은 키 리터럴을 "코드 발행 키"로 읽는다 — 접두는 조립한다 (회차 28 함정)
+	var family_prefix := "raceLog." + "neighbor"
+	var family := 0
+	for event in events_c:
+		if String(Dictionary(event).get("key", "")).begins_with(family_prefix):
+			family += 1
+	_ok("패시브 로그 ⓔ 한 턴에 패시브 문면은 1줄", family == 1, str(family))
+
+
+# 디아스를 뒤차로 둔 엔진 — `_neighbor_passive_runtime` 의 배치를 헬퍼로 (앞차는 눕혀 저항 = 기저 3.0).
+func _diaz_behind(seed_value: int) -> RaceEngine:
+	var engine := _new_engine(seed_value, "circuit_mn1")
+	if engine == null:
+		return null
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	var player_index := engine.positions.find(RaceEngine.PLAYER_ID)
+	if player_index >= engine.positions.size() - 1:
+		player_index = engine.positions.size() - 2
+		engine.positions.erase(RaceEngine.PLAYER_ID)
+		engine.positions.insert(player_index, RaceEngine.PLAYER_ID)
+	engine.positions.erase("ai_diaz")
+	engine.positions.insert(engine.positions.find(RaceEngine.PLAYER_ID) + 1, "ai_diaz")
+	engine._retarget(true, true)
+	return engine
+
+
+# 펄스 3매치(게이지 무관 심볼)로 한 턴을 정산한다 — 남는 게이지 변화는 패시브뿐이다.
+func _settle_pulse(engine: RaceEngine, front_start: float, rear_start: float) -> Array:
+	engine.begin_turn()
+	engine.spin()
+	engine.front_gauge = front_start
+	engine.rear_gauge = rear_start
+	engine.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
+	return engine.confirm(0.0)
 
 
 # ── 음성 검사 — "강제가 살아 있는가" (독립 검증 G-3) ──

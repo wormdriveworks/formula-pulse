@@ -1006,11 +1006,11 @@ func _settle_sector(momentum: bool) -> Array:
 				var line_coef := 1.0 + _stat("line_coef")
 				var slip_count := _count_symbol(RaceTypes.SYMBOL_SLIPSTREAM)
 				if slip_count > 0:
-					front_gauge += CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_SLIPSTREAM, slip_count)["front_gauge"])) * gauge_mult * advance_mult * slip_coef
+					_add_front_gauge(CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_SLIPSTREAM, slip_count)["front_gauge"])) * gauge_mult * advance_mult * slip_coef)
 				var line_count := _count_symbol(RaceTypes.SYMBOL_LINE)
 				if line_count > 0:
 					var line_effect := _match_effect(RaceTypes.SYMBOL_LINE, line_count)
-					front_gauge += CsvTable.to_float(String(line_effect["front_gauge"])) * gauge_mult * advance_mult * line_coef * front_coef
+					_add_front_gauge(CsvTable.to_float(String(line_effect["front_gauge"])) * gauge_mult * advance_mult * line_coef * front_coef)
 					_add_rear_gauge(CsvTable.to_float(String(line_effect["rear_gauge"])) * gauge_mult * advance_mult * line_coef)
 				var chance_count := _count_symbol(RaceTypes.SYMBOL_CHANCE)
 				if chance_count >= 3:
@@ -1018,19 +1018,24 @@ func _settle_sector(momentum: bool) -> Array:
 				if chance_count > 0:
 					var chance_effect := _match_effect(RaceTypes.SYMBOL_CHANCE, chance_count)
 					if String(chance_effect["special"]).strip_edges() == "duel_trigger":
-						chance_full = true
-						events.append(_ev("T5", "raceLog.chanceDuel01", {}))
+						# 즉시 듀얼도 앞차가 있어야 성립한다 (개선 회차 31) — 선두에서는 만충도 문면도 없다.
+						# 만충만 남기면 "즉시 듀얼" 로그가 일어나지 않은 일을 말한다.
+						if front_target != "":
+							chance_full = true
+							events.append(_ev("T5", "raceLog.chanceDuel01", {}))
 					else:
-						front_gauge += CsvTable.to_float(String(chance_effect["front_gauge"])) * gauge_mult * advance_mult * front_coef
+						_add_front_gauge(CsvTable.to_float(String(chance_effect["front_gauge"])) * gauge_mult * advance_mult * front_coef)
 						events.append(_ev("T5", "raceLog.chanceProc01", {}))
 				if momentum:
 					var bonus := data.param("param_gauge_momentum_bonus")
-					front_gauge += bonus * gauge_mult
-					events.append(_ev("T5", "raceLog.momentum01", {"amount": int(bonus)}))
+					# 모멘텀도 앞차가 있어야 쌓인다 (회차 31) — 문면은 쌓였을 때만 낸다(선두에서 "전방 +5" 는 거짓).
+					if front_target != "":
+						_add_front_gauge(bonus * gauge_mult)
+						events.append(_ev("T5", "raceLog.momentum01", {"amount": int(bonus)}))
 			RaceTypes.SettleStage.STAGE_5_GAUGE_CHECK:
-				_apply_neighbor_passives(gauge_mult)
+				events.append_array(_apply_neighbor_passives(gauge_mult))
 				if chance_full:
-					front_gauge = data.param("param_gauge_full_threshold")
+					_fill_front_gauge()
 				front_gauge = clampf(front_gauge, 0.0, data.param("param_gauge_full_threshold"))
 				rear_gauge = clampf(rear_gauge, 0.0, data.param("param_gauge_full_threshold"))
 				var threshold := data.param("param_gauge_full_threshold")
@@ -1074,9 +1079,9 @@ func _apply_resonance_bonus(gauge_mult: float) -> Array:
 		"front_gauge":
 			# [가안] 보너스는 명시 절대값으로 가산 — 게이지 계수(×1.5·×1.2)를 곱하지 않는다.
 			# (무대 1 보너스는 차지이므로 MS-2 범위에서는 비활성 경로. impl_log 등재)
-			front_gauge += bonus_value
+			_add_front_gauge(bonus_value)
 		"front_gauge_full":
-			front_gauge = data.param("param_gauge_full_threshold")
+			_fill_front_gauge()
 		"duel_judgment":
 			resonance_duel_bonus += bonus_value
 		"chassis":
@@ -1261,12 +1266,22 @@ func _gauge_mult() -> float:
 
 
 # 앞차 저항·뒤차 압박 (D13 별첨A §2.1) — 만충 판정 직전 적용 [가안 — 8단계 내 배치]
-func _apply_neighbor_passives(gauge_mult: float) -> void:
+#
+# **매 턴 로그 1줄** (개선 회차 31 · 사용자 결정 2026-09-17). 종전에는 이 두 항이 로그 없이 게이지를 움직여
+# "전방 +5 라는데 수치가 그대로" 로 읽혔다(모멘텀 +5 는 어떤 앞차 저항보다 작다). 문면에 싣는 수치는
+# **실제로 움직인 양**이다 — 게이지가 0 인데 "저항 −8" 을 적으면 같은 거짓이 방향만 바뀌어 남는다.
+# 절단은 여기서 직접 한다(종전에는 ⑤ 말미의 clampf 가 받았다 — 사이에 다른 대입이 없어 결과는 같다).
+# 반올림 뒤 0 이 되는 쪽은 문면에서 빠지고, 양쪽 다 0 이면 줄을 내지 않는다.
+func _apply_neighbor_passives(gauge_mult: float) -> Array:
+	var full := data.param("param_gauge_full_threshold")
+	var resist_applied := 0.0
+	var pressure_applied := 0.0
 	if front_target != "":
 		var front: Dictionary = entrants[front_target]
 		var resist := data.param("param_gauge_front_resist_base") \
 			+ _effective_pace(front) * data.param("param_gauge_front_resist_pace_coef")
-		front_gauge -= resist * gauge_mult
+		resist_applied = clampf(resist * gauge_mult, 0.0, front_gauge)
+		front_gauge -= resist_applied
 	if rear_target != "":
 		var rear: Dictionary = entrants[rear_target]
 		# 압박 산식의 공격성은 **시드값** 기준이다 (D13 별첨A §2.1 산출 예: 필러 8.6 =
@@ -1279,7 +1294,17 @@ func _apply_neighbor_passives(gauge_mult: float) -> void:
 		# OV-S3 하이 레이크 셋업의 대가 — 후방 압박 +10% (D13 별첨A §7.2).
 		# 소속 계수(불카 ×1.3) 뒤에 곱한다: 머신 쪽 사정이라 상대 소속과 독립이다.
 		pressure *= (1.0 + _stat("rear_pressure_ratio"))
-		_add_rear_gauge(pressure * gauge_mult)
+		pressure_applied = clampf(pressure * gauge_mult, 0.0, maxf(full - rear_gauge, 0.0))
+		_add_rear_gauge(pressure_applied)
+	var resist_amount := int(round(resist_applied))
+	var pressure_amount := int(round(pressure_applied))
+	if resist_amount > 0 and pressure_amount > 0:
+		return [_ev("T5", "raceLog.neighborBoth01", {"resist": resist_amount, "pressure": pressure_amount})]
+	if resist_amount > 0:
+		return [_ev("T5", "raceLog.neighborFront01", {"resist": resist_amount})]
+	if pressure_amount > 0:
+		return [_ev("T5", "raceLog.neighborRear01", {"pressure": pressure_amount})]
+	return []
 
 
 # ── 후방 게이지 가산 창구 (개선 회차 30 · 사용자 결정 2026-09-17) ──
@@ -1298,6 +1323,26 @@ func _add_rear_gauge(delta: float) -> void:
 	if delta > 0.0 and rear_target == "":
 		return
 	rear_gauge += delta
+
+
+# ── 전방 게이지 가산 창구 (개선 회차 31 · 사용자 결정 2026-09-17 — 후방과 같은 규칙) ──
+#
+# **앞에 아무도 없으면(선두) 전방 게이지는 오르지 않는다.** 슬립스트림·라인·찬스·모멘텀·레조넌스가 상대 없이
+# 쌓이면 만충 판정(⑤ · `front_target != ""` 요구)이 터지지 않고 리셋도 없어 후방과 같은 형태로 굳었다.
+# D05 §4.2 "전방 게이지: … 플레이어 측에 축적, 앞차의 저항으로 감쇄 → 만충 = 추월 듀얼" — 추월할 상대가 없는
+# 축적은 대상이 없는 값이다. 감산(앞차 저항)은 상대가 있을 때만 존재하므로 여기 오지 않는다.
+# 전방 가산 경로 전부(슬립스트림·라인·찬스·모멘텀·레조넌스 front_gauge)가 이 창구를 쓰고, "만충으로 채움" 두 곳
+# (찬스 3매치·레조넌스 front_gauge_full)은 `_fill_front_gauge` 를 쓴다.
+func _add_front_gauge(delta: float) -> void:
+	if delta > 0.0 and front_target == "":
+		return
+	front_gauge += delta
+
+
+func _fill_front_gauge() -> void:
+	if front_target == "":
+		return
+	front_gauge = data.param("param_gauge_full_threshold")
 
 
 func _effective_pace(entrant: Dictionary) -> float:

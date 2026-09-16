@@ -65,6 +65,9 @@ raceLog.duelLoseWaived01,듀얼 패배. 충격을 받아냈다.,Duel lost. The i
 raceLog.chanceProc01,결정적 순간이 열린다.,A decisive moment opens.,決定的な瞬間が開く。
 raceLog.chanceDuel01,찬스 3매치 — 즉시 듀얼.,Chance three-match — duel now.,チャンス3マッチ — 即時デュエル。
 raceLog.momentum01,흐름을 탔다. 전방 +{amount}.,Momentum caught. Front +{amount}.,流れに乗った。前方+{amount}。
+raceLog.neighborBoth01,앞차 저항 -{resist} · 뒤차 압박 +{pressure}.,Resist -{resist} · Pressure +{pressure}.,前方抵抗 -{resist}・後方圧力 +{pressure}。
+raceLog.neighborFront01,앞차 저항 -{resist}.,Front resist -{resist}.,前方抵抗 -{resist}。
+raceLog.neighborRear01,뒤차 압박 +{pressure}.,Rear pressure +{pressure}.,後方圧力 +{pressure}。
 raceLog.aiRetire01,{target} 리타이어.,{target} retires.,{target} リタイア。
 raceLog.playerRetire01,섀시 한계. 머신 세운다.,Chassis gone. Bringing it in.,シャシー限界。マシンを止める。
 raceLog.gpFinish01,체커. 최종 {rank}위.,Chequered flag. Final P{rank}.,チェッカー。最終{rank}位。
