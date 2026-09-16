@@ -1018,20 +1018,19 @@ func _settle_sector(momentum: bool) -> Array:
 				if chance_count > 0:
 					var chance_effect := _match_effect(RaceTypes.SYMBOL_CHANCE, chance_count)
 					if String(chance_effect["special"]).strip_edges() == "duel_trigger":
-						# 즉시 듀얼도 앞차가 있어야 성립한다 (개선 회차 31) — 선두에서는 만충도 문면도 없다.
-						# 만충만 남기면 "즉시 듀얼" 로그가 일어나지 않은 일을 말한다.
+						# 즉시 만충. "즉시 듀얼" 문면은 앞차가 있을 때만 참이다 (회차 31) — 선두에서는 ⑤ 의
+						# 간격 보상 문면이 그 자리를 말한다(회차 32): 만충은 채우되 "듀얼"을 말하지 않는다.
+						chance_full = true
 						if front_target != "":
-							chance_full = true
 							events.append(_ev("T5", "raceLog.chanceDuel01", {}))
 					else:
 						_add_front_gauge(CsvTable.to_float(String(chance_effect["front_gauge"])) * gauge_mult * advance_mult * front_coef)
 						events.append(_ev("T5", "raceLog.chanceProc01", {}))
 				if momentum:
 					var bonus := data.param("param_gauge_momentum_bonus")
-					# 모멘텀도 앞차가 있어야 쌓인다 (회차 31) — 문면은 쌓였을 때만 낸다(선두에서 "전방 +5" 는 거짓).
-					if front_target != "":
-						_add_front_gauge(bonus * gauge_mult)
-						events.append(_ev("T5", "raceLog.momentum01", {"amount": int(bonus)}))
+					# 선두에서도 쌓인다 (회차 32 — 회차 31 의 차단을 되돌림: 선두의 전방은 간격 루프의 재료다).
+					_add_front_gauge(bonus * gauge_mult)
+					events.append(_ev("T5", "raceLog.momentum01", {"amount": int(bonus)}))
 			RaceTypes.SettleStage.STAGE_5_GAUGE_CHECK:
 				events.append_array(_apply_neighbor_passives(gauge_mult))
 				if chance_full:
@@ -1039,6 +1038,10 @@ func _settle_sector(momentum: bool) -> Array:
 				front_gauge = clampf(front_gauge, 0.0, data.param("param_gauge_full_threshold"))
 				rear_gauge = clampf(rear_gauge, 0.0, data.param("param_gauge_full_threshold"))
 				var threshold := data.param("param_gauge_full_threshold")
+				# 선두 간격 루프 (회차 32) — 앞차가 없는 만충은 듀얼이 아니라 **간격**이다: 뒤차 압박을 깎고 0 으로.
+				# 방어 판정보다 **앞**에 둔다 — 벌린 간격이 이번 턴의 방어 듀얼 예약을 풀 수 있어야 한다.
+				if front_gauge >= threshold and front_target == "":
+					events.append_array(_lead_gap_reward())
 				_armed_duel = RaceTypes.DuelType.NONE
 				if front_gauge >= threshold and front_target != "":
 					_armed_duel = RaceTypes.DuelType.OVERTAKE
@@ -1325,24 +1328,38 @@ func _add_rear_gauge(delta: float) -> void:
 	rear_gauge += delta
 
 
-# ── 전방 게이지 가산 창구 (개선 회차 31 · 사용자 결정 2026-09-17 — 후방과 같은 규칙) ──
+# ── 전방 게이지 가산 창구 (개선 회차 31 신설 · 회차 32 개정) ──
 #
-# **앞에 아무도 없으면(선두) 전방 게이지는 오르지 않는다.** 슬립스트림·라인·찬스·모멘텀·레조넌스가 상대 없이
-# 쌓이면 만충 판정(⑤ · `front_target != ""` 요구)이 터지지 않고 리셋도 없어 후방과 같은 형태로 굳었다.
-# D05 §4.2 "전방 게이지: … 플레이어 측에 축적, 앞차의 저항으로 감쇄 → 만충 = 추월 듀얼" — 추월할 상대가 없는
-# 축적은 대상이 없는 값이다. 감산(앞차 저항)은 상대가 있을 때만 존재하므로 여기 오지 않는다.
+# 회차 31 은 후방과 같은 규칙("앞에 아무도 없으면 오르지 않는다")을 두었다. 그러자 선두에서 전진 계열 심볼
+# (슬립스트림·라인·찬스 = 릴의 절반)이 전부 죽은 심볼이 됐다. **회차 32 (사용자 제안 · 객관식 2026-09-17)**:
+# 선두의 전방은 앞차 저항 없이 차오르고, 만충이면 듀얼 대신 **간격 보상**(뒤차 압박 −param) 뒤 0 으로 돌아간다
+# (`_lead_gap_reward` · ⑤). 창구는 그대로 둔다 — 가산 경로 5곳이 한 문을 지나는 것이 TC-C 의 계수 트립와이어이고,
+# 규칙이 다시 바뀌어도 고칠 자리가 하나다. D05 §4.2 "스왑 시 리셋 · 이월 없음"은 그대로다.
 # 전방 가산 경로 전부(슬립스트림·라인·찬스·모멘텀·레조넌스 front_gauge)가 이 창구를 쓰고, "만충으로 채움" 두 곳
 # (찬스 3매치·레조넌스 front_gauge_full)은 `_fill_front_gauge` 를 쓴다.
 func _add_front_gauge(delta: float) -> void:
-	if delta > 0.0 and front_target == "":
-		return
 	front_gauge += delta
 
 
 func _fill_front_gauge() -> void:
-	if front_target == "":
-		return
 	front_gauge = data.param("param_gauge_full_threshold")
+
+
+# ── 선두 간격 보상 (개선 회차 32 · 사용자 제안 + 객관식 "후방 게이지 −15" 2026-09-17) ──
+#
+# 앞차가 없는 만충 = 페이스로 벌린 간격. 뒤차의 압박 게이지를 `param_gauge_lead_gap_rear` 만큼 깎고 전방을 0 으로
+# 되돌린다. 문면의 수치는 **실제로 깎인 양**(회차 31 과 같은 규칙) — 후방이 이미 0 이면 "뒤가 멀다"만 말한다.
+# 왜 후방 감산인가: 선두의 유일한 위협이 방어 듀얼이고, 게이지 계통 안에서만 움직여 차지 경제(D13 §2.2 순생산
+# 대조)·정비 경제(D06)에 닿지 않는다. 채움 주기가 빠르므로(저항 0 · 약 33G/스핀 → 3턴 1회) 값은 작아야 한다 —
+# 그 값은 D13 대장 밖의 사용자 결정으로 core_params 에 등재했다(불변규칙 2 창구). 감산은 후방 창구를 지난다.
+func _lead_gap_reward() -> Array:
+	front_gauge = 0.0
+	var applied := clampf(data.param("param_gauge_lead_gap_rear"), 0.0, rear_gauge)
+	_add_rear_gauge(-applied)
+	var amount := int(round(applied))
+	if amount > 0:
+		return [_ev("T5", "raceLog.leadGap01", {"amount": amount})]
+	return [_ev("T5", "raceLog.leadGapHeld01", {})]
 
 
 func _effective_pace(entrant: Dictionary) -> float:

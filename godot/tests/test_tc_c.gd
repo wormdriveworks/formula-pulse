@@ -31,7 +31,7 @@ func _init() -> void:
 	_seal_across_many_spins()
 	_neighbor_passive_runtime()
 	_rear_gauge_needs_target()
-	_front_gauge_needs_target()
+	_lead_gap_loop()
 	_neighbor_passive_log()
 	_slot_progression_wired()
 	_negative_guards()
@@ -2515,8 +2515,8 @@ func _rear_gauge_needs_target() -> void:
 	_eq_float("후방무주 ⓓ 감산은 뒤차가 없어도 통과", brake.rear_gauge, GAUGE_PROBE_BASE + braking1, 0.01)
 	# ⓔ 원본 — 창구 정의 1 + 호출 4 · `rear_gauge +=` 는 창구 안의 1건뿐 (새 가산 경로가 창구를 비켜 가면 붉는다)
 	var src := FileAccess.get_file_as_string("res://core/state/race_engine.gd")
-	_ok("후방무주 ⓔ 후방 가산은 창구만 (정의 1 + 호출 4) · 직접 `rear_gauge +=` 는 창구 안 1건",
-		src.count("_add_rear_gauge(") == 5 and src.count("rear_gauge +=") == 1,
+	_ok("후방무주 ⓔ 후방 가산은 창구만 (정의 1 + 호출 5 — 회차 32 의 간격 감산 포함) · 직접 `rear_gauge +=` 는 창구 안 1건",
+		src.count("_add_rear_gauge(") == 6 and src.count("rear_gauge +=") == 1,
 		"funnel=%d direct=%d" % [src.count("_add_rear_gauge("), src.count("rear_gauge +=")])
 
 
@@ -2527,88 +2527,120 @@ func _place_player(engine: RaceEngine, index: int) -> void:
 	engine._retarget(true, true)
 
 
-# ── 전방 게이지는 앞차가 있을 때만 오른다 (개선 회차 31 · 사용자 객관식 2026-09-17 "같은 규칙 적용") ──
+# ── 선두 간격 루프 (개선 회차 32 · 사용자 제안 + 객관식 "후방 게이지 −15" 2026-09-17) ──
 #
-# 후방(회차 30)의 대칭이다. 선두에서 슬립스트림·라인·찬스·모멘텀이 상대 없이 쌓이면 만충 판정이 터지지 않고
-# 리셋도 없어 꽉 찬 채 굳는다. 축은 다섯 자리를 잰다:
-#   ⓐ 선두(앞차 없음) — 슬립스트림 3매치도 전방 0
-#   ⓑ 선두 — 여유 확정(모멘텀)이어도 전방 0 이고 **"전방 +5" 문면도 나가지 않는다** (거짓 문면 차단)
-#   ⓒ 선두 — 찬스 3매치는 만충도 듀얼 예약도 "즉시 듀얼" 문면도 없다
-#   ⓓ 대조군(앞차 있음 · 저항 0 으로 눕힘) — 같은 슬립스트림 1 이 표값만큼 오른다
-#   ⓔ 원본 — 전방 가산 5경로가 창구를 지나고(정의 1 + 호출 5 · `+=` 는 창구 안 1건) 만충 채움 2곳은 `_fill_front_gauge`(정의 1 + 호출 2 · 임계 대입은 창구 안 1건)
-func _front_gauge_needs_target() -> void:
-	# ⓐ 선두 — 슬립스트림 3매치
-	var lead := _new_engine(71, "circuit_mn1")
-	if lead == null:
+# 회차 31 의 "선두에서는 오르지 않는다"를 되돌린 자리다 — 그 규칙은 선두의 전진 심볼(릴의 절반)을 죽였다.
+# 선두의 전방은 저항 없이 차오르고, 만충이면 듀얼 대신 뒤차 압박을 param 만큼 깎고 0 으로 돌아간다. 축은 일곱 자리:
+#   ⓐ 선두 · 만충 — 전방 0 으로 · 후방 = 시작 + 압박 − 15 · `leadGap01` {amount: 15}
+#   ⓑ 선두 · 미달 — 슬립스트림 1 이 저항 없이 표값 그대로 쌓인다(버리지 않는다)
+#   ⓒ 선두 · 모멘텀 — 전방 +5 이고 "전방 +5" 문면도 다시 참이다
+#   ⓓ 선두 · 찬스 3매치 — 즉시 만충 → 간격 보상 · "즉시 듀얼" 문면 없음 · 계수는 1
+#   ⓔ 후방이 0 이면 — 수치 문면 대신 `leadGapHeld01` (회차 31 규칙: 움직인 양만 말한다)
+#   ⓕ 간격이 방어 듀얼을 푼다 — 압박으로 100 이 될 턴에 만충이 겹치면 −15 로 85 · 예약 없음 (대조군은 예약)
+#   ⓖ 원본 — 전방 창구 정의 1 + 호출 5 · 채움 창구 정의 1 + 호출 2 · 보상 정의 1 + 호출 1 · 값은 param 창구
+func _lead_gap_loop() -> void:
+	var probe := _new_engine(71, "circuit_mn1")
+	if probe == null:
 		return
-	lead.start_gp()
-	_flatten_neighbors(lead)
-	_place_player(lead, 0)
-	_ok("전방무주 ⓐ 전제: 앞차 없음", lead.front_target == "", lead.front_target)
-	lead.begin_turn()
-	lead.spin()
+	var gap := probe.data.param("param_gauge_lead_gap_rear")
+	_ok("선두루프 전제: 값 창구 param_gauge_lead_gap_rear = 15 (사용자 객관식)", gap == 15.0, str(gap))
+	var slip3 := CsvTable.to_float(String(probe.data.match_effects[RaceTypes.SYMBOL_SLIPSTREAM][3]["front_gauge"]))
+	var slip1 := CsvTable.to_float(String(probe.data.match_effects[RaceTypes.SYMBOL_SLIPSTREAM][1]["front_gauge"]))
+	# ⓐ 만충 → 보상
+	var lead := _leader_engine(71)
+	var pressure := _expected_rear_pressure(lead) * lead._gauge_mult()
+	_ok("선두루프 ⓐ 전제: 앞차 없음 · 뒤차 있음", lead.front_target == "" and lead.rear_target != "",
+		"front=%s rear=%s" % [lead.front_target, lead.rear_target])
+	lead.front_gauge = 10.0
+	lead.rear_gauge = GAUGE_PROBE_BASE
 	lead.provisional = _combo(RaceTypes.SYMBOL_SLIPSTREAM, 3, RaceTypes.SYMBOL_SLIPSTREAM)
-	lead.confirm(0.0)
-	_eq_float("전방무주 ⓐ 선두에서 슬립스트림 3매치도 전방 0", lead.front_gauge, 0.0)
-	# ⓑ 선두 — 모멘텀 (여유 확정) : 게이지 0 · 문면 없음
-	var brisk := _new_engine(71, "circuit_mn1")
-	brisk.start_gp()
-	_flatten_neighbors(brisk)
-	_place_player(brisk, 0)
-	brisk.begin_turn()
-	brisk.spin()
+	var events_a := lead.confirm(0.0)
+	_ok("선두루프 ⓐ 전제: 만충에 닿는 스핀 (10 + %d ≥ 100)" % int(slip3), 10.0 + slip3 >= 100.0)
+	_eq_float("선두루프 ⓐ 전방은 0 으로 돌아간다", lead.front_gauge, 0.0)
+	_eq_float("선두루프 ⓐ 후방 = 시작 + 압박 − 간격", lead.rear_gauge, GAUGE_PROBE_BASE + pressure - gap, 0.01)
+	_ok("선두루프 ⓐ 문면 {amount} = 실제 깎인 15", int(_event_params(events_a, "raceLog.leadGap01").get("amount", -1)) == int(gap),
+		str(_event_params(events_a, "raceLog.leadGap01")))
+	_ok("선두루프 ⓐ 듀얼 예약 없음", lead.pending_duel == RaceTypes.DuelType.NONE)
+	# ⓑ 미달 — 쌓인다
+	var below := _leader_engine(71)
+	below.provisional = _combo(RaceTypes.SYMBOL_SLIPSTREAM, 1, RaceTypes.SYMBOL_PULSE)
+	var events_b := below.confirm(0.0)
+	_eq_float("선두루프 ⓑ 미달이면 저항 없이 표값 그대로 쌓인다", below.front_gauge, slip1 * below._gauge_mult(), 0.01)
+	_ok("선두루프 ⓑ 미달에는 간격 문면이 없다", not _has_key(events_b, "raceLog.leadGap01")
+		and not _has_key(events_b, "raceLog.leadGapHeld01"), _keys_of(events_b))
+	# ⓒ 모멘텀 — 다시 참
+	var brisk := _leader_engine(71)
 	brisk.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
-	var brisk_events := brisk.confirm(1.0)
-	_eq_float("전방무주 ⓑ 선두에서 모멘텀도 전방 0", brisk.front_gauge, 0.0)
-	_ok("전방무주 ⓑ 선두에서는 '전방 +5' 문면이 나가지 않는다",
-		not _has_key(brisk_events, "raceLog.momentum01"), _keys_of(brisk_events))
-	# 대조: 앞차가 있으면(P16) 여유 확정이 모멘텀 문면을 낸다 — ⓑ 가 문면 자체를 지운 것이 아님을 못박는다
-	var brisk_ctrl := _new_engine(71, "circuit_mn1")
-	brisk_ctrl.start_gp()
-	_flatten_neighbors(brisk_ctrl)
-	brisk_ctrl.begin_turn()
-	brisk_ctrl.spin()
-	brisk_ctrl.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
-	_ok("전방무주 ⓑ 대조: 앞차가 있으면 모멘텀 문면이 난다",
-		_has_key(brisk_ctrl.confirm(1.0), "raceLog.momentum01"))
-	# ⓒ 선두 — 찬스 3매치
-	var chance := _new_engine(71, "circuit_mn1")
-	chance.start_gp()
-	_flatten_neighbors(chance)
-	_place_player(chance, 0)
-	chance.begin_turn()
-	chance.spin()
+	var events_c := brisk.confirm(1.0)
+	_eq_float("선두루프 ⓒ 선두의 모멘텀도 쌓인다 (+5)", brisk.front_gauge,
+		brisk.data.param("param_gauge_momentum_bonus") * brisk._gauge_mult(), 0.01)
+	_ok("선두루프 ⓒ '전방 +5' 문면이 다시 난다", _has_key(events_c, "raceLog.momentum01"), _keys_of(events_c))
+	# ⓓ 찬스 3매치 — 즉시 만충 → 보상
+	var chance := _leader_engine(71)
+	chance.rear_gauge = GAUGE_PROBE_BASE
 	chance.provisional = _combo(RaceTypes.SYMBOL_CHANCE, 3, RaceTypes.SYMBOL_CHANCE)
-	var chance_events := chance.confirm(0.0)
-	_ok("전방무주 ⓒ 선두의 찬스 3매치 = 만충 없음 · 듀얼 예약 없음 · '즉시 듀얼' 문면 없음",
-		chance.front_gauge == 0.0 and chance.pending_duel == RaceTypes.DuelType.NONE
-		and not _has_key(chance_events, "raceLog.chanceDuel01"),
-		"front=%.1f pending=%d keys=%s" % [chance.front_gauge, chance.pending_duel, _keys_of(chance_events)])
-	_ok("전방무주 ⓒ 찬스 3매치 계수는 그대로 센다 (기록 축은 발동과 별개)", chance.chance_three_matches == 1)
-	# ⓓ 대조군 — 앞차 있음(저항 0)
-	var ctrl := _new_engine(71, "circuit_mn1")
-	ctrl.start_gp()
-	_flatten_neighbors(ctrl)
-	_isolate_gauge_side(ctrl, "front")
-	_ok("전방무주 ⓓ 전제: 앞차 있음 (P2)", ctrl.front_target != "" and ctrl.positions.find(RaceEngine.PLAYER_ID) == 1)
-	ctrl.begin_turn()
-	ctrl.spin()
-	ctrl.provisional = _combo(RaceTypes.SYMBOL_SLIPSTREAM, 1, RaceTypes.SYMBOL_PULSE)
-	ctrl.confirm(0.0)
-	var slip1 := CsvTable.to_float(String(
-		ctrl.data.match_effects[RaceTypes.SYMBOL_SLIPSTREAM][1]["front_gauge"]))
-	_eq_float("전방무주 ⓓ 앞차 있으면 표값만큼 오른다 (눕힌 저항 = 0)", ctrl.front_gauge,
-		slip1 * ctrl._gauge_mult(), 0.01)
-	# ⓔ 원본
+	var events_d := chance.confirm(0.0)
+	_ok("선두루프 ⓓ 선두의 찬스 3매치 = 즉시 간격 보상 · '즉시 듀얼' 문면 없음 · 예약 없음",
+		chance.front_gauge == 0.0 and _has_key(events_d, "raceLog.leadGap01")
+		and not _has_key(events_d, "raceLog.chanceDuel01") and chance.pending_duel == RaceTypes.DuelType.NONE,
+		"front=%.1f keys=%s" % [chance.front_gauge, _keys_of(events_d)])
+	_ok("선두루프 ⓓ 찬스 3매치 계수는 그대로 센다", chance.chance_three_matches == 1)
+	# ⓔ 후방 0 — 압박을 눕혀 0 을 유지시킨다
+	var clear := _leader_engine(71)
+	var rear_entrant: Dictionary = clear.entrants[clear.rear_target]
+	rear_entrant["seed_aggression"] = -clear.data.param("param_gauge_rear_pressure_base") \
+		/ clear.data.param("param_gauge_rear_pressure_aggr_coef")
+	clear.front_gauge = 10.0
+	clear.rear_gauge = 0.0
+	clear.provisional = _combo(RaceTypes.SYMBOL_SLIPSTREAM, 3, RaceTypes.SYMBOL_SLIPSTREAM)
+	var events_e := clear.confirm(0.0)
+	_ok("선두루프 ⓔ 후방이 0 이면 수치 문면 대신 '뒤가 멀다'",
+		_has_key(events_e, "raceLog.leadGapHeld01") and not _has_key(events_e, "raceLog.leadGap01")
+		and clear.front_gauge == 0.0 and clear.rear_gauge == 0.0,
+		"front=%.1f rear=%.1f keys=%s" % [clear.front_gauge, clear.rear_gauge, _keys_of(events_e)])
+	# ⓕ 간격이 방어 듀얼을 푼다
+	var saved := _leader_engine(71)
+	var full := saved.data.param("param_gauge_full_threshold")
+	saved.front_gauge = 10.0
+	saved.rear_gauge = full - 1.0   # 압박이 얹히면 만충 → 보상이 없으면 방어 듀얼 예약
+	saved.provisional = _combo(RaceTypes.SYMBOL_SLIPSTREAM, 3, RaceTypes.SYMBOL_SLIPSTREAM)
+	saved.confirm(0.0)
+	_ok("선두루프 ⓕ 벌린 간격이 방어 듀얼 예약을 푼다 (100 → 85)",
+		saved.pending_duel == RaceTypes.DuelType.NONE and is_equal_approx(saved.rear_gauge, full - gap),
+		"pending=%d rear=%.1f" % [saved.pending_duel, saved.rear_gauge])
+	var doomed := _leader_engine(71)
+	doomed.front_gauge = 10.0
+	doomed.rear_gauge = full - 1.0
+	doomed.provisional = _combo(RaceTypes.SYMBOL_PULSE, 3, RaceTypes.SYMBOL_PULSE)
+	doomed.confirm(0.0)
+	_ok("선두루프 ⓕ 대조: 만충이 없으면 압박이 방어 듀얼을 예약한다",
+		doomed.pending_duel == RaceTypes.DuelType.DEFENSE, "pending=%d rear=%.1f" % [doomed.pending_duel, doomed.rear_gauge])
+	# ⓖ 원본
 	var src := FileAccess.get_file_as_string("res://core/state/race_engine.gd")
-	_ok("전방무주 ⓔ 전방 가산은 창구만 (정의 1 + 호출 5) · `front_gauge +=` 는 창구 안 1건",
+	_ok("선두루프 ⓖ 전방 가산은 창구만 (정의 1 + 호출 5) · `front_gauge +=` 는 창구 안 1건",
 		src.count("_add_front_gauge(") == 6 and src.count("front_gauge +=") == 1,
 		"funnel=%d direct=%d" % [src.count("_add_front_gauge("), src.count("front_gauge +=")])
-	_ok("전방무주 ⓔ 만충 채움도 창구만 (정의 1 + 호출 2) · 임계 대입은 창구 안 1건",
+	_ok("선두루프 ⓖ 만충 채움도 창구만 (정의 1 + 호출 2) · 임계 대입은 창구 안 1건",
 		src.count("_fill_front_gauge(") == 3
 		and src.count('front_gauge = data.param("param_gauge_full_threshold")') == 1,
 		"fill=%d set=%d" % [src.count("_fill_front_gauge("),
 			src.count('front_gauge = data.param("param_gauge_full_threshold")')])
+	_ok("선두루프 ⓖ 보상 창구 정의 1 + 호출 1 · 값은 param 창구(리터럴 15 없음)",
+		src.count("_lead_gap_reward(") == 2 and src.contains('data.param("param_gauge_lead_gap_rear")'),
+		"reward=%d" % src.count("_lead_gap_reward("))
+
+
+# 선두(P1) 에 선 엔진 — 이웃을 눕히고 T4(스핀 뒤)까지 진행해 둔다. 뒤차 = 종전 선두(눕힌 페이스 · 시드 공격성은 표값).
+func _leader_engine(seed_value: int) -> RaceEngine:
+	var engine := _new_engine(seed_value, "circuit_mn1")
+	if engine == null:
+		return null
+	engine.start_gp()
+	_flatten_neighbors(engine)
+	_place_player(engine, 0)
+	engine.begin_turn()
+	engine.spin()
+	return engine
 
 
 func _has_key(events: Array, key: String) -> bool:

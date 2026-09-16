@@ -68,6 +68,8 @@ raceLog.momentum01,흐름을 탔다. 전방 +{amount}.,Momentum caught. Front +{
 raceLog.neighborBoth01,앞차 저항 -{resist} · 뒤차 압박 +{pressure}.,Resist -{resist} · Pressure +{pressure}.,前方抵抗 -{resist}・後方圧力 +{pressure}。
 raceLog.neighborFront01,앞차 저항 -{resist}.,Front resist -{resist}.,前方抵抗 -{resist}。
 raceLog.neighborRear01,뒤차 압박 +{pressure}.,Rear pressure +{pressure}.,後方圧力 +{pressure}。
+raceLog.leadGap01,선두 유지 — 간격을 벌렸다. 후방 -{amount}.,Leading — gap opened. Rear -{amount}.,先頭維持 — 差を広げた。後方 -{amount}。
+raceLog.leadGapHeld01,선두 유지 — 뒤가 멀다.,Leading — clear behind.,先頭維持 — 後方は遠い。
 raceLog.aiRetire01,{target} 리타이어.,{target} retires.,{target} リタイア。
 raceLog.playerRetire01,섀시 한계. 머신 세운다.,Chassis gone. Bringing it in.,シャシー限界。マシンを止める。
 raceLog.gpFinish01,체커. 최종 {rank}위.,Chequered flag. Final P{rank}.,チェッカー。最終{rank}位。

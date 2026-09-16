@@ -6,6 +6,7 @@ param_gauge_rear_pressure_base,2.0
 param_gauge_rear_pressure_aggr_coef,2.2
 param_gauge_momentum_bonus,5
 param_gauge_final_lap_mult,1.2
+param_gauge_lead_gap_rear,15
 param_charge_cap,10
 param_charge_stable_sector,1
 param_charge_duel_win,3
