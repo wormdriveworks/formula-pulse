@@ -412,6 +412,7 @@ ui.hub.amountFormat,{amount},{amount},{amount}
 ui.hub.progressFormat,시즌 {season} · 투어 {tour} · 제{race}전,Season {season} · Tour {tour} · Race {race},シーズン{season} · ツアー{tour} · 第{race}戦
 ui.hub.progressClosedFormat,시즌 {season} 마감,Season {season} closed,シーズン{season} 終了
 ui.hub.back,개러지로,To Garage,ガレージへ
+ui.hub.backTitle,타이틀로,To Title,タイトルへ
 ui.hub.depart,다음 대회 출발,Depart for Next Race,次のレースへ出発
 ui.hub.lockedByCrew," — {crew} 합류 시"," — on {crew} joining"," — {crew}加入時"
 ui.hub.stRepair,정비 베이,Service Bay,整備ベイ

@@ -5501,6 +5501,13 @@ func _has_digit(text: String) -> bool:
 #   ⓑ 열람 모드의 SYS-02 = 전용 문면 · 빈 슬롯 소등 · **삭제 버튼 없음**
 #   ⓒ 슬롯을 고르면 그 커리어를 세워 HUB-05 아카이브 탭으로 간다 (돌아갈 자리 = 타이틀)
 #   ⓓ 열람 모드의 뒤로는 타이틀이고 **디스크를 쓰지 않는다** — 복귀 저장은 개러지 몫이다
+#   ⓔ 뒤로 버튼의 **문면**도 돌아갈 자리를 따른다 — 타이틀이면 '타이틀로', 개러지면 '개러지로'
+#      (개선 회차 29 — 사용자 실기: 타이틀에서 연 기록실의 뒤로가 '개러지로' 라 적혀 있었다)
+#   ⓕ 아카이브 **재생·연속 재생에서 돌아온 기록실도 같은 자리**로 돌아간다 — 나가는 페이로드가
+#      `return` 을 되싣는다 (개선 회차 29 — 사용자 실기: VN 감상 뒤 '개러지로' 가 개러지로 갔다.
+#      그 자리는 복귀 저장 자리라 읽기만 한 커리어가 저장되는 창이 함께 열려 있었다). 실 왕복으로 잰다:
+#      기록실(열람) → 재생 버튼 → VN 화면을 그 페이로드로 세워 스킵 → 라우터가 받을 페이로드로 기록실을
+#      다시 세워 뒤로 → 타이틀 · 디스크 무접촉.
 const TITLE_SCENE := "res://ui/sys/title_screen.tscn"
 const SAVE_SLOT_SCENE := "res://ui/sys/save_slot_screen.tscn"
 
@@ -5582,16 +5589,91 @@ func _title_archive_flow(data: GameData) -> void:
 	_ok("52ⓓ 전제: 저장분 로드", bool(loaded.get("ok", false))
 		and viewer.restore(Dictionary(loaded.get("payload", {}))))
 	viewer.outgame.gain_credits(5000)   # 메모리만 흔든다 — 디스크에 닿으면 축이 잡는다
+	# ⓕ 의 전제 — 아카이브에 재생할 장면 하나(1막)와 연속 재생 시설(G2). 둘 다 메모리만이다.
+	viewer.narrative.vn_seen["vn_act1"] = true
+	viewer.outgame.facilities["facility_g2"] = true
 	var before := _saved_credits_of(2)
+	var st := data.strings
 	var records := _mount_payload_scene(RECORDS_SCENE, viewer, {"tab": "archive", "return": "SYS-01"})
+	var replay_outbound: Dictionary = {}
 	if records != null:
+		var back_button := records.get_node("%BackButton") as Button
+		# ⓔ 문면 — 돌아갈 자리가 타이틀이면 '개러지로' 는 거짓 안내다
+		_ok("52ⓔ 열람 모드의 뒤로 문면 = 타이틀로",
+			back_button.text == st.text("ui.hub.backTitle"), back_button.text)
+		var outbound: Array = []
+		records.navigate.connect(func(t: String, p: Dictionary) -> void:
+			outbound.append({"target": t, "payload": p}))
+		# ⓕ 나가는 두 경로 — 개별 재생 · 연속 재생
+		var replay_button := _first_live_replay(records)
+		_ok("52ⓕ 전제: 아카이브에 살아 있는 재생 버튼", replay_button != null)
+		if replay_button != null:
+			replay_button.pressed.emit()
+		var play_all := records.find_child("PlayAllButton", true, false) as Button
+		_ok("52ⓕ 전제: 연속 재생 버튼 점등 (G2 개방)", play_all != null and not play_all.disabled)
+		if play_all != null and not play_all.disabled:
+			play_all.pressed.emit()
+		var to_vn: Array = []
+		for entry in outbound:
+			if String(Dictionary(entry).get("target", "")) == "NAR-01":
+				to_vn.append(Dictionary(entry).get("payload", {}))
+		_ok("52ⓕ 두 경로 다 VN 으로 나간다", to_vn.size() == 2, "to_vn=%d" % to_vn.size())
+		for index in range(to_vn.size()):
+			var tail := _chain_tail(Dictionary(to_vn[index]))
+			var back_payload: Dictionary = tail.get("next_payload", {})
+			_ok("52ⓕ 경로 %d — 되돌아오는 자리 = HUB-05 아카이브 탭" % index,
+				String(tail.get("next", "")) == "HUB-05"
+				and String(back_payload.get("tab", "")) == "archive",
+				"%s %s" % [str(tail.get("next", "")), str(back_payload)])
+			_ok("52ⓕ 경로 %d — 되돌아오는 기록실이 돌아갈 자리를 안다 (return=SYS-01)" % index,
+				String(back_payload.get("return", "")) == "SYS-01", str(back_payload))
+		if not to_vn.is_empty():
+			replay_outbound = Dictionary(to_vn[0])
+		# ⓓ 뒤로
+		back_button.pressed.emit()
 		var routed: Array = []
-		records.navigate.connect(func(t: String, _p: Dictionary) -> void: routed.append(t))
-		(records.get_node("%BackButton") as Button).pressed.emit()
+		for entry in outbound:
+			if String(Dictionary(entry).get("target", "")) != "NAR-01":
+				routed.append(String(Dictionary(entry).get("target", "")))
 		_ok("52ⓓ 열람 모드의 뒤로 = 타이틀", routed == ["SYS-01"], str(routed))
 		_ok("52ⓓ 열람은 디스크를 쓰지 않는다", _saved_credits_of(2) == before,
 			"before=%d after=%d mem=%d" % [before, _saved_credits_of(2), viewer.outgame.credits])
 		_unmount(records)
+	# ⓕ 실 왕복 — 재생 화면을 **그 페이로드로** 세우고 스킵으로 마치면 라우터가 받을 다음 화면·페이로드가
+	# 그대로 드러난다. 그 페이로드로 기록실을 다시 세운 뒤의 뒤로가 이번 결함의 자리다.
+	if not replay_outbound.is_empty():
+		var vn := _mount_payload(data, viewer, replay_outbound)
+		var came_back: Array = []
+		vn.navigate.connect(func(t: String, p: Dictionary) -> void:
+			came_back.append({"target": t, "payload": p}))
+		(vn.get_node("%SkipButton") as Button).pressed.emit()
+		_ok("52ⓕ 재생 스킵 = HUB-05 로 1회 복귀", came_back.size() == 1
+			and String(Dictionary(came_back[0]).get("target", "")) == "HUB-05", str(came_back))
+		_unmount(vn)
+		if came_back.size() == 1:
+			var returned := _mount_payload_scene(RECORDS_SCENE, viewer,
+				Dictionary(came_back[0]).get("payload", {}))
+			if returned != null:
+				var returned_back := returned.get_node("%BackButton") as Button
+				_ok("52ⓕ 돌아온 기록실의 뒤로 문면 = 타이틀로",
+					returned_back.text == st.text("ui.hub.backTitle"), returned_back.text)
+				var routed_back: Array = []
+				returned.navigate.connect(func(t: String, _p: Dictionary) -> void: routed_back.append(t))
+				returned_back.pressed.emit()
+				_ok("52ⓕ 돌아온 기록실의 뒤로 = 타이틀 (개러지가 아니다)",
+					routed_back == ["SYS-01"], str(routed_back))
+				_ok("52ⓕ 그 왕복도 디스크를 쓰지 않는다", _saved_credits_of(2) == before,
+					"before=%d after=%d mem=%d" % [before, _saved_credits_of(2), viewer.outgame.credits])
+				_unmount(returned)
+	# ⓕ 원본 — 두 경로가 같은 창구를 쓰고 탭 힌트만 실은 리터럴 사전은 남지 않는다
+	# (남으면 다음 경로가 또 `return` 을 빠뜨린다). 정의 1 + 호출 2.
+	var records_src := FileAccess.get_file_as_string("res://ui/hub/records_screen.gd")
+	_ok("52ⓕ 나가는 페이로드 창구 1곳 (정의 1 + 호출 2) · 탭 힌트 리터럴 0",
+		records_src.count("_archive_return_payload()") == 3
+		and records_src.count('{"tab": "archive"}') == 0
+		and records_src.count('"return": _return_route') == 1,
+		"funnel=%d literal=%d return=%d" % [records_src.count("_archive_return_payload()"),
+			records_src.count('{"tab": "archive"}'), records_src.count('"return": _return_route')])
 	# 개러지 복귀는 종전대로 저장한다 — 같은 화면이 경로에 따라 갈린다는 것이 이 축의 요지다
 	var keeper := _fresh_session(data)
 	keeper.profile_index = 2
@@ -5601,6 +5683,10 @@ func _title_archive_flow(data: GameData) -> void:
 	if garage_records != null:
 		var routed: Array = []
 		garage_records.navigate.connect(func(t: String, _p: Dictionary) -> void: routed.append(t))
+		# ⓔ 개러지로 돌아가는 기록실의 문면은 종전대로 '개러지로' 다
+		_ok("52ⓔ 개러지 복귀의 뒤로 문면 = 개러지로",
+			(garage_records.get_node("%BackButton") as Button).text == st.text("ui.hub.back"),
+			(garage_records.get_node("%BackButton") as Button).text)
 		(garage_records.get_node("%BackButton") as Button).pressed.emit()
 		_ok("52ⓓ 개러지 복귀는 종전대로 저장", routed == ["HUB-01"]
 			and _saved_credits_of(2) == keeper.outgame.credits,
@@ -5631,6 +5717,27 @@ func _saved_credits_of(profile: int) -> int:
 		return -1
 	var payload: Dictionary = loaded.get("payload", {})
 	return int(Dictionary(payload.get("outgame", {})).get("credits", -1))
+
+
+# 아카이브 목록의 첫 살아 있는 재생 버튼 — 행 = [표제 Label, 재생 Button] (records_screen._fill_archive).
+func _first_live_replay(records: Control) -> Button:
+	var panel := records.get_node("%PanelArchive") as VBoxContainer
+	for row in panel.get_children():
+		if row is HBoxContainer and row.get_child_count() >= 2 and row.get_child(1) is Button \
+				and not (row.get_child(1) as Button).disabled:
+			return row.get_child(1) as Button
+	return null
+
+
+# VN 사슬의 마지막 칸 — 연속 재생은 `next=NAR-01` 로 감긴 사슬이고 개별 재생은 자기 자신이 곧 마지막 칸이다.
+# 마지막 칸의 `next`/`next_payload` 가 라우터가 받을 복귀다.
+func _chain_tail(payload: Dictionary) -> Dictionary:
+	var at := payload
+	var hops := 0
+	while String(at.get("next", "")) == "NAR-01" and hops < 64:
+		at = Dictionary(at.get("next_payload", {}))
+		hops += 1
+	return at
 
 
 # ── 51 튜닝 재배분 모드 (개선 회차 24 · 매뉴얼 9절 ①) ──

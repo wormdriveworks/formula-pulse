@@ -308,7 +308,7 @@ func _fill_archive() -> void:
 		play_all.name = "PlayAllButton"
 		play_all.add_theme_font_size_override("font_size", _body_font_size)
 		play_all.text = s.text("ui.records.playAll")
-		var chain := session.archive_chain_payload("HUB-05", {"tab": "archive"})
+		var chain := session.archive_chain_payload("HUB-05", _archive_return_payload())
 		if chain.is_empty():
 			play_all.disabled = true
 			play_all.focus_mode = Control.FOCUS_NONE
@@ -338,9 +338,10 @@ func _fill_archive() -> void:
 		# **페이로드는 세션 창구가 조립한다** (㊹ — 22차 개막 경로와 같은 교정). 화면이
 		# 직접 `{vn_id, replay, next}` 를 쥐여 주던 동안 문면·화자·정조가 통째로 빠져
 		# 골격 폴백 1줄이 떴다. 조립기를 화면에 두지 않는 규칙이 여기에도 걸린다.
-		# 복귀 페이로드에 탭 힌트 — 재생 종료가 아카이브 탭으로 돌아온다 (H9 · §A-19)
+		# 복귀 페이로드 = 탭 힌트 + 돌아갈 자리 (H9 · §A-19 · 개선 회차 29) — 재생 종료가 아카이브 탭으로,
+		# 그리고 **들어온 곳으로 돌아가는 기록실**로 돌아온다.
 		var replay_payload := session.archive_replay_payload(String(vn_id), "HUB-05",
-			{"tab": "archive"})
+			_archive_return_payload())
 		if replay_payload.is_empty():
 			# **되찾지 못하면 누르게 두지 않는다.** 빈 페이로드로 보내면 골격 화면이 서서
 			# 이번 결함이 그대로 재현된다 — 조용한 폴백 대신 죽은 버튼과 관측 지점을 남긴다.
@@ -351,6 +352,18 @@ func _fill_archive() -> void:
 			replay.pressed.connect(func(): go("NAR-01", replay_payload))
 		row.add_child(replay)
 		panel.add_child(row)
+
+
+# ── 재생에서 돌아오는 기록실의 페이로드 (개선 회차 29 · 2026-09-17 사용자 실기) ──
+#
+# 회차 26 은 타이틀에서 연 기록실에 `return=SYS-01` 을 실어 보냈고, 뒤로·Esc 와 복귀 저장 판정이
+# 그 값을 본다. 그런데 이 화면이 VN 으로 나가는 두 경로(개별 재생·연속 재생)는 복귀 페이로드에
+# **탭 힌트만** 되실었다 — 재생을 마치고 돌아온 HUB-05 는 기본값(개러지)으로 서서, 타이틀에서
+# 들어왔는데 뒤로가 개러지로 갔고, 그 자리는 복귀 저장 자리라 **읽기만 했는데 저장되는** 창이
+# 함께 열려 있었다. 들어온 곳은 페이로드로만 전해지므로 나가는 페이로드가 그것을 되실어야 한다.
+# 두 경로가 이 한 창구를 쓴다 — 리터럴 사전을 각자 쥐면 다음 경로가 또 빠뜨린다(UISCR 52ⓕ 가 센다).
+func _archive_return_payload() -> Dictionary:
+	return {"tab": "archive", "return": _return_route}
 
 
 # [가안] VN 인스턴스 id → 표제: 실문안 대장(D04 트랙) 유입 전까지 슬롯 유형으로 표기

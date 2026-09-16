@@ -7,10 +7,15 @@
 # 개별 HUB 화면은 `_on_hub_ready()` 를 구현하고, 뒤로 가기는 기본적으로 HUB-01로 돌린다.
 # **페이로드가 `return` 을 실어 오면 그쪽이다** (개선 회차 26) — 타이틀에서 세이브를 골라 연
 # 기록실 열람 모드(§A-1 E02)가 그 경로이며, 돌아갈 자리가 개러지가 아니면 복귀 저장도 없다.
+# **뒤로 버튼의 문면도 그 자리를 따른다** (개선 회차 29) — '개러지로' 는 개러지로 갈 때만 참이다.
 class_name HubScreen
 extends FlowScreen
 
 const ICON_DIR := "res://assets/ui/icons/"
+# 뒤로 버튼 문면 = 돌아갈 자리별 (개선 회차 29 · 2026-09-17 사용자 실기 — 타이틀에서 연 기록실의
+# 뒤로가 '개러지로' 라 적혀 있었다. 동작은 타이틀로 갔으니 문면만 거짓이었다).
+# 표에 없는 자리는 개러지 문면으로 접는다 — 돌아갈 자리가 늘면 여기에 한 줄이 함께 는다.
+const BACK_LABEL_KEYS := {"HUB-01": "ui.hub.back", "SYS-01": "ui.hub.backTitle"}
 
 var _return_route := "HUB-01"
 
@@ -59,7 +64,7 @@ func _fill_common_bar() -> void:
 	(%ProgressLabel as Label).text = progress_text
 	var back := get_node_or_null("%BackButton")
 	if back != null:
-		(back as Button).text = s.text("ui.hub.back")
+		(back as Button).text = s.text(_back_label_key())
 		# 뒤로 가기는 결정음이 아니라 취소음이다 (SE-U03). 조작음 자동 결속이 이 메타를 읽는다.
 		(back as Button).set_meta(AUDIO_EVENT_META, "ui_cancel")
 		(back as Button).pressed.connect(_return_to_garage)
@@ -109,6 +114,11 @@ func _return_to_garage() -> void:
 # 규칙이 따라온다.
 func _saves_on_return() -> bool:
 	return _return_route == "HUB-01"
+
+
+# 뒤로 버튼 문면 — 돌아갈 자리가 정한다. 복귀 저장 판정(`_saves_on_return`)과 같은 열쇠를 본다.
+func _back_label_key() -> String:
+	return String(BACK_LABEL_KEYS.get(_return_route, "ui.hub.back"))
 
 
 # 재화 갱신 — 구매 후 호출 (증감 피드백 규격의 최소형. 플로트·펄스는 아트 유입 시)
