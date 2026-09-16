@@ -958,7 +958,7 @@ func _settle_sector(momentum: bool) -> Array:
 					var trouble_rear := CsvTable.to_float(String(effect["rear_gauge"])) * gauge_mult
 					if bool(skill_mods.get(MOD_TROUBLE_REAR_ZERO, false)):
 						trouble_rear = 0.0   # SI3 카운터 스티어 (섀시 소모는 유지 — SI2 와 상보)
-					rear_gauge += trouble_rear
+					_add_rear_gauge(trouble_rear)   # 뒤차가 없으면 오르지 않는다 (창구 주석)
 					events.append(_ev("T5", "raceLog.troubleHit01", {"amount": chassis_delta}, SPEAKER_CREW))
 			RaceTypes.SettleStage.STAGE_2_RESOURCE:
 				var pulse_count := _count_symbol(RaceTypes.SYMBOL_PULSE)
@@ -985,9 +985,9 @@ func _settle_sector(momentum: bool) -> Array:
 					# 배수를 곱하면 감산이 커진다(방어 강화). 부호를 뒤집지 않는다.
 					# T2 브레이크 — 브레이킹 효과 계수 (D07 §3.2 · D13 별첨A §3.5 단계당 +7%).
 					# 감산에 곱하므로 계수가 오를수록 방어가 세진다(부호 유지 — SA3 와 같은 축).
-					rear_gauge += CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_BRAKING, braking_count)["rear_gauge"])) \
+					_add_rear_gauge(CsvTable.to_float(String(_match_effect(RaceTypes.SYMBOL_BRAKING, braking_count)["rear_gauge"])) \
 						* gauge_mult * float(skill_mods.get(MOD_DEFENSE_MULT, 1.0)) \
-						* (1.0 + _stat("braking_coef"))
+						* (1.0 + _stat("braking_coef")))
 			RaceTypes.SettleStage.STAGE_4_ADVANCE:
 				# SA1 풀 스로틀 — "이번 턴 전진 효과 ×1.5"(별첨A §4.2).
 				# **[가안] 적용 범위 = 심볼 유래 전진분 전속**이며 모멘텀 보너스는 제외한다.
@@ -1011,7 +1011,7 @@ func _settle_sector(momentum: bool) -> Array:
 				if line_count > 0:
 					var line_effect := _match_effect(RaceTypes.SYMBOL_LINE, line_count)
 					front_gauge += CsvTable.to_float(String(line_effect["front_gauge"])) * gauge_mult * advance_mult * line_coef * front_coef
-					rear_gauge += CsvTable.to_float(String(line_effect["rear_gauge"])) * gauge_mult * advance_mult * line_coef
+					_add_rear_gauge(CsvTable.to_float(String(line_effect["rear_gauge"])) * gauge_mult * advance_mult * line_coef)
 				var chance_count := _count_symbol(RaceTypes.SYMBOL_CHANCE)
 				if chance_count >= 3:
 					chance_three_matches += 1
@@ -1279,7 +1279,25 @@ func _apply_neighbor_passives(gauge_mult: float) -> void:
 		# OV-S3 하이 레이크 셋업의 대가 — 후방 압박 +10% (D13 별첨A §7.2).
 		# 소속 계수(불카 ×1.3) 뒤에 곱한다: 머신 쪽 사정이라 상대 소속과 독립이다.
 		pressure *= (1.0 + _stat("rear_pressure_ratio"))
-		rear_gauge += pressure * gauge_mult
+		_add_rear_gauge(pressure * gauge_mult)
+
+
+# ── 후방 게이지 가산 창구 (개선 회차 30 · 사용자 결정 2026-09-17) ──
+#
+# **뒤에 아무도 없으면 후방 게이지는 오르지 않는다** — 최후미(첫 GP 는 P16 고정 · D13 별첨A §6.3)이거나
+# 뒤차가 전원 리타이어해 뒤가 빈 자리. 종전에는 뒤차 압박(⑤)만 `rear_target` 을 봤고 트러블의 후방
+# 가산(①)은 상대 없이도 쌓였다. 그 게이지는 만충 판정(⑤)이 `rear_target != ""` 를 요구해 듀얼로
+# 터지지 않고, 이웃이 바뀌지 않으니 리셋도 없어 **레이스 내내 꽉 찬 채 굳었다**(사용자 실기 —
+# "레이스 시작 뒤 첫 스핀들인데 후방이 꽉 찼다"). D05 §4.2 는 후방 게이지를 "뒤차의 압박으로 **상대 측에**
+# 축적"으로 정의하고 §5.2 트러블 효과도 "후방 게이지 **상대** 가산"이라, 상대가 없는 축적은 대상이 없는 값이다.
+#
+# 감산(브레이킹·라인)은 그대로 통과한다 — 0 하한 절단이 받는다. 후방 가산 경로 전부(트러블·브레이킹·라인·
+# 뒤차 압박)가 이 창구를 쓴다 — 표에 양수 후방 효과가 새로 생겨도 규칙이 따라온다. 8단계 순서·구성은
+# 그대로다(불변규칙 3): 각 단계 안의 대입이 창구를 거칠 뿐이다.
+func _add_rear_gauge(delta: float) -> void:
+	if delta > 0.0 and rear_target == "":
+		return
+	rear_gauge += delta
 
 
 func _effective_pace(entrant: Dictionary) -> float:

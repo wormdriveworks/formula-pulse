@@ -30,6 +30,7 @@ func _init() -> void:
 	_tc_c12_scumming()
 	_seal_across_many_spins()
 	_neighbor_passive_runtime()
+	_rear_gauge_needs_target()
 	_slot_progression_wired()
 	_negative_guards()
 	_result_and_ranking()
@@ -141,8 +142,17 @@ func _expected_front_resist(engine: RaceEngine) -> float:
 	return engine.data.param("param_gauge_front_resist_base")
 
 
+# 눕힌 뒤차의 압박 — `_flatten_neighbors` 는 `aggression` 을 눕히지만 엔진은 **시드값**(`seed_aggression`)을
+# 읽으므로(D13 별첨A §2.1 산출 예 보존) 기저 2.0 만으로는 맞지 않는다. 뒤차가 없으면 0 이다.
+# 게이지 계수(배틀 존·최종 랩)는 호출부가 곱한다.
 func _expected_rear_pressure(engine: RaceEngine) -> float:
-	return engine.data.param("param_gauge_rear_pressure_base")
+	if engine.rear_target == "":
+		return 0.0
+	var rear: Dictionary = engine.entrants[engine.rear_target]
+	return (engine.data.param("param_gauge_rear_pressure_base")
+		+ float(rear["seed_aggression"]) * engine.data.param("param_gauge_rear_pressure_aggr_coef")) \
+		* float(rear["pressure_mult"]) \
+		* (1.0 + float(engine.machine_stats_carry_in.get("rear_pressure_ratio", 0.0)))
 
 
 # ── D13 확정값 대장 대조 ──
@@ -1048,6 +1058,8 @@ func _overhaul_effects_wired() -> void:
 	# OV-S3 대가 — 후방 압박 +10%
 	var press_base := _rear_pressure({})
 	var press := _rear_pressure({"rear_pressure_ratio": 0.10})
+	_ok("OV-S3 전제: 기저 압박이 0 이 아니다 (0 == 0 × 1.1 은 검사가 아니다)", press_base > 0.0,
+		"base=%f" % press_base)
 	_eq_float("OV-S3 대가 = 압박 ×1.1", press, press_base * 1.10, 0.01)
 
 	# 듀얼 판정 — 슬롯 항(장착 수 × 6)과 인스턴스 효과(+8)를 **함께** 센다 (사용자 결정)
@@ -1111,7 +1123,9 @@ func _rear_pressure(stats: Dictionary) -> float:
 	engine.machine_stats_carry_in = stats
 	engine.start_gp()
 	_flatten_neighbors(engine)
-	_isolate_gauge_side(engine, "rear")
+	# 뒤차 1명(최후미 — 정산 ⑧ 스왑 쌍에 들지 않는다). 종전의 최후미 격리는 뒤차 자체를 없애
+	# 압박이 0 이었고 OV-S3 축은 0 == 0 × 1.1 을 통과시키고 있었다 (회차 30 에서 발견 — 검사 증거 규칙).
+	_place_player(engine, engine.positions.size() - 2)
 	engine.begin_turn()
 	engine.spin()
 	engine.rear_gauge = 0.0
@@ -2401,6 +2415,99 @@ func _neighbor_passive_runtime() -> void:
 	_eq_float("D13 §2.1 디아스 압박 실측 = 16.9", engine.rear_gauge, 16.9, 0.05)
 
 
+# ── 후방 게이지는 뒤차가 있을 때만 오른다 (개선 회차 30 · 사용자 결정 2026-09-17) ──
+#
+# 사용자 실기: 레이스 시작(P16 고정) 뒤 첫 스핀들에서 후방이 꽉 찼다. 트러블의 후방 가산(①)이
+# `rear_target` 을 보지 않아 최후미에서도 쌓였고, 만충 판정(⑤)은 상대를 요구해 터지지 않으며
+# 이웃 불변이라 리셋도 없었다 — 대상 없는 게이지가 레이스 내내 꽉 찬 채 굳는다. 축은 다섯 자리를 잰다:
+#   ⓐ 최후미(뒤차 없음) — 트러블 3매치도 후방 0 · 같은 단계의 섀시 소모는 그대로 · 듀얼 예약 없음
+#   ⓑ 대조군(뒤차 있음) — 같은 스핀이 표값 + 뒤차 압박만큼 오른다 (창구가 정상 경로를 막지 않는다)
+#   ⓒ 뒤차가 리타이어해 뒤가 비면(리타이어 → 재타깃 → "") — 그 뒤의 트러블도 후방 0
+#   ⓓ 감산은 통과 — 최후미에서 브레이킹은 그대로 빠진다 (창구는 가산만 본다 · 하한은 절단 몫)
+#   ⓔ 원본 — 후방 대입 4경로(트러블·브레이킹·라인·압박)가 전부 창구를 지나고 `+=` 는 창구 안의 1건뿐
+func _rear_gauge_needs_target() -> void:
+	# ⓐ 최후미
+	var last := _new_engine(61, "circuit_mn1")
+	if last == null:
+		return
+	last.start_gp()
+	_flatten_neighbors(last)
+	_isolate_gauge_side(last, "rear")
+	var trouble3 := CsvTable.to_float(String(
+		last.data.match_effects[RaceTypes.SYMBOL_TROUBLE][3]["rear_gauge"]))
+	_ok("후방무주 ⓐ 전제: 뒤차 없음", last.rear_target == "", last.rear_target)
+	_ok("후방무주 ⓐ 전제: 표의 트러블 3매치 후방 가산은 양수", trouble3 > 0.0, str(trouble3))
+	last.begin_turn()
+	last.spin()
+	var chassis_before := last.chassis
+	last.provisional = _combo(RaceTypes.SYMBOL_TROUBLE, 3, RaceTypes.SYMBOL_TROUBLE)
+	last.confirm(0.0)
+	_eq_float("후방무주 ⓐ 트러블 3매치도 후방 0", last.rear_gauge, 0.0)
+	_ok("후방무주 ⓐ 같은 단계의 섀시 소모는 그대로", last.chassis < chassis_before,
+		"before=%.1f after=%.1f" % [chassis_before, last.chassis])
+	_ok("후방무주 ⓐ 듀얼 예약 없음", last.pending_duel == RaceTypes.DuelType.NONE,
+		str(last.pending_duel))
+	# ⓑ 대조군 — 뒤차 있음 (P15 · 뒤 = 최후미 1명). 이웃을 눕혀 압박을 상수로 만든다.
+	# 뒤차가 최후미라 정산 ⑧ 의 스왑 쌍(플레이어 포함 쌍 제외)에 들지 않는다 — 측정이 지워지지 않는다.
+	var mid := _new_engine(61, "circuit_mn1")
+	mid.start_gp()
+	_flatten_neighbors(mid)
+	_place_player(mid, mid.positions.size() - 2)
+	var rear_before := mid.rear_target
+	_ok("후방무주 ⓑ 전제: 뒤차 있음", rear_before != "", rear_before)
+	mid.begin_turn()
+	mid.spin()
+	mid.provisional = _combo(RaceTypes.SYMBOL_TROUBLE, 3, RaceTypes.SYMBOL_TROUBLE)
+	mid.confirm(0.0)
+	_ok("후방무주 ⓑ 전제: 정산 ⑧ 이 뒤차를 바꾸지 않았다", mid.rear_target == rear_before,
+		"before=%s after=%s" % [rear_before, mid.rear_target])
+	_eq_float("후방무주 ⓑ 뒤차 있으면 표값 + 압박", mid.rear_gauge,
+		(trouble3 + _expected_rear_pressure(mid)) * mid._gauge_mult(), 0.01)
+	# ⓒ 뒤차 리타이어 → 뒤가 빈다 (리타이어 → 재타깃 → "" · 게이지 리셋은 종전 규칙)
+	var widow := _new_engine(61, "circuit_mn1")
+	widow.start_gp()
+	_flatten_neighbors(widow)
+	_place_player(widow, widow.positions.size() - 2)
+	var behind := widow.rear_target
+	widow.rear_gauge = 40.0
+	widow._retire_entrant(behind)
+	widow._retarget_if_changed()
+	_ok("후방무주 ⓒ 뒤차 리타이어 → 뒤차 없음 · 게이지 리셋",
+		widow.rear_target == "" and widow.rear_gauge == 0.0,
+		"rear=%s gauge=%.1f" % [widow.rear_target, widow.rear_gauge])
+	widow.begin_turn()
+	widow.spin()
+	widow.provisional = _combo(RaceTypes.SYMBOL_TROUBLE, 2, RaceTypes.SYMBOL_PULSE)
+	widow.confirm(0.0)
+	_eq_float("후방무주 ⓒ 뒤가 빈 뒤의 트러블도 후방 0", widow.rear_gauge, 0.0)
+	# ⓓ 감산 통과 — 최후미에서 값을 심어 두고 브레이킹 1
+	var brake := _new_engine(61, "circuit_mn1")
+	brake.start_gp()
+	_flatten_neighbors(brake)
+	_isolate_gauge_side(brake, "rear")
+	brake.begin_turn()
+	brake.spin()
+	brake.rear_gauge = GAUGE_PROBE_BASE
+	brake.provisional = _combo(RaceTypes.SYMBOL_BRAKING, 1, RaceTypes.SYMBOL_PULSE)
+	brake.confirm(0.0)
+	var braking1 := CsvTable.to_float(String(
+		brake.data.match_effects[RaceTypes.SYMBOL_BRAKING][1]["rear_gauge"]))
+	_ok("후방무주 ⓓ 전제: 브레이킹 1매치는 감산", braking1 < 0.0, str(braking1))
+	_eq_float("후방무주 ⓓ 감산은 뒤차가 없어도 통과", brake.rear_gauge, GAUGE_PROBE_BASE + braking1, 0.01)
+	# ⓔ 원본 — 창구 정의 1 + 호출 4 · `rear_gauge +=` 는 창구 안의 1건뿐 (새 가산 경로가 창구를 비켜 가면 붉는다)
+	var src := FileAccess.get_file_as_string("res://core/state/race_engine.gd")
+	_ok("후방무주 ⓔ 후방 가산은 창구만 (정의 1 + 호출 4) · 직접 `rear_gauge +=` 는 창구 안 1건",
+		src.count("_add_rear_gauge(") == 5 and src.count("rear_gauge +=") == 1,
+		"funnel=%d direct=%d" % [src.count("_add_rear_gauge("), src.count("rear_gauge +=")])
+
+
+# 플레이어를 지정 인덱스에 두고 인접을 다시 잡는다 — 양 게이지 리셋 포함 (`_retarget(true, true)`).
+func _place_player(engine: RaceEngine, index: int) -> void:
+	engine.positions.erase(RaceEngine.PLAYER_ID)
+	engine.positions.insert(index, RaceEngine.PLAYER_ID)
+	engine._retarget(true, true)
+
+
 # ── 음성 검사 — "강제가 살아 있는가" (독립 검증 G-3) ──
 # 사후 조건 `transition_errors == 0`은 강제 코드가 살아 있을 때만 의미가 있다.
 # 전이 검사를 무력화하면 카운터가 0을 읽어 초록이 되므로, 위반을 실제로 시도해 거부를 단언한다.
@@ -3266,6 +3373,9 @@ func _skill_insure_family() -> void:
 	var si3 := _insure_outcome(941, "skill_si3")
 	_ok("대조군 트러블이 섀시를 깎는다", float(plain["chassis_delta"]) < 0.0,
 		str(plain["chassis_delta"]))
+	_ok("전제: 세 프로브의 뒤차가 정산 ⑧ 을 지나 그대로다 (아니면 아래 측정은 무효)",
+		bool(plain.get("rear_kept", false)) and bool(si2.get("rear_kept", false))
+		and bool(si3.get("rear_kept", false)))
 	_ok("대조군 트러블이 후방 게이지를 올린다", float(plain["rear"]) > 0.0, str(plain["rear"]))
 	# SI2 = 섀시 0 · 후방 유지
 	_eq_float("SI2 섀시 소모 0", float(si2["chassis_delta"]), 0.0)
@@ -3344,7 +3454,10 @@ func _insure_outcome(seed_value: int, skill_id: String) -> Dictionary:
 		engine.deck_carry_in = [skill_id]
 	engine.start_gp()
 	_flatten_neighbors(engine)
-	_isolate_gauge_side(engine, "rear")   # 뒤차 압박·이웃 교체가 후방 게이지 측정을 먹지 않게
+	# 뒤차 1명(최후미 — 정산 ⑧ 스왑 쌍에 들지 않는다). 뒤차가 없으면 트러블의 후방 가산이 0 인 것이
+	# 회차 30 의 규칙이라 측정에는 대상이 있어야 한다. 압박은 눕힌 시드값으로 계산해 뺀다.
+	_place_player(engine, engine.positions.size() - 2)
+	var rear_before := engine.rear_target
 	engine.begin_turn()
 	engine.spin()
 	engine.charge = 0 if skill_id.is_empty() \
@@ -3354,9 +3467,11 @@ func _insure_outcome(seed_value: int, skill_id: String) -> Dictionary:
 	if not skill_id.is_empty():
 		engine.use_skill(skill_id)
 	var chassis_before := engine.chassis
+	var pressure := _expected_rear_pressure(engine) * engine._gauge_mult()
 	engine.confirm(0.0)
 	return {"chassis_delta": engine.chassis - chassis_before,
-		"rear": engine.rear_gauge - GAUGE_PROBE_BASE}
+		"rear": engine.rear_gauge - GAUGE_PROBE_BASE - pressure,
+		"rear_kept": engine.rear_target == rear_before}
 
 
 func _survival_outcome(seed_value: int, skill_id: String) -> Dictionary:
