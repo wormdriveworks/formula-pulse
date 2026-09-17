@@ -208,6 +208,7 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	super()   # 화면 스코프 루프음 정지 (FlowScreen · 개선 회차 33) — 릴 회전·임박 틱이 화면과 함께 멎는다
 	if Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
 		Input.joy_connection_changed.disconnect(_on_joy_connection_changed)
 	# 일시정지의 SFX 뮤트는 **이 화면의 상태**다 — 화면이 내려가면 함께 내려간다 (개선 회차 28 —
@@ -217,6 +218,13 @@ func _exit_tree() -> void:
 	# 정지·재개까지 복구 수단도 없었다.
 	if session != null and session.audio != null:
 		session.audio.set_paused(false)
+
+
+# 이 화면이 켜는 루프음 2종 (SE-R02 릴 회전 · SE-T03 임박 틱 — 에셋 대장 §5.1 루프 에셋). 정상 경로에서는
+# 각자 끝나는 자리(릴 정지 끝 · 타이머 종료 창구)에서 멎고, 스핀·임박 도중 화면을 떠나는 경로(정지 메뉴 →
+# 타이틀)를 여기가 받친다.
+func _audio_exit_events() -> Array:
+	return ["reel_spin_loop", "timer_imminent_tick"]
 
 
 func _on_joy_connection_changed(_device: int, _connected: bool) -> void:
@@ -389,8 +397,7 @@ func _process(delta: float) -> void:
 	_update_timer_value()
 	_process_timer_sound(delta)
 	if _timer_remaining <= 0.0:
-		_timer_active = false
-		_e04_timer_ring.set_active(false)
+		_stop_timer()
 		var timeout_events := engine.timeout()
 		_push_events(timeout_events)
 		_run_presentation(timeout_events)  # 타임아웃 자동 확정도 확정이다 — 채널 동일
@@ -665,13 +672,12 @@ func _start_gp() -> void:
 
 
 func _next_turn() -> void:
-	_timer_active = false
+	_stop_timer()
 	_revealing = false
 	# 고지는 **턴 경계에서 걷힌다** — 거부는 그 턴의 사실이고, 넘어간 턴에 남으면
 	# 아직 유효한 규칙처럼 읽힌다(`limit_hold` 는 실제로 새 턴에서 거짓이 된다).
 	_reject_notice.text = ""
 	_clear_clone_pending()
-	_e04_timer_ring.set_active(false)
 	var info := engine.begin_turn()
 	if String(info.get("type", "")) == "finished":
 		_on_gp_finished()
@@ -853,8 +859,7 @@ func _on_spin() -> void:
 func _on_confirm() -> void:
 	if not _timer_active or _confirm_lockout > 0.0:
 		return
-	_timer_active = false
-	_e04_timer_ring.set_active(false)
+	_stop_timer()
 	# 비활성 시 모멘텀 = 조건 불성립 (여유 구간 자체가 없다 — D09 §6.2 채택 구조)
 	var ratio := 0.0 if _timer_disabled else _timer_remaining / _timer_effective_base
 	sfx("confirm")
@@ -1305,6 +1310,7 @@ func _reveal_reels(indices: Array, start_window: bool) -> void:
 	_revealing = true
 	var was_running := _timer_active
 	_timer_active = false
+	stop_sfx("timer_imminent_tick")   # 연출 중 잔량이 멎으면 틱도 멎는다 — 재개하면 다음 점멸에서 다시 선다
 	_refresh_action_enabled()
 	# O4 릴 정지 속도 — 표준 / 고속(배율 D13 창구) / 일괄 정지 (D09 §6.1 · D05 §5.1 예약 이행).
 	# 일괄 정지도 정지 이벤트 자체는 유지한다 — 연출 압축이지 결과 선표시가 아니다 (간격 0).
@@ -1324,6 +1330,7 @@ func _reveal_reels(indices: Array, start_window: bool) -> void:
 		# SE-R03 — **실제 정지하는 릴** 순서 기준 (D11 규칙 R-b: 홀드 릴은 정지음 없음).
 		# 일괄 정지(O4)도 정지 이벤트 자체는 유지된다(규칙 R-c) — 간격만 0 이다.
 		sfx("reel_stop")
+	stop_sfx("reel_spin_loop")   # SE-R02 는 개시→정지 사이 지속 (D11 §2.2) — 마지막 릴이 서면 루프도 선다 (개선 회차 33)
 	_revealing = false
 	# **봉인 해제 지점.** 릴 정지 연출이 여기서 끝난다 — 이 줄보다 앞에서 결과 상관 사운드를
 	# 부르면 디스패처가 막고, 뒤로 옮기면 매치 고지음(R-a)이 막힌다. 순서가 규격이다.
@@ -1467,8 +1474,10 @@ func _refresh_strip() -> void:
 		_e02_corner.text = ""
 		_e02_attr.texture = null
 	# 레조넌스는 **진입 시점에만** 공표한다 — 위치 사전 표시·예고는 어떤 채널로도 하지 않는다
-	# (D08 §3.7 R6 · D09 §3.6). 엔진의 announced 플래그를 그대로 따른다.
-	_e02_resonance.visible = engine.resonance_announced
+	# (D08 §3.7 R6 · D09 §3.6). 표시는 **지금 그 섹터에 있고 보너스가 아직 남았을 때**만 켠다
+	# (개선 회차 33 — 종전에는 GP 단위 announced 플래그를 따라 첫 진입 뒤 GP 내내 켜져 있었다).
+	# announced 는 공표 로그 1회의 장부이지 표시 상태가 아니다.
+	_e02_resonance.visible = engine.resonance_armed()
 	_e02_resonance.text = s.text("ui.race.resonanceBanner")
 	_e03_front.value = engine.front_gauge
 	_e03_rear.value = engine.rear_gauge
@@ -1601,6 +1610,15 @@ func _refresh_action_enabled() -> void:
 		_e13_slots[i].disabled = not (can_use_item and i < _e13_slot_ids.size())
 
 
+# 개입 창 종료 창구 (개선 회차 33) — 잔량 정지 · 링 소등 · **임박 틱 루프 정지**를 한 자리에서.
+# 종료 경로 3곳(확정 · 타임아웃 · 턴 경계)이 각자 두 줄을 적던 것을 모았다 — 틱은 루프 에셋이라
+# 끄는 쪽이 없으면 창이 닫힌 뒤에도 울린다.
+func _stop_timer() -> void:
+	_timer_active = false
+	_e04_timer_ring.set_active(false)
+	stop_sfx("timer_imminent_tick")
+
+
 # 개입 창 구간음 (D11 §2.3 SE-T01~T03).
 #
 # 구간 경계는 **링이 쓰는 것과 같은 데이터 값**이다 — 색·두께·점멸과 소리가 갈라지면
@@ -1630,6 +1648,10 @@ func _process_timer_sound(delta: float) -> void:
 		return
 	var hz: float = _e04_timer_ring.imminent_blink_hz()
 	_tick_left = 1.0 / hz if hz > 0.0 else 1.0
+	# SE-T03 은 **루프 에셋**이다(에셋 대장 §5.1) — 점멸마다 새로 켜면 끝나지 않는 P1 보이스가 점멸 수만큼
+	# 쌓여 상한(12)을 채우고, 그 뒤 P2·P3 는 전부 거부된다(임박 3.2초 → 12/12 · 확정음·조작음 무음 실측 —
+	# 개선 회차 33). 점멸 동기는 유지하고 **한 보이스만** 둔다: 직전 틱을 끄고 다시 켠다.
+	stop_sfx("timer_imminent_tick")
 	sfx("timer_imminent_tick")
 
 

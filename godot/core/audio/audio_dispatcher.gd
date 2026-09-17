@@ -212,6 +212,30 @@ func release_voice(sfx_id: String) -> void:
 			return
 
 
+# 루프음 정지 (개선 회차 33) — 이벤트에 결속된 **sfx 채널** 보이스를 즉시 걷어내고 걷어낸 sfx id 를 돌려준다.
+# 루프 에셋(에셋 대장 §5.1 "루프 포인트 필수" — SE-R02·T03·U15)은 `finished` 를 내지 않으므로 **켠 쪽이
+# 꺼야 한다.** 안 끄면 화면이 바뀌어도 울리고(투어 결산 롤업음이 개러지까지 따라온 실기 보고), 되풀이
+# 켜면 채널 상한까지 쌓여 P1 보호·컬링이 나머지 소리를 전부 죽인다(임박 틱 16회 → 12/12 P1 · P2·P3 거부 실측).
+# 규격은 컬링과 같다 — 즉시 정지·페이드 없음 (D11 §6.3). BGM 은 `stop_bgm()` 전속이고 징글은 단발이라
+# 여기서 다루지 않는다. 미등재 이벤트·울리지 않는 상태 = 빈 배열(정상).
+func stop_event(event_id: String) -> Array:
+	if data == null:
+		return []
+	var stopped: Array = []
+	for row in data.sounds_for(event_id):
+		if String(row["channel"]) != CHANNEL_SFX:
+			continue
+		var sfx_id := String(row["sfx_id"])
+		var index := _voices.size() - 1
+		while index >= 0:
+			if String(_voices[index]["sfx_id"]) == sfx_id:
+				_voices.remove_at(index)
+				output.cull_sfx(sfx_id)
+				stopped.append(sfx_id)
+			index -= 1
+	return stopped
+
+
 func active_voice_count() -> int:
 	return _voices.size()
 

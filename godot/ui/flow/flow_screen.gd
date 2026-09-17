@@ -48,6 +48,15 @@ func _enter_tree() -> void:
 	UiTheme.apply_palette(theme)
 
 
+# 화면이 트리를 떠난다 (라우터 `remove_child` · 종료) — **이 화면이 켠 루프음을 여기서 끈다** (개선 회차 33).
+# 루프 에셋은 스스로 끝나지 않고 재생기는 라우터에 매달려 화면보다 오래 살므로, 안 끄면 화면이 사라진
+# 뒤에도 울린다(투어 결산 롤업음이 개러지까지 따라온 실기 보고). 재정의하는 화면은 `super()` 를 부른다 —
+# 가상 메서드는 최하위 구현만 불리므로 빠지면 이 훅이 조용히 죽는다(UISCR 55ⓓ 가 원본으로 잡는다).
+func _exit_tree() -> void:
+	for event_id in _audio_exit_events():
+		stop_sfx(String(event_id))
+
+
 func bind(run_session: RunSession, payload: Dictionary) -> void:
 	session = run_session
 	# **`_on_bound()` 보다 먼저 채운다** — 화면 초기화가 이 값으로 Control 을 만든다.
@@ -101,8 +110,24 @@ func sfx(event_id: String) -> void:
 	session.audio.emit(event_id)
 
 
+# 루프음 정지 — `sfx()` 의 짝. 화면은 여기서도 이벤트 id 만 던지고 어느 sfx 가 멎을지는 표가 정한다.
+func stop_sfx(event_id: String) -> void:
+	if session == null or session.audio == null:
+		return
+	if session.data != null and not session.data.sound_map.has(event_id):
+		push_error("FlowScreen: sound_map has no event '%s'" % event_id)
+		return
+	session.audio.stop_event(event_id)
+
+
 # 화면 진입 시 울릴 이벤트 목록 (BGM·앰비언스·정거장음). 화면이 재정의한다.
 func _audio_enter_events() -> Array:
+	return []
+
+
+# 화면이 트리를 떠날 때 **끌** 이벤트 목록 — 이 화면이 켠 루프음(진입 목록에 있든 화면 안에서 켰든).
+# BGM·정거장음처럼 화면 밖에서도 살아야 하는 소리는 여기 두지 않는다. 화면이 재정의한다.
+func _audio_exit_events() -> Array:
 	return []
 
 

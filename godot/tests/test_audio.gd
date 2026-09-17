@@ -33,6 +33,7 @@ func _init() -> void:
 	_silent_fallback()
 	_values_come_from_data()
 	_haptic_wiring()
+	_loop_stop()
 	print("")
 	# 검사 수 하한 — 스위트가 쪼그라들면 "통과"가 아니다.
 	if _checked < 90:
@@ -392,6 +393,47 @@ func _values_come_from_data() -> void:
 	gate.clock_override_msec = int(round(default_data.param("param_audio_retrigger_gate_sec") * 1000.0))
 	_ok("게이트가 픽스처 값을 따른다", gate.emit("ui_cursor").is_empty(),
 		"fixture_gate=%f" % fixture.param("param_audio_retrigger_gate_sec"))
+
+
+# ── 루프음 정지 `stop_event` (개선 회차 33 — 실기 "투어 결산 효과음이 개러지까지 따라온다") ──
+#
+# 루프 에셋은 `finished` 를 내지 않으므로 켠 쪽이 꺼야 한다. 디스패처 층의 계약:
+#   ⓐ 이벤트의 sfx 보이스를 걷어내고 걷어낸 id 를 돌려준다 · 재생기에 컬링 통지 ⓑ 같은 id 가 여럿이면 전부
+#   ⓒ 울리지 않는 상태·미등재 이벤트 = 빈 배열 · 무해 ⓓ BGM 채널 행은 건드리지 않는다(`stop_bgm` 전속)
+#   ⓔ 걷어낸 뒤 같은 이벤트를 다시 켤 수 있다(게이트는 발화 시각 기준 — 정지가 시각을 지우지 않는다)
+func _loop_stop() -> void:
+	var data := _new_data()
+	if data == null:
+		return
+	var recorder := RecordingOutput.new()
+	var dispatcher := _new_dispatcher(data, recorder)
+	dispatcher.emit("settle_rollup")
+	_ok("ⓐ 전제: 롤업 점유 1", dispatcher.active_voice_count() == 1, str(dispatcher.active_voice_count()))
+	var stopped: Array = dispatcher.stop_event("settle_rollup")
+	_ok("ⓐ 걷어낸 id = SE-U15", stopped == ["SE-U15"], str(stopped))
+	_ok("ⓐ 점유 0", dispatcher.active_voice_count() == 0, str(dispatcher.active_voice_count()))
+	_ok("ⓐ 재생기 컬링 통지", recorder.culled == ["SE-U15"], str(recorder.culled))
+	# ⓑ 같은 id 여럿 — 게이트를 넘겨 두 번 켠다
+	dispatcher.emit("timer_imminent_tick")
+	dispatcher.clock_override_msec = 1000
+	dispatcher.emit("timer_imminent_tick")
+	_ok("ⓑ 전제: 틱 2 점유", dispatcher.active_voice_count() == 2, str(dispatcher.active_voice_count()))
+	var both: Array = dispatcher.stop_event("timer_imminent_tick")
+	_ok("ⓑ 둘 다 걷어낸다", both.size() == 2 and dispatcher.active_voice_count() == 0,
+		"%s 점유=%d" % [str(both), dispatcher.active_voice_count()])
+	_ok("ⓒ 울리지 않는 상태 = 빈 배열", dispatcher.stop_event("settle_rollup").is_empty())
+	_ok("ⓒ 미등재 이벤트 = 빈 배열", dispatcher.stop_event("no_such_event").is_empty())
+	# ⓓ BGM
+	dispatcher.emit("gp_result_enter")
+	var bgm_before := dispatcher.current_bgm()
+	_ok("ⓓ 전제: BGM 트랙", bgm_before != "", bgm_before)
+	_ok("ⓓ BGM 행은 걷어내지 않는다", dispatcher.stop_event("gp_result_enter").is_empty()
+		and dispatcher.current_bgm() == bgm_before and recorder.stopped == 0,
+		"bgm=%s stopped=%d" % [dispatcher.current_bgm(), recorder.stopped])
+	# ⓔ 다시 켤 수 있다
+	dispatcher.clock_override_msec = 2000
+	dispatcher.emit("settle_rollup")
+	_ok("ⓔ 정지 뒤 재발화", dispatcher.active_voice_count() == 1, str(dispatcher.active_voice_count()))
 
 
 # 검사용 출력 싱크 — 기본 구현(무음)을 상속해 호출만 기록한다.

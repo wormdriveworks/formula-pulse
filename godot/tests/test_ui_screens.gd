@@ -127,6 +127,8 @@ func _process(_delta: float) -> bool:
 	_title_archive_flow(data)
 	_overhaul_detail_reveal(data)
 	_sponsor_settlement_flow(data)
+	_resonance_banner_state(data)
+	_screen_loop_sfx_stop(data)
 	_achievement_without_career(data)
 	_achievement_with_career(data)
 	_achievement_icons(data)
@@ -5842,6 +5844,149 @@ func _tuning_redistribute_mode(data: GameData) -> void:
 		_ok("51ⓓ 되돌린 뒤 강화 버튼이 되살아난다", not buy2.disabled,
 			"step=%d credits=%d" % [revive.outgame.tuning_step("tuning_t1"), revive.outgame.credits])
 		_unmount(revive_bench)
+
+
+# ── 54 레조넌스 배너 = 무장 상태 추종 (개선 회차 33 · 2026-09-18 사용자 보고) ──
+#
+# 실기: "레조넌스 표시가 한 번 노출되면 계속 표시된다." 원인 = E02 배너가 GP 단위 `resonance_announced`
+# (공표 로그 1회의 장부)를 표시 상태로 읽었다. 실제 오버레이는 서킷 1곳의 슬롯 1개라 연속 등장이 아니다.
+# 결선 = `engine.resonance_armed()`(지금 그 섹터 + 보너스 잔존). 실화면으로 잰다:
+#   ⓐ 슬롯 밖 = 숨김 ⓑ 슬롯 진입 = 표시 ⓒ 3매치 확정 → 소진 = 같은 턴 갱신에서 숨김(announced 는 참)
+#   ⓓ 문면 = 키 (D09 별첨A §A-6 E02 "공표 배너")
+func _resonance_banner_state(data: GameData) -> void:
+	var screen := _new_race_screen()
+	if screen == null:
+		return
+	var engine: RaceEngine = screen.engine
+	_ok("54 전제: 부팅 = s1 섹터 턴", engine.sector == 1 and not engine.current_turn_is_duel)
+	engine.resonance_circuit_id = String(screen.data.circuit.get("id", ""))
+	engine.resonance_sector_slot = 2
+	screen._refresh_strip()
+	var banner := screen.get_node("%E02Resonance") as Label
+	_ok("54ⓐ 슬롯 밖 = 숨김", not banner.visible)
+	engine.spin()
+	engine.provisional = [RaceTypes.SYMBOL_PULSE, RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_BRAKING]
+	engine.confirm(0.0)
+	engine.begin_turn()   # s2 = 슬롯
+	screen._refresh_strip()
+	_ok("54ⓑ 슬롯 진입 = 표시", banner.visible)
+	_ok("54ⓓ 문면 = 키", banner.text == data.strings.text("ui.race.resonanceBanner"), banner.text)
+	engine.spin()
+	engine.provisional = [RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_LINE, RaceTypes.SYMBOL_LINE]
+	engine.confirm(0.0)
+	screen._refresh_strip()
+	_ok("54ⓒ 전제: 소진", engine.resonance_consumed)
+	_ok("54ⓒ 소진 = 같은 턴에서 숨김", not banner.visible)
+	_ok("54ⓒ announced 는 참 — 종전 근거였다면 켜져 있었다", engine.resonance_announced)
+	_unmount(screen)
+
+
+# ── 55 화면 스코프 루프음 종료 (개선 회차 33 · 2026-09-18 사용자 보고 "투어 결산 효과음이 개러지까지 따라온다") ──
+#
+# 루프 에셋(SE-U15 롤업 · SE-R02 릴 회전 · SE-T03 임박 틱 — 에셋 대장 §5.1)은 `finished` 를 내지 않고,
+# 재생기는 라우터에 매달려 화면보다 오래 산다. 켠 쪽이 꺼야 하는데 끄는 창구가 없었다. 결선:
+# `AudioDispatcher.stop_event` · `FlowScreen.stop_sfx` · `_audio_exit_events`(트리 이탈 시 정지).
+# 무음 싱크는 발화 즉시 점유를 비워 루프를 못 흉내 내므로 **점유를 쥐고 있는 싱크**로 갈아 끼워 잰다.
+#   ⓐ SET-01 — 진입에 SE-U15 점유 · 이탈(remove_child)에 컬링 통지 + 점유 0
+#   ⓑ RACE-01 — 릴 정지 연출 끝에 SE-R02 점유 0 (O4 일괄 정지 = 동기 경로) · 임박 틱은 점멸을 되풀이해도 보이스 1
+#   ⓒ RACE-01 이탈 — 켜져 있던 릴 회전·임박 틱이 함께 멎는다(`_exit_tree` 가 `super()` 를 부른다는 거동 증거)
+#   ⓓ 원본 — 타이머 종료 창구 `_stop_timer()` 정의 1 + 호출 3 · 링 소등은 창구 안 1건 ·
+#      FlowScreen 계열의 `_exit_tree` 재정의는 전부 `super()` 경유
+class HoldingOutput extends AudioOutput:
+	var culled: Array = []
+
+	func cull_sfx(sfx_id: String) -> void:
+		culled.append(sfx_id)
+
+
+func _voices_of(session: RunSession, sfx_id: String) -> int:
+	var total := 0
+	for voice in session.audio._voices:
+		if String(voice["sfx_id"]) == sfx_id:
+			total += 1
+	return total
+
+
+func _screen_loop_sfx_stop(data: GameData) -> void:
+	# ⓐ SET-01
+	var report_session := _finished_gp_session(data)
+	_ok("55ⓐ 전제: GP 실주행 세션", report_session != null)
+	if report_session != null:
+		report_session.close_tour()
+		var hold := HoldingOutput.new()
+		report_session.audio.output = hold
+		var screen := _mount(SET01_SCENE, report_session)
+		if screen != null:
+			var guard := screen.get_node_or_null("InputGuard")
+			if guard != null:
+				guard.free()
+			_ok("55ⓐ 진입 = SE-U15 점유 1", _voices_of(report_session, "SE-U15") == 1,
+				str(report_session.audio._voices))
+			_unmount(screen)
+			_ok("55ⓐ 이탈 = SE-U15 점유 0", _voices_of(report_session, "SE-U15") == 0,
+				str(report_session.audio._voices))
+			_ok("55ⓐ 이탈 = 재생기에 컬링 통지", hold.culled.has("SE-U15"), str(hold.culled))
+	# ⓑ RACE-01 릴 정지 끝 · 임박 틱 1보이스
+	var race := _new_race_screen()
+	if race == null:
+		return
+	var race_session: RunSession = race.session
+	var race_hold := HoldingOutput.new()
+	race_session.audio.output = race_hold
+	race_session.options.set_index("o4", 2)   # 일괄 정지 — 연출 대기 0 이라 동기 경로로 잴 수 있다
+	race_session.audio.clock_override_msec = 0
+	race._on_spin()
+	_ok("55ⓑ 스핀 직후 = 릴 정지 끝 → SE-R02 점유 0", _voices_of(race_session, "SE-R02") == 0,
+		str(race_session.audio._voices))
+	_ok("55ⓑ SE-R02 는 켜졌다가 걷혔다", race_hold.culled.has("SE-R02"), str(race_hold.culled))
+	# ⓒ 의 소재 — 릴 회전을 다시 켜 둔다 (P1 틱이 서기 전에 — P1 보호가 P3 신규 발음을 막는다)
+	race_session.audio.clock_override_msec = 500
+	race.sfx("reel_spin_loop")
+	_ok("55ⓒ 전제: 릴 회전 점유 1", _voices_of(race_session, "SE-R02") == 1, str(race_session.audio._voices))
+	# 임박 구간을 흉내 낸다 — 잔량을 경고 비율 아래로 두고 점멸 주기를 여러 번 돌린다
+	race._timer_active = true
+	race._timer_disabled = false
+	race._timer_effective_base = 10.0
+	race._timer_remaining = 0.5
+	race._timer_band = 2
+	race._tick_left = 0.0
+	for index in range(6):
+		race_session.audio.clock_override_msec = 1000 * (index + 1)
+		race._process_timer_sound(0.3)
+		race._tick_left = 0.0
+	_ok("55ⓑ 임박 틱 6회 = 보이스 1", _voices_of(race_session, "SE-T03") == 1,
+		str(race_session.audio._voices))
+	_ok("55ⓑ 직전 틱은 매번 걷힌다", race_hold.culled.count("SE-T03") >= 5, str(race_hold.culled.count("SE-T03")))
+	# ⓒ 이탈 — 두 루프를 켜 둔 채 내려간다
+	_ok("55ⓒ 전제: 릴 회전·임박 틱 점유", _voices_of(race_session, "SE-R02") == 1
+		and _voices_of(race_session, "SE-T03") == 1, str(race_session.audio._voices))
+	_unmount(race)
+	_ok("55ⓒ 이탈 = 릴 회전 0", _voices_of(race_session, "SE-R02") == 0, str(race_session.audio._voices))
+	_ok("55ⓒ 이탈 = 임박 틱 0", _voices_of(race_session, "SE-T03") == 0, str(race_session.audio._voices))
+	# ⓓ 원본
+	var race_src := FileAccess.get_file_as_string("res://ui/race/race_screen.gd")
+	_ok("55ⓓ 타이머 종료 창구 = 정의 1 + 호출 3", race_src.count("_stop_timer()") == 4,
+		str(race_src.count("_stop_timer()")))
+	_ok("55ⓓ 링 소등은 창구 안 1건", race_src.count("_e04_timer_ring.set_active(false)") == 1,
+		str(race_src.count("_e04_timer_ring.set_active(false)")))
+	var overrides := 0
+	var missing_super: Array = []
+	var scripts: Array[String] = []
+	_collect_ext("res://ui", ".gd", scripts)
+	var flow_family := RegEx.create_from_string("extends (FlowScreen|HubScreen)\\b")
+	for path in scripts:
+		var src := FileAccess.get_file_as_string(path)
+		if flow_family.search(src) == null or not src.contains("func _exit_tree()"):
+			continue
+		overrides += 1
+		var body := src.substr(src.find("func _exit_tree()"))
+		var next_func := body.find("\nfunc ", 1)
+		if next_func > 0:
+			body = body.substr(0, next_func)
+		if not body.contains("super()"):
+			missing_super.append(path)
+	_ok("55ⓓ FlowScreen 계열 _exit_tree 재정의 실재 (RACE-01)", overrides >= 1, str(overrides))
+	_ok("55ⓓ 재정의 전부 super() 경유", missing_super.is_empty(), str(missing_super))
 
 
 # ── 스폰서 정기 수입 결선 (개선 회차 13 · 2026-09-09 사용자 결정) ──

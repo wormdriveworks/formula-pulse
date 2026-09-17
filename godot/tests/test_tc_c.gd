@@ -38,6 +38,7 @@ func _init() -> void:
 	_result_and_ranking()
 	_sector_attribute_weights()
 	_resonance_runtime()
+	_resonance_armed_state()
 	_wall_rival_wired()
 	_consumable_paths()
 	_gp_summary_counters()
@@ -2406,6 +2407,78 @@ func _events_contain(events: Array, key: String) -> bool:
 		if String(event.get("key", "")) == key:
 			return true
 	return false
+
+
+# ── 레조넌스 표시 상태 `resonance_armed()` (개선 회차 33 — 실기 "배너가 한 번 뜨면 계속 켜져 있다") ──
+#
+# 배너의 근거를 GP 단위 `announced` 에서 "지금 그 섹터 + 보너스 잔존"으로 바꿨다. 축:
+#   ⓐ 진입 전 = 꺼짐 ⓑ 진입 턴 = 켜짐(공표 로그와 같은 턴) ⓒ 3매치 확정 → 소진 = 같은 섹터에서도 꺼짐
+#   ⓓ 다음 섹터 = 꺼짐(announced 는 여전히 참 — 표시가 그 장부를 따르지 않는다) ⓔ 미소진 상태로 다음 랩
+#   같은 슬롯 = 다시 켜짐 · 공표 로그는 다시 나지 않는다 ⓕ 듀얼 턴 = 꺼짐(R7 무관여)
+#   ⓖ 원본 — 화면이 이 조회를 쓰고 announced 를 표시에 쓰지 않는다(UISCR 54 가 실화면으로 다시 잰다)
+func _resonance_armed_state() -> void:
+	var probe := _new_engine(202, "circuit_mn1")
+	if probe == null:
+		return
+	probe.start_gp()
+	_flatten_neighbors(probe)
+	probe.resonance_circuit_id = "circuit_mn1"
+	probe.resonance_sector_slot = 2
+	probe.begin_turn()   # s1
+	_ok("ⓐ 진입 전 = 꺼짐", not probe.resonance_armed())
+	probe.spin()
+	probe.provisional = _combo(RaceTypes.SYMBOL_PULSE, 1, RaceTypes.SYMBOL_LINE)
+	probe.confirm(0.0)
+	var enter_info := probe.begin_turn()   # s2 = 슬롯
+	_ok("ⓑ 진입 턴 = 켜짐", probe.resonance_armed())
+	_ok("ⓑ 공표 로그도 같은 턴", _events_contain(enter_info.get("events", []), "raceLog.resonanceEnter01"))
+	probe.spin()
+	probe.provisional = _combo(RaceTypes.SYMBOL_LINE, 3, RaceTypes.SYMBOL_LINE)
+	probe.confirm(0.0)
+	_ok("ⓒ 3매치 확정 → 소진", probe.resonance_consumed)
+	_ok("ⓒ 소진 뒤 같은 섹터 = 꺼짐", not probe.resonance_armed())
+	probe.begin_turn()   # s3
+	_ok("ⓓ 다음 섹터 = 꺼짐", not probe.resonance_armed())
+	_ok("ⓓ announced 는 여전히 참 (표시가 따르지 않는 장부)", probe.resonance_announced)
+	# ⓔ 미소진 — 첫 랩은 비3매치로 지나고 다음 랩 같은 슬롯
+	var again := _new_engine(202, "circuit_mn1")
+	again.start_gp()
+	_flatten_neighbors(again)
+	again.resonance_circuit_id = "circuit_mn1"
+	again.resonance_sector_slot = 1
+	var first := again.begin_turn()   # 랩 1 s1
+	_ok("ⓔ 첫 진입 켜짐", again.resonance_armed())
+	_ok("ⓔ 첫 진입 공표", _events_contain(first.get("events", []), "raceLog.resonanceEnter01"))
+	again.spin()
+	again.provisional = _combo(RaceTypes.SYMBOL_PULSE, 1, RaceTypes.SYMBOL_LINE)
+	again.confirm(0.0)
+	again.begin_turn()   # s2
+	_ok("ⓔ 슬롯 밖 = 꺼짐", not again.resonance_armed())
+	again.spin()
+	again.provisional = _combo(RaceTypes.SYMBOL_PULSE, 1, RaceTypes.SYMBOL_LINE)
+	again.confirm(0.0)
+	again.lap = 2
+	again.sector = 0
+	var second := again.begin_turn()   # 랩 2 s1
+	_ok("ⓔ 미소진 다음 랩 같은 슬롯 = 다시 켜짐", again.resonance_armed())
+	_ok("ⓔ 공표 로그는 1회 — 다음 랩에는 없다",
+		not _events_contain(second.get("events", []), "raceLog.resonanceEnter01"))
+	# ⓕ 듀얼 턴
+	var duel := _new_engine(202, "circuit_mn1")
+	duel.start_gp()
+	_flatten_neighbors(duel)
+	duel.resonance_circuit_id = "circuit_mn1"
+	_force_duel(duel, RaceTypes.DuelType.OVERTAKE)
+	duel.resonance_sector_slot = duel.sector
+	duel.begin_turn()
+	_ok("ⓕ 전제: 듀얼 턴", duel.current_turn_is_duel)
+	_ok("ⓕ 듀얼 턴 = 꺼짐", not duel.resonance_armed())
+	# ⓖ 원본
+	var screen_src := FileAccess.get_file_as_string("res://ui/race/race_screen.gd")
+	_ok("ⓖ 화면이 resonance_armed() 를 쓴다", screen_src.count("engine.resonance_armed()") == 1,
+		str(screen_src.count("engine.resonance_armed()")))
+	_ok("ⓖ 화면이 announced 를 표시에 쓰지 않는다", screen_src.count("engine.resonance_announced") == 0,
+		str(screen_src.count("engine.resonance_announced")))
 
 
 # ── 압박·저항 런타임 대조 (D13 별첨A §2.1 인쇄값 도달성) ──

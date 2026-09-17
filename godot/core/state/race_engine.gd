@@ -1105,6 +1105,15 @@ func _is_resonance_sector() -> bool:
 	return sector == resonance_sector_slot
 
 
+# 표시 층 조회 (개선 회차 33) — **지금 이 턴이 레조넌스 섹터이고 보너스가 아직 남았는가.** E02 배너의 유일한 근거.
+# `resonance_announced` 는 공표 로그를 1회로 묶는 장부라 GP 단위로만 풀리고, 그것을 표시에 쓰면 첫 진입 뒤
+# GP 내내 켜져 있다(실기 보고). 섹터·서킷·듀얼 여부만 보므로 릴 결과와 무관하다(봉인 — 불변규칙 5);
+# `resonance_consumed` 는 확정 뒤 정산(② 자원)에서만 바뀐다. 같은 슬롯을 다음 랩에 다시 지나면 보너스가
+# 남아 있는 한 다시 켜진다 — 오버레이는 슬롯에 붙고(D08 §3.7 R1·R6) 지급만 무대당 1회다.
+func resonance_armed() -> bool:
+	return _is_resonance_sector() and not resonance_consumed
+
+
 func _has_any_three_match() -> bool:
 	if provisional.size() < 3:
 		return false

@@ -49,6 +49,7 @@ func _process(_delta: float) -> bool:
 	_volume_options(data)
 	_pause_rule(data)
 	_missing_stream(data)
+	_loop_stop_reaches_player(data)
 	_bgm_stems(data)
 	_session_wiring(data)
 	print("")
@@ -125,6 +126,25 @@ func _sfx_pool(data: GameData) -> void:
 	# 미상 id 컬링은 무해해야 한다(디스패처가 이미 비운 뒤에 통지가 올 수 있다).
 	player.cull_sfx("SE-NOPE")
 	_ok("미상 컬링 무해", player.active_sfx_count() == 0)
+
+
+# ── ②-b 루프 정지가 실물 슬롯까지 닿는가 (개선 회차 33) ──
+#
+# 디스패처의 `stop_event` 는 점유 장부를 비우고 재생기에 컬링을 통지한다 — 그 통지가 실물 풀의 슬롯을
+# 실제로 멈추는가는 여기서만 잴 수 있다. 루프 에셋(SE-U15)은 더미 드라이버에서도 끝나지 않으므로
+# 스스로 비는 경로와 섞이지 않는다.
+func _loop_stop_reaches_player(data: GameData) -> void:
+	var player := _player(data)
+	var dispatcher := AudioDispatcher.new()
+	dispatcher.setup(data, player)
+	player.bind_dispatcher(dispatcher)
+	var fired: Array = dispatcher.emit("settle_rollup")
+	_ok("②-b 전제: 롤업 발화 (행 id)", fired == ["sound_settle_rollup"], str(fired))
+	_ok("②-b 재생기 점유 1", player.active_sfx_count() == 1, str(player.active_sfx_count()))
+	var stopped: Array = dispatcher.stop_event("settle_rollup")
+	_ok("②-b 정지 = 걷어낸 id", stopped == ["SE-U15"], str(stopped))
+	_ok("②-b 정지 = 재생기 슬롯 해제", player.active_sfx_count() == 0, str(player.active_sfx_count()))
+	_ok("②-b 정지 = 디스패처 점유 0", dispatcher.active_voice_count() == 0, str(dispatcher.active_voice_count()))
 
 
 # ── ③ 보이스 통지 ──
