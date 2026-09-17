@@ -220,11 +220,19 @@ func _exit_tree() -> void:
 		session.audio.set_paused(false)
 
 
-# 이 화면이 켜는 루프음 2종 (SE-R02 릴 회전 · SE-T03 임박 틱 — 에셋 대장 §5.1 루프 에셋). 정상 경로에서는
-# 각자 끝나는 자리(릴 정지 끝 · 타이머 종료 창구)에서 멎고, 스핀·임박 도중 화면을 떠나는 경로(정지 메뉴 →
-# 타이틀)를 여기가 받친다.
+# 이 화면이 켜는 루프음 — SE-R02 릴 회전 · SE-T03 임박 틱(에셋 대장 §5.1 루프 에셋)은 정상 경로에서 각자
+# 끝나는 자리(릴 정지 끝 · 타이머 종료 창구)에서 멎고, 스핀·임박 도중 화면을 떠나는 경로(정지 메뉴 → 타이틀)를
+# 여기가 받친다. **관중 베드(AMB-01)·무대 베드(펄스 돔 AMB-05)는 레이스 화면과 수명이 같다** (개선 회차 34 ·
+# 사용자 결정 "GP 결산 진입에 끈다") — 결산(RACE-03)으로 가든 타이틀로 나가든 화면이 내려가는 자리가 끝이다.
+# 무대 진입 이벤트는 `_start_gp` 와 같은 파생식이고 BGM 행은 `stop_event` 가 건너뛰므로(트랙 교체는 크로스페이드
+# 몫) BGM 행만 있는 무대에서는 걷어낼 sfx 가 없어 무해하다.
 func _audio_exit_events() -> Array:
-	return ["reel_spin_loop", "timer_imminent_tick"]
+	var events: Array = ["reel_spin_loop", "timer_imminent_tick", "race_stage_enter"]
+	if data != null and engine != null:
+		var stage_event := "%s_enter" % String(data.stage_of_active_circuit().get("id", ""))
+		if data.sound_map.has(stage_event):
+			events.append(stage_event)
+	return events
 
 
 func _on_joy_connection_changed(_device: int, _connected: bool) -> void:
@@ -661,6 +669,9 @@ func _start_gp() -> void:
 	rng = session.rng
 	engine = session.engine
 	_e10_log.clear_feed()
+	# 개러지 룸톤(AMB-04)은 **레이스 출발에 멎는다** (개선 회차 34 · 사용자 결정). 개러지가 켠 루프지만 개러지는
+	# 하위 스테이션(HUB-02~08)을 오가며 트리를 떠나므로 이탈 훅에 둘 수 없다 — 관중 베드가 이어받는 여기가 끝이다.
+	stop_sfx("hub_enter")
 	# 무대 BGM(§4.1 5종 1:1) + 관중 베드(AMB-01). **이벤트 id 를 무대 id 에서 파생**하므로
 	# 무대가 늘면 `sound_map` 에 행만 추가하면 붙는다 — 화면에 무대 목록을 적지 않는다.
 	sfx("%s_enter" % String(data.stage_of_active_circuit().get("id", "")))

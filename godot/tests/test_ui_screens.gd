@@ -5987,6 +5987,35 @@ func _screen_loop_sfx_stop(data: GameData) -> void:
 			missing_super.append(path)
 	_ok("55ⓓ FlowScreen 계열 _exit_tree 재정의 실재 (RACE-01)", overrides >= 1, str(overrides))
 	_ok("55ⓓ 재정의 전부 super() 경유", missing_super.is_empty(), str(missing_super))
+	# ⓔⓕ 앰비언스 (개선 회차 34 · 사용자 결정) — 룸톤은 레이스 출발에, 관중 베드는 레이스 화면 이탈에 멎는다.
+	# 라우터 순서 그대로 세운다(세션 주입 → add_child → bind): 출발 전에 개러지가 켠 룸톤을 점유해 둔다.
+	var amb_session := _fresh_session(data)
+	var amb_hold := HoldingOutput.new()
+	amb_session.audio.output = amb_hold
+	amb_session.audio.emit("hub_enter")
+	_ok("55ⓔ 전제: 개러지 룸톤 점유 1", _voices_of(amb_session, "AMB-04") == 1, str(amb_session.audio._voices))
+	var amb_race := _mount(RACE_SCENE, amb_session)
+	if amb_race != null:
+		_ok("55ⓔ 레이스 출발 = 룸톤 0", _voices_of(amb_session, "AMB-04") == 0, str(amb_session.audio._voices))
+		_ok("55ⓔ 룸톤 컬링 통지", amb_hold.culled.has("AMB-04"), str(amb_hold.culled))
+		_ok("55ⓔ 출발 = 관중 베드 점유 1", _voices_of(amb_session, "AMB-01") == 1, str(amb_session.audio._voices))
+		_ok("55ⓔ 허브 BGM 은 무접촉 — 무대 트랙으로 교체됐다(BGM 은 stop_bgm 전속)",
+			amb_session.audio.current_bgm() != "BGM-02" and amb_session.audio.current_bgm() != "",
+			amb_session.audio.current_bgm())
+		var exit_events: Array = amb_race._audio_exit_events()
+		_ok("55ⓕ 이탈 목록 = 릴 회전 · 임박 틱 · 관중 베드 · 무대 진입", exit_events.has("race_stage_enter")
+			and exit_events.has("%s_enter" % String(amb_session.data.stage_of_active_circuit().get("id", "")))
+			and exit_events.has("reel_spin_loop") and exit_events.has("timer_imminent_tick"),
+			str(exit_events))
+		_unmount(amb_race)
+		_ok("55ⓕ 이탈 = 관중 베드 0", _voices_of(amb_session, "AMB-01") == 0, str(amb_session.audio._voices))
+		_ok("55ⓕ 관중 베드 컬링 통지", amb_hold.culled.has("AMB-01"), str(amb_hold.culled))
+	# 원본 — 룸톤 정지는 출발 안 · 관중 베드를 켜기 전이다
+	var start_at := race_src.find("func _start_gp()")
+	var stop_hub := race_src.find("stop_sfx(\"hub_enter\")", start_at)
+	var crowd := race_src.find("sfx(\"race_stage_enter\")", start_at)
+	_ok("55ⓕ 원본: 룸톤 정지가 출발 안 · 관중 베드보다 앞", start_at >= 0 and stop_hub > start_at and crowd > stop_hub,
+		"start=%d stop_hub=%d crowd=%d" % [start_at, stop_hub, crowd])
 
 
 # ── 스폰서 정기 수입 결선 (개선 회차 13 · 2026-09-09 사용자 결정) ──
