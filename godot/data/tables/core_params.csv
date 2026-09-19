@@ -94,7 +94,6 @@ param_vn_auto_slow_sec,3.0
 param_vn_auto_normal_sec,2.0
 param_vn_auto_fast_sec,1.2
 param_opt_reel_fast_mult,0.5
-param_pause_countin_sec,3
 param_fx_reduced_mult,0.5
 param_fx_shake_weak_px,2
 param_fx_shake_strong_px,4
@@ -140,3 +139,7 @@ param_scene_machine_y,30
 param_scene_cut_fps,8
 param_settle_input_guard_sec,0.4
 param_scene_panel_dim,0.70
+param_start_light_interval_sec,0.3
+param_start_light_hold_min_sec,0.8
+param_start_light_hold_max_sec,1.5
+param_start_signal_go_offset_sec,0.78

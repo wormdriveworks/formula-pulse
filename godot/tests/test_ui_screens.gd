@@ -129,6 +129,8 @@ func _process(_delta: float) -> bool:
 	_sponsor_settlement_flow(data)
 	_resonance_banner_state(data)
 	_screen_loop_sfx_stop(data)
+	_start_lights_sequence(data)
+	_pause_resume_immediate(data)
 	_achievement_without_career(data)
 	_achievement_with_career(data)
 	_achievement_icons(data)
@@ -225,7 +227,19 @@ func _mount(scene_path: String, session: RunSession) -> Control:
 	screen.session = session
 	root.add_child(screen)
 	screen.bind(session, {})
+	if scene_path == RACE_SCENE:
+		_finish_start_lights(screen)
 	return screen
+
+
+# 출발 신호등을 끝까지 돌린다 (개선 회차 35) — 소등 전에는 T1 행동(스핀·소모품)이 잠기므로, 출발선 자체를
+# 보는 축(56)이 아니면 세운 레이스 화면은 소등 뒤 상태로 넘긴다. 신호등은 `_process` 가 굴리고 큰 delta 한 번에
+# 문턱(점등·개시음·소등)을 전부 넘는다 — 정지 오버레이의 카운트인을 `_process(9999)` 로 넘기던 기법과 같다.
+func _finish_start_lights(screen: Control) -> void:
+	if screen == null or not ("_start_lights_active" in screen):
+		return
+	if screen._start_lights_active:
+		screen._process(60.0)
 
 
 func _unmount(screen: Control) -> void:
@@ -602,6 +616,7 @@ func _race_input_via_actions() -> void:
 			return
 		var screen := packed.instantiate() as Control
 		root.add_child(screen)
+		_finish_start_lights(screen)   # 소등 뒤 상태 — 붉은 동안은 스핀 입력이 없는 입력이다 (개선 회차 35)
 		var label := String(entry[0])
 		var before: int = screen.engine.turn_phase
 		_ok("%s — 전제: T1 대기" % label, before == RaceTypes.TurnPhase.T1_SECTOR_OPEN,
@@ -622,6 +637,7 @@ func _race_input_via_actions() -> void:
 		var packed2 := load(RACE_SCENE) as PackedScene
 		var screen2 := packed2.instantiate() as Control
 		root.add_child(screen2)
+		_finish_start_lights(screen2)
 		var label2 := String(entry2[0])
 		_ok("%s — 전제: 정지 아님" % label2, not screen2._paused)
 		var event2: InputEvent
@@ -741,6 +757,7 @@ func _new_race_screen() -> Control:
 		return null
 	var screen := packed.instantiate() as Control
 	root.add_child(screen)
+	_finish_start_lights(screen)   # 소등 뒤 상태 — 출발선 자체는 축 56 이 본다
 	return screen
 
 
@@ -887,8 +904,7 @@ func _race_pause_resume_focus() -> void:
 	var paused_owner := root.gui_get_focus_owner()
 	_ok("전제: 정지 중 포커스 = 재개 버튼",
 		paused_owner != null and paused_owner.name == "ResumeButton", str(paused_owner))
-	screen._pause_overlay._begin_countin()
-	screen._pause_overlay._process(9999.0)   # 카운트인 만료 → resumed
+	screen._pause_overlay._resume()   # 재개 = 즉시 (개선 회차 35 — 카운트인 폐지)
 	_ok("재개 = 정지 해제", not screen._paused)
 	_ok("재개 뒤 포커스 = 확정 (허공에 떨어지지 않는다)",
 		root.gui_get_focus_owner() == screen._e08_confirm, str(root.gui_get_focus_owner()))
@@ -916,8 +932,7 @@ func _race_pause_exit_unmutes() -> void:
 	if again == null:
 		return
 	again._open_pause()
-	again._pause_overlay._begin_countin()
-	again._pause_overlay._process(9999.0)
+	again._pause_overlay._resume()
 	_ok("재개 경로도 정지 해제", not again.session.audio.paused())
 	_unmount(again)
 
@@ -6571,3 +6586,161 @@ func _ui_gd_sources() -> Dictionary:
 			entry = dir.get_next()
 		dir.list_dir_end()
 	return found
+
+
+# ── 56 출발 신호등 (개선 회차 35 · 사용자 요청 — F1 문법) ──
+# 소등이 출발이다: 붉은 동안 T1 행동이 잠기고, 스타트 시그널(SE-U18)은 개시음이 소등에 떨어지도록 소등 앞
+# `go_offset` 에 울린다. 출발선 상태가 필요하므로 `_new_race_screen()`(소등까지 돌림)을 쓰지 않고 직접 세운다.
+# 시간 문턱은 `_process(delta)` 직접 호출로 넘긴다 — 정지 오버레이·릴 정지 연출을 재던 기법과 같다.
+func _start_lights_sequence(data: GameData) -> void:
+	var session := _fresh_session(data)
+	session.options.set_index("o4", 2)   # 일괄 정지 — 소등 뒤 스핀 커밋을 동기 경로로 확인한다
+	var packed := load(RACE_SCENE) as PackedScene
+	var screen := packed.instantiate() as Control
+	screen.session = session
+	root.add_child(screen)
+	screen.bind(session, {})
+	var interval: float = data.param("param_start_light_interval_sec")
+	var go_offset: float = data.param("param_start_signal_go_offset_sec")
+	var hold_max: float = data.param("param_start_light_hold_max_sec")
+	var count: int = screen.START_LIGHT_COUNT
+	var host := screen.get_node("%E15ScenePanel") as Control
+	var lights: Control = host.get_node_or_null(screen.START_LIGHTS_NAME)
+	# ⓐ 출발선
+	_ok("56ⓐ 전제: 출발선 = 신호등 진행 중", screen._start_lights_active)
+	_ok("56ⓐ 신호등 실물 = 씬 패널 슬롯의 둘째 자식 · 표시 · 비인터랙티브", lights != null and lights.visible
+		and lights.get_index() == 1 and lights.mouse_filter == Control.MOUSE_FILTER_IGNORE)
+	if lights == null:
+		_unmount(screen)
+		return
+	_ok("56ⓐ 첫 등은 출발선에서 켜진다", lights.lit_count() == 1, str(lights.lit_count()))
+	_ok("56ⓐ 등 수 = %d" % count, lights.lamp_count() == count, str(lights.lamp_count()))
+	_ok("56ⓐ 대기 = [개시음 선행, 상한] 안", screen._start_lights_hold >= go_offset - 0.0001
+		and screen._start_lights_hold <= hold_max + 0.0001, str(screen._start_lights_hold))
+	_ok("56ⓐ 붉은 동안 확정(스핀) 버튼 잠금", screen._e08_confirm.disabled)
+	_ok("56ⓐ 개시음은 아직 없다", screen.session.audio.fired.count("SE-U18") == 0, str(screen.session.audio.fired))
+	screen._on_primary_action()
+	_ok("56ⓐ 붉은 동안의 확정 입력 = 무동작 (스핀 커밋 없음)", screen.engine.get_provisional().is_empty()
+		and screen.engine.turn_phase == RaceTypes.TurnPhase.T1_SECTOR_OPEN)
+	var tutorial_due: bool = screen._tutorial.should_run()
+	_ok("56ⓐ 튜토리얼은 소등 전에 서지 않는다", not screen._tutorial.visible)
+	# ⓑ 순차 점등 — 등 k 는 (k−1)×interval (부동소수 누적을 피해 문턱마다 1ms 를 얹는다)
+	var lit_steps: Array = [lights.lit_count()]
+	for k in range(2, count + 1):
+		screen._process(interval + 0.001)
+		lit_steps.append(lights.lit_count())
+	_ok("56ⓑ 점등은 한 등씩 차례로", lit_steps == range(1, count + 1), str(lit_steps))
+	_ok("56ⓑ 전등 시점에 아직 진행 중", screen._start_lights_active and lights.visible)
+	# ⓒ 개시음 = 소등 앞 go_offset — 그 문턱을 막 넘긴 지점
+	var signal_at: float = float(count - 1) * interval + screen._start_lights_hold - go_offset
+	screen._process(maxf(0.0, signal_at - screen._start_lights_elapsed) + 0.01)
+	_ok("56ⓒ 개시음 발화 = 소등 앞 %.2f초" % go_offset, screen.session.audio.fired.count("SE-U18") == 1,
+		str(screen.session.audio.fired))
+	_ok("56ⓒ 개시음 뒤에도 등은 전부 붉다", screen._start_lights_active and lights.lit_count() == count)
+	# ⓓ 소등 = 출발
+	screen._process(go_offset)
+	_ok("56ⓓ 소등 = 진행 종료 · 신호등 숨김 · 등 0", not screen._start_lights_active and not lights.visible
+		and lights.lit_count() == 0)
+	_ok("56ⓓ 소등 = 확정(스핀) 버튼 열림", not screen._e08_confirm.disabled)
+	_ok("56ⓓ 소등 뒤 튜토리얼이 선다 (첫 GP 이면)", screen._tutorial.visible == tutorial_due)
+	_ok("56ⓓ 개시음은 한 번", screen.session.audio.fired.count("SE-U18") == 1)
+	screen._on_primary_action()
+	_ok("56ⓓ 소등 뒤 확정 입력 = 스핀 커밋", screen.engine.get_provisional().size() == 3)
+	_unmount(screen)
+	# ⓔ 정지 중엔 신호등도 멎는다 — 재개하면 이어서 간다
+	var paused_session := _fresh_session(data)
+	var paused_screen := packed.instantiate() as Control
+	paused_screen.session = paused_session
+	root.add_child(paused_screen)
+	paused_screen.bind(paused_session, {})
+	var paused_host := paused_screen.get_node("%E15ScenePanel") as Control
+	var paused_lights: Control = paused_host.get_node(paused_screen.START_LIGHTS_NAME)
+	paused_screen._open_pause()
+	paused_screen._process(60.0)
+	_ok("56ⓔ 정지 중 60초 = 신호등 무진행 · 개시음 없음", paused_screen._start_lights_active
+		and paused_lights.lit_count() == 1 and paused_session.audio.fired.count("SE-U18") == 0,
+		str(paused_lights.lit_count()))
+	paused_screen._pause_overlay._resume()
+	paused_screen._process(60.0)
+	_ok("56ⓔ 재개 뒤 진행 → 소등 · 개시음 1", not paused_screen._start_lights_active
+		and paused_session.audio.fired.count("SE-U18") == 1)
+	_unmount(paused_screen)
+	# ⓕ 대기 추첨 = reserve 스트림 · 범위 [max(하한, 개시음 선행), 상한] · 사용자 상한 1.5초
+	var draw_session := _fresh_session(data)
+	var lower := maxf(data.param("param_start_light_hold_min_sec"), go_offset)
+	var state_before: int = draw_session.rng.stream("reserve").state
+	var in_range := true
+	var distinct: Dictionary = {}
+	for i in range(40):
+		var hold: float = draw_session.start_light_hold_sec()
+		if hold < lower - 0.0001 or hold > hold_max + 0.0001:
+			in_range = false
+		distinct[snappedf(hold, 0.001)] = true
+	_ok("56ⓕ 대기 40회 전부 범위 안 [%.2f, %.2f]" % [lower, hold_max], in_range)
+	_ok("56ⓕ 대기는 무작위다 (40회 중 서로 다른 값 ≥ 2)", distinct.size() >= 2, str(distinct.size()))
+	_ok("56ⓕ 추첨은 reserve 스트림을 소비한다", draw_session.rng.stream("reserve").state != state_before)
+	_ok("56ⓕ 상한 = 사용자 요청 1.5초 이하 · 하한 ≥ 개시음 선행", hold_max <= 1.5 + 0.0001 and lower >= go_offset,
+		"%.2f / %.2f" % [hold_max, lower])
+	# ⓖ 원본 — 스타트 시그널은 로그 깔때기가 아니라 신호등이 울린다 · 잠금 술어는 버튼·핸들러 양쪽
+	var race_src := FileAccess.get_file_as_string("res://ui/race/race_screen.gd")
+	var constants := (load("res://ui/race/race_screen.gd") as GDScript).get_script_constant_map()
+	var table: Dictionary = constants.get("SOUND_BY_KEY", {})
+	_ok("56ⓖ 로그 깔때기(SOUND_BY_KEY)에 gpStart01 없음", not table.has("raceLog.gpStart01"))
+	var fire_literal := "sfx(\"gp_start\")"
+	_ok("56ⓖ 개시음 발화 지점 1곳", race_src.count(fire_literal) == 1, str(race_src.count(fire_literal)))
+	_ok("56ⓖ 튜토리얼 개시 = 소등 창구 1곳", race_src.count("_tutorial.begin()") == 1
+		and race_src.find("_tutorial.begin()") > race_src.find("func _finish_start_lights"),
+		str(race_src.count("_tutorial.begin()")))
+	_ok("56ⓖ 소등 전 잠금 — 버튼 술어 2 · 확정 핸들러 1 · 소모품 핸들러 1",
+		race_src.count("and not _start_lights_active") == 2
+		and race_src.count("_revealing or _start_lights_active") == 1
+		and race_src.count("_paused or _start_lights_active") == 1)
+	var process_at := race_src.find("func _process(delta: float)")
+	var lights_step_at := race_src.find("if _start_lights_active:", process_at)
+	var pause_freeze_at := race_src.find("if _paused:", process_at)
+	_ok("56ⓖ 신호등 진행은 _process 의 정지 동결 뒤에 있다", process_at >= 0 and pause_freeze_at > process_at
+		and lights_step_at > pause_freeze_at)
+
+
+# ── 57 정지 재개 = 즉시 (개선 회차 35 · 사용자 결정 — 3-2-1 카운트인 폐지) ──
+# F2 보호는 그대로다: 가림막은 재개와 같은 호출에서 내려가고 타이머는 그 순간부터 흐른다 — 타이머가 멎은 채
+# 보드가 보이는 프레임이 없다. 카운트인의 코드·값·문면·노드가 함께 걷혔는지 원본으로 본다.
+func _pause_resume_immediate(data: GameData) -> void:
+	var screen := _new_race_screen()
+	if screen == null:
+		return
+	var overlay: Control = screen._pause_overlay
+	var mask := overlay.get_node("%BoardMask") as Control
+	# ⓐ T1 정지 → 재개 즉시
+	screen._open_pause()
+	_ok("57ⓐ 전제: 정지 · 오버레이 표시 · T1 이라 가림막 없음", screen._paused and overlay.visible and not mask.visible)
+	overlay._resume()
+	_ok("57ⓐ 재개 = 같은 호출에서 정지 해제 · 오버레이 숨김", not screen._paused and not overlay.visible)
+	# ⓑ 개입 창 중 정지 — 가림막 · 타이머 동결 · 재개 즉시 흐름
+	var base: float = data.param("param_timer_base_sec")
+	screen._timer_active = true
+	screen._timer_disabled = false
+	screen._timer_effective_base = base
+	screen._timer_remaining = base
+	screen._e04_timer_ring.set_active(true)
+	screen._open_pause()
+	_ok("57ⓑ 개입 창 중 정지 = 가림막", mask.visible)
+	screen._process(1.0)
+	_ok("57ⓑ 정지 중 타이머 동결", is_equal_approx(screen._timer_remaining, base), str(screen._timer_remaining))
+	overlay._resume()
+	_ok("57ⓑ 재개 = 오버레이(가림막 포함) 즉시 내려감", not overlay.visible and not screen._paused)
+	screen._process(0.5)
+	_ok("57ⓑ 재개 즉시 타이머가 흐른다", screen._timer_remaining < base - 0.4,
+		"%.2f → %.2f" % [base, screen._timer_remaining])
+	screen._stop_timer()
+	# ⓒ 실물 — 카운트인 노드·코드·값·문면 부재
+	_ok("57ⓒ CountLabel 노드 없음", overlay.get_node_or_null("CountLabel") == null)
+	_unmount(screen)
+	var overlay_src := FileAccess.get_file_as_string("res://ui/race/pause_overlay.gd")
+	_ok("57ⓒ 오버레이에 카운트인 코드 없음 (_begin_countin · _counting · _process)",
+		not overlay_src.contains("_begin_countin") and not overlay_src.contains("_counting")
+		and not overlay_src.contains("func _process("))
+	_ok("57ⓒ 재개 버튼 = _resume 결선", overlay_src.contains("pressed.connect(_resume)"))
+	var params_src := FileAccess.get_file_as_string("res://data/tables/core_params.csv")
+	_ok("57ⓒ 값 표에 param_pause_countin_sec 없음", not params_src.contains("param_pause_countin_sec"))
+	_ok("57ⓒ 문면 ui.pause.countFormat 없음", not data.strings.has_key("ui.pause." + "countFormat"))   # 키를 쪼갠다 — V2 가 검사 원본의 리터럴을 문면 참조로 읽는다

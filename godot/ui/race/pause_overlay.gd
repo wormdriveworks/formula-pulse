@@ -1,7 +1,14 @@
 # SYS-05 일시정지 메뉴 — D09 §3.7 · 별첨A §A-5. RACE-01 내부 오버레이 (라우터 비경유).
 #
 # **개입 창 중 호출 시: 릴·게이지 존 가림막 + 타이머 정지 (확정)** — 정지 상태에서 보드를
-# 숙고하는 소프트 타임 리미트 우회를 차단한다 (F2 보호). 재개 시 3-2-1 카운트인.
+# 숙고하는 소프트 타임 리미트 우회를 차단한다 (F2 보호).
+#
+# **재개는 즉시다 (개선 회차 35 · 사용자 결정 — D09 §3.7 · 별첨A §A-5 · D13 별첨A "재개 시 3-2-1 카운트인" 폐지).**
+# 카운트인은 실시간 조작 게임이 재개 직후의 조작 준비 시간을 주는 장치인데, 이 게임의 개입 창은 소프트 타임
+# 리미트일 뿐 반사 조작을 요구하지 않는다. F2 보호는 그대로 선다 — 가림막은 재개와 **같은 호출**에서 내려가고
+# 타이머는 그 순간부터 다시 흐르므로, 타이머가 멎은 채 보드가 보이는 프레임이 없다(카운트인 동안 가림막을
+# 유지하던 이유가 곧 이것이었다). 값 `param_pause_countin_sec` · 문면 `ui.pause.countFormat` · 노드 `CountLabel` 도
+# 함께 걷었다. 모바일(D09-2 §7.1)의 승계 문면은 MS-3 범위 밖이라 그 문서 몫으로 남는다.
 #
 # 메뉴: 재개 / 옵션 / 업적 / 타이틀로(최근 저장 지점 복귀 경고) — §A-5 확정 4항.
 # 업적(SYS-04)은 MS-3 에서 서면서 들어왔다(IMPL-077 범위 제외 해소).
@@ -11,12 +18,8 @@ signal resumed
 signal quit_to_title
 
 var _session: RunSession
-var _counting := false
-var _count_left := 0.0
-var _countin_total := 3.0
 
 @onready var _mask: ColorRect = %BoardMask
-@onready var _count_label: Label = %CountLabel
 @onready var _menu: Control = %MenuColumn
 
 
@@ -48,14 +51,13 @@ func _on_focus_changed(control: Control) -> void:
 
 func setup(run_session: RunSession) -> void:
 	_session = run_session
-	_countin_total = _session.data.param("param_pause_countin_sec")
 	var s := _session.data.strings
 	(%ResumeButton as Button).text = s.text("ui.pause.resume")
 	(%OptionsButton as Button).text = s.text("ui.pause.options")
 	(%AchievementsButton as Button).text = s.text("ui.pause.achievements")
 	(%TitleButton as Button).text = s.text("ui.pause.toTitle")
 	(%TitleWarning as Label).text = s.text("ui.pause.saveNotice")
-	(%ResumeButton as Button).pressed.connect(_begin_countin)
+	(%ResumeButton as Button).pressed.connect(_resume)
 	(%OptionsButton as Button).pressed.connect(_open_options)
 	(%AchievementsButton as Button).pressed.connect(_open_achievements)
 	(%TitleButton as Button).pressed.connect(func(): quit_to_title.emit())
@@ -64,34 +66,15 @@ func setup(run_session: RunSession) -> void:
 # intervention = 개입 창 중 호출 여부 — 가림막은 이때만 필요하다 (D09 §3.7)
 func open(intervention: bool) -> void:
 	_mask.visible = intervention
-	_count_label.visible = false
 	_menu.visible = true
-	_counting = false
 	visible = true
 	(%ResumeButton as Button).grab_focus()  # 초기 포커스 = 재개 (§A-5)
 
 
-func _begin_countin() -> void:
-	# 카운트인 중에도 가림막은 유지한다 — 카운트다운 동안 보드를 읽으면 우회가 성립한다
-	_menu.visible = false
-	_count_label.visible = true
-	_count_left = _countin_total
-	_counting = true
-
-
-func _process(delta: float) -> void:
-	if not _counting:
-		return
-	_count_left -= delta
-	if _count_left <= 0.0:
-		_counting = false
-		visible = false
-		resumed.emit()
-		return
-	var count_text := _session.data.strings.text("ui.pause.countFormat", {
-		"count": int(ceil(_count_left)),
-	})
-	_count_label.text = count_text
+# 재개 = 즉시. 가림막·오버레이가 이 호출에서 내려가고 `resumed` 로 화면이 정지를 푼다 — 사이에 프레임이 없다.
+func _resume() -> void:
+	visible = false
+	resumed.emit()
 
 
 func _open_options() -> void:

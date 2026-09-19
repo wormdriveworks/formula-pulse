@@ -678,6 +678,19 @@ func pacing_beat_due() -> bool:
 	return rng.randf("reserve") < data.param("param_pacing_beat_probability")
 
 
+# 출발 신호등 전등 뒤 대기(초) — 무작위 (개선 회차 35 · 사용자 요청 "약간의 랜덤 대기 · 최대 1.5초").
+# 완급 비트와 같은 이유로 `reserve` 스트림이다(표현 층 전용 스트림 신설 불가 · 직렬화 밖 난수는 재로드 리롤).
+# **하한은 개시음 선행(`param_start_signal_go_offset_sec`)이 받친다** — 스타트 시그널 에셋의 3타가 소등 앞
+# 0.78초를 채우므로 대기가 그보다 짧으면 3타가 아직 점등 중에 시작한다. 상한이 하한보다 작게 적히면 하한이다.
+func start_light_hold_sec() -> float:
+	var lower := maxf(data.param("param_start_light_hold_min_sec"),
+		data.param("param_start_signal_go_offset_sec"))
+	var upper := maxf(lower, data.param("param_start_light_hold_max_sec"))
+	if rng == null:
+		return lower
+	return rng.randf_range("reserve", lower, upper)
+
+
 func jude_rank_delta() -> int:
 	var order := season.championship_standings()
 	var player_index := order.find(SeasonState.PLAYER_ID)

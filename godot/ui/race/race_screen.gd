@@ -49,6 +49,11 @@ const ICON_DIR := "res://assets/ui/icons/"
 const CG_CUTIN_NAME := "CgCutIn"
 # E15 씬 패널 — 컷 합성 노드 이름 (검사가 실물을 찾는 지점)
 const SCENE_PANEL_NAME := "ScenePanel"
+# 출발 신호등 노드 이름 (검사가 실물을 찾는 지점) · 등 수 = F1 문법 5등 [가안 — 연출 구성이라 D13 수치 대장
+# 밖: 에셋 대장 §9-㉑ '스타트 시그널 타수 3+1' 과 같은 성격(총괄 추인 IMPL-261 "연출 구성 재량")]. 시간값은
+# 전부 표에 있다(`param_start_light_*` · `param_start_signal_go_offset_sec`).
+const START_LIGHTS_NAME := "StartLights"
+const START_LIGHT_COUNT := 5
 
 # 엔진 로그 키 → 사운드 이벤트 id (D11 §1.4 이벤트 결속 · §2.4 SE-E 계열 정의).
 # **화면은 SFX id 를 들지 않는다** — 무엇이 울릴지는 `sound_map` 이 정한다. 여기 있는 것은
@@ -58,7 +63,9 @@ const SCENE_PANEL_NAME := "ScenePanel"
 # `defendFail01` 은 `duelLoseDefense01` 과 같은 턴에 함께 발행되므로 등재하지 않는다 —
 # 등재하면 한 결판에 두 번 울린다. `aiRetire01` 은 플레이어의 사건이 아니라 제외.
 const SOUND_BY_KEY := {
-	"raceLog.gpStart01": "gp_start",
+	# `raceLog.gpStart01` → `gp_start`(SE-U18) 는 여기 없다 (개선 회차 35) — 스타트 시그널은 출발 신호등
+	# 시퀀스가 **개시음이 소등에 떨어지는 시점**에 직접 울린다(`_process_start_lights`). 로그 깔때기에 두면
+	# 개시음(에셋 안 0.78초 지점)이 신호등이 아직 붉은 동안 울린다.
 	"raceLog.overtakeSuccess01": "result_advance",   # SE-E01 전진 (추월·순위 상승)
 	"raceLog.defendSuccess01": "result_defend",      # SE-E02 방어 (피추월 방어)
 	"raceLog.stableSector01": "result_stable",       # SE-E03 안정 (무사 통과)
@@ -104,6 +111,15 @@ var _timer_disabled := false
 var _revealing := false
 var _confirm_lockout := 0.0
 var _lockout_base := 0.3
+
+# 출발 신호등 (개선 회차 35 · 사용자 요청 — F1 문법). 순차 점등 → 전등 뒤 무작위 대기 → 소등 = 출발.
+# 소등 전에는 T1 행동(스핀·소모품)이 잠기고, 스타트 시그널(SE-U18)은 개시음이 소등에 떨어지도록 소등
+# `param_start_signal_go_offset_sec` 앞에 울린다. 진행은 `_process` 가 굴리므로 정지 중엔 함께 멎는다.
+var _start_lights: StartLights
+var _start_lights_active := false
+var _start_lights_elapsed := 0.0
+var _start_lights_hold := 0.0
+var _start_signal_fired := false
 
 # 사운드 상태 — 전이 시점을 잡기 위한 직전 상태 기억(상태 자체는 전부 엔진·데이터가 갖는다).
 var _timer_band := 0        # 0 여유 · 1 경고 · 2 임박 (D05 §7.2 구간 = 링과 같은 경계값)
@@ -321,8 +337,8 @@ func _boot() -> void:
 	# 정지 오버레이만 메뉴 성격이라 조작음을 결속한다.
 	audio_bind_controls(_pause_overlay)
 	_start_gp()
-	if _tutorial.should_run():
-		_tutorial.begin()
+	# TUT-01 은 **소등 뒤** 선다 (개선 회차 35 — 소등 창구 `_finish_start_lights`). 신호등이 붉은 동안 "스핀하라"는
+	# 콜아웃이 뜨면 지시 행동이 잠긴 채로 첫 단계가 서고, 첫 지목 하이라이트도 신호등과 겹친다.
 
 
 func _audio_auto_bind() -> bool:
@@ -393,7 +409,9 @@ func _with_cost(label_key: String, cost_param: String) -> String:
 
 func _process(delta: float) -> void:
 	if _paused:
-		return  # 타이머 정지 (D09 §3.7) — 잔량·링·확정 잠금 전부 동결
+		return  # 타이머 정지 (D09 §3.7) — 잔량·링·확정 잠금·출발 신호등 전부 동결
+	if _start_lights_active:
+		_process_start_lights(delta)
 	_process_shake(delta)
 	if _confirm_lockout > 0.0:
 		_confirm_lockout = maxf(0.0, _confirm_lockout - delta)
@@ -679,7 +697,55 @@ func _start_gp() -> void:
 	_charge_shown = engine.charge   # 이월 차지를 획득으로 오인하지 않게 기준선을 먼저 잡는다
 	_chassis_warned = _chassis_critical()
 	_push_events(engine.start_gp())
+	# 출발 신호등은 첫 T1 **앞에** 세운다 — `_next_turn` 의 행동 잠금 갱신이 신호등 상태를 읽어야 한다.
+	_begin_start_lights()
 	_next_turn()
+
+
+# ── 출발 신호등 (개선 회차 35 · 사용자 요청 — F1 문법) ──
+#
+# 등 k 는 (k−1)×interval 에 켜지고, 전등 뒤 hold(무작위 — `RunSession.start_light_hold_sec` · `reserve` 스트림)
+# 만큼 붉게 머문 뒤 일제히 꺼진다. **소등이 출발이다** — 그 전에는 스핀·소모품이 잠긴다(`_refresh_action_enabled`
+# 의 술어 + `_on_primary_action` · `_on_consumable` 의 같은 조건).
+#
+# **스타트 시그널(SE-U18)은 소등에 맞춘다.** 에셋은 "저음 3타(260ms) + 상향 개시음" 한 덩이라(에셋 대장 §9-㉑ ·
+# 개시음 = 0.78초 지점) 점등에 맞춰 울리면 개시음이 등이 붉은 동안 난다. 소등 `param_start_signal_go_offset_sec`
+# 앞에 울려 개시음이 소등 순간에 떨어지게 하고, 3타는 소등 직전을 채운다. hold 하한이 그 값 이상이라
+# (`start_light_hold_sec` 이 받친다) 3타가 점등 중에 시작하는 일은 없다.
+#
+# 진행은 `_process` 가 굴린다 — 정지 중(`_paused`)엔 신호등도 함께 멎고, 큰 delta 한 번에도 각 문턱을 한 번씩만
+# 넘는다(검사가 `_process(큰 값)` 으로 끝까지 돌린다).
+func _begin_start_lights() -> void:
+	_start_lights_elapsed = 0.0
+	_start_signal_fired = false
+	_start_lights_hold = session.start_light_hold_sec()
+	_start_lights_active = true
+	_start_lights.set_lit(1)   # 첫 등은 출발선에 서는 순간 켠다
+	_start_lights.visible = true
+
+
+func _process_start_lights(delta: float) -> void:
+	_start_lights_elapsed += delta
+	var interval := maxf(data.param("param_start_light_interval_sec"), 0.001)
+	_start_lights.set_lit(clampi(int(floor(_start_lights_elapsed / interval)) + 1, 1, START_LIGHT_COUNT))
+	var lights_out_at := float(START_LIGHT_COUNT - 1) * interval + _start_lights_hold
+	var signal_at := lights_out_at - data.param("param_start_signal_go_offset_sec")
+	if not _start_signal_fired and _start_lights_elapsed >= signal_at:
+		_start_signal_fired = true
+		sfx("gp_start")   # SE-U18 — 개시음이 소등에 떨어진다
+	if _start_lights_elapsed >= lights_out_at:
+		_finish_start_lights()
+
+
+func _finish_start_lights() -> void:
+	_start_lights_active = false
+	_start_lights.set_lit(0)
+	_start_lights.visible = false
+	_refresh_action_enabled()
+	_ensure_default_focus()
+	# TUT-01 — 첫 그랑프리 실주행 위 오버레이. 출발 뒤에 선다(`_boot` 의 주석).
+	if _tutorial.should_run():
+		_tutorial.begin()
 
 
 func _next_turn() -> void:
@@ -839,8 +905,8 @@ func _on_primary_action() -> void:
 		if _pacing_beat_timer != null:
 			_pacing_beat_timer.time_left = 0.0   # 즉시 통과 — 타이머가 이번 프레임에 발화한다
 		return
-	if _revealing or engine == null or engine.finished:
-		return
+	if _revealing or _start_lights_active or engine == null or engine.finished:
+		return   # 출발 신호등이 붉은 동안의 확정 입력은 없는 입력이다 (개선 회차 35)
 	# SH3 택1 대기 중이면 확정은 **새 후보 채택**이고 턴은 넘기지 않는다 — 한 입력이
 	# 택1과 확정을 겸하면 되돌릴 기회가 사라진다(신구 병치의 의미가 없어진다).
 	if _resolve_snapshot_keep_new():
@@ -1578,8 +1644,8 @@ func _on_consumable(index: int) -> void:
 	# 없어 마우스 전용"이라 적었지만 **포커스 경로가 남아 있었다** — 정지 중 Tab 으로 이
 	# 슬롯에 포커스가 넘어가고 확정 입력이 눌렸다(정지 상태에서 리페어 키트 실소비 실측).
 	# 오버레이 쪽 포커스 트랩과 겹으로 막는다 — 가드 하나는 언젠가 우회된다.
-	if _paused:
-		return
+	if _paused or _start_lights_active:
+		return   # 출발 신호등이 붉은 동안은 소모품도 잠긴다 (개선 회차 35 — 버튼 술어 `can_use_item` 과 같은 조건)
 	if engine == null or index >= _e13_slot_ids.size():
 		return
 	var events := engine.use_consumable(_e13_slot_ids[index])
@@ -1603,8 +1669,10 @@ func _refresh_action_enabled() -> void:
 	_refresh_skill_slots()
 	for box in _hold_boxes:
 		box.disabled = not open
+	# 출발 신호등이 붉은 동안은 T1 이라도 잠긴다 (개선 회차 35) — 소등이 출발이다.
 	var can_spin := (
 		engine != null and not engine.finished and not _revealing and not _timer_active
+		and not _start_lights_active
 		and engine.turn_phase == RaceTypes.TurnPhase.T1_SECTOR_OPEN
 	)
 	_e08_confirm.disabled = not (can_spin or (open and _confirm_lockout <= 0.0))
@@ -1613,6 +1681,7 @@ func _refresh_action_enabled() -> void:
 	# (듀얼 = 전용 스핀이라 '섹터 개시'가 아니다 — R-B 문면, IMPL-111).
 	var can_use_item := (
 		engine != null and not engine.finished and not _revealing and not _timer_active
+		and not _start_lights_active
 		and engine.turn_phase == RaceTypes.TurnPhase.T1_SECTOR_OPEN
 		and engine.gp_state == RaceTypes.GpState.SECTOR_TURN
 		and not engine.current_turn_is_duel
@@ -1897,6 +1966,13 @@ func _setup_scene_panel() -> void:
 	host.add_child(_scene_panel)
 	# O12 '씬 패널 모션: 표준 / 정지 컷' — 접근성 폴백 (D09 §6.1)
 	_scene_panel.set_motion_enabled(session.options.index_of("o12") == 0)
+	# 출발 신호등 — 씬 패널 위에 얹는다(같은 PanelContainer 의 둘째 자식 = 같은 rect · 저강조 곱연산 밖).
+	# 컷이 아니라 화면 층의 신호라 O12 정지 컷에서도 그대로 진행한다(모션이 아니라 상태 전이다).
+	_start_lights = StartLights.new()
+	_start_lights.name = START_LIGHTS_NAME
+	_start_lights.setup(START_LIGHT_COUNT)
+	_start_lights.visible = false
+	host.add_child(_start_lights)
 	# **여기서 첫 컷을 세우지 않는다.** `_boot()` 는 `_start_gp()` **전에** 돌아 엔진이 아직
 	# 없으므로, 세우려는 호출은 조기 반환으로 아무 일도 하지 않는다 — 29차 반증(N7)이
 	# 그 무동작을 드러냈다. 죽은 한 줄을 남겨 두면 다음 사람이 그것을 결선의 증거로 읽는다

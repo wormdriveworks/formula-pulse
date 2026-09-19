@@ -699,18 +699,6 @@ theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
 theme_override_font_sizes/font_size = 11
 autowrap_mode = 3
 
-[node name="CountLabel" type="Label" parent="PauseOverlay" unique_id=900363162]
-unique_name_in_owner = true
-visible = false
-layout_mode = 0
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-theme_override_colors/font_color = Color(0.247059, 0.878431, 0.960784, 1)
-theme_override_fonts/font = ExtResource("6_y37x3")
-theme_override_font_sizes/font_size = 28
-
 [node name="FxFlash" type="ColorRect" parent="." unique_id=1786640899]
 unique_name_in_owner = true
 layout_mode = 0

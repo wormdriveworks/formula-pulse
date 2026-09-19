@@ -12,7 +12,7 @@
 # 생성 시점 판정을 병기한다 — 판정 불가면 생성 자체가 실패한다(침묵 통과 없음).
 extends SceneTree
 
-const APPENDIX_PATH := "res://../docs/design/D09_별첨A_화면상세_v1_2.md"
+const APPENDIX_PATH := "res://../docs/design/D09_별첨A_화면상세_v1_3.md"
 const OUTPUT_PATH := "res://../docs/qa/TL2_기능체크리스트.md"
 const APP_ROOT_PATH := "res://ui/flow/app_root.gd"
 const STRINGS_PATH := "res://data/strings/strings.csv"
@@ -72,7 +72,7 @@ func _init() -> void:
 	var go_graph := _build_go_graph(routes)
 	var out := "# TL-2 기능 체크리스트 — 화면 23종 × 5축 (기계 생성)\n\n"
 	out += "> 생성기: `godot/tests/gen_tl2_checklist.gd` (재생성 = 같은 명령 — 수기 편집 금지)\n"
-	out += "> 생성 규칙 정본: D14 §2.2 · 화면 목록 정본: D09 별첨A v1.2 · 범위: IMPL-077 (25종 − SYS-04·TUT-01)\n"
+	out += "> 생성 규칙 정본: D14 §2.2 · 화면 목록 정본: D09 별첨A v1.3 · 범위: IMPL-077 (25종 − SYS-04·TUT-01)\n"
 	out += "> 기계가 채운 것 = 실측 증거 / 체크박스 = 실행 단계에서 별첨A 명세와 눈 대조 (TL-2 실행 시)\n\n"
 	var generated := 0
 	for screen in roster:
@@ -250,7 +250,7 @@ func _option_consumers(script_path: String) -> Array:
 	var hits: Array = []
 	var source := _read(script_path)
 	var regex := RegEx.new()
-	regex.compile("param_opt_[a-z0-9_]+|options\\.index_of\\(\"(o\\d+)\"\\)|param_fx_[a-z0-9_]+|param_pause_countin_sec")
+	regex.compile("param_opt_[a-z0-9_]+|options\\.index_of\\(\"(o\\d+)\"\\)|param_fx_[a-z0-9_]+")
 	for found in regex.search_all(source):
 		var hit := found.get_string(0)
 		if found.get_string(1) != "":

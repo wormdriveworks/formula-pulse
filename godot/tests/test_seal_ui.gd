@@ -77,7 +77,9 @@ func _process(delta: float) -> bool:
 			# 확정 후 전이 연출(듀얼 결과 프레임 내 표기 — D09 §3.5) 중에는 아직 이전 턴이다.
 			# 엔진이 T1 에 도달할 때까지 기다린다 — 연출 중 상태를 T1 로 오인하면
 			# 직전 결과가 "대기 중 노출"로 오검출된다 (실측 7건).
-			if _screen._revealing or _screen.engine.turn_phase != RaceTypes.TurnPhase.T1_SECTOR_OPEN:
+			# 출발 신호등(개선 회차 35)이 붉은 동안은 아직 출발 전이다 — 소등까지 기다린다.
+			if _screen._revealing or _screen._start_lights_active \
+					or _screen.engine.turn_phase != RaceTypes.TurnPhase.T1_SECTOR_OPEN:
 				return false
 			# T1 대기 — 이 시점에도 릴은 비어 있어야 한다
 			_assert(_hidden_count() == 3, "T1 대기 중 릴 전량 비공개")

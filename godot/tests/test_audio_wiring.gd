@@ -403,7 +403,10 @@ func _process(delta: float) -> bool:
 	var audio: AudioDispatcher = _screen.session.audio
 	match _phase:
 		"idle":
-			if _screen._revealing or _screen.engine.turn_phase != RaceTypes.TurnPhase.T1_SECTOR_OPEN:
+			# 출발 신호등(개선 회차 35)이 붉은 동안은 아직 출발 전이다 — GP 개시 사운드 가운데 스타트
+			# 시그널(SE-U18)은 소등에 맞춰 울리므로 개시 판정도 소등 뒤에 한다.
+			if _screen._revealing or _screen._start_lights_active \
+					or _screen.engine.turn_phase != RaceTypes.TurnPhase.T1_SECTOR_OPEN:
 				return false
 			if _round == 0:
 				_assert_gp_open(audio)
