@@ -666,7 +666,6 @@ ui.pause.options,옵션,Options,オプション
 ui.pause.achievements,업적,Achievements,実績
 ui.pause.toTitle,타이틀로,To Title,タイトルへ
 ui.pause.saveNotice,진행은 최근 저장 지점 기준입니다.,Progress is based on the last save point.,進行は直近のセーブ地点が基準です。
-ui.pause.close,닫기,Close,閉じる
 ui.tip.currencyTitle,재화 안내,Currency Guide,通貨ガイド
 ui.tip.currencyBody,크레딧은 정비·소모품에 쓰는 회전 재화입니다. 주행 데이터는 스킬·시설에 쓰는 축적 재화입니다.,Credits are the rotating currency for service and consumables. Drive Data is the accumulating currency for skills and facilities.,クレジットは整備・消耗品に使う回転型の通貨です。走行データはスキル・施設に使う蓄積型の通貨です。
 ui.tip.dismiss,확인,OK,確認

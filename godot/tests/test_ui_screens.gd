@@ -6749,7 +6749,8 @@ func _pause_resume_immediate(data: GameData) -> void:
 
 # ── 58 개러지 시스템 메뉴 (개선 회차 36 · 사용자 요청) ──
 # 레이스의 ≡ 과 같은 실물(SYS-05 공용 씬 `ui/sys/pause_overlay.tscn`)을 개러지 푸터 우단에서 연다. 열기 = ≡ 실 클릭 ·
-# Esc/Start(`pause_menu`) · 닫기 = 닫기 버튼 · Esc · B(`ui_cancel`). 타이틀로는 떠나는 자리 저장(회차 17 규칙) 뒤 SYS-01.
+# Esc/Start(`pause_menu`) · 닫기 = 재개 버튼(문면은 레이스와 같다 — 사용자 추가 요청) · Esc · B(`ui_cancel`). 타이틀로는
+# 떠나는 자리 저장(회차 17 규칙) 뒤 SYS-01.
 # 레이스 쪽 일시정지 축(57 등)이 공용 씬 인스턴스 위에서 그대로 서는 것이 "실물이 하나"의 증거다.
 func _garage_system_menu(data: GameData) -> void:
 	var session := _fresh_session(data)
@@ -6775,20 +6776,20 @@ func _garage_system_menu(data: GameData) -> void:
 	_ok("58ⓑ ≡ 실 클릭 = 메뉴 열림", menu.visible)
 	_ok("58ⓑ 열린 메뉴는 루트의 마지막 자식 (동적 카드 위)", menu.get_index() == screen.get_child_count() - 1)
 	var owner := root.gui_get_focus_owner()
-	_ok("58ⓑ 초기 포커스 = 첫 버튼(닫기)", owner != null and owner.name == "ResumeButton", str(owner))
-	_ok("58ⓑ 첫 버튼 문면 = 닫기 (재개가 아니다)",
-		(menu.get_node("%ResumeButton") as Button).text == data.strings.text("ui.pause.close"))
+	_ok("58ⓑ 초기 포커스 = 첫 버튼(재개)", owner != null and owner.name == "ResumeButton", str(owner))
+	_ok("58ⓑ 첫 버튼 문면 = 재개 (레이스와 같다 — 사용자 추가 요청)",
+		(menu.get_node("%ResumeButton") as Button).text == data.strings.text("ui.pause.resume"))
 	_ok("58ⓑ 가림막 없음 · 저장 지점 경고 숨김", not (menu.get_node("%BoardMask") as Control).visible
 		and not (menu.get_node("%TitleWarning") as Control).visible)
-	# ⓒ 닫기 = 즉시 · 포커스는 ≡ 로 (클릭이 ≡ 에 포커스를 두었다)
+	# ⓒ 재개 = 즉시 닫힘 · 포커스는 ≡ 로 (클릭이 ≡ 에 포커스를 두었다)
 	(menu.get_node("%ResumeButton") as Button).pressed.emit()
-	_ok("58ⓒ 닫기 버튼 = 즉시 숨김", not menu.visible)
+	_ok("58ⓒ 재개 버튼 = 즉시 숨김", not menu.visible)
 	_ok("58ⓒ 닫힌 뒤 포커스 = ≡", root.gui_get_focus_owner() == button, str(root.gui_get_focus_owner()))
 	# ⓓ Esc/Start 토글 — 서 있던 앵커로 돌아온다 · 메뉴 위의 B 도 닫는다
 	var repair := screen.get_node("%StRepair") as Button
 	repair.grab_focus()
 	screen._unhandled_input(_action_event("pause_menu"))
-	_ok("58ⓓ pause_menu = 메뉴 열림 · 포커스 = 닫기", menu.visible
+	_ok("58ⓓ pause_menu = 메뉴 열림 · 포커스 = 재개", menu.visible
 		and root.gui_get_focus_owner() != null and root.gui_get_focus_owner().name == "ResumeButton")
 	screen._unhandled_input(_action_event("pause_menu"))
 	_ok("58ⓓ 다시 pause_menu = 닫힘 · 포커스 복귀(정비 앵커)", not menu.visible and root.gui_get_focus_owner() == repair)

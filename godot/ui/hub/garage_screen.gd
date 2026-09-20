@@ -82,13 +82,14 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 	depart.pressed.connect(_on_depart)
 	# ── 시스템 메뉴 (개선 회차 36 · 사용자 요청 "개러지에도 시스템 메뉴") ──
 	# 레이스의 우측 하단 ≡ 과 같은 자리(푸터 우단)·같은 실물(SYS-05 공용 씬 `ui/sys/pause_overlay.tscn`). 개러지엔
-	# 개입 창이 없으니 가림막도 SFX 뮤트도 없고, 첫 버튼은 '재개'가 아니라 '닫기'다. 타이틀로는 `_quit_to_title` —
-	# 떠나는 자리에서 저장하므로 "최근 저장 지점 복귀" 경고는 끈다.
+	# 개입 창이 없으니 가림막도 SFX 뮤트도 없다. 첫 버튼 문면은 레이스와 같은 **'재개'** (사용자 추가 요청 2026-09-20 —
+	# 두 호스트의 메뉴가 같아 보여야 한다). 타이틀로는 `_quit_to_title` — 떠나는 자리에서 저장하므로 "최근 저장 지점
+	# 복귀" 경고는 끈다.
 	var menu_button := %MenuButton as Button
 	menu_button.text = s.text("ui.hub.menu")
 	menu_button.pressed.connect(_open_system_menu)
 	var menu := %PauseOverlay as Control
-	menu.setup(session, "ui.pause.close", false)
+	menu.setup(session, false)
 	menu.resumed.connect(_close_system_menu)
 	menu.quit_to_title.connect(_quit_to_title)
 	# 초기 포커스 = 첫 스테이션 (개선 2026-09-02 H6 — §A-11 "초기 포커스 = E09" 를 사용자
@@ -299,7 +300,7 @@ func _on_depart() -> void:
 #
 # SYS-05 공용 씬을 개러지가 시스템 메뉴로 쓴다 — 옵션·업적·타이틀로가 개러지에서도 닿는다. 종전에는 타이틀과 레이스
 # 일시정지에서만 닿았다(D09 §2 "옵션 SYS-03·업적 SYS-04는 타이틀·일시정지 양측에서 진입" — 이 결선은 그 확장이며
-# 사용자 결정으로 기록한다 · IMPL-535). 열기 = ≡ 버튼 · Esc · 패드 Start(`pause_menu`) · 닫기 = 닫기 버튼 · Esc · 패드 B.
+# 사용자 결정으로 기록한다 · IMPL-535). 열기 = ≡ 버튼 · Esc · 패드 Start(`pause_menu`) · 닫기 = 재개 버튼 · Esc · 패드 B.
 # 하위 스테이션(HUB-02~08)은 Esc·B 가 '개러지로' 이므로 이 메뉴를 두지 않는다 — 개러지로 나와서 연다.
 func _open_system_menu() -> void:
 	var menu := %PauseOverlay as Control

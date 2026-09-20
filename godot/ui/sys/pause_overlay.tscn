@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3 uid="uid://lgo6poer12ro"]
+[gd_scene format=3 uid="uid://lgo6poer12ro"]
 
 [ext_resource type="Script" uid="uid://dvlix85bj0kjm" path="res://ui/sys/pause_overlay.gd" id="1_pause"]
 
