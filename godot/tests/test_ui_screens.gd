@@ -131,6 +131,7 @@ func _process(_delta: float) -> bool:
 	_screen_loop_sfx_stop(data)
 	_start_lights_sequence(data)
 	_pause_resume_immediate(data)
+	_garage_system_menu(data)
 	_achievement_without_career(data)
 	_achievement_with_career(data)
 	_achievement_icons(data)
@@ -6736,7 +6737,7 @@ func _pause_resume_immediate(data: GameData) -> void:
 	# ⓒ 실물 — 카운트인 노드·코드·값·문면 부재
 	_ok("57ⓒ CountLabel 노드 없음", overlay.get_node_or_null("CountLabel") == null)
 	_unmount(screen)
-	var overlay_src := FileAccess.get_file_as_string("res://ui/race/pause_overlay.gd")
+	var overlay_src := FileAccess.get_file_as_string("res://ui/sys/pause_overlay.gd")
 	_ok("57ⓒ 오버레이에 카운트인 코드 없음 (_begin_countin · _counting · _process)",
 		not overlay_src.contains("_begin_countin") and not overlay_src.contains("_counting")
 		and not overlay_src.contains("func _process("))
@@ -6744,3 +6745,85 @@ func _pause_resume_immediate(data: GameData) -> void:
 	var params_src := FileAccess.get_file_as_string("res://data/tables/core_params.csv")
 	_ok("57ⓒ 값 표에 param_pause_countin_sec 없음", not params_src.contains("param_pause_countin_sec"))
 	_ok("57ⓒ 문면 ui.pause.countFormat 없음", not data.strings.has_key("ui.pause." + "countFormat"))   # 키를 쪼갠다 — V2 가 검사 원본의 리터럴을 문면 참조로 읽는다
+
+
+# ── 58 개러지 시스템 메뉴 (개선 회차 36 · 사용자 요청) ──
+# 레이스의 ≡ 과 같은 실물(SYS-05 공용 씬 `ui/sys/pause_overlay.tscn`)을 개러지 푸터 우단에서 연다. 열기 = ≡ 실 클릭 ·
+# Esc/Start(`pause_menu`) · 닫기 = 닫기 버튼 · Esc · B(`ui_cancel`). 타이틀로는 떠나는 자리 저장(회차 17 규칙) 뒤 SYS-01.
+# 레이스 쪽 일시정지 축(57 등)이 공용 씬 인스턴스 위에서 그대로 서는 것이 "실물이 하나"의 증거다.
+func _garage_system_menu(data: GameData) -> void:
+	var session := _fresh_session(data)
+	var screen := _mount(GARAGE_SCENE, session)
+	if screen == null:
+		return
+	var menu: Control = screen.get_node_or_null("%PauseOverlay")
+	var button := screen.get_node_or_null("%MenuButton") as Button
+	var depart := screen.get_node("%DepartButton") as Button
+	_ok("58ⓐ 실물: 시스템 메뉴 오버레이 · ≡ 버튼", menu != null and button != null)
+	if menu == null or button == null:
+		_unmount(screen)
+		return
+	_ok("58ⓐ 공용 씬 인스턴스 (SYS-05)", menu.scene_file_path == "res://ui/sys/pause_overlay.tscn", menu.scene_file_path)
+	_ok("58ⓐ ≡ 은 푸터 우단 — 출발 버튼의 오른쪽 이웃", button.get_parent() == depart.get_parent()
+		and button.get_index() == depart.get_index() + 1)
+	_ok("58ⓐ ≡ 문면 = ui.hub.menu = 레이스 ≡ 과 같은 글리프", button.text == data.strings.text("ui.hub.menu")
+		and button.text == data.strings.text("ui.race.menu"))
+	_ok("58ⓐ 처음엔 닫혀 있다 · 초기 포커스는 종전대로 첫 스테이션", not menu.visible
+		and root.gui_get_focus_owner() == screen.get_node("%StRepair"))
+	# ⓑ 실 클릭으로 연다
+	_click_at(screen.get_viewport(), button.get_global_rect().get_center())
+	_ok("58ⓑ ≡ 실 클릭 = 메뉴 열림", menu.visible)
+	_ok("58ⓑ 열린 메뉴는 루트의 마지막 자식 (동적 카드 위)", menu.get_index() == screen.get_child_count() - 1)
+	var owner := root.gui_get_focus_owner()
+	_ok("58ⓑ 초기 포커스 = 첫 버튼(닫기)", owner != null and owner.name == "ResumeButton", str(owner))
+	_ok("58ⓑ 첫 버튼 문면 = 닫기 (재개가 아니다)",
+		(menu.get_node("%ResumeButton") as Button).text == data.strings.text("ui.pause.close"))
+	_ok("58ⓑ 가림막 없음 · 저장 지점 경고 숨김", not (menu.get_node("%BoardMask") as Control).visible
+		and not (menu.get_node("%TitleWarning") as Control).visible)
+	# ⓒ 닫기 = 즉시 · 포커스는 ≡ 로 (클릭이 ≡ 에 포커스를 두었다)
+	(menu.get_node("%ResumeButton") as Button).pressed.emit()
+	_ok("58ⓒ 닫기 버튼 = 즉시 숨김", not menu.visible)
+	_ok("58ⓒ 닫힌 뒤 포커스 = ≡", root.gui_get_focus_owner() == button, str(root.gui_get_focus_owner()))
+	# ⓓ Esc/Start 토글 — 서 있던 앵커로 돌아온다 · 메뉴 위의 B 도 닫는다
+	var repair := screen.get_node("%StRepair") as Button
+	repair.grab_focus()
+	screen._unhandled_input(_action_event("pause_menu"))
+	_ok("58ⓓ pause_menu = 메뉴 열림 · 포커스 = 닫기", menu.visible
+		and root.gui_get_focus_owner() != null and root.gui_get_focus_owner().name == "ResumeButton")
+	screen._unhandled_input(_action_event("pause_menu"))
+	_ok("58ⓓ 다시 pause_menu = 닫힘 · 포커스 복귀(정비 앵커)", not menu.visible and root.gui_get_focus_owner() == repair)
+	screen._unhandled_input(_action_event("pause_menu"))
+	screen._unhandled_input(_action_event("ui_cancel"))
+	_ok("58ⓓ 메뉴 위의 B(ui_cancel) = 닫힘", not menu.visible)
+	screen._unhandled_input(_action_event("ui_cancel"))
+	_ok("58ⓓ 메뉴 없는 개러지의 B = 무동작 (뒤로 갈 곳이 없다)", not menu.visible)
+	# ⓔ 타이틀로 = 저장 1회 뒤 SYS-01
+	var targets: Array = []
+	screen.navigate.connect(func(target: String, _payload: Dictionary) -> void: targets.append(target))
+	var saves: Array = []
+	session.progress_saved.connect(func(ok: bool) -> void: saves.append(ok))
+	screen._unhandled_input(_action_event("pause_menu"))
+	(menu.get_node("%TitleButton") as Button).pressed.emit()
+	_ok("58ⓔ 타이틀로 = 저장 1회(성공) 뒤 SYS-01", saves == [true] and targets == ["SYS-01"],
+		"%s / %s" % [str(saves), str(targets)])
+	_unmount(screen)
+	# ⓕ 하위 스테이션은 무변경 — 메뉴 실물이 없다 (Esc·B 는 종전대로 개러지로 — 기존 축)
+	var bay := _mount("res://ui/hub/repair_bay_screen.tscn", _fresh_session(data))
+	if bay != null:
+		_ok("58ⓕ 하위 스테이션엔 시스템 메뉴 없음", bay.get_node_or_null("%PauseOverlay") == null
+			and bay.get_node_or_null("%MenuButton") == null)
+		_unmount(bay)
+	# ⓖ 레이스도 같은 공용 씬을 인스턴스한다 — 실물이 하나
+	var race := _new_race_screen()
+	if race != null:
+		_ok("58ⓖ RACE-01 일시정지 = 같은 공용 씬", race._pause_overlay.scene_file_path == "res://ui/sys/pause_overlay.tscn"
+			and (race._pause_overlay.get_node("%TitleWarning") as Control).visible
+			and (race._pause_overlay.get_node("%ResumeButton") as Button).text == data.strings.text("ui.pause.resume"))
+		_unmount(race)
+	var race_tscn := FileAccess.get_file_as_string("res://ui/race/race_screen.tscn")
+	var garage_tscn := FileAccess.get_file_as_string("res://ui/hub/garage_screen.tscn")
+	_ok("58ⓖ 원본: 두 호스트 씬이 공용 씬을 참조하고 인라인 서브트리는 없다",
+		race_tscn.contains("res://ui/sys/pause_overlay.tscn") and garage_tscn.contains("res://ui/sys/pause_overlay.tscn")
+		and not race_tscn.contains("name=\"BoardMask\"") and not garage_tscn.contains("name=\"BoardMask\""))
+	_ok("58ⓖ 원본: 오버레이 스크립트는 ui/sys 로 옮겨졌다", FileAccess.file_exists("res://ui/sys/pause_overlay.gd")
+		and not FileAccess.file_exists("res://ui/race/pause_overlay.gd"))

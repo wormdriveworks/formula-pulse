@@ -20,6 +20,9 @@ const STATIONS := [
 	["StRecruit", "ui.hub.stRecruit", "", ""],
 ]
 
+# 시스템 메뉴가 닫힌 뒤 돌아갈 포커스 — 열 때의 주인(≡ 클릭이면 그 버튼 · Esc 면 서 있던 앵커). 개선 회차 36.
+var _menu_return_focus: Control = null
+
 
 # 허브 BGM(BGM-02) + 개러지 룸톤(AMB-04). 정거장 진입음이 아니라 **차고 자체**에 붙는다 —
 # 하위 스테이션(HUB-02~08)에서 돌아올 때 BGM 은 같은 트랙이라 재시작하지 않는다(디스패처 판정).
@@ -77,6 +80,17 @@ func _on_hub_ready(_payload: Dictionary) -> void:
 	var depart := %DepartButton as Button
 	depart.text = s.text("ui.hub.depart")
 	depart.pressed.connect(_on_depart)
+	# ── 시스템 메뉴 (개선 회차 36 · 사용자 요청 "개러지에도 시스템 메뉴") ──
+	# 레이스의 우측 하단 ≡ 과 같은 자리(푸터 우단)·같은 실물(SYS-05 공용 씬 `ui/sys/pause_overlay.tscn`). 개러지엔
+	# 개입 창이 없으니 가림막도 SFX 뮤트도 없고, 첫 버튼은 '재개'가 아니라 '닫기'다. 타이틀로는 `_quit_to_title` —
+	# 떠나는 자리에서 저장하므로 "최근 저장 지점 복귀" 경고는 끈다.
+	var menu_button := %MenuButton as Button
+	menu_button.text = s.text("ui.hub.menu")
+	menu_button.pressed.connect(_open_system_menu)
+	var menu := %PauseOverlay as Control
+	menu.setup(session, "ui.pause.close", false)
+	menu.resumed.connect(_close_system_menu)
+	menu.quit_to_title.connect(_quit_to_title)
 	# 초기 포커스 = 첫 스테이션 (개선 2026-09-02 H6 — §A-11 "초기 포커스 = E09" 를 사용자
 	# 지시로 뒤집음). 출발은 **비가역 전이**다(저장 + 브리핑 소비 + 허브 복귀 불가) — 직전
 	# VN 을 확정 연타로 넘기던 관성 입력 1회가 그대로 출발을 눌러 허브 전체가 건너뛰어졌다
@@ -279,3 +293,58 @@ func _on_depart() -> void:
 		go("NAR-01", act_vn)
 		return
 	go("RACE-01", {})
+
+
+# ── 시스템 메뉴 (개선 회차 36 · 사용자 요청) ──
+#
+# SYS-05 공용 씬을 개러지가 시스템 메뉴로 쓴다 — 옵션·업적·타이틀로가 개러지에서도 닿는다. 종전에는 타이틀과 레이스
+# 일시정지에서만 닿았다(D09 §2 "옵션 SYS-03·업적 SYS-04는 타이틀·일시정지 양측에서 진입" — 이 결선은 그 확장이며
+# 사용자 결정으로 기록한다 · IMPL-535). 열기 = ≡ 버튼 · Esc · 패드 Start(`pause_menu`) · 닫기 = 닫기 버튼 · Esc · 패드 B.
+# 하위 스테이션(HUB-02~08)은 Esc·B 가 '개러지로' 이므로 이 메뉴를 두지 않는다 — 개러지로 나와서 연다.
+func _open_system_menu() -> void:
+	var menu := %PauseOverlay as Control
+	if menu.visible:
+		return
+	_menu_return_focus = get_viewport().gui_get_focus_owner()
+	# 영입 카드·온보딩 팁 같은 동적 자식 위에 뜬다 — 형제 순서가 그리기 순서다
+	move_child(menu, get_child_count() - 1)
+	menu.open(false)   # 개러지엔 개입 창이 없다 — 가림막 없음
+
+
+# 닫힌 뒤 포커스 복귀 — 열 때의 주인이 살아 있고 받을 수 있으면 그 자리, 아니면 ≡ 버튼.
+# (포커스를 받을 수 없는 곳에 걸면 포커스가 어디에도 없는 화면이 된다 — `_initial_station` 과 같은 방어)
+func _close_system_menu() -> void:
+	var target := _menu_return_focus
+	_menu_return_focus = null
+	if target != null and is_instance_valid(target) and target.is_visible_in_tree() \
+			and target.focus_mode != Control.FOCUS_NONE \
+			and not (target is BaseButton and (target as BaseButton).disabled):
+		target.grab_focus()
+		return
+	(%MenuButton as Button).grab_focus()
+
+
+# 타이틀로 — **저장은 떠나는 자리에 붙인다** (개선 회차 17 의 규칙). 개러지 자체에서 바뀌는 상태(크루 영입)는 다음
+# 저장 지점(출발·스테이션 복귀)까지 디스크에 없으므로, 여기서 저장하지 않으면 메뉴 한 번에 영입이 사라진다.
+# 그래서 SYS-05 의 "최근 저장 지점 복귀" 경고도 이 호스트에서는 끈다(`setup(..., false)`) — 지금이 그 지점이다.
+func _quit_to_title() -> void:
+	var saved := session.save_progress()
+	if not bool(saved.get("ok", false)):
+		push_error("GarageScreen: save before title failed - %s" % String(saved.get("error", "")))
+	go("SYS-01", {})
+
+
+# Esc·Start = 메뉴 토글 · 메뉴가 떠 있을 때의 B = 닫기. 그 외는 공통 베이스로(뒤로 버튼이 없는 개러지에선 무동작).
+# 모달(ConfirmDialog)이 떠 있으면 창이 먼저 소비한다 — 여기 오지 않는다.
+func _unhandled_input(event: InputEvent) -> void:
+	var menu := %PauseOverlay as Control
+	if event.is_action_pressed("pause_menu") or (menu.visible and event.is_action_pressed("ui_cancel")):
+		get_viewport().set_input_as_handled()
+		if menu.visible:
+			sfx("ui_cancel")   # SE-U03 — 취소음 (뒤로 버튼·Esc 와 같은 축)
+			menu.close()
+		else:
+			sfx("ui_decide")   # ≡ 버튼 경로의 조작음과 같게
+			_open_system_menu()
+		return
+	super(event)

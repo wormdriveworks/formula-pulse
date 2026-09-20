@@ -52,8 +52,8 @@ const LATENT_REFERENCE_ALLOW := [
 # 커버리지 면제 대장 — **사유는 실독이고, 면제가 불필요해지면 검사가 실패한다.**
 const COVERAGE_EXEMPT := [
 	{
-		"char": "≡", "font": "Galmuri14", "keys": ["ui.race.menu"],
-		"reason": "소비 노드 %E14Menu (ui/race/race_screen.tscn) 에 theme_override_fonts/font"
+		"char": "≡", "font": "Galmuri14", "keys": ["ui.race.menu", "ui.hub.menu"],
+		"reason": "소비 노드 %E14Menu (ui/race/race_screen.tscn) · %MenuButton (ui/hub/garage_screen.tscn — 개선 회차 36) 에 theme_override_fonts/font"
 			+ " 가 없다 — 전역 기본(Galmuri11 · 회차 28 승격) 렌더이고 그 원도는 탑재한다 (실독 확인).",
 	},
 ]

@@ -1,4 +1,10 @@
-# SYS-05 일시정지 메뉴 — D09 §3.7 · 별첨A §A-5. RACE-01 내부 오버레이 (라우터 비경유).
+# SYS-05 일시정지 메뉴 / 시스템 메뉴 — D09 §3.7 · 별첨A §A-5. 라우터 비경유 오버레이 · 공용 씬 `ui/sys/pause_overlay.tscn`.
+#
+# **두 호스트가 같은 실물을 인스턴스한다 (개선 회차 36 · 사용자 요청 "개러지에도 시스템 메뉴").** RACE-01 은 일시정지
+# 메뉴로(재개 · 개입 창 가림막 · SFX 뮤트는 호스트 몫), HUB-01 은 시스템 메뉴로(닫기 · 가림막 없음 · 타이틀로 앞 저장은
+# 호스트 몫) 쓴다. 첫 버튼 문면과 저장 지점 경고의 표시 여부만 `setup()` 인자로 갈리고 나머지(옵션·업적 오버레이 ·
+# 포커스 트랩 · 즉시 닫힘)는 하나다. 정본 D09 §2 는 옵션·업적 진입을 "타이틀·일시정지 양측"으로만 적는다 — 개러지
+# 진입은 그 확장이며 사용자 결정으로 기록한다(impl_log IMPL-535).
 #
 # **개입 창 중 호출 시: 릴·게이지 존 가림막 + 타이머 정지 (확정)** — 정지 상태에서 보드를
 # 숙고하는 소프트 타임 리미트 우회를 차단한다 (F2 보호).
@@ -49,14 +55,18 @@ func _on_focus_changed(control: Control) -> void:
 	(%ResumeButton as Button).grab_focus()
 
 
-func setup(run_session: RunSession) -> void:
+# resume_label_key = 첫 버튼 문면(레이스 '재개' · 개러지 '닫기') · title_warning = "최근 저장 지점 복귀" 경고 표시 여부
+# (개러지는 타이틀로 앞에 저장하므로 끈다).
+func setup(run_session: RunSession, resume_label_key: String = "ui.pause.resume",
+		title_warning: bool = true) -> void:
 	_session = run_session
 	var s := _session.data.strings
-	(%ResumeButton as Button).text = s.text("ui.pause.resume")
+	(%ResumeButton as Button).text = s.text(resume_label_key)
 	(%OptionsButton as Button).text = s.text("ui.pause.options")
 	(%AchievementsButton as Button).text = s.text("ui.pause.achievements")
 	(%TitleButton as Button).text = s.text("ui.pause.toTitle")
 	(%TitleWarning as Label).text = s.text("ui.pause.saveNotice")
+	(%TitleWarning as Label).visible = title_warning
 	(%ResumeButton as Button).pressed.connect(_resume)
 	(%OptionsButton as Button).pressed.connect(_open_options)
 	(%AchievementsButton as Button).pressed.connect(_open_achievements)
@@ -71,10 +81,15 @@ func open(intervention: bool) -> void:
 	(%ResumeButton as Button).grab_focus()  # 초기 포커스 = 재개 (§A-5)
 
 
-# 재개 = 즉시. 가림막·오버레이가 이 호출에서 내려가고 `resumed` 로 화면이 정지를 푼다 — 사이에 프레임이 없다.
-func _resume() -> void:
+# 재개/닫기 = 즉시. 가림막·오버레이가 이 호출에서 내려가고 `resumed` 로 호스트가 뒤처리(정지 해제·포커스 복귀)를 한다 —
+# 사이에 프레임이 없다. 호스트가 Esc·B 로 닫을 때도 여기로 온다.
+func close() -> void:
 	visible = false
 	resumed.emit()
+
+
+func _resume() -> void:
+	close()
 
 
 func _open_options() -> void:

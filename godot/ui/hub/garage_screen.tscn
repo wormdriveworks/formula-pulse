@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dthtr80abuy4o" path="res://ui/hub/garage_screen.gd" id="1_2t2sp"]
 [ext_resource type="FontFile" uid="uid://dyw2qbqpna4ub" path="res://assets/fonts/Galmuri14.ttf" id="2_0sxwh"]
+[ext_resource type="PackedScene" uid="uid://lgo6poer12ro" path="res://ui/sys/pause_overlay.tscn" id="3_pause"]
 
 [node name="GarageScreen" type="Control" unique_id=1470492467]
 layout_mode = 3
@@ -151,3 +152,12 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
+
+[node name="MenuButton" type="Button" parent="Pad/Column/Footer" unique_id=1736620936]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+
+[node name="PauseOverlay" parent="." instance=ExtResource("3_pause") unique_id=1736620937]
+unique_name_in_owner = true
+visible = false

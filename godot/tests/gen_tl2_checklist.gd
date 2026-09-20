@@ -29,10 +29,10 @@ const NON_ROUTED := {
 		"scene": "res://ui/race/race_screen.tscn", "root": "DuelOverlay",
 		"entry": "RACE-01 듀얼 삽입 (D05 §3 상태 머신 1:1 — 라우터 비경유)",
 		"exit": "듀얼 결판 → RACE-01 복귀 (결과 프레임 내 표기 후 해제)"},
-	"SYS-05": {"script": "res://ui/race/pause_overlay.gd",
-		"scene": "res://ui/race/race_screen.tscn", "root": "PauseOverlay",
-		"entry": "RACE-01 일시정지 (ESC — 개입 창 중 전면 가림막)",
-		"exit": "재개(3-2-1 카운트인) / 옵션 오버레이 / 타이틀"},
+	"SYS-05": {"script": "res://ui/sys/pause_overlay.gd",
+		"scene": "res://ui/sys/pause_overlay.tscn", "root": "",
+		"entry": "RACE-01 일시정지(Esc·Start — 개입 창 중 전면 가림막) · HUB-01 시스템 메뉴(≡ · Esc·Start — 개선 회차 36 · 공용 씬 인스턴스)",
+		"exit": "재개/닫기(즉시 — 카운트인 폐지 개선 회차 35) / 옵션·업적 오버레이 / 타이틀(개러지는 저장 뒤)"},
 	"NAR-02": {"script": "res://ui/nar/vn_screen.gd",
 		"scene": "res://ui/nar/vn_screen.tscn", "root": "CalendarPanel",
 		"entry": "NAR-01 내부 오버레이 (시즌 오프닝 캘린더 공개 — 신규 슬롯 불신설)",
@@ -48,6 +48,7 @@ const NON_ROUTED := {
 # 호스트 씬에서 다른 화면이 소유한 서브트리 — 호스트 인벤토리에서 제외한다
 const CLAIMED_ROOTS := {
 	"res://ui/race/race_screen.tscn": ["DuelOverlay", "PauseOverlay"],
+	"res://ui/hub/garage_screen.tscn": ["PauseOverlay"],
 	"res://ui/nar/vn_screen.tscn": ["CalendarPanel"],
 }
 

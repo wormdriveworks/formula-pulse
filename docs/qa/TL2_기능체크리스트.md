@@ -6,7 +6,7 @@
 
 ## SYS-01 타이틀 화면 (§A-1)
 - 구현: res://ui/sys/title_screen.gd
-- [ ] ①진입/이탈 — 진입: 앱 기동(ENTRY_SCREEN)·SYS-02·RACE-01 / 이탈: SYS-04·SYS-03·SYS-02 (실측 — 별첨A 플로우와 대조)
+- [ ] ①진입/이탈 — 진입: 앱 기동(ENTRY_SCREEN)·SYS-02·RACE-01·HUB-01 / 이탈: SYS-04·SYS-03·SYS-02 (실측 — 별첨A 플로우와 대조)
 - [ ] ②표시 요소 전수 (9개 실측): TitleLabel(Label)·SubtitleLabel(Label)·ContinueButton(Button)·NewCareerButton(Button)·ArchiveButton(Button)·AchievementsButton(Button)·OptionsButton(Button)·QuitButton(Button)·VersionLabel(Label)
 - [ ] ③옵션 반영 — 소비 실측: (직접 소비 없음 — 공통 채널 경유 여부 확인)
 - [ ] ④T-1 완칭 — 사용 키 9종 · '티어' 단독 표기 기계 검사 통과 (문면 눈 대조는 실행 시)
@@ -31,8 +31,8 @@
 ## SYS-04 업적 화면 — **생성 제외** (MS-2 범위 외 — 업적 데이터 테이블 부재 (IMPL-077))
 
 ## SYS-05 일시정지 메뉴 (오버레이) (§A-5)
-- 구현: res://ui/race/pause_overlay.gd
-- [ ] ①진입/이탈 — 진입: RACE-01 일시정지 (ESC — 개입 창 중 전면 가림막) / 이탈: 재개(3-2-1 카운트인) / 옵션 오버레이 / 타이틀
+- 구현: res://ui/sys/pause_overlay.gd
+- [ ] ①진입/이탈 — 진입: RACE-01 일시정지(Esc·Start — 개입 창 중 전면 가림막) · HUB-01 시스템 메뉴(≡ · Esc·Start — 개선 회차 36 · 공용 씬 인스턴스) / 이탈: 재개/닫기(즉시 — 카운트인 폐지 개선 회차 35) / 옵션·업적 오버레이 / 타이틀(개러지는 저장 뒤)
 - [ ] ②표시 요소 전수 (5개 실측): ResumeButton(Button)·OptionsButton(Button)·AchievementsButton(Button)·TitleButton(Button)·TitleWarning(Label)
 - [ ] ③옵션 반영 — 소비 실측: (직접 소비 없음 — 공통 채널 경유 여부 확인)
 - [ ] ④T-1 완칭 — 사용 키 5종 · '티어' 단독 표기 기계 검사 통과 (문면 눈 대조는 실행 시)
@@ -80,10 +80,10 @@
 
 ## HUB-01 개러지 (허브) (§A-11)
 - 구현: res://ui/hub/garage_screen.gd
-- [ ] ①진입/이탈 — 진입: RACE-03·RUN-02·HUB-02·HUB-03·HUB-04·HUB-05·HUB-06·HUB-07·HUB-08 / 이탈: HUB-01·NAR-01·RACE-01 (실측 — 별첨A 플로우와 대조)
-- [ ] ②표시 요소 전수 (16개 실측): CreditIcon(TextureRect)·CreditValue(Label)·DataIcon(TextureRect)·DataValue(Label)·ProgressLabel(Label)·BackButton(Button)·HeaderLabel(Label)·StRepair(Button)·StTuning(Button)·StStrategy(Button)·StRecords(Button)·StSponsor(Button)·StFacility(Button)·StOverhaul(Button)·StRecruit(Button)·DepartButton(Button)
+- [ ] ①진입/이탈 — 진입: RACE-03·RUN-02·HUB-02·HUB-03·HUB-04·HUB-05·HUB-06·HUB-07·HUB-08 / 이탈: HUB-01·NAR-01·RACE-01·SYS-01 (실측 — 별첨A 플로우와 대조)
+- [ ] ②표시 요소 전수 (17개 실측): CreditIcon(TextureRect)·CreditValue(Label)·DataIcon(TextureRect)·DataValue(Label)·ProgressLabel(Label)·BackButton(Button)·HeaderLabel(Label)·StRepair(Button)·StTuning(Button)·StStrategy(Button)·StRecords(Button)·StSponsor(Button)·StFacility(Button)·StOverhaul(Button)·StRecruit(Button)·DepartButton(Button)·MenuButton(Button)
 - [ ] ③옵션 반영 — 소비 실측: (직접 소비 없음 — 공통 채널 경유 여부 확인)
-- [ ] ④T-1 완칭 — 사용 키 20종 · '티어' 단독 표기 기계 검사 통과 (문면 눈 대조는 실행 시)
+- [ ] ④T-1 완칭 — 사용 키 22종 · '티어' 단독 표기 기계 검사 통과 (문면 눈 대조는 실행 시)
 - [x] ⑤금지 구역 진입점 0 — 광고 계층 어휘 0건 (기계 판정 통과)
 
 ## HUB-02 정비 베이 (§A-12)

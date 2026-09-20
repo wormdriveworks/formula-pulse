@@ -6,7 +6,7 @@
 [ext_resource type="Script" uid="uid://cldv4l6qg1o56" path="res://ui/race/log_feed.gd" id="4_y37x3"]
 [ext_resource type="Script" uid="uid://b8x3m0ygu3bs4" path="res://ui/race/duel_overlay.gd" id="5_5jw0g"]
 [ext_resource type="FontFile" uid="uid://dyw2qbqpna4ub" path="res://assets/fonts/Galmuri14.ttf" id="6_y37x3"]
-[ext_resource type="Script" uid="uid://dvlix85bj0kjm" path="res://ui/race/pause_overlay.gd" id="7_y37x3"]
+[ext_resource type="PackedScene" uid="uid://lgo6poer12ro" path="res://ui/sys/pause_overlay.tscn" id="7_y37x3"]
 [ext_resource type="Script" uid="uid://dwjyutjlfa7ll" path="res://ui/race/tutorial_overlay.gd" id="8_tut01"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_n72o0"]
@@ -107,18 +107,6 @@ content_margin_bottom = 1.0
 bg_color = Color(0.082353, 0.105882, 0.133333, 0.86)
 border_width_top = 1
 border_color = Color(1, 0.309804, 0.690196, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_8hr8o"]
-content_margin_left = 10.0
-content_margin_top = 10.0
-content_margin_right = 10.0
-content_margin_bottom = 10.0
-bg_color = Color(0.082353, 0.105882, 0.133333, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.356863, 0.392157, 0.435294, 1)
 
 [node name="RaceScreen" type="Control" unique_id=1690535070]
 layout_mode = 3
@@ -636,68 +624,9 @@ theme_override_font_sizes/font_size = 14
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="PauseOverlay" type="Control" parent="." unique_id=1891229247]
+[node name="PauseOverlay" parent="." instance=ExtResource("7_y37x3") unique_id=1891229247]
 unique_name_in_owner = true
 visible = false
-anchors_preset = 0
-anchor_right = 1.0
-anchor_bottom = 1.0
-script = ExtResource("7_y37x3")
-
-[node name="BoardMask" type="ColorRect" parent="PauseOverlay" unique_id=959607561]
-unique_name_in_owner = true
-layout_mode = 0
-anchor_right = 1.0
-anchor_bottom = 1.0
-color = Color(0.031373, 0.043137, 0.066667, 1)
-
-[node name="Dim" type="ColorRect" parent="PauseOverlay" unique_id=663735074]
-layout_mode = 0
-anchor_right = 1.0
-anchor_bottom = 1.0
-color = Color(0, 0, 0, 0.55)
-
-[node name="Center" type="CenterContainer" parent="PauseOverlay" unique_id=180937189]
-layout_mode = 0
-anchor_right = 1.0
-anchor_bottom = 1.0
-
-[node name="Panel" type="PanelContainer" parent="PauseOverlay/Center" unique_id=1629395463]
-custom_minimum_size = Vector2(180, 0)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_8hr8o")
-
-[node name="MenuColumn" type="VBoxContainer" parent="PauseOverlay/Center/Panel" unique_id=120449061]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="ResumeButton" type="Button" parent="PauseOverlay/Center/Panel/MenuColumn" unique_id=1191826670]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 11
-
-[node name="OptionsButton" type="Button" parent="PauseOverlay/Center/Panel/MenuColumn" unique_id=51376014]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 11
-
-[node name="AchievementsButton" type="Button" parent="PauseOverlay/Center/Panel/MenuColumn" unique_id=612430893]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 11
-
-[node name="TitleButton" type="Button" parent="PauseOverlay/Center/Panel/MenuColumn" unique_id=941539708]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 11
-
-[node name="TitleWarning" type="Label" parent="PauseOverlay/Center/Panel/MenuColumn" unique_id=359458265]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.545098, 0.580392, 0.623529, 1)
-theme_override_font_sizes/font_size = 11
-autowrap_mode = 3
 
 [node name="FxFlash" type="ColorRect" parent="." unique_id=1786640899]
 unique_name_in_owner = true
